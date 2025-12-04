@@ -10,6 +10,7 @@ import '../models/setlist.dart';
 import '../app.dart';
 import 'score_viewer_screen.dart';
 import 'setlist_detail_screen.dart';
+import 'library_screen.dart';
 import '../utils/icon_mappings.dart';
 
 enum SearchScope { library, team }
@@ -50,6 +51,17 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  final FocusNode _searchFocusNode = FocusNode();
+  final TextEditingController _searchController = TextEditingController();
+  int _lastClearRequest = 0;
+
+  @override
+  void dispose() {
+    _searchFocusNode.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scores = ref.watch(scoresProvider);
@@ -58,6 +70,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final searchQuery = ref.watch(searchQueryProvider);
     final searchScope = ref.watch(searchScopeProvider);
     final hasUnreadNotifications = ref.watch(hasUnreadNotificationsProvider);
+    
+    // Listen for clear search request from back button
+    final clearRequest = ref.watch(clearSearchRequestProvider);
+    if (clearRequest != _lastClearRequest) {
+      _lastClearRequest = clearRequest;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _searchController.clear();
+        _searchFocusNode.unfocus();
+      });
+    }
 
     final recentScores = [...scores]..sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
     final recentSetlists = [...setlists]..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
@@ -104,12 +126,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     IconButton(
                       onPressed: () => ref.read(hasUnreadNotificationsProvider.notifier).state = false,
-                      style: IconButton.styleFrom(
-                        backgroundColor: hasUnreadNotifications ? Colors.white.withValues(alpha: 0.5) : Colors.transparent,
-                      ),
                       icon: Stack(
                         children: [
-                          const Icon(AppIcons.notificationsOutlined, size: 24, color: AppColors.gray700),
+                          const Icon(AppIcons.notificationsOutlined, size: 24, color: AppColors.gray600),
                           if (hasUnreadNotifications)
                             Positioned(
                               top: 0,
@@ -120,7 +139,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 decoration: BoxDecoration(
                                   color: AppColors.red500,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2),
+                                  border: Border.all(color: Colors.white, width: 1.5),
                                 ),
                               ),
                             ),
@@ -131,9 +150,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
                   onChanged: (value) => ref.read(searchQueryProvider.notifier).state = value,
                   decoration: InputDecoration(
                     hintText: 'Search scores and setlists...',
+                    hintStyle: const TextStyle(color: AppColors.gray400),
                     prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400),
                     filled: true,
                     fillColor: Colors.white,
@@ -168,14 +190,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               child: ClipRRect(
                 borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
-                  children: [
-                    if (searchQuery.trim().isNotEmpty)
-                      _buildSearchResults(searchResultsScores, searchResultsSetlists, searchScope)
-                    else
-                      _buildHomeContent(scores, setlists, recentScores.take(4), recentSetlists.take(3)),
-                  ],
+                child: GestureDetector(
+                  onTap: () => _searchFocusNode.unfocus(),
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+                    children: [
+                      if (searchQuery.trim().isNotEmpty)
+                        _buildSearchResults(searchResultsScores, searchResultsSetlists, searchScope)
+                      else
+                        _buildHomeContent(scores, setlists, recentScores.take(4), recentSetlists.take(3)),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -264,11 +289,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             Expanded(
               child: GestureDetector(
-                onTap: () => ref.read(currentPageProvider.notifier).state = AppPage.library,
+                onTap: () {
+                  ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
+                  ref.read(currentPageProvider.notifier).state = AppPage.library;
+                },
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.blue50, Color(0xFFDEE9FB)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    color: AppColors.blue50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.blue100),
                   ),
@@ -292,11 +320,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: GestureDetector(
-                onTap: () => ref.read(currentPageProvider.notifier).state = AppPage.library,
+                onTap: () {
+                  ref.read(libraryTabProvider.notifier).state = LibraryTab.setlists;
+                  ref.read(currentPageProvider.notifier).state = AppPage.library;
+                },
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.emerald50, Color(0xFFD5F5EA)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                    color: AppColors.emerald50,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppColors.emerald100),
                   ),
@@ -386,8 +417,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(color: AppColors.emerald50, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald600),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.emerald50, AppColors.emerald100],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -397,7 +435,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                       Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
                       Text(
-                        '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Created ${_formatDate(setlist.dateCreated)}',
+                        '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Personal',
                         style: const TextStyle(fontSize: 12, color: AppColors.gray400),
                       ),
                     ],
@@ -435,8 +473,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(color: AppColors.blue50, borderRadius: BorderRadius.circular(12)),
-                  child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue600),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.blue50, AppColors.blue100],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue550),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -445,7 +490,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600)),
                       Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
-                      Text('Added ${_formatDate(score.dateAdded)}', style: const TextStyle(fontSize: 12, color: AppColors.gray400)),
+                      const Text('Personal', style: TextStyle(fontSize: 12, color: AppColors.gray400)),
                     ],
                   ),
                 ),
@@ -455,9 +500,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.month}.${date.day}.${date.year}';
   }
 }

@@ -203,16 +203,22 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.gray200),
-            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
           ),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(color: AppColors.emerald50, borderRadius: BorderRadius.circular(12)),
-                child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald600),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.emerald50, AppColors.emerald100],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -221,15 +227,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
                   children: [
                     Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
-                    Row(
-                      children: [
-                        const Icon(AppIcons.people, size: 14, color: AppColors.gray400),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${setlist.scores.length} scores • Shared with ${team.members.length} members',
-                          style: const TextStyle(fontSize: 12, color: AppColors.gray400),
-                        ),
-                      ],
+                    Text(
+                      '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Team',
+                      style: const TextStyle(fontSize: 12, color: AppColors.gray400),
                     ),
                   ],
                 ),
@@ -267,16 +267,22 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.gray200),
-            boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
           ),
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               Container(
                 width: 48,
                 height: 48,
-                decoration: BoxDecoration(color: AppColors.blue50, borderRadius: BorderRadius.circular(12)),
-                child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue600),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.blue50, AppColors.blue100],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue550),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -285,15 +291,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
                   children: [
                     Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600)),
                     Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
-                    Row(
-                      children: [
-                        const Icon(AppIcons.people, size: 14, color: AppColors.gray400),
-                        const SizedBox(width: 4),
-                        Text(
-                          'Shared with ${team.members.length} members',
-                          style: const TextStyle(fontSize: 12, color: AppColors.gray400),
-                        ),
-                      ],
+                    const Text(
+                      'Team',
+                      style: TextStyle(fontSize: 12, color: AppColors.gray400),
                     ),
                   ],
                 ),
@@ -315,7 +315,6 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.gray200),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
             ),
             padding: const EdgeInsets.all(16),
             child: Row(

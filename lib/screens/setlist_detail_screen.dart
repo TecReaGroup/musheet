@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/setlist.dart';
@@ -60,22 +61,17 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         child: Row(
                           children: [
                             Container(
-                              width: 40,
-                              height: 40,
+                              width: 44,
+                              height: 44,
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [AppColors.emerald400, AppColors.emerald600],
+                                  colors: [AppColors.emerald350, AppColors.emerald550],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
                                 ),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.emerald200.withValues(alpha: 0.5),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 20),
+                              child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -121,29 +117,17 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                                 width: 80,
                                 height: 80,
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [AppColors.blue50, AppColors.blue100],
-                                  ),
+                                  color: AppColors.gray100,
                                   borderRadius: BorderRadius.circular(24),
                                 ),
-                                child: const Icon(AppIcons.musicNote, size: 40, color: AppColors.blue400),
+                                child: const Icon(AppIcons.musicNote, size: 40, color: AppColors.gray400),
                               ),
                               const SizedBox(height: 16),
-                              const Text('Empty Setlist', style: TextStyle(fontSize: 18, color: AppColors.gray700)),
+                              const Text('Empty Setlist', style: TextStyle(fontSize: 18, color: AppColors.gray600)),
                               const SizedBox(height: 8),
                               const Text(
-                                'Start building your collection',
-                                style: TextStyle(fontSize: 14, color: AppColors.gray500),
-                              ),
-                              const SizedBox(height: 24),
-                              ElevatedButton(
-                                onPressed: () => setState(() => _showAddModal = true),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.blue500,
-                                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: const Text('Add Scores'),
+                                'Add scores using the button below',
+                                style: TextStyle(fontSize: 14, color: AppColors.gray400),
                               ),
                             ],
                           ),
@@ -152,6 +136,22 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     : ReorderableListView.builder(
                         padding: const EdgeInsets.all(24),
                         itemCount: currentSetlist.scores.length,
+                        proxyDecorator: (child, index, animation) {
+                          return AnimatedBuilder(
+                            animation: animation,
+                            builder: (context, child) {
+                              final elevation = lerpDouble(0, 6, Curves.easeInOut.transform(animation.value))!;
+                              return Material(
+                                elevation: elevation,
+                                color: Colors.transparent,
+                                shadowColor: Colors.black26,
+                                borderRadius: BorderRadius.circular(16),
+                                child: child,
+                              );
+                            },
+                            child: child,
+                          );
+                        },
                         onReorder: (oldIndex, newIndex) {
                           if (newIndex > oldIndex) newIndex--;
                           final newScores = List<Score>.from(currentSetlist.scores);
@@ -161,81 +161,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         },
                         itemBuilder: (context, index) {
                           final score = currentSetlist.scores[index];
-                          return Container(
-                            key: ValueKey(score.id),
-                            margin: const EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.gray100),
-                              boxShadow: const [
-                                BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1)),
-                              ],
-                            ),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ScoreViewerScreen(
-                                        score: score,
-                                        setlistScores: currentSetlist.scores,
-                                        currentIndex: index,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(16),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Row(
-                                    children: [
-                                      const Icon(AppIcons.dragHandle, size: 18, color: AppColors.gray300),
-                                      const SizedBox(width: 12),
-                                      Container(
-                                        width: 28,
-                                        height: 28,
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [AppColors.gray100, AppColors.gray200],
-                                          ),
-                                          borderRadius: BorderRadius.circular(14),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            '${index + 1}',
-                                            style: const TextStyle(fontSize: 12, color: AppColors.gray600),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              score.title,
-                                              style: const TextStyle(fontWeight: FontWeight.w600),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            Text(
-                                              score.composer,
-                                              style: const TextStyle(fontSize: 14, color: AppColors.gray500),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
+                          return _buildReorderableItem(context, index, score, currentSetlist);
                         },
                       ),
               ),
@@ -272,6 +198,96 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ),
           if (_showAddModal) _buildAddScoreModal(scores, currentSetlist),
         ],
+      ),
+    );
+  }
+
+  Widget _buildReorderableItem(BuildContext context, int index, Score score, Setlist currentSetlist) {
+    return Container(
+      key: ValueKey(score.id),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.gray100),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ScoreViewerScreen(
+                  score: score,
+                  setlistScores: currentSetlist.scores,
+                  currentIndex: index,
+                ),
+              ),
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 12, right: 16),
+            child: Row(
+              children: [
+                ReorderableDragStartListener(
+                  index: index,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {},
+                    onTapDown: (_) {},
+                    onLongPress: () {},
+                    onDoubleTap: () {},
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      color: Colors.transparent,
+                      child: const Center(
+                        child: Icon(AppIcons.dragHandle, size: 20, color: AppColors.gray400),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 0),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.gray600),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        score.title,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        score.composer,
+                        style: const TextStyle(fontSize: 14, color: AppColors.gray500),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -325,7 +341,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [AppColors.blue400, AppColors.blue600]),
+                          gradient: const LinearGradient(
+                            colors: [AppColors.blue400, AppColors.blue600],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
                           borderRadius: BorderRadius.circular(16),
                           boxShadow: [
                             BoxShadow(

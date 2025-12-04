@@ -37,7 +37,6 @@ class SettingsScreen extends ConsumerWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.gray200),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
               ),
               child: Material(
                 color: Colors.transparent,
@@ -93,7 +92,6 @@ class SettingsScreen extends ConsumerWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.gray200),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
               ),
               child: _SettingsItem(
                 icon: AppIcons.bluetooth,
@@ -114,7 +112,6 @@ class SettingsScreen extends ConsumerWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.gray200),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
               ),
               child: Column(
                 children: [
@@ -145,7 +142,6 @@ class SettingsScreen extends ConsumerWidget {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppColors.gray200),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
               ),
               child: Column(
                 children: [

@@ -79,29 +79,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     });
   }
 
+  static const double _swipeThreshold = 32.0; // 触发阈值
+  static const double _swipeMaxOffset = 64.0; // 最大滑动距离
+
   void _handleSwipeUpdate(Offset position) {
     if (_dragStart == null || !_isDragging) return;
     
     final deltaX = position.dx - _dragStart!.dx;
-    final deltaY = (position.dy - _dragStart!.dy).abs();
-    
-    if (deltaX.abs() > deltaY) {
-      final newOffset = deltaX.clamp(-80.0, 0.0);
-      setState(() {
-        _swipeOffset = newOffset;
-        if (deltaX.abs() > 5) {
-          _hasSwiped = true;
-        }
-      });
-    }
+    final newOffset = deltaX.clamp(-_swipeMaxOffset, 0.0);
+    setState(() {
+      _swipeOffset = newOffset;
+      if (deltaX.abs() > 5) {
+        _hasSwiped = true;
+      }
+    });
   }
 
   void _handleSwipeEnd() {
     if (!_isDragging) return;
     
     setState(() {
-      if (_swipeOffset < -40) {
-        _swipeOffset = -80;
+      if (_swipeOffset < -_swipeThreshold) {
+        _swipeOffset = -_swipeMaxOffset;
       } else {
         _swipeOffset = 0;
         _swipedItemId = null;
@@ -283,6 +282,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     _handleImportScore();
                   }
                 },
+                elevation: 2,
+                highlightElevation: 4,
                 backgroundColor: AppColors.blue500,
                 child: const Icon(AppIcons.add, size: 28),
               ),
@@ -405,52 +406,68 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }) {
     final isSwipedItem = _swipedItemId == id;
     final offset = isSwipedItem ? _swipeOffset : 0.0;
+    final showDeleteButton = offset < -_swipeThreshold;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Stack(
-        children: [
-          if (isSwipedItem && offset < -10)
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            // 红色背景 + 删除按钮
             Positioned.fill(
               child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.red500,
-                  borderRadius: BorderRadius.circular(12),
+                color: AppColors.red500,
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    // 垃圾桶居中于露出的区域 (宽度 = -offset)
+                    SizedBox(
+                      width: -offset,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 150),
+                        opacity: showDeleteButton ? 1.0 : 0.0,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: showDeleteButton ? onDelete : null,
+                          child: const SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: Center(
+                              child: Icon(AppIcons.delete, color: Colors.white, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          GestureDetector(
-            onPanStart: (details) => _handleSwipeStart(id, details.globalPosition),
-            onPanUpdate: (details) => _handleSwipeUpdate(details.globalPosition),
-            onPanEnd: (_) => _handleSwipeEnd(),
-            onTap: () {
-              if (isSwipedItem && offset < -40) {
-                setState(() {
-                  _swipedItemId = null;
-                  _swipeOffset = 0;
-                });
-              } else {
-                onTap();
-              }
-            },
-            child: Transform.translate(
-              offset: Offset(offset, 0),
-              child: child,
-            ),
-          ),
-          if (isSwipedItem && offset < -40)
-            Positioned(
-              right: 28,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: IconButton(
-                  onPressed: onDelete,
-                  icon: const Icon(AppIcons.delete, color: Colors.white, size: 24),
-                ),
+            // 卡片内容
+            GestureDetector(
+              onHorizontalDragStart: (details) => _handleSwipeStart(id, details.globalPosition),
+              onHorizontalDragUpdate: (details) => _handleSwipeUpdate(details.globalPosition),
+              onHorizontalDragEnd: (_) => _handleSwipeEnd(),
+              onTap: () {
+                if (showDeleteButton) {
+                  setState(() {
+                    _swipedItemId = null;
+                    _swipeOffset = 0;
+                  });
+                } else {
+                  onTap();
+                }
+              },
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: _isDragging ? 0 : 200),
+                curve: Curves.easeOutCubic,
+                transform: Matrix4.translationValues(offset, 0, 0),
+                child: child,
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -493,7 +510,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.emerald500,
+                        gradient: const LinearGradient(
+                          colors: [AppColors.emerald350, AppColors.emerald550],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
@@ -632,9 +653,6 @@ class _SetlistCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1)),
-        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Row(
@@ -643,10 +661,14 @@ class _SetlistCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.emerald50,
+              gradient: const LinearGradient(
+                colors: [AppColors.emerald50, AppColors.emerald100],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald600),
+            child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -656,7 +678,7 @@ class _SetlistCard extends StatelessWidget {
                 Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                 Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
                 Text(
-                  '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Created ${_formatDate(setlist.dateCreated)}',
+                  '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Personal',
                   style: const TextStyle(fontSize: 12, color: AppColors.gray400),
                 ),
               ],
@@ -666,10 +688,6 @@ class _SetlistCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.month}.${date.day}.${date.year}';
   }
 }
 
@@ -685,9 +703,6 @@ class _ScoreCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1)),
-        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Row(
@@ -696,10 +711,14 @@ class _ScoreCard extends StatelessWidget {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.blue50,
+              gradient: const LinearGradient(
+                colors: [AppColors.blue50, AppColors.blue100],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue600),
+            child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue550),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -708,9 +727,9 @@ class _ScoreCard extends StatelessWidget {
               children: [
                 Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600)),
                 Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
-                Text(
-                  'Added ${_formatDate(score.dateAdded)}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                const Text(
+                  'Personal',
+                  style: TextStyle(fontSize: 12, color: AppColors.gray400),
                 ),
               ],
             ),
@@ -718,9 +737,5 @@ class _ScoreCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.month}.${date.day}.${date.year}';
   }
 }
