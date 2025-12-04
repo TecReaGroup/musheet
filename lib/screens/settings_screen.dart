@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
+import '../widgets/common_widgets.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -81,84 +82,55 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
 
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Text('PERFORMANCE', style: TextStyle(fontSize: 12, color: AppColors.gray500, fontWeight: FontWeight.w600)),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.gray200),
-              ),
-              child: _SettingsItem(
+          SettingsGroup(
+            title: 'PERFORMANCE',
+            children: [
+              SettingsListItem(
                 icon: AppIcons.bluetooth,
                 label: 'Bluetooth Devices',
                 onTap: () {},
+                isFirst: true,
+                isLast: true,
               ),
-            ),
+            ],
           ),
 
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
-            child: Text('SYNC & STORAGE', style: TextStyle(fontSize: 12, color: AppColors.gray500, fontWeight: FontWeight.w600)),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.gray200),
+          SettingsGroup(
+            title: 'SYNC & STORAGE',
+            children: [
+              SettingsListItem(
+                icon: AppIcons.cloud,
+                label: 'Cloud Sync',
+                onTap: () {},
+                showDivider: true,
+                isFirst: true,
               ),
-              child: Column(
-                children: [
-                  _SettingsItem(
-                    icon: AppIcons.cloud,
-                    label: 'Cloud Sync',
-                    onTap: () {},
-                    showDivider: true,
-                  ),
-                  _SettingsItem(
-                    icon: AppIcons.notifications,
-                    label: 'Notifications',
-                    onTap: () {},
-                  ),
-                ],
+              SettingsListItem(
+                icon: AppIcons.notifications,
+                label: 'Notifications',
+                onTap: () {},
+                isLast: true,
               ),
-            ),
+            ],
           ),
 
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
-            child: Text('ABOUT', style: TextStyle(fontSize: 12, color: AppColors.gray500, fontWeight: FontWeight.w600)),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.gray200),
+          SettingsGroup(
+            title: 'ABOUT',
+            children: [
+              SettingsListItem(
+                icon: AppIcons.helpOutline,
+                label: 'Help & Support',
+                onTap: () {},
+                showDivider: true,
+                isFirst: true,
               ),
-              child: Column(
-                children: [
-                  _SettingsItem(
-                    icon: AppIcons.helpOutline,
-                    label: 'Help & Support',
-                    onTap: () {},
-                    showDivider: true,
-                  ),
-                  _SettingsItem(
-                    icon: AppIcons.infoOutline,
-                    label: 'About MuSheet',
-                    onTap: () {},
-                  ),
-                ],
+              SettingsListItem(
+                icon: AppIcons.infoOutline,
+                label: 'About MuSheet',
+                onTap: () {},
+                isLast: true,
               ),
-            ),
+            ],
           ),
 
           const Padding(
@@ -178,46 +150,6 @@ class SettingsScreen extends ConsumerWidget {
         ],
         ),
       ),
-    );
-  }
-}
-
-class _SettingsItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool showDivider;
-
-  const _SettingsItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.showDivider = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(icon, size: 20, color: AppColors.gray600),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(label)),
-                  const Icon(AppIcons.chevronRight, size: 20, color: AppColors.gray400),
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (showDivider) const Divider(height: 1, color: AppColors.gray200),
-      ],
     );
   }
 }

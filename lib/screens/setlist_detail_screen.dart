@@ -8,6 +8,7 @@ import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
+import '../widgets/common_widgets.dart';
 
 class SetlistDetailScreen extends ConsumerStatefulWidget {
   final Setlist setlist;
@@ -107,31 +108,10 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
               ),
               Expanded(
                 child: currentSetlist.scores.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  color: AppColors.gray100,
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                                child: const Icon(AppIcons.musicNote, size: 40, color: AppColors.gray400),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text('Empty Setlist', style: TextStyle(fontSize: 18, color: AppColors.gray600)),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Add scores using the button below',
-                                style: TextStyle(fontSize: 14, color: AppColors.gray400),
-                              ),
-                            ],
-                          ),
-                        ),
+                    ? const EmptyState(
+                        icon: AppIcons.musicNote,
+                        title: 'Empty Setlist',
+                        subtitle: 'Add scores using the button below',
                       )
                     : ReorderableListView.builder(
                         padding: const EdgeInsets.all(24),
@@ -425,8 +405,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                              Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray500)),
+                                              Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                              Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray500), maxLines: 1, overflow: TextOverflow.ellipsis),
                                             ],
                                           ),
                                         ),

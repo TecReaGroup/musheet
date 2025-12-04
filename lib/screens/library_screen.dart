@@ -9,8 +9,27 @@ import '../models/setlist.dart';
 import 'setlist_detail_screen.dart';
 import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
+import '../widgets/common_widgets.dart';
 
 enum LibraryTab { scores, setlists }
+
+// 排序类型
+enum SortType { recentCreated, alphabetical, recentOpened }
+
+// 排序状态
+class SortState {
+  final SortType type;
+  final bool ascending;
+  
+  const SortState({this.type = SortType.recentCreated, this.ascending = false});
+  
+  SortState copyWith({SortType? type, bool? ascending}) {
+    return SortState(
+      type: type ?? this.type,
+      ascending: ascending ?? this.ascending,
+    );
+  }
+}
 
 class LibraryTabNotifier extends Notifier<LibraryTab> {
   @override
@@ -36,9 +55,62 @@ class ShowCreateModalNotifier extends Notifier<bool> {
   set state(bool newState) => super.state = newState;
 }
 
+// 排序状态 providers
+class SetlistSortNotifier extends Notifier<SortState> {
+  @override
+  SortState build() => const SortState();
+  
+  void setSort(SortType type) {
+    if (state.type == type) {
+      // 同类型点击，切换升降序
+      state = state.copyWith(ascending: !state.ascending);
+    } else {
+      // 不同类型，默认降序（最新在前）
+      state = SortState(type: type, ascending: false);
+    }
+  }
+}
+
+class ScoreSortNotifier extends Notifier<SortState> {
+  @override
+  SortState build() => const SortState();
+  
+  void setSort(SortType type) {
+    if (state.type == type) {
+      state = state.copyWith(ascending: !state.ascending);
+    } else {
+      state = SortState(type: type, ascending: false);
+    }
+  }
+}
+
 final libraryTabProvider = NotifierProvider<LibraryTabNotifier, LibraryTab>(LibraryTabNotifier.new);
 final selectedSetlistProvider = NotifierProvider<SelectedSetlistNotifier, Setlist?>(SelectedSetlistNotifier.new);
 final showCreateModalProvider = NotifierProvider<ShowCreateModalNotifier, bool>(ShowCreateModalNotifier.new);
+final setlistSortProvider = NotifierProvider<SetlistSortNotifier, SortState>(SetlistSortNotifier.new);
+final scoreSortProvider = NotifierProvider<ScoreSortNotifier, SortState>(ScoreSortNotifier.new);
+
+// 最近打开记录 - 使用 Notifier
+class RecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
+  @override
+  Map<String, DateTime> build() => {};
+  
+  void recordOpen(String id) {
+    state = {...state, id: DateTime.now()};
+  }
+}
+
+class RecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
+  @override
+  Map<String, DateTime> build() => {};
+  
+  void recordOpen(String id) {
+    state = {...state, id: DateTime.now()};
+  }
+}
+
+final recentlyOpenedSetlistsProvider = NotifierProvider<RecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(RecentlyOpenedSetlistsNotifier.new);
+final recentlyOpenedScoresProvider = NotifierProvider<RecentlyOpenedScoresNotifier, Map<String, DateTime>>(RecentlyOpenedScoresNotifier.new);
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -56,11 +128,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchQuery = '';
 
   @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -217,7 +294,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     Row(
                       children: [
                         Expanded(
-                          child: _TabButton(
+                          child: AppTabButton(
                             label: 'Setlists',
                             icon: AppIcons.setlistIcon,
                             isActive: activeTab == LibraryTab.setlists,
@@ -233,7 +310,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: _TabButton(
+                          child: AppTabButton(
                             label: 'Scores',
                             icon: AppIcons.musicNote,
                             isActive: activeTab == LibraryTab.scores,
@@ -255,6 +332,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
+                    // Dismiss keyboard when tapping outside
+                    FocusScope.of(context).unfocus();
                     if (_swipedItemId != null && _swipeOffset < -40) {
                       setState(() {
                         _swipedItemId = null;
@@ -296,105 +375,344 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   Widget _buildSetlistsTab(List<Setlist> setlists) {
     if (setlists.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(AppIcons.setlistIcon, size: 64, color: AppColors.gray300),
-              const SizedBox(height: 16),
-              const Text('No setlists yet', style: TextStyle(fontSize: 18, color: AppColors.gray600)),
-              const SizedBox(height: 8),
-              const Text(
-                'Create a setlist to organize your performance repertoire',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: AppColors.gray500),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.read(showCreateModalProvider.notifier).state = true,
-                child: const Text('Create Setlist'),
-              ),
-            ],
-          ),
+      return EmptyState.setlists(
+        action: ElevatedButton(
+          onPressed: () => ref.read(showCreateModalProvider.notifier).state = true,
+          child: const Text('Create Setlist'),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
-      itemCount: setlists.length,
-      itemBuilder: (context, index) {
-        final setlist = setlists[index];
-        return _buildSwipeableItem(
-          id: setlist.id,
-          child: _SetlistCard(setlist: setlist),
-          onDelete: () => _handleDelete(setlist.id, false),
-          onTap: () {
-            if (!_hasSwiped) {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => SetlistDetailScreen(setlist: setlist),
-                ),
+    final sortState = ref.watch(setlistSortProvider);
+    final recentlyOpened = ref.watch(recentlyOpenedSetlistsProvider);
+    
+    // Apply search filter
+    final filteredSetlists = _searchQuery.isEmpty
+        ? setlists
+        : setlists.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    final sortedSetlists = _sortSetlists(filteredSetlists, sortState, recentlyOpened);
+
+    return Column(
+      children: [
+        _buildSortBar(
+          sortState: sortState,
+          onSort: (type) => ref.read(setlistSortProvider.notifier).setSort(type),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+            itemCount: sortedSetlists.length,
+            itemBuilder: (context, index) {
+              final setlist = sortedSetlists[index];
+              return _buildSwipeableItem(
+                id: setlist.id,
+                child: _LibrarySetlistCard(setlist: setlist),
+                onDelete: () => _handleDelete(setlist.id, false),
+                onTap: () {
+                  if (!_hasSwiped) {
+                    ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => SetlistDetailScreen(setlist: setlist),
+                      ),
+                    );
+                  }
+                },
               );
-            }
-          },
-        );
-      },
+            },
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildScoresTab(List<Score> scores) {
     if (scores.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(AppIcons.musicNote, size: 64, color: AppColors.gray300),
-              const SizedBox(height: 16),
-              const Text('No scores yet', style: TextStyle(fontSize: 18, color: AppColors.gray600)),
-              const SizedBox(height: 8),
-              const Text(
-                'Import your first PDF score to get started',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: AppColors.gray500),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: _handleImportScore,
-                icon: const Icon(AppIcons.upload),
-                label: const Text('Import Score'),
-              ),
-            ],
-          ),
+      return EmptyState.scores(
+        action: ElevatedButton.icon(
+          onPressed: _handleImportScore,
+          icon: const Icon(AppIcons.upload),
+          label: const Text('Import Score'),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
-      itemCount: scores.length,
-      itemBuilder: (context, index) {
-        final score = scores[index];
-        return _buildSwipeableItem(
-          id: score.id,
-          child: _ScoreCard(score: score),
-          onDelete: () => _handleDelete(score.id, true),
-          onTap: () {
-            if (!_hasSwiped) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ScoreViewerScreen(score: score),
-                ),
+    final sortState = ref.watch(scoreSortProvider);
+    final recentlyOpened = ref.watch(recentlyOpenedScoresProvider);
+    
+    // Apply search filter
+    final filteredScores = _searchQuery.isEmpty
+        ? scores
+        : scores.where((s) => s.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
+    final sortedScores = _sortScores(filteredScores, sortState, recentlyOpened);
+
+    return Column(
+      children: [
+        _buildSortBar(
+          sortState: sortState,
+          onSort: (type) => ref.read(scoreSortProvider.notifier).setSort(type),
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+            itemCount: sortedScores.length,
+            itemBuilder: (context, index) {
+              final score = sortedScores[index];
+              return _buildSwipeableItem(
+                id: score.id,
+                child: _LibraryScoreCard(score: score),
+                onDelete: () => _handleDelete(score.id, true),
+                onTap: () {
+                  if (!_hasSwiped) {
+                    ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ScoreViewerScreen(score: score),
+                      ),
+                    );
+                  }
+                },
               );
-            }
-          },
-        );
-      },
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Setlist> _sortSetlists(List<Setlist> setlists, SortState sortState, Map<String, DateTime> recentlyOpened) {
+    final sorted = List<Setlist>.from(setlists);
+    
+    switch (sortState.type) {
+      case SortType.recentCreated:
+        sorted.sort((a, b) => sortState.ascending 
+            ? a.dateCreated.compareTo(b.dateCreated)
+            : b.dateCreated.compareTo(a.dateCreated));
+        break;
+      case SortType.alphabetical:
+        sorted.sort((a, b) => sortState.ascending
+            ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
+            : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        break;
+      case SortType.recentOpened:
+        sorted.sort((a, b) {
+          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
+          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
+          return sortState.ascending
+              ? aOpened.compareTo(bOpened)
+              : bOpened.compareTo(aOpened);
+        });
+        break;
+    }
+    return sorted;
+  }
+
+  List<Score> _sortScores(List<Score> scores, SortState sortState, Map<String, DateTime> recentlyOpened) {
+    final sorted = List<Score>.from(scores);
+    
+    switch (sortState.type) {
+      case SortType.recentCreated:
+        sorted.sort((a, b) => sortState.ascending 
+            ? a.dateAdded.compareTo(b.dateAdded)
+            : b.dateAdded.compareTo(a.dateAdded));
+        break;
+      case SortType.alphabetical:
+        sorted.sort((a, b) => sortState.ascending
+            ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+            : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        break;
+      case SortType.recentOpened:
+        sorted.sort((a, b) {
+          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
+          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
+          return sortState.ascending
+              ? aOpened.compareTo(bOpened)
+              : bOpened.compareTo(aOpened);
+        });
+        break;
+    }
+    return sorted;
+  }
+
+  Widget _buildSortBar({
+    required SortState sortState,
+    required void Function(SortType) onSort,
+  }) {
+    String getSortLabel(SortType type) {
+      switch (type) {
+        case SortType.recentCreated:
+          return 'Added';
+        case SortType.alphabetical:
+          return 'A-Z';
+        case SortType.recentOpened:
+          return 'Opened';
+      }
+    }
+
+    IconData getSortIcon(SortType type) {
+      switch (type) {
+        case SortType.recentCreated:
+          return AppIcons.clock;
+        case SortType.alphabetical:
+          return AppIcons.alphabetical;
+        case SortType.recentOpened:
+          return AppIcons.calendarClock;
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          // Search box
+          Expanded(
+            child: SizedBox(
+              height: 32,
+              child: TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
+                style: const TextStyle(fontSize: 13, color: AppColors.gray700),
+                textAlignVertical: TextAlignVertical.center,
+                decoration: InputDecoration(
+                  hintText: 'Search...',
+                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
+                  prefixIcon: const Icon(AppIcons.search, size: 16, color: AppColors.gray400),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 36),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                          child: const Icon(AppIcons.close, size: 14, color: AppColors.gray400),
+                        )
+                      : null,
+                  suffixIconConstraints: const BoxConstraints(minWidth: 32),
+                  filled: true,
+                  fillColor: AppColors.gray50,
+                  contentPadding: EdgeInsets.zero,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(color: AppColors.gray200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(color: AppColors.gray200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide(color: AppColors.gray300),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Sort button
+          PopupMenuButton<SortType>(
+            offset: const Offset(0, 40),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            color: Colors.white,
+            elevation: 4,
+            constraints: const BoxConstraints(minWidth: 130, maxWidth: 130),
+            tooltip: '',
+            splashRadius: 0,
+            onOpened: () {
+              _searchFocusNode.unfocus();
+            },
+            onSelected: onSort,
+            onCanceled: () {
+              _searchFocusNode.unfocus();
+            },
+            itemBuilder: (context) => [
+                _buildSortMenuItem(SortType.recentCreated, 'Added', AppIcons.clock, sortState),
+                _buildSortMenuItem(SortType.alphabetical, 'A-Z', AppIcons.alphabetical, sortState),
+                _buildSortMenuItem(SortType.recentOpened, 'Opened', AppIcons.calendarClock, sortState),
+            ],
+            child: Material(
+              color: AppColors.gray50,
+              borderRadius: BorderRadius.circular(20),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                splashColor: AppColors.gray200,
+                highlightColor: AppColors.gray100,
+                onTap: null,
+                child: Container(
+                  width: 130,
+                  height: 32,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.gray200),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(getSortIcon(sortState.type), size: 16, color: AppColors.gray400),
+                      const SizedBox(width: 6),
+                      Text(
+                        getSortLabel(sortState.type),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.gray400),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        sortState.ascending ? AppIcons.arrowUp : AppIcons.arrowDown,
+                        size: 14,
+                        color: AppColors.gray400,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<SortType> _buildSortMenuItem(SortType type, String label, IconData icon, SortState sortState) {
+    final isSelected = sortState.type == type;
+    return PopupMenuItem<SortType>(
+      value: type,
+      mouseCursor: SystemMouseCursors.click,
+      child: Theme(
+        data: ThemeData(
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+        ),
+        child: Row(
+        children: [
+          Icon(icon, size: 18, color: isSelected ? AppColors.blue600 : AppColors.gray500),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected ? AppColors.blue600 : AppColors.gray700,
+              ),
+            ),
+          ),
+          if (isSelected)
+            Icon(
+              sortState.ascending ? AppIcons.arrowUp : AppIcons.arrowDown,
+              size: 16,
+              color: AppColors.blue600,
+            ),
+        ],
+      ),
+      ),
     );
   }
 
@@ -449,21 +767,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               onHorizontalDragStart: (details) => _handleSwipeStart(id, details.globalPosition),
               onHorizontalDragUpdate: (details) => _handleSwipeUpdate(details.globalPosition),
               onHorizontalDragEnd: (_) => _handleSwipeEnd(),
-              onTap: () {
-                if (showDeleteButton) {
-                  setState(() {
-                    _swipedItemId = null;
-                    _swipeOffset = 0;
-                  });
-                } else {
-                  onTap();
-                }
-              },
               child: AnimatedContainer(
                 duration: Duration(milliseconds: _isDragging ? 0 : 200),
                 curve: Curves.easeOutCubic,
                 transform: Matrix4.translationValues(offset, 0, 0),
-                child: child,
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () {
+                      if (showDeleteButton) {
+                        setState(() {
+                          _swipedItemId = null;
+                          _swipeOffset = 0;
+                        });
+                      } else {
+                        onTap();
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: child,
+                  ),
+                ),
               ),
             ),
           ],
@@ -596,61 +921,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 }
 
-class _TabButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isActive;
-  final Color activeColor;
-  final VoidCallback onTap;
-
-  const _TabButton({
-    required this.label,
-    required this.icon,
-    required this.isActive,
-    required this.activeColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: isActive ? activeColor : AppColors.gray100,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: isActive ? Colors.white : AppColors.gray600),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isActive ? Colors.white : AppColors.gray600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SetlistCard extends StatelessWidget {
+class _LibrarySetlistCard extends StatelessWidget {
   final Setlist setlist;
 
-  const _SetlistCard({required this.setlist});
+  const _LibrarySetlistCard({required this.setlist});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
       ),
@@ -675,8 +954,18 @@ class _SetlistCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
+                Text(
+                  setlist.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  setlist.description,
+                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 Text(
                   '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Personal',
                   style: const TextStyle(fontSize: 12, color: AppColors.gray400),
@@ -691,16 +980,15 @@ class _SetlistCard extends StatelessWidget {
   }
 }
 
-class _ScoreCard extends StatelessWidget {
+class _LibraryScoreCard extends StatelessWidget {
   final Score score;
 
-  const _ScoreCard({required this.score});
+  const _LibraryScoreCard({required this.score});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
       ),
@@ -725,8 +1013,18 @@ class _ScoreCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
+                Text(
+                  score.title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  score.composer,
+                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const Text(
                   'Personal',
                   style: TextStyle(fontSize: 12, color: AppColors.gray400),

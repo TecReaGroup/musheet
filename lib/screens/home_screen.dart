@@ -12,6 +12,7 @@ import 'score_viewer_screen.dart';
 import 'setlist_detail_screen.dart';
 import 'library_screen.dart';
 import '../utils/icon_mappings.dart';
+import '../widgets/common_widgets.dart';
 
 enum SearchScope { library, team }
 
@@ -232,18 +233,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 16),
         if (scores.isEmpty && setlists.isEmpty)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Column(
-                children: [
-                  Icon(AppIcons.search, size: 48, color: AppColors.gray300),
-                  SizedBox(height: 12),
-                  Text('No results found', style: TextStyle(color: AppColors.gray500)),
-                ],
-              ),
-            ),
-          )
+          EmptyState.noSearchResults()
         else
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,106 +278,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         Row(
           children: [
             Expanded(
-              child: GestureDetector(
+              child: StatCard.scores(
+                count: scores.length,
                 onTap: () {
                   ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
                   ref.read(currentPageProvider.notifier).state = AppPage.library;
                 },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.blue50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.blue100),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(AppIcons.musicNote, size: 20, color: AppColors.blue600),
-                          SizedBox(width: 8),
-                          Text('Scores', style: TextStyle(fontSize: 14, color: AppColors.blue600)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text('${scores.length}', style: const TextStyle(fontSize: 24, color: AppColors.gray900)),
-                    ],
-                  ),
-                ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: GestureDetector(
+              child: StatCard.setlists(
+                count: setlists.length,
                 onTap: () {
                   ref.read(libraryTabProvider.notifier).state = LibraryTab.setlists;
                   ref.read(currentPageProvider.notifier).state = AppPage.library;
                 },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.emerald50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.emerald100),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(AppIcons.setlistIcon, size: 20, color: AppColors.emerald600),
-                          SizedBox(width: 8),
-                          Text('Setlists', style: TextStyle(fontSize: 14, color: AppColors.emerald600)),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text('${setlists.length}', style: const TextStyle(fontSize: 24, color: AppColors.gray900)),
-                    ],
-                  ),
-                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 24),
         if (recentSetlists.isNotEmpty) ...[
-          const Row(
-            children: [
-              Icon(AppIcons.accessTime, size: 20, color: AppColors.gray600),
-              SizedBox(width: 8),
-              Text('Recent Setlists', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            ],
+          const SectionHeader(
+            icon: AppIcons.accessTime,
+            title: 'Recent Setlists',
           ),
           const SizedBox(height: 12),
           ...recentSetlists.map((setlist) => _buildSetlistCard(setlist)),
           const SizedBox(height: 24),
         ],
         if (recentScores.isNotEmpty) ...[
-          const Row(
-            children: [
-              Icon(AppIcons.trendingUp, size: 20, color: AppColors.gray600),
-              SizedBox(width: 8),
-              Text('Recently Added', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            ],
+          const SectionHeader(
+            icon: AppIcons.trendingUp,
+            title: 'Recently Added',
           ),
           const SizedBox(height: 12),
           ...recentScores.map((score) => _buildScoreCard(score)),
         ],
         if (scores.isEmpty && setlists.isEmpty)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Column(
-                children: [
-                  Icon(AppIcons.musicNote, size: 64, color: AppColors.gray300),
-                  SizedBox(height: 16),
-                  Text('Welcome to MuSheet!', style: TextStyle(fontSize: 18, color: AppColors.gray600)),
-                  SizedBox(height: 8),
-                  Text('Start by importing your first score', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
-                ],
-              ),
-            ),
+          const EmptyState(
+            icon: AppIcons.musicNote,
+            title: 'Welcome to MuSheet!',
+            subtitle: 'Start by importing your first score',
           ),
       ],
     );
@@ -432,8 +365,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
+                      Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600), maxLines: 1, overflow: TextOverflow.ellipsis),
                       Text(
                         '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Personal',
                         style: const TextStyle(fontSize: 12, color: AppColors.gray400),
@@ -488,8 +421,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
+                      Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600), maxLines: 1, overflow: TextOverflow.ellipsis),
                       const Text('Personal', style: TextStyle(fontSize: 12, color: AppColors.gray400)),
                     ],
                   ),

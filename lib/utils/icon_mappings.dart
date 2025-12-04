@@ -29,9 +29,20 @@ class AppIcons {
   static const chevronRight = LucideIcons.chevronRight;
   static const chevronLeft = LucideIcons.chevronLeft;
   static const chevronDown = LucideIcons.chevronDown;
+  static const chevronUp = LucideIcons.chevronUp;
   static const keyboardArrowDown = LucideIcons.chevronDown;
   static const arrowBack = LucideIcons.arrowLeft;
   static const arrowForward = LucideIcons.arrowRight;
+  static const arrowUp = LucideIcons.arrowUp;
+  static const arrowDown = LucideIcons.arrowDown;
+  
+  // Sorting
+  static const sortAsc = LucideIcons.arrowUpNarrowWide;
+  static const sortDesc = LucideIcons.arrowDownWideNarrow;
+  static const listOrdered = LucideIcons.listOrdered;
+  static const clock = LucideIcons.clock;
+  static const alphabetical = LucideIcons.aLargeSmall;
+  static const calendarClock = LucideIcons.calendarClock;
   
   // Music & Media
   static const musicNote = LucideIcons.music;
