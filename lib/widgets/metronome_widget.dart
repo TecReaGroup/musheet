@@ -91,11 +91,13 @@ class MetronomeController extends ChangeNotifier {
 class MetronomeWidget extends StatefulWidget {
   final int? initialBpm;
   final ValueChanged<int>? onBpmChanged;
+  final MetronomeController? controller; // External controller
 
   const MetronomeWidget({
     super.key,
     this.initialBpm,
     this.onBpmChanged,
+    this.controller,
   });
 
   @override
@@ -103,14 +105,18 @@ class MetronomeWidget extends StatefulWidget {
 }
 
 class _MetronomeWidgetState extends State<MetronomeWidget> {
-  late MetronomeController _controller;
+  MetronomeController? _ownController;
+  MetronomeController get _controller => widget.controller ?? _ownController!;
+  bool get _ownsController => widget.controller == null;
   Timer? _continuousTimer;
   int? _slidingBpm; // Temporary BPM value while sliding
 
   @override
   void initState() {
     super.initState();
-    _controller = MetronomeController(bpm: widget.initialBpm ?? 120);
+    if (_ownsController) {
+      _ownController = MetronomeController(bpm: widget.initialBpm ?? 120);
+    }
     _controller.addListener(_onControllerChanged);
   }
 
@@ -298,7 +304,9 @@ class _MetronomeWidgetState extends State<MetronomeWidget> {
   void dispose() {
     _continuousTimer?.cancel();
     _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
+    if (_ownsController) {
+      _ownController?.dispose();
+    }
     super.dispose();
   }
 }

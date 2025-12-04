@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,13 +41,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   // Undo/Redo stacks per page
   final Map<int, List<Annotation>> _pageUndoStacks = {};
   
-  // Current drawing path (screen coordinates, will be converted to relative)
-  List<Offset> _currentPath = [];
-  
   bool _showMetronome = false;
   bool _showSetlistNav = false;
   bool _showPenOptions = false;
   bool _showUI = false;
+  
+  // Page indicator auto-hide
+  bool _showPageIndicator = false;
+  Timer? _pageIndicatorTimer;
+  
+  // Metronome controller - persists across modal open/close
+  MetronomeController? _metronomeController;
 
   final List<Color> _penColors = [
     Colors.black,
@@ -61,8 +67,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _metronomeController = MetronomeController();
+    _metronomeController!.addListener(_onMetronomeChanged);
     _initAnnotations();
     _loadPdfDocument();
+  }
+  
+  void _onMetronomeChanged() {
+    // Update UI when metronome state changes
+    if (mounted) setState(() {});
   }
   
   void _initAnnotations() {
@@ -79,9 +92,21 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     if (page >= 1 && page <= _totalPages && page != _currentPage) {
       setState(() {
         _currentPage = page;
-        _currentPath = []; // Clear current drawing when changing page
+        _showPageIndicator = true;
       });
+      _startPageIndicatorTimer();
     }
+  }
+  
+  void _startPageIndicatorTimer() {
+    _pageIndicatorTimer?.cancel();
+    _pageIndicatorTimer = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) {
+        setState(() {
+          _showPageIndicator = false;
+        });
+      }
+    });
   }
 
   Future<void> _loadPdfDocument() async {
@@ -114,6 +139,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   @override
   void dispose() {
+    _pageIndicatorTimer?.cancel();
+    _metronomeController?.removeListener(_onMetronomeChanged);
+    _metronomeController?.dispose();
     _pdfDocument?.dispose();
     super.dispose();
   }
@@ -134,16 +162,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   void _toggleTool(String tool) {
     setState(() {
-      if (_selectedTool == tool) {
-        _selectedTool = 'none';
-        _isDrawMode = false;
-      } else {
-        _selectedTool = tool;
-        _isDrawMode = tool == 'pen' || tool == 'eraser';
-      }
-      if (tool == 'pen') {
-        _showPenOptions = !_showPenOptions;
-      } else {
+      if (tool == 'eraser') {
+        if (_selectedTool == 'eraser') {
+          // Switch back to pen
+          _selectedTool = 'pen';
+        } else {
+          // Switch to eraser
+          _selectedTool = 'eraser';
+        }
         _showPenOptions = false;
       }
     });
@@ -169,31 +195,6 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         _pageAnnotations[_currentPage]!.add(last);
       });
     }
-  }
-
-  void _eraseAtPoint(Offset point) {
-    final annotations = _pageAnnotations[_currentPage];
-    if (annotations == null) return;
-    
-    setState(() {
-      annotations.removeWhere((annotation) {
-        if (annotation.points == null) return false;
-        
-        for (int i = 0; i < annotation.points!.length; i += 2) {
-          if (i + 1 < annotation.points!.length) {
-            final annotationPoint = Offset(
-              annotation.points![i],
-              annotation.points![i + 1],
-            );
-            
-            if ((annotationPoint - point).distance < 20) {
-              return true;
-            }
-          }
-        }
-        return false;
-      });
-    });
   }
   
   void _addAnnotation(Annotation annotation) {
@@ -270,18 +271,18 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               ),
             ),
           ),
-          // Navigation arrows - shown when UI is visible
-          if (_totalPages > 1 && _currentPage > 1)
+          // Navigation arrows - shown when UI is visible and not at edge
+          if (_totalPages > 1)
             Positioned(
               left: 16,
               top: 0,
               bottom: 0,
               child: Center(
                 child: IgnorePointer(
-                  ignoring: !_showUI,
+                  ignoring: !_showUI || _currentPage <= 1,
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
-                    opacity: _showUI ? 1.0 : 0.0,
+                    opacity: (_showUI && _currentPage > 1) ? 1.0 : 0.0,
                     child: _buildPageNavButton(
                       icon: AppIcons.chevronLeft,
                       onPressed: () => _goToPage(_currentPage - 1),
@@ -290,35 +291,35 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 ),
               ),
             ),
-            if (_totalPages > 1 && _currentPage < _totalPages)
-              Positioned(
-                right: 16,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: IgnorePointer(
-                    ignoring: !_showUI,
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: _showUI ? 1.0 : 0.0,
-                      child: _buildPageNavButton(
-                        icon: AppIcons.chevronRight,
-                        onPressed: () => _goToPage(_currentPage + 1),
-                      ),
+          if (_totalPages > 1)
+            Positioned(
+              right: 16,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: IgnorePointer(
+                  ignoring: !_showUI || _currentPage >= _totalPages,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: (_showUI && _currentPage < _totalPages) ? 1.0 : 0.0,
+                    child: _buildPageNavButton(
+                      icon: AppIcons.chevronRight,
+                      onPressed: () => _goToPage(_currentPage + 1),
                     ),
                   ),
                 ),
               ),
-            // Page indicator - shown when UI is visible with fade animation
+            ),
+            // Page indicator - shown when UI is visible OR briefly after page change
             Positioned(
               bottom: 90,
               left: 0,
               right: 0,
               child: IgnorePointer(
-                ignoring: !_showUI,
+                ignoring: true,
                 child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: _showUI ? 1.0 : 0.0,
+                  duration: Duration(milliseconds: (_showUI || _showPageIndicator) ? 150 : 400),
+                  opacity: (_showUI || _showPageIndicator) ? 1.0 : 0.0,
                   child: Center(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
@@ -346,7 +347,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 ),
               ),
             ),
-            // Toolbar - shown when UI is visible with fade animation
+            // Toolbar - shown when UI is visible
             Positioned(
               bottom: 0,
               left: 0,
@@ -360,75 +361,6 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 ),
               ),
             ),
-            // Drawing overlay - only active in draw mode
-            if (_isDrawMode)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onPanStart: (details) {
-                    if (_selectedTool == 'pen') {
-                      setState(() {
-                        _currentPath = [details.localPosition];
-                      });
-                    }
-                  },
-                  onPanUpdate: (details) {
-                    if (_selectedTool == 'pen') {
-                      setState(() {
-                        _currentPath.add(details.localPosition);
-                      });
-                    } else if (_selectedTool == 'eraser') {
-                      _eraseAtPoint(details.localPosition);
-                    }
-                  },
-                  onPanEnd: (details) {
-                    if (_selectedTool == 'pen' && _currentPath.length > 1) {
-                      final annotation = Annotation(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        type: 'draw',
-                        color: '#${_penColor.toARGB32().toRadixString(16).substring(2, 8)}',
-                        width: _penWidth,
-                        points: _currentPath.expand((p) => [p.dx, p.dy]).toList(),
-                        page: _currentPage,
-                      );
-                      _addAnnotation(annotation);
-                      setState(() {
-                        _currentPath = [];
-                      });
-                    } else {
-                      setState(() {
-                        _currentPath = [];
-                      });
-                    }
-                  },
-                  child: CustomPaint(
-                    painter: AnnotationPainter(
-                      annotations: _pageAnnotations[_currentPage] ?? [],
-                      currentPage: _currentPage,
-                      currentPath: _currentPath,
-                      currentColor: _penColor,
-                      currentWidth: _penWidth,
-                    ),
-                    size: Size.infinite,
-                  ),
-                ),
-              ),
-            // Annotation display layer (when not in draw mode, just show annotations)
-            if (!_isDrawMode && (_pageAnnotations[_currentPage]?.isNotEmpty ?? false))
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: AnnotationPainter(
-                      annotations: _pageAnnotations[_currentPage] ?? [],
-                      currentPage: _currentPage,
-                      currentPath: const [],
-                      currentColor: _penColor,
-                      currentWidth: _penWidth,
-                    ),
-                    size: Size.infinite,
-                  ),
-                ),
-              ),
             if (_showPenOptions) _buildPenOptions(),
             if (_showMetronome) _buildMetronomeModal(),
             if (_showSetlistNav && widget.setlistScores != null)
@@ -509,9 +441,33 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       document: _pdfDocument!,
       pageNumber: _currentPage,
       isDrawMode: _isDrawMode,
+      selectedTool: _selectedTool,
+      penColor: _penColor,
+      penWidth: _penWidth,
+      annotations: _pageAnnotations[_currentPage] ?? [],
+      onAnnotationAdded: (annotation) {
+        _addAnnotation(annotation);
+      },
+      onAnnotationErased: (annotation) {
+        setState(() {
+          _pageAnnotations[_currentPage]?.remove(annotation);
+          _pageUndoStacks[_currentPage] ??= [];
+          _pageUndoStacks[_currentPage]!.add(annotation);
+        });
+      },
       onTap: () {
-        if (!_isDrawMode) {
+        if (_isDrawMode) {
+          // In draw mode, tap closes pen options
+          if (_showPenOptions) {
+            setState(() {
+              _showPenOptions = false;
+            });
+          }
+        } else {
           setState(() {
+            // Close any open modals
+            _showMetronome = false;
+            _showSetlistNav = false;
             _showUI = !_showUI;
           });
         }
@@ -617,8 +573,24 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               ],
             ),
           ),
-          // Placeholder to balance the back button
-          const SizedBox(width: 48),
+          // Setlist navigation button or placeholder
+          if (widget.setlistScores != null)
+            IconButton(
+              icon: Icon(
+                AppIcons.playlistPlay,
+                color: _showSetlistNav ? AppColors.blue500 : AppColors.gray700,
+              ),
+              onPressed: () {
+                setState(() {
+                  _showSetlistNav = !_showSetlistNav;
+                  if (_showSetlistNav) {
+                    _showMetronome = false;
+                  }
+                });
+              },
+            )
+          else
+            const SizedBox(width: 48),
         ],
       ),
     );
@@ -639,35 +611,48 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       ),
       child: Row(
         children: [
-          // Left group: Pen and Eraser
-          _buildToolButton(
-            icon: AppIcons.edit,
-            isActive: _selectedTool == 'pen',
-            activeColor: AppColors.blue500,
-            onPressed: () => _toggleTool('pen'),
-          ),
+          // Left group: Pen/Color and Eraser (eraser only in edit mode)
+          if (_isDrawMode)
+            _buildColorPickerButton()
+          else
+            _buildToolButton(
+              icon: AppIcons.edit,
+              isActive: false,
+              activeColor: AppColors.blue500,
+              onPressed: _enterEditMode,
+            ),
           const SizedBox(width: 4),
-          _buildToolButton(
-            icon: AppIcons.autoFixHigh,
-            isActive: _selectedTool == 'eraser',
-            activeColor: AppColors.blue500,
-            onPressed: () => _toggleTool('eraser'),
-          ),
+          // Eraser placeholder (keep space consistent)
+          if (_isDrawMode)
+            _buildToolButton(
+              icon: AppIcons.autoFixHigh,
+              isActive: _selectedTool == 'eraser',
+              activeColor: AppColors.blue500,
+              onPressed: () => _toggleTool('eraser'),
+            )
+          else
+            const SizedBox(width: 44), // Same width as tool button
           
           const Spacer(),
           
-          // Undo and Redo
-          _buildToolButton(
-            icon: AppIcons.undo,
-            isDisabled: (_pageAnnotations[_currentPage]?.isEmpty ?? true),
-            onPressed: (_pageAnnotations[_currentPage]?.isNotEmpty ?? false) ? _undo : null,
-          ),
-          const SizedBox(width: 4),
-          _buildToolButton(
-            icon: AppIcons.redo,
-            isDisabled: (_pageUndoStacks[_currentPage]?.isEmpty ?? true),
-            onPressed: (_pageUndoStacks[_currentPage]?.isNotEmpty ?? false) ? _redo : null,
-          ),
+          // Undo and Redo (placeholder when not in edit mode to keep layout stable)
+          if (_isDrawMode) ...[
+            _buildToolButton(
+              icon: AppIcons.undo,
+              isDisabled: (_pageAnnotations[_currentPage]?.isEmpty ?? true),
+              onPressed: (_pageAnnotations[_currentPage]?.isNotEmpty ?? false) ? _undo : null,
+            ),
+            const SizedBox(width: 4),
+            _buildToolButton(
+              icon: AppIcons.redo,
+              isDisabled: (_pageUndoStacks[_currentPage]?.isEmpty ?? true),
+              onPressed: (_pageUndoStacks[_currentPage]?.isNotEmpty ?? false) ? _redo : null,
+            ),
+          ] else ...[
+            const SizedBox(width: 44), // Undo placeholder
+            const SizedBox(width: 4),
+            const SizedBox(width: 44), // Redo placeholder
+          ],
           
           // Divider
           Container(
@@ -677,38 +662,127 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             color: AppColors.gray200,
           ),
           
-          // Metronome (moved to right of divider)
-          _buildToolButton(
-            icon: AppIcons.metronome,
-            isActive: _showMetronome,
-            activeColor: AppColors.blue500,
-            onPressed: () {
-              setState(() {
-                _showMetronome = !_showMetronome;
-              });
-            },
-          ),
-          
-          const Spacer(),
-          
-          // Right: Preview/View button (or Setlist nav if in setlist mode)
-          if (widget.setlistScores != null)
+          // Clear all or Metronome button
+          if (_isDrawMode)
             _buildToolButton(
-              icon: AppIcons.playlistPlay,
-              isActive: _showSetlistNav,
+              key: const ValueKey('clear_button'),
+              icon: AppIcons.close,
+              isDisabled: (_pageAnnotations[_currentPage]?.isEmpty ?? true),
+              onPressed: (_pageAnnotations[_currentPage]?.isNotEmpty ?? false)
+                  ? _clearCurrentPageAnnotations
+                  : null,
+            )
+          else
+            _buildToolButton(
+              key: const ValueKey('metronome_button'),
+              icon: AppIcons.metronome,
+              isActive: _metronomeController?.isPlaying ?? false,
               activeColor: AppColors.blue500,
               onPressed: () {
                 setState(() {
-                  _showSetlistNav = !_showSetlistNav;
+                  _showMetronome = !_showMetronome;
+                  // Close other modals
+                  if (_showMetronome) {
+                    _showSetlistNav = false;
+                  }
                 });
               },
+            ),
+          
+          const Spacer(),
+          
+          // Confirm button (exit edit mode) - only in draw mode, positioned at right
+          if (_isDrawMode)
+            _buildToolButton(
+              key: const ValueKey('confirm_button'),
+              icon: AppIcons.check,
+              onPressed: _exitEditMode,
             ),
         ],
       ),
     );
   }
 
+  void _enterEditMode() {
+    setState(() {
+      _isDrawMode = true;
+      _selectedTool = 'pen';
+      _showPenOptions = false;
+      _showMetronome = false; // Close metronome modal
+      _showSetlistNav = false;
+    });
+  }
+
+  void _exitEditMode() {
+    setState(() {
+      _isDrawMode = false;
+      _selectedTool = 'none';
+      _showPenOptions = false;
+    });
+  }
+
+  void _clearCurrentPageAnnotations() {
+    final annotations = _pageAnnotations[_currentPage];
+    if (annotations == null || annotations.isEmpty) return;
+    
+    setState(() {
+      // Store all annotations in undo stack for recovery
+      _pageUndoStacks[_currentPage] ??= [];
+      _pageUndoStacks[_currentPage]!.addAll(annotations);
+      // Clear all annotations on current page
+      _pageAnnotations[_currentPage] = [];
+    });
+  }
+
+  Widget _buildColorPickerButton() {
+    final isActive = _selectedTool == 'pen';
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (_showPenOptions) {
+            // Close color picker
+            _showPenOptions = false;
+          } else {
+            // Select pen tool and show color picker
+            _selectedTool = 'pen';
+            _showPenOptions = true;
+          }
+        });
+      },
+      child: Container(
+        alignment: Alignment.center,
+        width: 44,
+        height: 44,
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: isActive ? _penColor.withValues(alpha: 0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          alignment: Alignment.center,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: _penColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: _penColor.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildToolButton({
+    Key? key,
     required IconData icon,
     bool isActive = false,
     bool isDisabled = false,
@@ -716,6 +790,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     VoidCallback? onPressed,
   }) {
     return Material(
+      key: key,
       color: isActive ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
       borderRadius: BorderRadius.circular(22),
       child: InkWell(
@@ -741,18 +816,18 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   Widget _buildPenOptions() {
     return Positioned(
-      bottom: 100 + MediaQuery.of(context).padding.bottom,
+      bottom: 74 + MediaQuery.of(context).padding.bottom,
       left: 16,
       right: 16,
       child: Center(
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.1),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 20,
                 offset: const Offset(0, 4),
               ),
@@ -761,15 +836,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                'Pen Color',
-                style: TextStyle(
-                  color: AppColors.gray500,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
+              // Color selection row
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: _penColors.map((color) {
@@ -778,37 +845,48 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     onTap: () => _onPenColorSelected(color),
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 6),
-                      width: 36,
-                      height: 36,
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
-                        color: color,
+                        color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
                         shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isSelected ? AppColors.gray900 : Colors.transparent,
-                          width: 3,
+                      ),
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: color,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.3),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: color.withValues(alpha: 0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        child: isSelected
+                            ? Icon(
+                                AppIcons.check,
+                                size: 16,
+                                color: _getContrastColor(color),
+                              )
+                            : null,
                       ),
                     ),
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 20),
-              Text(
-                'Pen Width',
-                style: TextStyle(
-                  color: AppColors.gray500,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              const SizedBox(height: 16),
+              // Divider
+              Container(
+                width: double.infinity,
+                height: 1,
+                color: AppColors.gray100,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
+              // Width selection row
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: _penWidths.map((width) {
@@ -816,27 +894,21 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   return GestureDetector(
                     onTap: () => _onPenWidthSelected(width),
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      child: Column(
-                        children: [
-                          Container(
-                            width: width * 5 + 8,
-                            height: width * 5 + 8,
-                            decoration: BoxDecoration(
-                              color: isSelected ? _penColor : AppColors.gray300,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${width.toInt()}',
-                            style: TextStyle(
-                              color: isSelected ? AppColors.gray900 : AppColors.gray400,
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                            ),
-                          ),
-                        ],
+                      margin: const EdgeInsets.symmetric(horizontal: 8),
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected ? _penColor.withValues(alpha: 0.1) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Container(
+                        width: width * 4 + 6,
+                        height: width * 4 + 6,
+                        decoration: BoxDecoration(
+                          color: isSelected ? _penColor : AppColors.gray300,
+                          shape: BoxShape.circle,
+                        ),
                       ),
                     ),
                   );
@@ -849,9 +921,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     );
   }
 
+  // Get contrasting color (white or black) for checkmark
+  Color _getContrastColor(Color color) {
+    final luminance = color.computeLuminance();
+    return luminance > 0.5 ? Colors.black : Colors.white;
+  }
+
   Widget _buildMetronomeModal() {
     return Positioned(
-      bottom: 100 + MediaQuery.of(context).padding.bottom,
+      bottom: 74 + MediaQuery.of(context).padding.bottom,
       left: 16,
       right: 16,
       child: Container(
@@ -866,22 +944,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             ),
           ],
         ),
-        child: Stack(
-          children: [
-            MetronomeWidget(),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: IconButton(
-                icon: const Icon(AppIcons.close, color: AppColors.gray400),
-                onPressed: () {
-                  setState(() {
-                    _showMetronome = false;
-                  });
-                },
-              ),
-            ),
-          ],
+        child: MetronomeWidget(
+          controller: _metronomeController,
         ),
       ),
     );
@@ -889,7 +953,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   Widget _buildSetlistNavModal() {
     return Positioned(
-      bottom: 100 + MediaQuery.of(context).padding.bottom,
+      bottom: 74 + MediaQuery.of(context).padding.bottom,
       left: 16,
       right: 16,
       child: Container(
@@ -1044,23 +1108,395 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 }
 
-class AnnotationPainter extends CustomPainter {
+/// Independent PDF page widget wrapper with gesture handling and integrated drawing.
+/// Each page is a standalone widget for instant switching and smooth gesture response.
+/// Drawing coordinates are normalized (0-1) relative to PDF page size for proper scaling.
+class PdfPageWrapper extends StatefulWidget {
+  final PdfDocument document;
+  final int pageNumber;
+  final bool isDrawMode;
+  final String selectedTool;
+  final Color penColor;
+  final double penWidth;
   final List<Annotation> annotations;
-  final int currentPage;
+  final Function(Annotation) onAnnotationAdded;
+  final Function(Annotation) onAnnotationErased;
+  final VoidCallback onTap;
+  final VoidCallback onSwipeLeft;
+  final VoidCallback onSwipeRight;
+
+  const PdfPageWrapper({
+    super.key,
+    required this.document,
+    required this.pageNumber,
+    required this.isDrawMode,
+    required this.selectedTool,
+    required this.penColor,
+    required this.penWidth,
+    required this.annotations,
+    required this.onAnnotationAdded,
+    required this.onAnnotationErased,
+    required this.onTap,
+    required this.onSwipeLeft,
+    required this.onSwipeRight,
+  });
+
+  @override
+  State<PdfPageWrapper> createState() => _PdfPageWrapperState();
+}
+
+class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProviderStateMixin {
+  // Gesture tracking
+  double _swipeStartX = 0;
+  bool _swipeHandled = false;
+  int _pointerCount = 0;
+  
+  // Tap detection (for faster response than GestureDetector)
+  Offset? _tapDownPosition;
+  DateTime? _tapDownTime;
+  static const int _tapTimeout = 200; // milliseconds
+  static const double _tapSlop = 20.0; // max distance for tap
+  
+  // Zoom state
+  final TransformationController _transformController = TransformationController();
+  bool _isZoomed = false;
+  
+  // Drawing state
+  List<Offset> _currentPath = [];
+  bool _isDrawing = false;
+  
+  // Content size for coordinate normalization
+  Size _contentSize = Size.zero;
+  final GlobalKey _contentKey = GlobalKey();
+  
+  // Fade-in animation for smooth page transitions
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+  
+  static const double _swipeThreshold = 90.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 150),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
+    );
+    // Start fade-in after a tiny delay to let PDF start loading
+    Future.delayed(const Duration(milliseconds: 30), () {
+      if (mounted) _fadeController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    _pointerCount++;
+    if (_pointerCount == 1) {
+      // Track for tap detection
+      _tapDownPosition = event.position;
+      _tapDownTime = DateTime.now();
+      
+      if (!_isZoomed && !widget.isDrawMode) {
+        _swipeStartX = event.position.dx;
+        _swipeHandled = false;
+      }
+    } else {
+      // Multi-touch cancels tap
+      _tapDownPosition = null;
+      _tapDownTime = null;
+    }
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    final wasMultiTouch = _pointerCount > 1;
+    _pointerCount = (_pointerCount - 1).clamp(0, 10);
+    
+    // Check for tap (quick click without much movement)
+    if (_pointerCount == 0 && !wasMultiTouch && !_swipeHandled && !_isDrawing) {
+      if (_tapDownPosition != null && _tapDownTime != null) {
+        final elapsed = DateTime.now().difference(_tapDownTime!).inMilliseconds;
+        final distance = (event.position - _tapDownPosition!).distance;
+        if (elapsed < _tapTimeout && distance < _tapSlop) {
+          // This is a tap!
+          widget.onTap();
+        }
+      }
+    }
+    
+    // Clear tap tracking
+    _tapDownPosition = null;
+    _tapDownTime = null;
+    
+    // Handle drawing end when lifting finger
+    if (_isDrawing && _pointerCount == 0) {
+      _finishDrawing();
+    }
+    
+    if (_pointerCount == 0) {
+      _swipeHandled = false;
+    } else if (wasMultiTouch && _pointerCount == 1) {
+      _swipeHandled = true;
+      // Also cancel any ongoing drawing when transitioning from multi to single touch
+      if (_isDrawing) {
+        setState(() {
+          _currentPath = [];
+          _isDrawing = false;
+        });
+      }
+    }
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    // Skip if multi-touch (for zooming)
+    if (_pointerCount > 1) return;
+    
+    // Handle drawing
+    if (widget.isDrawMode && _pointerCount == 1 && !_swipeHandled) {
+      if (widget.selectedTool == 'pen') {
+        final localPos = _screenToLocal(event.position);
+        if (localPos != null) {
+          setState(() {
+            if (!_isDrawing) {
+              _isDrawing = true;
+              _currentPath = [localPos];
+            } else {
+              _currentPath.add(localPos);
+            }
+          });
+        }
+      } else if (widget.selectedTool == 'eraser') {
+        final localPos = _screenToLocal(event.position);
+        if (localPos != null) {
+          _eraseAtPoint(localPos);
+        }
+      }
+      return;
+    }
+    
+    // Handle swipe for page navigation (only when not in draw mode)
+    if (_pointerCount != 1 || _swipeHandled || _isZoomed || widget.isDrawMode) {
+      return;
+    }
+
+    final swipeDistance = event.position.dx - _swipeStartX;
+
+    if (swipeDistance < -_swipeThreshold) {
+      _swipeHandled = true;
+      widget.onSwipeLeft();
+    } else if (swipeDistance > _swipeThreshold) {
+      _swipeHandled = true;
+      widget.onSwipeRight();
+    }
+  }
+  
+  // Convert screen coordinates to local content coordinates
+  Offset? _screenToLocal(Offset screenPos) {
+    final RenderBox? renderBox = _contentKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return null;
+    
+    // Get position relative to the Container (which wraps InteractiveViewer)
+    final localPos = renderBox.globalToLocal(screenPos);
+    
+    // When InteractiveViewer is zoomed/panned, it applies a transformation matrix to its child
+    // We need to convert the touch position (in InteractiveViewer's viewport coordinates)
+    // to content coordinates (in the child's coordinate system)
+    final matrix = _transformController.value;
+    
+    // Use the inverse matrix to transform from viewport to content coordinates
+    final Matrix4 inverseMatrix = Matrix4.tryInvert(matrix) ?? Matrix4.identity();
+    return MatrixUtils.transformPoint(inverseMatrix, localPos);
+  }
+  
+  // Convert local content coordinates to normalized (0-1) coordinates
+  List<double> _normalizePoints(List<Offset> points) {
+    if (_contentSize == Size.zero) return [];
+    return points.expand((p) => [
+      p.dx / _contentSize.width,
+      p.dy / _contentSize.height,
+    ]).toList();
+  }
+  
+  void _finishDrawing() {
+    if (_currentPath.length > 1 && widget.selectedTool == 'pen') {
+      final normalizedPoints = _normalizePoints(_currentPath);
+      final annotation = Annotation(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'draw',
+        color: '#${widget.penColor.toARGB32().toRadixString(16).substring(2, 8)}',
+        width: widget.penWidth,
+        points: normalizedPoints,
+        page: widget.pageNumber,
+      );
+      widget.onAnnotationAdded(annotation);
+    }
+    setState(() {
+      _currentPath = [];
+      _isDrawing = false;
+    });
+  }
+  
+  void _eraseAtPoint(Offset point) {
+    // Normalize the erase point for comparison
+    if (_contentSize == Size.zero) return;
+    final normalizedX = point.dx / _contentSize.width;
+    final normalizedY = point.dy / _contentSize.height;
+    final eraseRadius = 20.0 / _contentSize.width; // Normalize erase radius
+    
+    for (final annotation in widget.annotations) {
+      if (annotation.points == null) continue;
+      
+      for (int i = 0; i < annotation.points!.length; i += 2) {
+        if (i + 1 < annotation.points!.length) {
+          final dx = annotation.points![i] - normalizedX;
+          final dy = annotation.points![i + 1] - normalizedY;
+          final distance = (dx * dx + dy * dy);
+          
+          if (distance < eraseRadius * eraseRadius) {
+            widget.onAnnotationErased(annotation);
+            return; // Only erase one at a time per move event
+          }
+        }
+      }
+    }
+  }
+
+  void _onInteractionStart(ScaleStartDetails details) {
+    if (details.pointerCount > 1) {
+      // Multi-touch: start zooming, cancel any drawing
+      setState(() {
+        _isZoomed = true;
+        if (_isDrawing) {
+          _currentPath = [];
+          _isDrawing = false;
+        }
+      });
+    }
+  }
+
+  void _onInteractionEnd(ScaleEndDetails details) {
+    final scale = _transformController.value.getMaxScaleOnAxis();
+    if (scale <= 1.05) {
+      _transformController.value = Matrix4.identity();
+      setState(() {
+        _isZoomed = false;
+      });
+    }
+  }
+
+  void _resetZoom() {
+    if (_isZoomed) {
+      _transformController.value = Matrix4.identity();
+      setState(() {
+        _isZoomed = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Listener(
+        onPointerDown: _handlePointerDown,
+        onPointerUp: _handlePointerUp,
+        onPointerMove: _handlePointerMove,
+        onPointerCancel: (_) {
+          _pointerCount = 0;
+          _swipeHandled = false;
+          if (_isDrawing) {
+            setState(() {
+              _currentPath = [];
+              _isDrawing = false;
+            });
+          }
+        },
+        child: GestureDetector(
+          // onTap handled by Listener for faster response
+          onDoubleTap: _resetZoom,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            key: _contentKey,
+            child: InteractiveViewer(
+              transformationController: _transformController,
+              minScale: 1.0,
+              maxScale: 4.0,
+              panEnabled: _isZoomed && !widget.isDrawMode,
+              scaleEnabled: true, // Always allow pinch zoom
+              onInteractionStart: _onInteractionStart,
+              onInteractionEnd: _onInteractionEnd,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Update content size synchronously for immediate use
+                  // This ensures annotations are visible on first render
+                  if (_contentSize != constraints.biggest) {
+                    _contentSize = constraints.biggest;
+                  }
+                  
+                  return Container(
+                    color: Colors.white,
+                    child: Stack(
+                      children: [
+                        // PDF page
+                        PdfPageView(
+                          document: widget.document,
+                          pageNumber: widget.pageNumber,
+                          alignment: Alignment.center,
+                        ),
+                        // Annotation layer
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: _IntegratedAnnotationPainter(
+                              annotations: widget.annotations,
+                              currentPath: _currentPath,
+                              currentColor: widget.penColor,
+                              currentWidth: widget.penWidth,
+                              contentSize: constraints.biggest, // Use constraints directly
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Annotation painter that works with normalized coordinates
+class _IntegratedAnnotationPainter extends CustomPainter {
+  final List<Annotation> annotations;
   final List<Offset> currentPath;
   final Color currentColor;
   final double currentWidth;
+  final Size contentSize;
 
-  AnnotationPainter({
+  _IntegratedAnnotationPainter({
     required this.annotations,
-    required this.currentPage,
-    this.currentPath = const [],
-    this.currentColor = Colors.black,
-    this.currentWidth = 2.0,
+    required this.currentPath,
+    required this.currentColor,
+    required this.currentWidth,
+    required this.contentSize,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (contentSize == Size.zero) return;
+    
+    // Draw saved annotations (with normalized coordinates)
     for (final annotation in annotations) {
       if (annotation.type == 'draw' && annotation.points != null) {
         final paint = Paint()
@@ -1070,22 +1506,28 @@ class AnnotationPainter extends CustomPainter {
           ..strokeJoin = StrokeJoin.round
           ..style = PaintingStyle.stroke;
 
-        final path = Path();
         final points = annotation.points!;
         if (points.length >= 2) {
-          path.moveTo(points[0], points[1]);
+          final path = Path();
+          // Denormalize first point
+          path.moveTo(
+            points[0] * contentSize.width,
+            points[1] * contentSize.height,
+          );
+          
           for (int i = 2; i < points.length; i += 2) {
             if (i + 1 < points.length) {
+              final x = points[i] * contentSize.width;
+              final y = points[i + 1] * contentSize.height;
+              
               if (i + 3 < points.length) {
-                final p1 = Offset(points[i], points[i + 1]);
-                final p2 = Offset(points[i + 2], points[i + 3]);
-                final controlPoint = Offset(
-                  (p1.dx + p2.dx) / 2,
-                  (p1.dy + p2.dy) / 2,
-                );
-                path.quadraticBezierTo(p1.dx, p1.dy, controlPoint.dx, controlPoint.dy);
+                final x2 = points[i + 2] * contentSize.width;
+                final y2 = points[i + 3] * contentSize.height;
+                final controlX = (x + x2) / 2;
+                final controlY = (y + y2) / 2;
+                path.quadraticBezierTo(x, y, controlX, controlY);
               } else {
-                path.lineTo(points[i], points[i + 1]);
+                path.lineTo(x, y);
               }
             }
           }
@@ -1094,6 +1536,7 @@ class AnnotationPainter extends CustomPainter {
       }
     }
 
+    // Draw current path (already in local coordinates)
     if (currentPath.length > 1) {
       final paint = Paint()
         ..color = currentColor
@@ -1122,156 +1565,9 @@ class AnnotationPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant AnnotationPainter oldDelegate) {
+  bool shouldRepaint(covariant _IntegratedAnnotationPainter oldDelegate) {
     return annotations != oldDelegate.annotations ||
-        currentPage != oldDelegate.currentPage ||
-        currentPath != oldDelegate.currentPath;
-  }
-}
-
-/// Independent PDF page widget wrapper with gesture handling.
-/// Each page is a standalone widget for instant switching and smooth gesture response.
-class PdfPageWrapper extends StatefulWidget {
-  final PdfDocument document;
-  final int pageNumber;
-  final bool isDrawMode;
-  final VoidCallback onTap;
-  final VoidCallback onSwipeLeft;
-  final VoidCallback onSwipeRight;
-
-  const PdfPageWrapper({
-    super.key,
-    required this.document,
-    required this.pageNumber,
-    required this.isDrawMode,
-    required this.onTap,
-    required this.onSwipeLeft,
-    required this.onSwipeRight,
-  });
-
-  @override
-  State<PdfPageWrapper> createState() => _PdfPageWrapperState();
-}
-
-class _PdfPageWrapperState extends State<PdfPageWrapper> {
-  // Gesture tracking
-  double _swipeStartX = 0;
-  bool _swipeHandled = false;
-  int _pointerCount = 0;
-  
-  // Zoom state
-  final TransformationController _transformController = TransformationController();
-  bool _isZoomed = false;
-  
-  static const double _swipeThreshold = 90.0;
-
-  @override
-  void dispose() {
-    _transformController.dispose();
-    super.dispose();
-  }
-
-  void _handlePointerDown(PointerDownEvent event) {
-    _pointerCount++;
-    if (_pointerCount == 1 && !_isZoomed) {
-      _swipeStartX = event.position.dx;
-      _swipeHandled = false;
-    }
-  }
-
-  void _handlePointerUp(PointerUpEvent event) {
-    final wasMultiTouch = _pointerCount > 1;
-    _pointerCount = (_pointerCount - 1).clamp(0, 10);
-    if (_pointerCount == 0) {
-      _swipeHandled = false;
-    } else if (wasMultiTouch && _pointerCount == 1) {
-      // Transitioning from multi-touch to single finger
-      // Mark as handled to prevent accidental swipe
-      _swipeHandled = true;
-    }
-  }
-
-  void _handlePointerMove(PointerMoveEvent event) {
-    // Only handle single finger swipe when not zoomed
-    if (_pointerCount != 1 || _swipeHandled || _isZoomed || widget.isDrawMode) {
-      return;
-    }
-
-    final swipeDistance = event.position.dx - _swipeStartX;
-
-    if (swipeDistance < -_swipeThreshold) {
-      // Swipe left -> next page
-      _swipeHandled = true;
-      widget.onSwipeLeft();
-    } else if (swipeDistance > _swipeThreshold) {
-      // Swipe right -> previous page
-      _swipeHandled = true;
-      widget.onSwipeRight();
-    }
-  }
-
-  void _onInteractionStart(ScaleStartDetails details) {
-    // Detect pinch zoom start
-    if (details.pointerCount > 1) {
-      setState(() {
-        _isZoomed = true;
-      });
-    }
-  }
-
-  void _onInteractionEnd(ScaleEndDetails details) {
-    // Check if zoomed back to normal scale
-    final scale = _transformController.value.getMaxScaleOnAxis();
-    if (scale <= 1.05) {
-      _transformController.value = Matrix4.identity();
-      setState(() {
-        _isZoomed = false;
-      });
-    }
-  }
-
-  void _resetZoom() {
-    // Double-tap to reset zoom to original scale
-    if (_isZoomed) {
-      _transformController.value = Matrix4.identity();
-      setState(() {
-        _isZoomed = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Listener(
-      onPointerDown: _handlePointerDown,
-      onPointerUp: _handlePointerUp,
-      onPointerMove: _handlePointerMove,
-      onPointerCancel: (_) {
-        _pointerCount = 0;
-        _swipeHandled = false;
-      },
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onDoubleTap: _resetZoom,
-        behavior: HitTestBehavior.opaque,
-        child: InteractiveViewer(
-          transformationController: _transformController,
-          minScale: 1.0,
-          maxScale: 4.0,
-          panEnabled: _isZoomed,
-          scaleEnabled: !widget.isDrawMode,
-          onInteractionStart: _onInteractionStart,
-          onInteractionEnd: _onInteractionEnd,
-          child: Container(
-            color: Colors.white,
-            child: PdfPageView(
-              document: widget.document,
-              pageNumber: widget.pageNumber,
-              alignment: Alignment.center,
-            ),
-          ),
-        ),
-      ),
-    );
+        currentPath != oldDelegate.currentPath ||
+        contentSize != oldDelegate.contentSize;
   }
 }
