@@ -21,13 +21,28 @@ class SetlistDetailScreen extends ConsumerStatefulWidget {
 
 class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   bool _showAddModal = false;
+  bool _showEditModal = false;
   String _addScoreSearchQuery = '';
   final FocusNode _addScoreSearchFocusNode = FocusNode();
+  final TextEditingController _editNameController = TextEditingController();
+  final TextEditingController _editDescriptionController = TextEditingController();
 
   @override
   void dispose() {
     _addScoreSearchFocusNode.dispose();
+    _editNameController.dispose();
+    _editDescriptionController.dispose();
     super.dispose();
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+  }
+
+  void _openEditModal(Setlist setlist) {
+    _editNameController.text = setlist.name;
+    _editDescriptionController.text = setlist.description;
+    setState(() => _showEditModal = true);
   }
 
   @override
@@ -56,54 +71,70 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                 ),
                 child: SafeArea(
                   bottom: false,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [AppColors.emerald350, AppColors.emerald550],
-                                  begin: Alignment.centerLeft,
-                                  end: Alignment.centerRight,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.emerald350, AppColors.emerald550],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    currentSetlist.name,
-                                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  if (currentSetlist.description.isNotEmpty)
-                                    Text(
-                                      currentSetlist.description,
-                                      style: const TextStyle(fontSize: 14, color: AppColors.gray500),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(AppIcons.close, color: AppColors.gray400),
-                            ),
-                          ],
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 24),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentSetlist.name,
+                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              if (currentSetlist.description.isNotEmpty) ...[
+                                Text(
+                                  currentSetlist.description,
+                                  style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                              ],
+                              Text(
+                                '${currentSetlist.scores.length} ${currentSetlist.scores.length == 1 ? "score" : "scores"} · Personal · ${_formatDate(currentSetlist.dateCreated)}',
+                                style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => _openEditModal(currentSetlist),
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(AppIcons.edit, color: AppColors.gray400, size: 20),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: Icon(AppIcons.close, color: AppColors.gray400, size: 22),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -178,8 +209,172 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
             ],
           ),
           if (_showAddModal) _buildAddScoreModal(scores, currentSetlist),
+          if (_showEditModal) _buildEditModal(currentSetlist),
         ],
       ),
+    );
+  }
+
+  Widget _buildEditModal(Setlist setlist) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () {
+              setState(() => _showEditModal = false);
+            },
+            child: Container(color: Colors.black.withValues(alpha: 0.1)),
+          ),
+        ),
+        Center(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 60,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.emerald50, Colors.white],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                    border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.emerald350, AppColors.emerald550],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(AppIcons.edit, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Edit Setlist', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                            SizedBox(height: 2),
+                            Text('Update name and description', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => setState(() => _showEditModal = false),
+                        icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                      ),
+                    ],
+                  ),
+                ),
+                // Form content
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _editNameController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Setlist name',
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          filled: true,
+                          fillColor: AppColors.gray50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _editDescriptionController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'Description (optional)',
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          filled: true,
+                          fillColor: AppColors.gray50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => setState(() => _showEditModal = false),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.gray200),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.w500)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                if (_editNameController.text.trim().isNotEmpty) {
+                                  ref.read(setlistsProvider.notifier).updateSetlist(
+                                    setlist.id,
+                                    name: _editNameController.text.trim(),
+                                    description: _editDescriptionController.text.trim(),
+                                  );
+                                  setState(() => _showEditModal = false);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.emerald500,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -264,6 +459,43 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Remove Score'),
+                        content: const Text('Are you sure you want to remove this score from this setlist?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              ref.read(setlistsProvider.notifier).removeScoreFromSetlist(currentSetlist.id, score.id);
+                              Navigator.pop(context);
+                            },
+                            child: const Text('Remove', style: TextStyle(color: AppColors.red500)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      AppIcons.delete,
+                      size: 20,
+                      color: AppColors.red500,
+                    ),
                   ),
                 ),
               ],

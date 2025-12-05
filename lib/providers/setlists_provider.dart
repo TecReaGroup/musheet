@@ -74,6 +74,18 @@ class SetlistsNotifier extends Notifier<List<Setlist>> {
       return setlist;
     }).toList();
   }
+
+  void updateSetlist(String setlistId, {String? name, String? description}) {
+    state = state.map((setlist) {
+      if (setlist.id == setlistId) {
+        return setlist.copyWith(
+          name: name ?? setlist.name,
+          description: description ?? setlist.description,
+        );
+      }
+      return setlist;
+    }).toList();
+  }
 }
 
 final setlistsProvider = NotifierProvider<SetlistsNotifier, List<Setlist>>(() {

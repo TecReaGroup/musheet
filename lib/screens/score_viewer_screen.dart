@@ -209,8 +209,19 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     });
   }
 
-  void _navigateToScore(int index) {
+  void _navigateToScore(int index) async {
     if (widget.setlistScores != null && index >= 0 && index < widget.setlistScores!.length) {
+      // Stop and destroy metronome before navigating to properly release audio resources
+      _metronomeController?.stop();
+      _metronomeController?.removeListener(_onMetronomeChanged);
+      _metronomeController?.dispose();
+      _metronomeController = null;
+      
+      // Small delay to allow audio resources to be fully released
+      await Future.delayed(const Duration(milliseconds: 50));
+      
+      if (!mounted) return;
+      
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -996,7 +1007,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+                padding: const EdgeInsets.fromLTRB(18, 8, 6, 8),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: AppColors.gray100)),
                 ),
@@ -1121,7 +1132,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                               side: const BorderSide(color: AppColors.gray200),
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(24),
                               ),
                             ),
                             child: const Row(
@@ -1151,7 +1162,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                               side: const BorderSide(color: AppColors.gray200),
                               padding: const EdgeInsets.symmetric(horizontal: 8),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(24),
                               ),
                             ),
                             child: const Row(

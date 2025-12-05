@@ -36,6 +36,12 @@ class AppColors {
   static const gray900 = Color(0xFF111827);
 
   // Red (Delete, Recording)
+  static const red50 = Color(0xFFFEF2F2);
+  static const red100 = Color(0xFFFEE2E2);
+  static const red200 = Color(0xFFFECACA);
+  static const red300 = Color(0xFFFCA5A5);
+  static const red400 = Color(0xFFF87171);
+  static const red450 = Color(0xFFEF6A6A); // Between 400 and 500
   static const red500 = Color(0xFFEF4444);
   static const red600 = Color(0xFFDC2626);
 

@@ -10,7 +10,12 @@ import '../models/setlist.dart';
 import '../app.dart';
 import 'score_viewer_screen.dart';
 import 'setlist_detail_screen.dart';
-import 'library_screen.dart' show LibraryTab, libraryTabProvider, recentlyOpenedSetlistsProvider, recentlyOpenedScoresProvider;
+import 'library_screen.dart'
+    show
+        LibraryTab,
+        libraryTabProvider,
+        recentlyOpenedSetlistsProvider,
+        recentlyOpenedScoresProvider;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 
@@ -19,7 +24,7 @@ enum SearchScope { library, team }
 class SearchQueryNotifier extends Notifier<String> {
   @override
   String build() => '';
-  
+
   @override
   set state(String newState) => super.state = newState;
 }
@@ -27,7 +32,7 @@ class SearchQueryNotifier extends Notifier<String> {
 class SearchScopeNotifier extends Notifier<SearchScope> {
   @override
   SearchScope build() => SearchScope.library;
-  
+
   @override
   set state(SearchScope newState) => super.state = newState;
 }
@@ -35,14 +40,21 @@ class SearchScopeNotifier extends Notifier<SearchScope> {
 class HasUnreadNotificationsNotifier extends Notifier<bool> {
   @override
   bool build() => true;
-  
+
   @override
   set state(bool newState) => super.state = newState;
 }
 
-final searchQueryProvider = NotifierProvider<SearchQueryNotifier, String>(SearchQueryNotifier.new);
-final searchScopeProvider = NotifierProvider<SearchScopeNotifier, SearchScope>(SearchScopeNotifier.new);
-final hasUnreadNotificationsProvider = NotifierProvider<HasUnreadNotificationsNotifier, bool>(HasUnreadNotificationsNotifier.new);
+final searchQueryProvider = NotifierProvider<SearchQueryNotifier, String>(
+  SearchQueryNotifier.new,
+);
+final searchScopeProvider = NotifierProvider<SearchScopeNotifier, SearchScope>(
+  SearchScopeNotifier.new,
+);
+final hasUnreadNotificationsProvider =
+    NotifierProvider<HasUnreadNotificationsNotifier, bool>(
+      HasUnreadNotificationsNotifier.new,
+    );
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -71,11 +83,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final searchQuery = ref.watch(searchQueryProvider);
     final searchScope = ref.watch(searchScopeProvider);
     final hasUnreadNotifications = ref.watch(hasUnreadNotificationsProvider);
-    
+
     // Get recently opened records
     final recentlyOpenedSetlists = ref.watch(recentlyOpenedSetlistsProvider);
     final recentlyOpenedScores = ref.watch(recentlyOpenedScoresProvider);
-    
+
     // Listen for clear search request from back button
     final clearRequest = ref.watch(clearSearchRequestProvider);
     if (clearRequest != _lastClearRequest) {
@@ -87,25 +99,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     // Sort by recently opened (only include items that have been opened)
-    final recentSetlistsList = setlists.where((s) => recentlyOpenedSetlists.containsKey(s.id)).toList()
-      ..sort((a, b) => recentlyOpenedSetlists[b.id]!.compareTo(recentlyOpenedSetlists[a.id]!));
-    final recentScoresList = scores.where((s) => recentlyOpenedScores.containsKey(s.id)).toList()
-      ..sort((a, b) => recentlyOpenedScores[b.id]!.compareTo(recentlyOpenedScores[a.id]!));
+    final recentSetlistsList =
+        setlists.where((s) => recentlyOpenedSetlists.containsKey(s.id)).toList()
+          ..sort(
+            (a, b) => recentlyOpenedSetlists[b.id]!.compareTo(
+              recentlyOpenedSetlists[a.id]!,
+            ),
+          );
+    final recentScoresList =
+        scores.where((s) => recentlyOpenedScores.containsKey(s.id)).toList()
+          ..sort(
+            (a, b) => recentlyOpenedScores[b.id]!.compareTo(
+              recentlyOpenedScores[a.id]!,
+            ),
+          );
 
     final searchData = searchScope == SearchScope.library
         ? {'scores': scores, 'setlists': setlists}
-        : {'scores': currentTeam?.sharedScores ?? [], 'setlists': currentTeam?.sharedSetlists ?? []};
+        : {
+            'scores': currentTeam?.sharedScores ?? [],
+            'setlists': currentTeam?.sharedSetlists ?? [],
+          };
 
     final searchResultsScores = searchQuery.trim().isNotEmpty
-        ? (searchData['scores'] as List<Score>).where((score) =>
-            score.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-            score.composer.toLowerCase().contains(searchQuery.toLowerCase())).toList()
+        ? (searchData['scores'] as List<Score>)
+              .where(
+                (score) =>
+                    score.title.toLowerCase().contains(
+                      searchQuery.toLowerCase(),
+                    ) ||
+                    score.composer.toLowerCase().contains(
+                      searchQuery.toLowerCase(),
+                    ),
+              )
+              .toList()
         : <Score>[];
 
     final searchResultsSetlists = searchQuery.trim().isNotEmpty
-        ? (searchData['setlists'] as List<Setlist>).where((setlist) =>
-            setlist.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-            setlist.description.toLowerCase().contains(searchQuery.toLowerCase())).toList()
+        ? (searchData['setlists'] as List<Setlist>)
+              .where(
+                (setlist) =>
+                    setlist.name.toLowerCase().contains(
+                      searchQuery.toLowerCase(),
+                    ) ||
+                    setlist.description.toLowerCase().contains(
+                      searchQuery.toLowerCase(),
+                    ),
+              )
+              .toList()
         : <Setlist>[];
 
     return Container(
@@ -120,7 +161,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: [
           Padding(
             // Add top safe area padding to position content below status bar
-            padding: EdgeInsets.fromLTRB(16, 12 + MediaQuery.of(context).padding.top, 16, 24),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              12 + MediaQuery.of(context).padding.top,
+              16,
+              24,
+            ),
             child: Column(
               children: [
                 Row(
@@ -128,15 +174,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     ShaderMask(
                       shaderCallback: (bounds) => const LinearGradient(
-                        colors: [Color(0xFF3B82F6), Color(0xFF14B8A6), Color(0xFF10B981)],
+                        colors: [
+                          Color(0xFF3B82F6),
+                          Color(0xFF14B8A6),
+                          Color(0xFF10B981),
+                        ],
                       ).createShader(bounds),
-                      child: Text('MuSheet', style: GoogleFonts.righteous(fontSize: 36, color: Colors.white)),
+                      child: Text(
+                        'MuSheet',
+                        style: GoogleFonts.righteous(
+                          fontSize: 36,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                     IconButton(
-                      onPressed: () => ref.read(hasUnreadNotificationsProvider.notifier).state = false,
+                      onPressed: () =>
+                          ref
+                                  .read(hasUnreadNotificationsProvider.notifier)
+                                  .state =
+                              false,
                       icon: Stack(
                         children: [
-                          const Icon(AppIcons.notificationsOutlined, size: 24, color: AppColors.gray600),
+                          const Icon(
+                            AppIcons.notificationsOutlined,
+                            size: 24,
+                            color: AppColors.gray600,
+                          ),
                           if (hasUnreadNotifications)
                             Positioned(
                               top: 0,
@@ -147,7 +211,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 decoration: BoxDecoration(
                                   color: AppColors.red500,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
                                 ),
                               ),
                             ),
@@ -160,11 +227,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 TextField(
                   controller: _searchController,
                   focusNode: _searchFocusNode,
-                  onChanged: (value) => ref.read(searchQueryProvider.notifier).state = value,
+                  onChanged: (value) =>
+                      ref.read(searchQueryProvider.notifier).state = value,
                   decoration: InputDecoration(
                     hintText: 'Search scores and setlists...',
                     hintStyle: const TextStyle(color: AppColors.gray400),
-                    prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400),
+                    prefixIcon: const Icon(
+                      AppIcons.search,
+                      color: AppColors.gray400,
+                    ),
                     filled: true,
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
@@ -177,9 +248,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.blue400, width: 2),
+                      borderSide: const BorderSide(
+                        color: AppColors.blue400,
+                        width: 2,
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ],
@@ -193,20 +270,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                 ),
-                borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 30, offset: Offset(0, 8))],
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 30,
+                    offset: Offset(0, 8),
+                  ),
+                ],
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
                 child: GestureDetector(
                   onTap: () => _searchFocusNode.unfocus(),
                   child: ListView(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      16,
+                      16,
+                      24 +
+                          MediaQuery.of(context).padding.bottom +
+                          kBottomNavigationBarHeight,
+                    ),
                     children: [
                       if (searchQuery.trim().isNotEmpty)
-                        _buildSearchResults(searchResultsScores, searchResultsSetlists, searchScope)
+                        _buildSearchResults(
+                          searchResultsScores,
+                          searchResultsSetlists,
+                          searchScope,
+                        )
                       else
-                        _buildHomeContent(scores, setlists, recentScoresList.take(5), recentSetlistsList.take(3)),
+                        _buildHomeContent(
+                          scores,
+                          setlists,
+                          recentScoresList.take(5),
+                          recentSetlistsList.take(3),
+                        ),
                     ],
                   ),
                 ),
@@ -218,16 +323,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSearchResults(List<Score> scores, List<Setlist> setlists, SearchScope scope) {
+  Widget _buildSearchResults(
+    List<Score> scores,
+    List<Setlist> setlists,
+    SearchScope scope,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Search Results', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            const Text(
+              'Search Results',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
             Container(
-              decoration: BoxDecoration(color: AppColors.gray100, borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(
+                color: AppColors.gray100,
+                borderRadius: BorderRadius.circular(8),
+              ),
               padding: const EdgeInsets.all(4),
               child: Row(
                 children: [
@@ -246,13 +361,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (setlists.isNotEmpty) ...[
-                const Text('Setlists', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                const Text(
+                  'Setlists',
+                  style: TextStyle(fontSize: 14, color: AppColors.gray500),
+                ),
                 const SizedBox(height: 12),
                 ...setlists.map((setlist) => _buildSetlistCard(setlist)),
                 const SizedBox(height: 24),
               ],
               if (scores.isNotEmpty) ...[
-                const Text('Scores', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                const Text(
+                  'Scores',
+                  style: TextStyle(fontSize: 14, color: AppColors.gray500),
+                ),
                 const SizedBox(height: 12),
                 ...scores.map((score) => _buildScoreCard(score)),
               ],
@@ -262,7 +383,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildScopeButton(String label, SearchScope value, SearchScope current) {
+  Widget _buildScopeButton(
+    String label,
+    SearchScope value,
+    SearchScope current,
+  ) {
     final isSelected = value == current;
     return GestureDetector(
       onTap: () => ref.read(searchScopeProvider.notifier).state = value,
@@ -271,14 +396,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected ? [const BoxShadow(color: Colors.black12, blurRadius: 2)] : null,
+          boxShadow: isSelected
+              ? [const BoxShadow(color: Colors.black12, blurRadius: 2)]
+              : null,
         ),
-        child: Text(label, style: TextStyle(fontSize: 14, color: isSelected ? AppColors.gray900 : AppColors.gray600)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            color: isSelected ? AppColors.gray900 : AppColors.gray600,
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildHomeContent(List<Score> scores, List<Setlist> setlists, Iterable<Score> recentScores, Iterable<Setlist> recentSetlists) {
+  Widget _buildHomeContent(
+    List<Score> scores,
+    List<Setlist> setlists,
+    Iterable<Score> recentScores,
+    Iterable<Setlist> recentSetlists,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -288,8 +426,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: StatCard.scores(
                 count: scores.length,
                 onTap: () {
-                  ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
-                  ref.read(currentPageProvider.notifier).state = AppPage.library;
+                  ref.read(libraryTabProvider.notifier).state =
+                      LibraryTab.scores;
+                  ref.read(currentPageProvider.notifier).state =
+                      AppPage.library;
                 },
               ),
             ),
@@ -298,8 +438,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: StatCard.setlists(
                 count: setlists.length,
                 onTap: () {
-                  ref.read(libraryTabProvider.notifier).state = LibraryTab.setlists;
-                  ref.read(currentPageProvider.notifier).state = AppPage.library;
+                  ref.read(libraryTabProvider.notifier).state =
+                      LibraryTab.setlists;
+                  ref.read(currentPageProvider.notifier).state =
+                      AppPage.library;
                 },
               ),
             ),
@@ -316,26 +458,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(height: 24),
         ],
         if (recentScores.isNotEmpty) ...[
-          const SectionHeader(
-            icon: AppIcons.musicNote,
-            title: 'Recent Scores',
-          ),
+          const SectionHeader(icon: AppIcons.musicNote, title: 'Recent Scores'),
           const SizedBox(height: 12),
           ...recentScores.map((score) => _buildScoreCard(score)),
         ],
         // Show hint when both recent lists are empty but library has content
-        if (recentSetlists.isEmpty && recentScores.isEmpty && (scores.isNotEmpty || setlists.isNotEmpty))
+        if (recentSetlists.isEmpty &&
+            recentScores.isEmpty &&
+            (scores.isNotEmpty || setlists.isNotEmpty))
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 32),
-            child: Center(
-              child: Text(
-                'Open scores or setlists to start...',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppColors.gray400,
-                  fontStyle: FontStyle.italic,
+            padding: const EdgeInsets.only(top: 16, bottom: 32),
+            child: Column(
+              children: [
+                // Decorative divider with center dots
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(height: 1, color: AppColors.gray200),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Container(
+                        width: 3,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.gray300,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      width: 3,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: AppColors.gray300,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Container(
+                        width: 3,
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: AppColors.gray300,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(height: 1, color: AppColors.gray200),
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 24),
+                Text(
+                  'Open scores or setlists to start...',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppColors.gray400,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
             ),
           ),
         if (scores.isEmpty && setlists.isEmpty)
@@ -366,7 +551,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(border: Border.all(color: AppColors.gray200), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.gray200),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
                 Container(
@@ -380,18 +568,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
+                  child: const Icon(
+                    AppIcons.setlistIcon,
+                    size: 24,
+                    color: AppColors.emerald550,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        setlist.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        setlist.description,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.gray600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       Text(
                         '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Personal',
-                        style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.gray400,
+                        ),
                       ),
                     ],
                   ),
@@ -422,7 +630,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(border: Border.all(color: AppColors.gray200), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.gray200),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
                 Container(
@@ -436,16 +647,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue550),
+                  child: const Icon(
+                    AppIcons.musicNote,
+                    size: 24,
+                    color: AppColors.blue550,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const Text('Personal', style: TextStyle(fontSize: 12, color: AppColors.gray400)),
+                      Text(
+                        score.title,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        score.composer,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.gray600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Text(
+                        'Personal',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.gray400,
+                        ),
+                      ),
                     ],
                   ),
                 ),

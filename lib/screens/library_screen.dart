@@ -438,16 +438,42 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           final setlist = sortedSetlists[index];
           return _buildSwipeableItem(
             id: setlist.id,
-            child: _LibrarySetlistCard(setlist: setlist),
-            onDelete: () => _handleDelete(setlist.id, false),
-            onTap: () {
-              if (!_hasSwiped) {
+            child: _LibrarySetlistCard(
+              setlist: setlist,
+              onArrowTap: () {
+                // Arrow tap: go to detail screen
                 ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => SetlistDetailScreen(setlist: setlist),
                   ),
                 );
+              },
+            ),
+            onDelete: () => _handleDelete(setlist.id, false),
+            onTap: () {
+              if (!_hasSwiped) {
+                // Card tap: preview first score
+                ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                if (setlist.scores.isNotEmpty) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ScoreViewerScreen(
+                        score: setlist.scores.first,
+                        setlistScores: setlist.scores,
+                        currentIndex: 0,
+                        setlistName: setlist.name,
+                      ),
+                    ),
+                  );
+                } else {
+                  // Empty setlist: go to detail screen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => SetlistDetailScreen(setlist: setlist),
+                    ),
+                  );
+                }
               }
             },
           );
@@ -909,7 +935,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               _nameController.clear();
               _descriptionController.clear();
             },
-            child: Container(color: Colors.black.withValues(alpha: 0.05)),
+            child: Container(color: Colors.black.withValues(alpha: 0.1)),
           ),
         ),
         Center(
@@ -918,101 +944,142 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             constraints: const BoxConstraints(maxWidth: 400),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 30,
-                  offset: const Offset(0, 8),
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 60,
+                  offset: const Offset(0, 20),
                 ),
               ],
             ),
-            padding: const EdgeInsets.all(32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.emerald350, AppColors.emerald550],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
+                // Header with gradient background
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.emerald50, Colors.white],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                    border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.emerald350, AppColors.emerald550],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        borderRadius: BorderRadius.circular(16),
+                        child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
                       ),
-                      child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
-                    ),
-                    const SizedBox(width: 16),
-                    const Text('New Setlist', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () {
-                        ref.read(showCreateModalProvider.notifier).state = false;
-                        _nameController.clear();
-                        _descriptionController.clear();
-                      },
-                      icon: const Icon(AppIcons.close, color: AppColors.gray400),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 32),
-                TextField(
-                  controller: _nameController,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: 'Setlist name',
-                    filled: true,
-                    fillColor: AppColors.gray50,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _descriptionController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: 'Description (optional)',
-                    filled: true,
-                    fillColor: AppColors.gray50,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('New Setlist', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                            SizedBox(height: 2),
+                            Text('Create a new setlist', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
                         onPressed: () {
                           ref.read(showCreateModalProvider.notifier).state = false;
                           _nameController.clear();
                           _descriptionController.clear();
                         },
-                        child: const Text('Cancel', style: TextStyle(color: AppColors.gray600)),
+                        icon: const Icon(AppIcons.close, color: AppColors.gray400),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: _handleCreateSetlist,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.emerald500,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                    ],
+                  ),
+                ),
+                // Form content
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _nameController,
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Setlist name',
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          filled: true,
+                          fillColor: AppColors.gray50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
-                        child: const Text('Create'),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _descriptionController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          hintText: 'Description (optional)',
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          filled: true,
+                          fillColor: AppColors.gray50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                ref.read(showCreateModalProvider.notifier).state = false;
+                                _nameController.clear();
+                                _descriptionController.clear();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.gray200),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.w500)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _handleCreateSetlist,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.emerald500,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text('Create', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1025,8 +1092,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
 class _LibrarySetlistCard extends StatelessWidget {
   final Setlist setlist;
+  final VoidCallback? onArrowTap;
 
-  const _LibrarySetlistCard({required this.setlist});
+  const _LibrarySetlistCard({required this.setlist, this.onArrowTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1035,7 +1103,7 @@ class _LibrarySetlistCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
       child: Row(
         children: [
           Container(
@@ -1075,7 +1143,17 @@ class _LibrarySetlistCard extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(AppIcons.chevronRight, color: AppColors.gray400),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onArrowTap,
+              borderRadius: BorderRadius.circular(20),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+              ),
+            ),
+          ),
         ],
       ),
     );
