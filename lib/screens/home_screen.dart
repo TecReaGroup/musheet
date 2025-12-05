@@ -10,7 +10,7 @@ import '../models/setlist.dart';
 import '../app.dart';
 import 'score_viewer_screen.dart';
 import 'setlist_detail_screen.dart';
-import 'library_screen.dart';
+import 'library_screen.dart' show LibraryTab, libraryTabProvider, recentlyOpenedSetlistsProvider, recentlyOpenedScoresProvider;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 
@@ -72,6 +72,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final searchScope = ref.watch(searchScopeProvider);
     final hasUnreadNotifications = ref.watch(hasUnreadNotificationsProvider);
     
+    // Get recently opened records
+    final recentlyOpenedSetlists = ref.watch(recentlyOpenedSetlistsProvider);
+    final recentlyOpenedScores = ref.watch(recentlyOpenedScoresProvider);
+    
     // Listen for clear search request from back button
     final clearRequest = ref.watch(clearSearchRequestProvider);
     if (clearRequest != _lastClearRequest) {
@@ -82,8 +86,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       });
     }
 
-    final recentScores = [...scores]..sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
-    final recentSetlists = [...setlists]..sort((a, b) => b.dateCreated.compareTo(a.dateCreated));
+    // Sort by recently opened (only include items that have been opened)
+    final recentSetlistsList = setlists.where((s) => recentlyOpenedSetlists.containsKey(s.id)).toList()
+      ..sort((a, b) => recentlyOpenedSetlists[b.id]!.compareTo(recentlyOpenedSetlists[a.id]!));
+    final recentScoresList = scores.where((s) => recentlyOpenedScores.containsKey(s.id)).toList()
+      ..sort((a, b) => recentlyOpenedScores[b.id]!.compareTo(recentlyOpenedScores[a.id]!));
 
     final searchData = searchScope == SearchScope.library
         ? {'scores': scores, 'setlists': setlists}
@@ -113,7 +120,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         children: [
           Padding(
             // Add top safe area padding to position content below status bar
-            padding: EdgeInsets.fromLTRB(16, 18 + MediaQuery.of(context).padding.top, 16, 24),
+            padding: EdgeInsets.fromLTRB(16, 12 + MediaQuery.of(context).padding.top, 16, 24),
             child: Column(
               children: [
                 Row(
@@ -199,7 +206,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       if (searchQuery.trim().isNotEmpty)
                         _buildSearchResults(searchResultsScores, searchResultsSetlists, searchScope)
                       else
-                        _buildHomeContent(scores, setlists, recentScores.take(4), recentSetlists.take(3)),
+                        _buildHomeContent(scores, setlists, recentScoresList.take(5), recentSetlistsList.take(3)),
                     ],
                   ),
                 ),
@@ -310,8 +317,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
         if (recentScores.isNotEmpty) ...[
           const SectionHeader(
-            icon: AppIcons.trendingUp,
-            title: 'Recently Added',
+            icon: AppIcons.accessTime,
+            title: 'Recent Scores',
           ),
           const SizedBox(height: 12),
           ...recentScores.map((score) => _buildScoreCard(score)),

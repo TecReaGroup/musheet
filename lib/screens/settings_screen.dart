@@ -23,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
               border: Border(bottom: BorderSide(color: AppColors.gray200)),
             ),
             // Add top safe area padding
-            padding: EdgeInsets.fromLTRB(16, 24 + MediaQuery.of(context).padding.top, 16, 24),
+            padding: EdgeInsets.fromLTRB(16, 16 + MediaQuery.of(context).padding.top, 16, 24),
             child: const Text(
               'Settings',
               style: TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: AppColors.gray700),

@@ -98,18 +98,49 @@ class TeamScreen extends ConsumerStatefulWidget {
   ConsumerState<TeamScreen> createState() => _TeamScreenState();
 }
 
-class _TeamScreenState extends ConsumerState<TeamScreen> {
+class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProviderStateMixin {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+  
+  // Drawer animation state
+  bool _isDrawerExpanded = false;
+  late AnimationController _drawerController;
+  late Animation<double> _drawerAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _drawerController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+    _drawerAnimation = CurvedAnimation(
+      parent: _drawerController,
+      curve: Curves.easeOut,
+    );
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _drawerController.dispose();
     super.dispose();
+  }
+
+  void _toggleDrawer() {
+    setState(() {
+      _isDrawerExpanded = !_isDrawerExpanded;
+      if (_isDrawerExpanded) {
+        _drawerController.forward();
+      } else {
+        _drawerController.reverse();
+        _searchFocusNode.unfocus();
+      }
+    });
   }
 
   void _handleInvite() {
@@ -152,30 +183,40 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
           Column(
             children: [
               Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
-                  border: Border(bottom: BorderSide(color: AppColors.gray200)),
                 ),
                 // Add top safe area padding
-                padding: EdgeInsets.fromLTRB(16, 24 + MediaQuery.of(context).padding.top, 16, 16),
+                padding: EdgeInsets.fromLTRB(16, 16 + MediaQuery.of(context).padding.top, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            currentTeam.name,
-                            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: AppColors.gray700),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                    GestureDetector(
+                      onTap: () => ref.read(showTeamSwitcherProvider.notifier).state = !showTeamSwitcher,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width - 150),
+                            child: Text(
+                              currentTeam.name,
+                              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: AppColors.gray700),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          onPressed: () => ref.read(showTeamSwitcherProvider.notifier).state = !showTeamSwitcher,
-                          icon: const Icon(AppIcons.keyboardArrowDown, size: 28, color: AppColors.gray600),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Icon(
+                              showTeamSwitcher ? AppIcons.chevronUp : AppIcons.chevronDown,
+                              size: 22,
+                              color: AppColors.gray500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -219,6 +260,30 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
                   ],
                 ),
               ),
+              // Drawer handle and search/sort bar (only for setlists and scores tabs)
+              if (activeTab == TeamTab.setlists || activeTab == TeamTab.scores)
+                _buildDrawerSection(
+                  sortState: activeTab == TeamTab.setlists
+                      ? ref.watch(teamSetlistSortProvider)
+                      : ref.watch(teamScoreSortProvider),
+                  onSort: (type) => activeTab == TeamTab.setlists
+                      ? ref.read(teamSetlistSortProvider.notifier).setSort(type)
+                      : ref.read(teamScoreSortProvider.notifier).setSort(type),
+                ),
+              // Divider for members tab (same style as other tabs but without drawer)
+              if (activeTab == TeamTab.members)
+                SizedBox(
+                  height: 20,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        height: 1,
+                        color: AppColors.gray200,
+                      ),
+                    ],
+                  ),
+                ),
               Expanded(
                 child: GestureDetector(
                   onTap: () {
@@ -265,10 +330,6 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
 
     return Column(
       children: [
-        _buildSortBar(
-          sortState: sortState,
-          onSort: (type) => ref.read(teamSetlistSortProvider.notifier).setSort(type),
-        ),
         ...sortedSetlists.map((setlist) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -352,10 +413,6 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
 
     return Column(
       children: [
-        _buildSortBar(
-          sortState: sortState,
-          onSort: (type) => ref.read(teamScoreSortProvider.notifier).setSort(type),
-        ),
         ...sortedScores.map((score) {
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
@@ -473,6 +530,89 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
     return sorted;
   }
 
+  Widget _buildDrawerSection({
+    required SortState sortState,
+    required void Function(SortType) onSort,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Animated drawer content
+        AnimatedBuilder(
+          animation: _drawerAnimation,
+          builder: (context, child) {
+            return ClipRect(
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: _drawerAnimation.value,
+                child: Opacity(
+                  opacity: _drawerAnimation.value,
+                  child: _buildSortBar(
+                    sortState: sortState,
+                    onSort: onSort,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        // Draggable divider with handle indicator
+        GestureDetector(
+          onVerticalDragUpdate: (details) {
+            if (details.delta.dy > 0 && !_isDrawerExpanded) {
+              _toggleDrawer();
+            } else if (details.delta.dy < 0 && _isDrawerExpanded) {
+              _toggleDrawer();
+            }
+          },
+          onTap: _toggleDrawer,
+          child: Container(
+            color: Colors.transparent,
+            width: double.infinity,
+            height: 20,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Divider line
+                Container(
+                  height: 1,
+                  color: AppColors.gray200,
+                ),
+                // Drag handle indicator - double lines
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: AppColors.gray300,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        width: 24,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: AppColors.gray300,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSortBar({
     required SortState sortState,
     required void Function(SortType) onSort,
@@ -500,7 +640,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
       child: Row(
         children: [
           // Search box
@@ -734,59 +874,94 @@ class _TeamScreenState extends ConsumerState<TeamScreen> {
         Positioned.fill(
           child: GestureDetector(
             onTap: () => ref.read(showTeamSwitcherProvider.notifier).state = false,
-            child: Container(color: Colors.transparent),
+            child: Container(color: Colors.black.withValues(alpha: 0.05)),
           ),
         ),
         Positioned(
-          top: 80,
+          top: MediaQuery.of(context).padding.top + 62,
           left: 16,
+          right: 16,
           child: Container(
-            width: 256,
+            constraints: const BoxConstraints(maxWidth: 320),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.gray200),
-              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: teams.map((team) {
-                final isCurrentTeam = team.id == currentTeam.id;
-                return Material(
-                  color: isCurrentTeam ? AppColors.blue50 : Colors.white,
-                  child: InkWell(
-                    onTap: () {
-                      ref.read(currentTeamIdProvider.notifier).state = team.id;
-                      ref.read(showTeamSwitcherProvider.notifier).state = false;
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Icon(AppIcons.people, size: 18, color: isCurrentTeam ? AppColors.blue600 : AppColors.gray400),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  team.name,
-                                  style: TextStyle(fontSize: 14, color: isCurrentTeam ? AppColors.blue600 : AppColors.gray900),
-                                ),
-                                Text(
-                                  '${team.members.length} ${team.members.length == 1 ? "member" : "members"}',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.gray500),
-                                ),
-                              ],
-                            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: teams.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final team = entry.value;
+                  final isCurrentTeam = team.id == currentTeam.id;
+                  final isLast = index == teams.length - 1;
+                  return Material(
+                    color: isCurrentTeam ? AppColors.blue50 : Colors.white,
+                    child: InkWell(
+                      onTap: () {
+                        ref.read(currentTeamIdProvider.notifier).state = team.id;
+                        ref.read(showTeamSwitcherProvider.notifier).state = false;
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          border: isLast ? null : Border(
+                            bottom: BorderSide(color: AppColors.gray100),
                           ),
-                          if (isCurrentTeam) const Icon(AppIcons.check, size: 16, color: AppColors.blue600),
-                        ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: isCurrentTeam ? AppColors.blue100 : AppColors.gray100,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                AppIcons.people,
+                                size: 18,
+                                color: isCurrentTeam ? AppColors.blue600 : AppColors.gray500,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    team.name,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: isCurrentTeam ? FontWeight.w600 : FontWeight.w500,
+                                      color: isCurrentTeam ? AppColors.blue600 : AppColors.gray700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${team.members.length} ${team.members.length == 1 ? "member" : "members"}',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isCurrentTeam)
+                              Icon(AppIcons.check, size: 18, color: AppColors.blue600),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
+                  );
+                }).toList(),
+              ),
             ),
           ),
         ),

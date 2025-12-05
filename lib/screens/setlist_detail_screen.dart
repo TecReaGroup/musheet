@@ -39,24 +39,17 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  gradient: const LinearGradient(
+                    colors: [AppColors.emerald50, Colors.white],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
                   border: Border(bottom: BorderSide(color: AppColors.gray100)),
                 ),
                 child: SafeArea(
                   bottom: false,
                   child: Column(
                     children: [
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Container(
-                          width: 48,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: AppColors.gray300,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        ),
-                      ),
                       Padding(
                         padding: const EdgeInsets.all(24),
                         child: Row(

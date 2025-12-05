@@ -119,12 +119,17 @@ class LibraryScreen extends ConsumerStatefulWidget {
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTickerProviderStateMixin {
   String? _swipedItemId;
   double _swipeOffset = 0;
   Offset? _dragStart;
   bool _isDragging = false;
   bool _hasSwiped = false;
+  
+  // Drawer state
+  bool _isDrawerExpanded = false;
+  late AnimationController _drawerController;
+  late Animation<double> _drawerAnimation;
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -133,12 +138,38 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   String _searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    _drawerController = AnimationController(
+      duration: const Duration(milliseconds: 250),
+      vsync: this,
+    );
+    _drawerAnimation = CurvedAnimation(
+      parent: _drawerController,
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _drawerController.dispose();
     super.dispose();
+  }
+
+  void _toggleDrawer() {
+    setState(() {
+      _isDrawerExpanded = !_isDrawerExpanded;
+    });
+    if (_isDrawerExpanded) {
+      _drawerController.forward();
+    } else {
+      _drawerController.reverse();
+      _searchFocusNode.unfocus();
+    }
   }
 
   void _handleSwipeStart(String itemId, Offset position) {
@@ -272,12 +303,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           Column(
             children: [
               Container(
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
-                  border: Border(bottom: BorderSide(color: AppColors.gray200)),
                 ),
                 // Add top safe area padding
-                padding: EdgeInsets.fromLTRB(16, 24 + MediaQuery.of(context).padding.top, 16, 16),
+                padding: EdgeInsets.fromLTRB(16, 16 + MediaQuery.of(context).padding.top, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -328,6 +358,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     ),
                   ],
                 ),
+              ),
+              // Drawer handle and search/sort bar
+              _buildDrawerSection(
+                sortState: activeTab == LibraryTab.setlists
+                    ? ref.watch(setlistSortProvider)
+                    : ref.watch(scoreSortProvider),
+                onSort: (type) => activeTab == LibraryTab.setlists
+                    ? ref.read(setlistSortProvider.notifier).setSort(type)
+                    : ref.read(scoreSortProvider.notifier).setSort(type),
               ),
               Expanded(
                 child: GestureDetector(
@@ -392,38 +431,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         : setlists.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
     final sortedSetlists = _sortSetlists(filteredSetlists, sortState, recentlyOpened);
 
-    return Column(
-      children: [
-        _buildSortBar(
-          sortState: sortState,
-          onSort: (type) => ref.read(setlistSortProvider.notifier).setSort(type),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
-            itemCount: sortedSetlists.length,
-            itemBuilder: (context, index) {
-              final setlist = sortedSetlists[index];
-              return _buildSwipeableItem(
-                id: setlist.id,
-                child: _LibrarySetlistCard(setlist: setlist),
-                onDelete: () => _handleDelete(setlist.id, false),
-                onTap: () {
-                  if (!_hasSwiped) {
-                    ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => SetlistDetailScreen(setlist: setlist),
-                      ),
-                    );
-                  }
-                },
-              );
+    return ListView.builder(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+      itemCount: sortedSetlists.length,
+      itemBuilder: (context, index) {
+          final setlist = sortedSetlists[index];
+          return _buildSwipeableItem(
+            id: setlist.id,
+            child: _LibrarySetlistCard(setlist: setlist),
+            onDelete: () => _handleDelete(setlist.id, false),
+            onTap: () {
+              if (!_hasSwiped) {
+                ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => SetlistDetailScreen(setlist: setlist),
+                  ),
+                );
+              }
             },
-          ),
-        ),
-      ],
-    );
+          );
+        },
+      );
   }
 
   Widget _buildScoresTab(List<Score> scores) {
@@ -446,39 +475,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         : scores.where((s) => s.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
     final sortedScores = _sortScores(filteredScores, sortState, recentlyOpened);
 
-    return Column(
-      children: [
-        _buildSortBar(
-          sortState: sortState,
-          onSort: (type) => ref.read(scoreSortProvider.notifier).setSort(type),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
-            itemCount: sortedScores.length,
-            itemBuilder: (context, index) {
-              final score = sortedScores[index];
-              return _buildSwipeableItem(
-                id: score.id,
-                child: _LibraryScoreCard(score: score),
-                onDelete: () => _handleDelete(score.id, true),
-                onTap: () {
-                  if (!_hasSwiped) {
-                    ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ScoreViewerScreen(score: score),
-                      ),
-                    );
-                  }
-                },
-              );
+    return ListView.builder(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+      itemCount: sortedScores.length,
+      itemBuilder: (context, index) {
+          final score = sortedScores[index];
+          return _buildSwipeableItem(
+            id: score.id,
+            child: _LibraryScoreCard(score: score),
+            onDelete: () => _handleDelete(score.id, true),
+            onTap: () {
+              if (!_hasSwiped) {
+                ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ScoreViewerScreen(score: score),
+                  ),
+                );
+              }
             },
-          ),
-        ),
-      ],
-    );
+          );
+        },
+      );
   }
 
   List<Setlist> _sortSetlists(List<Setlist> setlists, SortState sortState, Map<String, DateTime> recentlyOpened) {
@@ -535,6 +554,89 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     return sorted;
   }
 
+  Widget _buildDrawerSection({
+    required SortState sortState,
+    required void Function(SortType) onSort,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Animated drawer content
+        AnimatedBuilder(
+          animation: _drawerAnimation,
+          builder: (context, child) {
+            return ClipRect(
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: _drawerAnimation.value,
+                child: Opacity(
+                  opacity: _drawerAnimation.value,
+                  child: _buildSortBar(
+                    sortState: sortState,
+                    onSort: onSort,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+        // Draggable divider with handle indicator
+        GestureDetector(
+          onVerticalDragUpdate: (details) {
+            if (details.delta.dy > 0 && !_isDrawerExpanded) {
+              _toggleDrawer();
+            } else if (details.delta.dy < 0 && _isDrawerExpanded) {
+              _toggleDrawer();
+            }
+          },
+          onTap: _toggleDrawer,
+          child: Container(
+            color: Colors.transparent,
+            width: double.infinity,
+            height: 20,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Divider line
+                Container(
+                  height: 1,
+                  color: AppColors.gray200,
+                ),
+                // Drag handle indicator - double lines
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: AppColors.gray300,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Container(
+                        width: 24,
+                        height: 2,
+                        decoration: BoxDecoration(
+                          color: AppColors.gray300,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSortBar({
     required SortState sortState,
     required void Function(SortType) onSort,
@@ -562,7 +664,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
       child: Row(
         children: [
           // Search box
