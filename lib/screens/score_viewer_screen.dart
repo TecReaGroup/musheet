@@ -14,12 +14,14 @@ class ScoreViewerScreen extends ConsumerStatefulWidget {
   final Score score;
   final List<Score>? setlistScores;
   final int? currentIndex;
+  final String? setlistName;
 
   const ScoreViewerScreen({
     super.key,
     required this.score,
     this.setlistScores,
     this.currentIndex,
+    this.setlistName,
   });
 
   @override
@@ -44,6 +46,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   bool _showMetronome = false;
   bool _showSetlistNav = false;
   bool _showPenOptions = false;
+  ScrollController? _setlistScrollController;
   bool _showUI = false;
   
   // Page indicator auto-hide
@@ -215,6 +218,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             score: widget.setlistScores![index],
             setlistScores: widget.setlistScores,
             currentIndex: index,
+            setlistName: widget.setlistName,
           ),
         ),
       );
@@ -585,6 +589,19 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   _showSetlistNav = !_showSetlistNav;
                   if (_showSetlistNav) {
                     _showMetronome = false;
+                    // Create scroll controller and scroll to current item
+                    // Each item is ~52px (padding 8*2 + content ~36)
+                    // List height is 194px, so max visible is ~3.5 items
+                    const itemHeight = 52.0;
+                    const listHeight = 194.0;
+                    const listPadding = 12.0; // vertical padding 6*2
+                    final totalContentHeight = widget.setlistScores!.length * itemHeight + listPadding;
+                    final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
+                    final targetOffset = ((widget.currentIndex ?? 0) * itemHeight).clamp(0.0, maxScrollOffset);
+                    _setlistScrollController = ScrollController(initialScrollOffset: targetOffset);
+                  } else {
+                    _setlistScrollController?.dispose();
+                    _setlistScrollController = null;
                   }
                 });
               },
@@ -952,73 +969,88 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Widget _buildSetlistNavModal() {
+    // Each card is approximately 52px (padding 8*2 + content ~36)
+    // 3.5 cards = ~182px, plus list padding 6*2 = 194px
+    const double listHeight = 194;
+    
     return Positioned(
-      bottom: 74 + MediaQuery.of(context).padding.bottom,
-      left: 16,
-      right: 16,
-      child: Container(
-        constraints: const BoxConstraints(maxHeight: 360),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 12, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Setlist',
-                    style: TextStyle(
-                      color: AppColors.gray900,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(AppIcons.close, color: AppColors.gray400),
-                    onPressed: () {
-                      setState(() {
-                        _showSetlistNav = false;
-                      });
-                    },
-                  ),
-                ],
+      top: MediaQuery.of(context).padding.top + 56,
+      right: 12,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 280,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.15),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
-            ),
-            const Divider(height: 1, color: AppColors.gray100),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: widget.setlistScores!.length,
-                itemBuilder: (context, index) {
-                  final score = widget.setlistScores![index];
-                  final isCurrent = index == widget.currentIndex;
-                  return Material(
-                    color: isCurrent ? AppColors.blue50 : Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _navigateToScore(index),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(AppIcons.setlistIcon, color: AppColors.gray400, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        widget.setlistName ?? 'Setlist',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray900,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(AppIcons.close, size: 18, color: AppColors.gray400),
+                      onPressed: () => setState(() => _showSetlistNav = false),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    ),
+                  ],
+                ),
+              ),
+              // Score list with fixed height
+              SizedBox(
+                height: listHeight,
+                child: ListView.builder(
+                  controller: _setlistScrollController,
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  itemCount: widget.setlistScores!.length,
+                  itemBuilder: (context, index) {
+                    final score = widget.setlistScores![index];
+                    final isCurrent = index == widget.currentIndex;
+                    return InkWell(
+                      onTap: () {
+                        setState(() => _showSetlistNav = false);
+                        _navigateToScore(index);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        color: isCurrent ? AppColors.blue50 : Colors.transparent,
                         child: Row(
                           children: [
                             Container(
-                              width: 32,
-                              height: 32,
+                              width: 26,
+                              height: 26,
                               decoration: BoxDecoration(
                                 color: isCurrent ? AppColors.blue500 : AppColors.gray100,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Center(
                                 child: Text(
@@ -1026,12 +1058,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                                   style: TextStyle(
                                     color: isCurrent ? Colors.white : AppColors.gray600,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 13,
+                                    fontSize: 11,
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1041,67 +1073,104 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                                     style: TextStyle(
                                       color: isCurrent ? AppColors.blue600 : AppColors.gray900,
                                       fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
-                                      fontSize: 14,
+                                      fontSize: 13,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
                                     score.composer,
                                     style: const TextStyle(
                                       color: AppColors.gray500,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
                               ),
                             ),
-                            if (isCurrent)
-                              const Icon(AppIcons.playArrow, color: AppColors.blue500, size: 20),
                           ],
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            if (widget.currentIndex != null) ...[
-              const Divider(height: 1, color: AppColors.gray100),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: widget.currentIndex! > 0 ? _goToPreviousScore : null,
-                        icon: const Icon(AppIcons.arrowBack, size: 18),
-                        label: const Text('Previous'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.gray700,
-                          side: const BorderSide(color: AppColors.gray200),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: widget.currentIndex! < widget.setlistScores!.length - 1
-                            ? _goToNextScore
-                            : null,
-                        icon: const Icon(AppIcons.arrowForward, size: 18),
-                        label: const Text('Next'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.blue500,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
+              // Navigation buttons - matching style
+              if (widget.currentIndex != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: AppColors.gray100)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: OutlinedButton(
+                            onPressed: widget.currentIndex! > 0 
+                                ? () {
+                                    setState(() => _showSetlistNav = false);
+                                    _goToPreviousScore();
+                                  }
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.gray700,
+                              side: const BorderSide(color: AppColors.gray200),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(AppIcons.arrowBack, size: 14),
+                                SizedBox(width: 4),
+                                Text('Prev', style: TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: OutlinedButton(
+                            onPressed: widget.currentIndex! < widget.setlistScores!.length - 1
+                                ? () {
+                                    setState(() => _showSetlistNav = false);
+                                    _goToNextScore();
+                                  }
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.gray700,
+                              side: const BorderSide(color: AppColors.gray200),
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text('Next', style: TextStyle(fontSize: 12)),
+                                SizedBox(width: 4),
+                                Icon(AppIcons.arrowForward, size: 14),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

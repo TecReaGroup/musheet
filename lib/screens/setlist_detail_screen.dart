@@ -21,6 +21,14 @@ class SetlistDetailScreen extends ConsumerStatefulWidget {
 
 class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   bool _showAddModal = false;
+  String _addScoreSearchQuery = '';
+  final FocusNode _addScoreSearchFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _addScoreSearchFocusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,6 +203,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                   score: score,
                   setlistScores: currentSetlist.scores,
                   currentIndex: index,
+                  setlistName: currentSetlist.name,
                 ),
               ),
             );
@@ -267,12 +276,28 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
 
   Widget _buildAddScoreModal(List<Score> allScores, Setlist setlist) {
     final availableScores = allScores.where((score) => !setlist.scores.any((s) => s.id == score.id)).toList();
+    final filteredScores = _addScoreSearchQuery.isEmpty
+        ? availableScores
+        : availableScores.where((score) =>
+            score.title.toLowerCase().contains(_addScoreSearchQuery.toLowerCase()) ||
+            score.composer.toLowerCase().contains(_addScoreSearchQuery.toLowerCase())).toList();
 
     return Stack(
       children: [
         Positioned.fill(
           child: GestureDetector(
-            onTap: () => setState(() => _showAddModal = false),
+            onTap: () {
+              // If search field is focused, just unfocus it
+              if (_addScoreSearchFocusNode.hasFocus) {
+                _addScoreSearchFocusNode.unfocus();
+                return;
+              }
+              // Otherwise close the modal
+              setState(() {
+                _showAddModal = false;
+                _addScoreSearchQuery = '';
+              });
+            },
             child: Container(color: Colors.black.withValues(alpha: 0.1)),
           ),
         ),
@@ -294,59 +319,96 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.blue50, Colors.white],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                GestureDetector(
+                  onTap: () => _addScoreSearchFocusNode.unfocus(),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.blue50, Colors.white],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                      border: Border(bottom: BorderSide(color: AppColors.gray100)),
                     ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(24),
-                      topRight: Radius.circular(24),
-                    ),
-                    border: Border(bottom: BorderSide(color: AppColors.gray100)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.blue400, AppColors.blue600],
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.blue200.withValues(alpha: 0.5),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.blue400, AppColors.blue600],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
                             ),
-                          ],
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.blue200.withValues(alpha: 0.5),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(AppIcons.musicNote, color: Colors.white, size: 24),
                         ),
-                        child: const Icon(AppIcons.musicNote, color: Colors.white, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Add Scores', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-                            Text('Choose scores to add', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
-                          ],
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Add Scores', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+                              Text('Choose scores to add', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                            ],
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => setState(() => _showAddModal = false),
-                        icon: const Icon(AppIcons.close, color: AppColors.gray400),
-                      ),
-                    ],
+                        IconButton(
+                          onPressed: () => setState(() {
+                            _showAddModal = false;
+                            _addScoreSearchQuery = '';
+                          }),
+                          icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+                // Search bar
+                if (availableScores.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    child: TextField(
+                      focusNode: _addScoreSearchFocusNode,
+                      onChanged: (value) => setState(() => _addScoreSearchQuery = value),
+                      decoration: InputDecoration(
+                        hintText: 'Search scores...',
+                        hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                        prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400, size: 20),
+                        filled: true,
+                        fillColor: AppColors.gray50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.blue400, width: 1.5),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        isDense: true,
+                      ),
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                  ),
                 Flexible(
                   child: availableScores.isEmpty
                       ? const Padding(
@@ -357,12 +419,23 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                             textAlign: TextAlign.center,
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(20),
-                          shrinkWrap: true,
-                          itemCount: availableScores.length,
-                          itemBuilder: (context, index) {
-                            final score = availableScores[index];
+                      : filteredScores.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(48),
+                              child: Text(
+                                'No scores matching "$_addScoreSearchQuery"',
+                                style: const TextStyle(color: AppColors.gray500),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: () => FocusScope.of(context).unfocus(),
+                              child: ListView.builder(
+                              padding: const EdgeInsets.all(20),
+                              shrinkWrap: true,
+                              itemCount: filteredScores.length,
+                              itemBuilder: (context, index) {
+                                final score = filteredScores[index];
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               child: Material(
@@ -371,7 +444,10 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                                 child: InkWell(
                                   onTap: () {
                                     ref.read(setlistsProvider.notifier).addScoreToSetlist(setlist.id, score);
-                                    setState(() => _showAddModal = false);
+                                    setState(() {
+                                      _showAddModal = false;
+                                      _addScoreSearchQuery = '';
+                                    });
                                   },
                                   borderRadius: BorderRadius.circular(16),
                                   child: Container(
@@ -420,6 +496,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                             );
                           },
                         ),
+                            ),
                 ),
               ],
             ),

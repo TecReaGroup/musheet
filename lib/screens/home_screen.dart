@@ -308,7 +308,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         const SizedBox(height: 24),
         if (recentSetlists.isNotEmpty) ...[
           const SectionHeader(
-            icon: AppIcons.accessTime,
+            icon: AppIcons.setlistIcon,
             title: 'Recent Setlists',
           ),
           const SizedBox(height: 12),
@@ -317,12 +317,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ],
         if (recentScores.isNotEmpty) ...[
           const SectionHeader(
-            icon: AppIcons.accessTime,
+            icon: AppIcons.musicNote,
             title: 'Recent Scores',
           ),
           const SizedBox(height: 12),
           ...recentScores.map((score) => _buildScoreCard(score)),
         ],
+        // Show hint when both recent lists are empty but library has content
+        if (recentSetlists.isEmpty && recentScores.isEmpty && (scores.isNotEmpty || setlists.isNotEmpty))
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Text(
+                'Open scores or setlists to start...',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: AppColors.gray400,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          ),
         if (scores.isEmpty && setlists.isEmpty)
           const EmptyState(
             icon: AppIcons.musicNote,
