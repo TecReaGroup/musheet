@@ -8,6 +8,7 @@ import '../theme/app_colors.dart';
 import '../widgets/add_score_widget.dart';
 import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
+import 'library_screen.dart' show lastOpenedInstrumentInScoreProvider;
 
 class ScoreDetailScreen extends ConsumerStatefulWidget {
   final Score score;
@@ -467,6 +468,12 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
+            // Record the instrument index being opened
+            ref.read(lastOpenedInstrumentInScoreProvider.notifier).recordLastOpened(score.id, index);
+            
+            // Note: When clicking from score detail, we use the clicked instrument directly
+            // The smart selection logic (recent > preferred > default) is only used
+            // when opening a score from cards/lists where no specific instrument is chosen
             Navigator.push(
               context,
               MaterialPageRoute(

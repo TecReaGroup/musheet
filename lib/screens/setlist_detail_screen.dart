@@ -7,7 +7,7 @@ import '../providers/setlists_provider.dart';
 import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import 'score_viewer_screen.dart';
-import 'library_screen.dart' show scoreSortProvider, recentlyOpenedScoresProvider, SortState, SortType;
+import 'library_screen.dart' show scoreSortProvider, recentlyOpenedScoresProvider, SortState, SortType, lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider, preferredInstrumentProvider, getBestInstrumentIndex;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 
@@ -394,11 +394,21 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
+            // Record the score index being opened in the setlist
+            ref.read(lastOpenedScoreInSetlistProvider.notifier).recordLastOpened(currentSetlist.id, index);
+            
+            // Get best instrument using priority: recent > preferred > default
+            final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(score.id);
+            final preferredInstrument = ref.read(preferredInstrumentProvider);
+            final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
+            final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
+            
             Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => ScoreViewerScreen(
                   score: score,
+                  instrumentScore: instrumentScore,
                   setlistScores: setlistScores,
                   currentIndex: index,
                   setlistName: currentSetlist.name,

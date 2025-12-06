@@ -10,6 +10,8 @@ import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/metronome_widget.dart';
 import '../utils/icon_mappings.dart';
+import '../providers/setlists_provider.dart';
+import 'library_screen.dart' show lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider;
 
 class ScoreViewerScreen extends ConsumerStatefulWidget {
   final Score score;
@@ -172,6 +174,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       return;
     }
     
+    // Record the instrument index being switched to
+    final instrumentIndex = widget.score.instrumentScores.indexWhere((s) => s.id == instrumentScore.id);
+    if (instrumentIndex >= 0) {
+      ref.read(lastOpenedInstrumentInScoreProvider.notifier).recordLastOpened(widget.score.id, instrumentIndex);
+    }
+    
     // Dispose old document
     _pdfDocument?.dispose();
     
@@ -260,6 +268,20 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   void _navigateToScore(int index) async {
     if (widget.setlistScores != null && index >= 0 && index < widget.setlistScores!.length) {
+      // Record the score index being navigated to in the setlist
+      if (widget.setlistScores != null) {
+        // Find the setlist ID by looking up which setlist contains these scores
+        // We need to get the setlist ID from somewhere - we can use the setlistName to find it
+        // For now, we'll use a simple approach: store by setlist name or pass setlist ID
+        // Since we have setlistName, we can create a composite key or just track by the score order
+        final setlists = ref.read(setlistsProvider);
+        final currentSetlist = setlists.firstWhere(
+          (s) => s.name == widget.setlistName,
+          orElse: () => setlists.first,
+        );
+        ref.read(lastOpenedScoreInSetlistProvider.notifier).recordLastOpened(currentSetlist.id, index);
+      }
+      
       // Stop and destroy metronome before navigating to properly release audio resources
       _metronomeController?.stop();
       _metronomeController?.removeListener(_onMetronomeChanged);

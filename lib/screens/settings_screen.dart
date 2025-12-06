@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
+import '../models/instrument_score.dart';
+import 'library_screen.dart' show preferredInstrumentProvider;
+import 'instrument_preference_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -83,13 +86,55 @@ class SettingsScreen extends ConsumerWidget {
           ),
 
           SettingsGroup(
-            title: 'PERFORMANCE',
+            title: 'PREFERENCES',
             children: [
+              Consumer(
+                builder: (context, ref, child) {
+                  final preferredInstrument = ref.watch(preferredInstrumentProvider);
+                  String displayText = 'Not set';
+                  if (preferredInstrument != null) {
+                    // Try to find the instrument type
+                    final instrumentType = InstrumentType.values.firstWhere(
+                      (type) => type.name == preferredInstrument,
+                      orElse: () => InstrumentType.other,
+                    );
+                    displayText = instrumentType.name[0].toUpperCase() + instrumentType.name.substring(1);
+                  }
+                  
+                  return SettingsListItem(
+                    icon: AppIcons.piano,
+                    label: 'Preferred Instrument',
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          displayText,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.gray500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(AppIcons.chevronRight, size: 20, color: AppColors.gray400),
+                      ],
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const InstrumentPreferenceScreen(),
+                        ),
+                      );
+                    },
+                    showDivider: true,
+                    isFirst: true,
+                  );
+                },
+              ),
               SettingsListItem(
                 icon: AppIcons.bluetooth,
                 label: 'Bluetooth Devices',
                 onTap: () {},
-                isFirst: true,
                 isLast: true,
               ),
             ],

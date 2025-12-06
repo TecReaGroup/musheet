@@ -122,8 +122,84 @@ class RecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
   }
 }
 
+// Track last opened score index per setlist
+class LastOpenedScoreInSetlistNotifier extends Notifier<Map<String, int>> {
+  @override
+  Map<String, int> build() => {};
+  
+  void recordLastOpened(String setlistId, int scoreIndex) {
+    state = {...state, setlistId: scoreIndex};
+  }
+  
+  int? getLastOpened(String setlistId) => state[setlistId];
+}
+
+// Track last opened instrument index per score
+class LastOpenedInstrumentInScoreNotifier extends Notifier<Map<String, int>> {
+  @override
+  Map<String, int> build() => {};
+  
+  void recordLastOpened(String scoreId, int instrumentIndex) {
+    state = {...state, scoreId: instrumentIndex};
+  }
+  
+  int? getLastOpened(String scoreId) => state[scoreId];
+  
+  void clearAll() {
+    state = {};
+  }
+}
+
+// Track user's preferred instrument type
+class PreferredInstrumentNotifier extends Notifier<String?> {
+  @override
+  String? build() => null; // null means no preference set
+  
+  void setPreferredInstrument(String? instrumentKey) {
+    state = instrumentKey;
+    // Clear all last opened instrument records when preference changes
+    // This ensures the new preference takes effect immediately
+    ref.read(lastOpenedInstrumentInScoreProvider.notifier).clearAll();
+  }
+}
+
 final recentlyOpenedSetlistsProvider = NotifierProvider<RecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(RecentlyOpenedSetlistsNotifier.new);
 final recentlyOpenedScoresProvider = NotifierProvider<RecentlyOpenedScoresNotifier, Map<String, DateTime>>(RecentlyOpenedScoresNotifier.new);
+final lastOpenedScoreInSetlistProvider = NotifierProvider<LastOpenedScoreInSetlistNotifier, Map<String, int>>(LastOpenedScoreInSetlistNotifier.new);
+final lastOpenedInstrumentInScoreProvider = NotifierProvider<LastOpenedInstrumentInScoreNotifier, Map<String, int>>(LastOpenedInstrumentInScoreNotifier.new);
+final preferredInstrumentProvider = NotifierProvider<PreferredInstrumentNotifier, String?>(PreferredInstrumentNotifier.new);
+
+// Helper function to get the best instrument index for a score
+// Priority: 1. Last opened > 2. User preferred > 3. Vocal > 4. Default (first)
+int getBestInstrumentIndex(Score score, int? lastOpenedIndex, String? preferredInstrumentKey) {
+  // Priority 1: Use last opened if available
+  if (lastOpenedIndex != null && lastOpenedIndex >= 0 && lastOpenedIndex < score.instrumentScores.length) {
+    return lastOpenedIndex;
+  }
+  
+  // Priority 2: Use preferred instrument if set and available
+  if (preferredInstrumentKey != null && score.instrumentScores.isNotEmpty) {
+    final preferredIndex = score.instrumentScores.indexWhere(
+      (inst) => inst.instrumentKey == preferredInstrumentKey
+    );
+    if (preferredIndex >= 0) {
+      return preferredIndex;
+    }
+  }
+  
+  // Priority 3: Use Vocal if available
+  if (score.instrumentScores.isNotEmpty) {
+    final vocalIndex = score.instrumentScores.indexWhere(
+      (inst) => inst.instrumentKey == 'vocal'
+    );
+    if (vocalIndex >= 0) {
+      return vocalIndex;
+    }
+  }
+  
+  // Priority 4: Default to first instrument
+  return 0;
+}
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -463,15 +539,28 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             onDelete: () => _handleDelete(setlist.id, false),
             onTap: () {
               if (!_hasSwiped) {
-                // Card tap: preview first score
+                // Card tap: preview last opened score or first score
                 ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
                 if (setlistScores.isNotEmpty) {
+                  // Get last opened score index, default to 0 if not found
+                  final lastOpenedIndex = ref.read(lastOpenedScoreInSetlistProvider.notifier).getLastOpened(setlist.id) ?? 0;
+                  // Ensure index is valid
+                  final validIndex = lastOpenedIndex.clamp(0, setlistScores.length - 1);
+                  final selectedScore = setlistScores[validIndex];
+                  
+                  // Get best instrument using priority: recent > preferred > default
+                  final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(selectedScore.id);
+                  final preferredInstrument = ref.read(preferredInstrumentProvider);
+                  final bestInstrumentIndex = getBestInstrumentIndex(selectedScore, lastOpenedInstrumentIndex, preferredInstrument);
+                  final instrumentScore = selectedScore.instrumentScores.isNotEmpty ? selectedScore.instrumentScores[bestInstrumentIndex] : null;
+                  
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) => ScoreViewerScreen(
-                        score: setlistScores.first,
+                        score: selectedScore,
+                        instrumentScore: instrumentScore,
                         setlistScores: setlistScores,
-                        currentIndex: 0,
+                        currentIndex: validIndex,
                         setlistName: setlist.name,
                       ),
                     ),
@@ -534,10 +623,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             onTap: () {
               if (!_hasSwiped) {
                 ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                // Get best instrument using priority: recent > preferred > default
+                final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(score.id);
+                final preferredInstrument = ref.read(preferredInstrumentProvider);
+                final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
+                final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
+                
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ScoreViewerScreen(score: score),
+                    builder: (context) => ScoreViewerScreen(
+                      score: score,
+                      instrumentScore: instrumentScore,
+                    ),
                   ),
                 );
               }

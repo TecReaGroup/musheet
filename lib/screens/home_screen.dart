@@ -16,7 +16,11 @@ import 'library_screen.dart'
         LibraryTab,
         libraryTabProvider,
         recentlyOpenedSetlistsProvider,
-        recentlyOpenedScoresProvider;
+        recentlyOpenedScoresProvider,
+        lastOpenedScoreInSetlistProvider,
+        lastOpenedInstrumentInScoreProvider,
+        preferredInstrumentProvider,
+        getBestInstrumentIndex;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 
@@ -548,15 +552,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: () {
-            // Card tap: preview first score if available
+            // Card tap: preview last opened score or first score if available
             if (setlistScores.isNotEmpty) {
+              // Get last opened score index, default to 0 if not found
+              final lastOpenedIndex = ref.read(lastOpenedScoreInSetlistProvider.notifier).getLastOpened(setlist.id) ?? 0;
+              // Ensure index is valid
+              final validIndex = lastOpenedIndex.clamp(0, setlistScores.length - 1);
+              final selectedScore = setlistScores[validIndex];
+              
+              // Get best instrument using priority: recent > preferred > default
+              final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(selectedScore.id);
+              final preferredInstrument = ref.read(preferredInstrumentProvider);
+              final bestInstrumentIndex = getBestInstrumentIndex(selectedScore, lastOpenedInstrumentIndex, preferredInstrument);
+              final instrumentScore = selectedScore.instrumentScores.isNotEmpty ? selectedScore.instrumentScores[bestInstrumentIndex] : null;
+              
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ScoreViewerScreen(
-                    score: setlistScores.first,
+                    score: selectedScore,
+                    instrumentScore: instrumentScore,
                     setlistScores: setlistScores,
-                    currentIndex: 0,
+                    currentIndex: validIndex,
                     setlistName: setlist.name,
                   ),
                 ),
@@ -652,10 +669,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: () {
+            // Get best instrument using priority: recent > preferred > default
+            final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(score.id);
+            final preferredInstrument = ref.read(preferredInstrumentProvider);
+            final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
+            final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
+            
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => ScoreViewerScreen(score: score),
+                builder: (context) => ScoreViewerScreen(
+                  score: score,
+                  instrumentScore: instrumentScore,
+                ),
               ),
             );
           },
