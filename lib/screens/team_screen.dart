@@ -331,6 +331,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
     return Column(
       children: [
         ...sortedSetlists.map((setlist) {
+          final scoreCount = setlist.scoreIds.length;
           return Container(
             margin: const EdgeInsets.only(bottom: 12),
             child: Material(
@@ -376,7 +377,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
                             Text(setlist.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600), maxLines: 1, overflow: TextOverflow.ellipsis),
                             Text(
-                              '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Team',
+                              '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • Team',
                               style: const TextStyle(fontSize: 12, color: AppColors.gray400),
                             ),
                           ],

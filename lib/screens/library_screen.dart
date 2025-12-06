@@ -47,7 +47,15 @@ class SelectedSetlistNotifier extends Notifier<Setlist?> {
   set state(Setlist? newState) => super.state = newState;
 }
 
-class ShowCreateModalNotifier extends Notifier<bool> {
+class ShowCreateSetlistModalNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+  
+  @override
+  set state(bool newState) => super.state = newState;
+}
+
+class ShowCreateScoreModalNotifier extends Notifier<bool> {
   @override
   bool build() => false;
   
@@ -65,8 +73,9 @@ class SetlistSortNotifier extends Notifier<SortState> {
       // 同类型点击，切换升降序
       state = state.copyWith(ascending: !state.ascending);
     } else {
-      // 不同类型，默认降序（最新在前）
-      state = SortState(type: type, ascending: false);
+      // 不同类型：字母排序默认升序（A→Z），其他默认降序（最新在前）
+      final defaultAscending = type == SortType.alphabetical;
+      state = SortState(type: type, ascending: defaultAscending);
     }
   }
 }
@@ -79,14 +88,17 @@ class ScoreSortNotifier extends Notifier<SortState> {
     if (state.type == type) {
       state = state.copyWith(ascending: !state.ascending);
     } else {
-      state = SortState(type: type, ascending: false);
+      // 不同类型：字母排序默认升序（A→Z），其他默认降序（最新在前）
+      final defaultAscending = type == SortType.alphabetical;
+      state = SortState(type: type, ascending: defaultAscending);
     }
   }
 }
 
 final libraryTabProvider = NotifierProvider<LibraryTabNotifier, LibraryTab>(LibraryTabNotifier.new);
 final selectedSetlistProvider = NotifierProvider<SelectedSetlistNotifier, Setlist?>(SelectedSetlistNotifier.new);
-final showCreateModalProvider = NotifierProvider<ShowCreateModalNotifier, bool>(ShowCreateModalNotifier.new);
+final showCreateSetlistModalProvider = NotifierProvider<ShowCreateSetlistModalNotifier, bool>(ShowCreateSetlistModalNotifier.new);
+final showCreateScoreModalProvider = NotifierProvider<ShowCreateScoreModalNotifier, bool>(ShowCreateScoreModalNotifier.new);
 final setlistSortProvider = NotifierProvider<SetlistSortNotifier, SortState>(SetlistSortNotifier.new);
 final scoreSortProvider = NotifierProvider<ScoreSortNotifier, SortState>(ScoreSortNotifier.new);
 
@@ -133,6 +145,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _scoreTitleController = TextEditingController();
+  final TextEditingController _scoreComposerController = TextEditingController();
+  final TextEditingController _customInstrumentController = TextEditingController();
+  final FocusNode _customInstrumentFocusNode = FocusNode();
+  String? _selectedPdfPath;
+  String? _selectedPdfName;
+  InstrumentType _selectedInstrument = InstrumentType.vocal;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
@@ -154,8 +173,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _scoreTitleController.dispose();
+    _scoreComposerController.dispose();
+    _customInstrumentController.dispose();
+    _customInstrumentFocusNode.dispose();
     _searchController.dispose();
-    _searchFocusNode.dispose();
+    _searchFocusNode.dispose;
     _drawerController.dispose();
     super.dispose();
   }
@@ -226,7 +249,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     });
   }
 
-  Future<void> _handleImportScore() async {
+  Future<void> _handleSelectPdf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf'],
@@ -234,15 +257,37 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
-      final newScore = Score(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        title: file.name.replaceAll('.pdf', ''),
-        composer: 'Unknown',
-        pdfUrl: file.path ?? '',
-        dateAdded: DateTime.now(),
-      );
-      ref.read(scoresProvider.notifier).addScore(newScore);
+      setState(() {
+        _selectedPdfPath = file.path;
+        _selectedPdfName = file.name;
+        if (_scoreTitleController.text.isEmpty) {
+          _scoreTitleController.text = file.name.replaceAll('.pdf', '');
+        }
+      });
     }
+  }
+
+  void _handleCreateScore() {
+    if (_scoreTitleController.text.trim().isEmpty || _selectedPdfPath == null) return;
+    
+    final newScore = Score(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      title: _scoreTitleController.text.trim(),
+      composer: _scoreComposerController.text.trim().isEmpty ? 'Unknown' : _scoreComposerController.text.trim(),
+      pdfUrl: _selectedPdfPath!,
+      dateAdded: DateTime.now(),
+      instrumentType: _selectedInstrument,
+      customInstrument: _selectedInstrument == InstrumentType.other ? _customInstrumentController.text.trim() : null,
+    );
+    ref.read(scoresProvider.notifier).addScore(newScore);
+    
+    _scoreTitleController.clear();
+    _scoreComposerController.clear();
+    _customInstrumentController.clear();
+    _selectedPdfPath = null;
+    _selectedPdfName = null;
+    _selectedInstrument = InstrumentType.vocal;
+    ref.read(showCreateScoreModalProvider.notifier).state = false;
   }
 
   void _handleCreateSetlist() {
@@ -255,7 +300,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     
     _nameController.clear();
     _descriptionController.clear();
-    ref.read(showCreateModalProvider.notifier).state = false;
+    ref.read(showCreateSetlistModalProvider.notifier).state = false;
   }
 
   void _handleDelete(String id, bool isScore) {
@@ -294,7 +339,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     final scores = ref.watch(scoresProvider);
     final setlists = ref.watch(setlistsProvider);
     final activeTab = ref.watch(libraryTabProvider);
-    final showCreateModal = ref.watch(showCreateModalProvider);
+    final showCreateSetlistModal = ref.watch(showCreateSetlistModalProvider);
+    final showCreateScoreModal = ref.watch(showCreateScoreModalProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -395,9 +441,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               child: FloatingActionButton(
                 onPressed: () {
                   if (activeTab == LibraryTab.setlists) {
-                    ref.read(showCreateModalProvider.notifier).state = true;
+                    ref.read(showCreateSetlistModalProvider.notifier).state = true;
                   } else {
-                    _handleImportScore();
+                    ref.read(showCreateScoreModalProvider.notifier).state = true;
                   }
                 },
                 elevation: 2,
@@ -406,7 +452,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 child: const Icon(AppIcons.add, size: 28),
               ),
             ),
-          if (showCreateModal) _buildCreateModal(),
+          if (showCreateSetlistModal) _buildCreateSetlistModal(),
+          if (showCreateScoreModal) _buildCreateScoreModal(),
         ],
       ),
     );
@@ -416,7 +463,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     if (setlists.isEmpty) {
       return EmptyState.setlists(
         action: ElevatedButton(
-          onPressed: () => ref.read(showCreateModalProvider.notifier).state = true,
+          onPressed: () => ref.read(showCreateSetlistModalProvider.notifier).state = true,
           child: const Text('Create Setlist'),
         ),
       );
@@ -436,10 +483,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
       itemCount: sortedSetlists.length,
       itemBuilder: (context, index) {
           final setlist = sortedSetlists[index];
+          final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
           return _buildSwipeableItem(
             id: setlist.id,
             child: _LibrarySetlistCard(
               setlist: setlist,
+              scoreCount: setlistScores.length,
               onArrowTap: () {
                 // Arrow tap: go to detail screen
                 ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
@@ -455,12 +504,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               if (!_hasSwiped) {
                 // Card tap: preview first score
                 ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                if (setlist.scores.isNotEmpty) {
+                if (setlistScores.isNotEmpty) {
                   Navigator.of(context).push(
                     MaterialPageRoute(
                       builder: (context) => ScoreViewerScreen(
-                        score: setlist.scores.first,
-                        setlistScores: setlist.scores,
+                        score: setlistScores.first,
+                        setlistScores: setlistScores,
                         currentIndex: 0,
                         setlistName: setlist.name,
                       ),
@@ -485,9 +534,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     if (scores.isEmpty) {
       return EmptyState.scores(
         action: ElevatedButton.icon(
-          onPressed: _handleImportScore,
-          icon: const Icon(AppIcons.upload),
-          label: const Text('Import Score'),
+          onPressed: () => ref.read(showCreateScoreModalProvider.notifier).state = true,
+          icon: const Icon(AppIcons.add),
+          label: const Text('Add Score'),
         ),
       );
     }
@@ -925,21 +974,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     );
   }
 
-  Widget _buildCreateModal() {
+  Widget _buildCreateSetlistModal() {
     return Stack(
       children: [
         Positioned.fill(
           child: GestureDetector(
             onTap: () {
-              ref.read(showCreateModalProvider.notifier).state = false;
-              _nameController.clear();
-              _descriptionController.clear();
+              // First unfocus any text field, only close modal if nothing was focused
+              final currentFocus = FocusScope.of(context);
+              if (currentFocus.hasFocus) {
+                currentFocus.unfocus();
+              } else {
+                ref.read(showCreateSetlistModalProvider.notifier).state = false;
+                _nameController.clear();
+                _descriptionController.clear();
+              }
             },
             child: Container(color: Colors.black.withValues(alpha: 0.1)),
           ),
         ),
         Center(
-          child: Container(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 400),
             decoration: BoxDecoration(
@@ -956,7 +1013,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header with gradient background
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -999,7 +1055,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                       ),
                       IconButton(
                         onPressed: () {
-                          ref.read(showCreateModalProvider.notifier).state = false;
+                          ref.read(showCreateSetlistModalProvider.notifier).state = false;
                           _nameController.clear();
                           _descriptionController.clear();
                         },
@@ -1008,14 +1064,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                     ],
                   ),
                 ),
-                // Form content
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
                       TextField(
                         controller: _nameController,
-                        autofocus: true,
                         decoration: InputDecoration(
                           hintText: 'Setlist name',
                           hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
@@ -1050,7 +1104,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
-                                ref.read(showCreateModalProvider.notifier).state = false;
+                                ref.read(showCreateSetlistModalProvider.notifier).state = false;
                                 _nameController.clear();
                                 _descriptionController.clear();
                               },
@@ -1085,6 +1139,332 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             ),
           ),
         ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCreateScoreModal() {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () {
+              // First unfocus any text field, only close modal if nothing was focused
+              final currentFocus = FocusScope.of(context);
+              if (currentFocus.hasFocus) {
+                currentFocus.unfocus();
+              } else {
+                ref.read(showCreateScoreModalProvider.notifier).state = false;
+                _scoreTitleController.clear();
+                _scoreComposerController.clear();
+                _customInstrumentController.clear();
+                _selectedPdfPath = null;
+                _selectedPdfName = null;
+                _selectedInstrument = InstrumentType.vocal;
+              }
+            },
+            child: Container(color: Colors.black.withValues(alpha: 0.1)),
+          ),
+        ),
+        Center(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 60,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.blue50, Colors.white],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(24),
+                      topRight: Radius.circular(24),
+                    ),
+                    border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.blue400, AppColors.blue600],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(AppIcons.musicNote, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('New Score', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                            SizedBox(height: 2),
+                            Text('Add a new score', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () {
+                          ref.read(showCreateScoreModalProvider.notifier).state = false;
+                          _scoreTitleController.clear();
+                          _scoreComposerController.clear();
+                          _customInstrumentController.clear();
+                          _selectedPdfPath = null;
+                          _selectedPdfName = null;
+                          _selectedInstrument = InstrumentType.vocal;
+                        },
+                        icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _scoreTitleController,
+                        decoration: InputDecoration(
+                          hintText: 'Score title',
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          filled: true,
+                          fillColor: AppColors.gray50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _scoreComposerController,
+                        decoration: InputDecoration(
+                          hintText: 'Composer (optional)',
+                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          filled: true,
+                          fillColor: AppColors.gray50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Instrument type dropdown or custom input
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: AppColors.gray50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _selectedInstrument == InstrumentType.other
+                                ? TextField(
+                                    controller: _customInstrumentController,
+                                    focusNode: _customInstrumentFocusNode,
+                                    autofocus: false,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Enter instrument name',
+                                      hintStyle: TextStyle(color: AppColors.gray400, fontSize: 15),
+                                      border: InputBorder.none,
+                                      filled: true,
+                                      fillColor: AppColors.gray50,
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    ),
+                                  )
+                                : IgnorePointer(
+                                    child: TextField(
+                                      controller: TextEditingController(
+                                        text: _selectedInstrument.name[0].toUpperCase() + _selectedInstrument.name.substring(1),
+                                      ),
+                                      readOnly: true,
+                                      decoration: const InputDecoration(
+                                        border: InputBorder.none,
+                                        filled: true,
+                                        fillColor: AppColors.gray50,
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                        isDense: false,
+                                      ),
+                                    ),
+                                  ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(2, 0, 6, 0),
+                              child: PopupMenuButton<InstrumentType>(
+                                icon: const Icon(AppIcons.chevronDown, size: 20, color: AppColors.gray400),
+                                padding: EdgeInsets.zero,
+                                menuPadding: EdgeInsets.zero,
+                                offset: const Offset(-50, 0),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                clipBehavior: Clip.antiAlias,
+                                onOpened: () {
+                                  // Unfocus any input field when opening the menu
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                },
+                                itemBuilder: (context) {
+                                  final items = InstrumentType.values;
+                                  return items.asMap().entries.map((entry) {
+                                    final index = entry.key;
+                                    final type = entry.value;
+                                    final isSelected = _selectedInstrument == type;
+                                    final isFirst = index == 0;
+                                    final isLast = index == items.length - 1;
+                                    final borderRadius = BorderRadius.vertical(
+                                      top: isFirst ? const Radius.circular(12) : Radius.zero,
+                                      bottom: isLast ? const Radius.circular(12) : Radius.zero,
+                                    );
+                                    
+                                    return PopupMenuItem(
+                                      value: type,
+                                      height: 44,
+                                      padding: EdgeInsets.zero,
+                                      child: ClipRRect(
+                                        borderRadius: borderRadius,
+                                        child: Material(
+                                          color: isSelected ? AppColors.gray100 : Colors.transparent,
+                                          child: InkWell(
+                                            borderRadius: borderRadius,
+                                            onTap: () {
+                                              FocusManager.instance.primaryFocus?.unfocus();
+                                              Navigator.pop(context, type);
+                                            },
+                                            child: Container(
+                                              width: double.infinity,
+                                              height: 44,
+                                              alignment: Alignment.centerLeft,
+                                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                                              child: Text(
+                                                type.name[0].toUpperCase() + type.name.substring(1),
+                                                style: const TextStyle(color: AppColors.gray700, fontSize: 15),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList();
+                                },
+                                onSelected: (value) {
+                                  // Unfocus everything first
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  setState(() {
+                                    _selectedInstrument = value;
+                                    if (value == InstrumentType.other) {
+                                      _customInstrumentController.clear();
+                                    } else {
+                                      _customInstrumentController.clear();
+                                    }
+                                  });
+                                  // Double ensure unfocus after rebuild
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    FocusManager.instance.primaryFocus?.unfocus();
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // PDF select button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _handleSelectPdf,
+                          icon: Icon(
+                            _selectedPdfPath != null ? AppIcons.check : AppIcons.upload,
+                            size: 18,
+                          ),
+                          label: Text(
+                            _selectedPdfName ?? 'Select PDF File',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _selectedPdfPath != null ? AppColors.blue600 : AppColors.blue500,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                ref.read(showCreateScoreModalProvider.notifier).state = false;
+                                _scoreTitleController.clear();
+                                _scoreComposerController.clear();
+                                _customInstrumentController.clear();
+                                _selectedPdfPath = null;
+                                _selectedPdfName = null;
+                                _selectedInstrument = InstrumentType.vocal;
+                              },
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.gray200),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text('Cancel', style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.w500)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _selectedPdfPath != null ? _handleCreateScore : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.blue500,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: AppColors.gray200,
+                                disabledForegroundColor: AppColors.gray400,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                              ),
+                              child: const Text('Create', style: TextStyle(fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        ),
       ],
     );
   }
@@ -1092,9 +1472,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
 class _LibrarySetlistCard extends StatelessWidget {
   final Setlist setlist;
+  final int scoreCount;
   final VoidCallback? onArrowTap;
 
-  const _LibrarySetlistCard({required this.setlist, this.onArrowTap});
+  const _LibrarySetlistCard({required this.setlist, this.scoreCount = 0, this.onArrowTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1137,7 +1518,7 @@ class _LibrarySetlistCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Personal',
+                  '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • Personal',
                   style: const TextStyle(fontSize: 12, color: AppColors.gray400),
                 ),
               ],

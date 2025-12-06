@@ -1,5 +1,7 @@
 import 'annotation.dart';
 
+enum InstrumentType { vocal, keyboard, bass, drums, guitar, other }
+
 class Score {
   final String id;
   final String title;
@@ -8,7 +10,9 @@ class Score {
   final String? thumbnail;
   final DateTime dateAdded;
   final List<Annotation>? annotations;
-  final int bpm; // Metronome BPM for this score
+  final int bpm;
+  final InstrumentType instrumentType;
+  final String? customInstrument;
 
   Score({
     required this.id,
@@ -19,6 +23,8 @@ class Score {
     required this.dateAdded,
     this.annotations,
     this.bpm = 120,
+    this.instrumentType = InstrumentType.vocal,
+    this.customInstrument,
   });
 
   Score copyWith({
@@ -30,6 +36,8 @@ class Score {
     DateTime? dateAdded,
     List<Annotation>? annotations,
     int? bpm,
+    InstrumentType? instrumentType,
+    String? customInstrument,
   }) =>
       Score(
         id: id ?? this.id,
@@ -40,6 +48,8 @@ class Score {
         dateAdded: dateAdded ?? this.dateAdded,
         annotations: annotations ?? this.annotations,
         bpm: bpm ?? this.bpm,
+        instrumentType: instrumentType ?? this.instrumentType,
+        customInstrument: customInstrument ?? this.customInstrument,
       );
 
   Map<String, dynamic> toJson() => {
@@ -51,6 +61,8 @@ class Score {
         'dateAdded': dateAdded.toIso8601String(),
         'annotations': annotations?.map((a) => a.toJson()).toList(),
         'bpm': bpm,
+        'instrumentType': instrumentType.name,
+        'customInstrument': customInstrument,
       };
 
   factory Score.fromJson(Map<String, dynamic> json) => Score(
@@ -64,5 +76,9 @@ class Score {
             ? (json['annotations'] as List).map((a) => Annotation.fromJson(a)).toList()
             : null,
         bpm: json['bpm'] ?? 120,
+        instrumentType: json['instrumentType'] != null
+            ? InstrumentType.values.firstWhere((e) => e.name == json['instrumentType'], orElse: () => InstrumentType.vocal)
+            : InstrumentType.vocal,
+        customInstrument: json['customInstrument'],
       );
 }

@@ -366,7 +366,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   style: TextStyle(fontSize: 14, color: AppColors.gray500),
                 ),
                 const SizedBox(height: 12),
-                ...setlists.map((setlist) => _buildSetlistCard(setlist)),
+                ...setlists.map((setlist) {
+                  final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
+                  return _buildSetlistCard(setlist, setlistScores.length, setlistScores);
+                }),
                 const SizedBox(height: 24),
               ],
               if (scores.isNotEmpty) ...[
@@ -454,7 +457,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             title: 'Recent Setlists',
           ),
           const SizedBox(height: 12),
-          ...recentSetlists.map((setlist) => _buildSetlistCard(setlist)),
+          ...recentSetlists.map((setlist) {
+            final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
+            return _buildSetlistCard(setlist, setlistScores.length, setlistScores);
+          }),
           const SizedBox(height: 24),
         ],
         if (recentScores.isNotEmpty) ...[
@@ -533,7 +539,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSetlistCard(Setlist setlist) {
+  Widget _buildSetlistCard(Setlist setlist, int scoreCount, List<Score> setlistScores) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
@@ -541,16 +547,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => SetlistDetailScreen(setlist: setlist),
-              ),
-            );
+            // Card tap: preview first score if available
+            if (setlistScores.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ScoreViewerScreen(
+                    score: setlistScores.first,
+                    setlistScores: setlistScores,
+                    currentIndex: 0,
+                    setlistName: setlist.name,
+                  ),
+                ),
+              );
+            } else {
+              // Empty setlist: go to detail screen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SetlistDetailScreen(setlist: setlist),
+                ),
+              );
+            }
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.gray200),
               borderRadius: BorderRadius.circular(12),
@@ -568,11 +590,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
-                    AppIcons.setlistIcon,
-                    size: 24,
-                    color: AppColors.emerald550,
-                  ),
+                  child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -587,21 +605,34 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       Text(
                         setlist.description,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray600,
-                        ),
+                        style: const TextStyle(fontSize: 14, color: AppColors.gray600),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Personal',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.gray400,
-                        ),
+                        '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • Personal',
+                        style: const TextStyle(fontSize: 12, color: AppColors.gray400),
                       ),
                     ],
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      // Arrow tap: go to detail screen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SetlistDetailScreen(setlist: setlist),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+                    ),
                   ),
                 ),
               ],

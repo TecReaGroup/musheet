@@ -1,17 +1,15 @@
-import 'score.dart';
-
 class Setlist {
   final String id;
   final String name;
   final String description;
-  final List<Score> scores;
+  final List<String> scoreIds; // Store only score IDs as references
   final DateTime dateCreated;
 
   Setlist({
     required this.id,
     required this.name,
     required this.description,
-    required this.scores,
+    required this.scoreIds,
     required this.dateCreated,
   });
 
@@ -19,14 +17,14 @@ class Setlist {
     String? id,
     String? name,
     String? description,
-    List<Score>? scores,
+    List<String>? scoreIds,
     DateTime? dateCreated,
   }) =>
       Setlist(
         id: id ?? this.id,
         name: name ?? this.name,
         description: description ?? this.description,
-        scores: scores ?? this.scores,
+        scoreIds: scoreIds ?? this.scoreIds,
         dateCreated: dateCreated ?? this.dateCreated,
       );
 
@@ -34,7 +32,7 @@ class Setlist {
         'id': id,
         'name': name,
         'description': description,
-        'scores': scores.map((s) => s.toJson()).toList(),
+        'scoreIds': scoreIds,
         'dateCreated': dateCreated.toIso8601String(),
       };
 
@@ -42,7 +40,7 @@ class Setlist {
         id: json['id'],
         name: json['name'],
         description: json['description'],
-        scores: (json['scores'] as List).map((s) => Score.fromJson(s)).toList(),
+        scoreIds: (json['scoreIds'] as List).cast<String>(),
         dateCreated: DateTime.parse(json['dateCreated']),
       );
 }

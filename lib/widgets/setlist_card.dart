@@ -112,7 +112,7 @@ class SetlistCard extends StatelessWidget {
         // Metadata
         const SizedBox(height: 2),
         Text(
-          '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"} • Created ${_formatDate(setlist.dateCreated)}',
+          '${setlist.scoreIds.length} ${setlist.scoreIds.length == 1 ? "score" : "scores"} • Created ${_formatDate(setlist.dateCreated)}',
           style: const TextStyle(
             fontSize: 12,
             color: AppColors.gray400,
@@ -235,7 +235,7 @@ class SetlistCardWithActions extends StatelessWidget {
                         ],
                         const SizedBox(height: 2),
                         Text(
-                          '${setlist.scores.length} ${setlist.scores.length == 1 ? "score" : "scores"}',
+                          '${setlist.scoreIds.length} ${setlist.scoreIds.length == 1 ? "score" : "scores"}',
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppColors.gray400,

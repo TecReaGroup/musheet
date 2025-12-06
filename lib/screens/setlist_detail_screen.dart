@@ -7,6 +7,7 @@ import '../providers/setlists_provider.dart';
 import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import 'score_viewer_screen.dart';
+import 'library_screen.dart' show scoreSortProvider, recentlyOpenedScoresProvider, SortState, SortType;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 
@@ -53,6 +54,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       (s) => s.id == widget.setlist.id,
       orElse: () => widget.setlist,
     );
+    // Get resolved scores from scoreIds
+    final setlistScores = ref.watch(setlistScoresProvider(currentSetlist.id));
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -111,7 +114,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                                 const SizedBox(height: 2),
                               ],
                               Text(
-                                '${currentSetlist.scores.length} ${currentSetlist.scores.length == 1 ? "score" : "scores"} · Personal · ${_formatDate(currentSetlist.dateCreated)}',
+                                '${setlistScores.length} ${setlistScores.length == 1 ? "score" : "scores"} · Personal · ${_formatDate(currentSetlist.dateCreated)}',
                                 style: const TextStyle(fontSize: 12, color: AppColors.gray400),
                               ),
                             ],
@@ -139,7 +142,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                 ),
               ),
               Expanded(
-                child: currentSetlist.scores.isEmpty
+                child: setlistScores.isEmpty
                     ? const EmptyState(
                         icon: AppIcons.musicNote,
                         title: 'Empty Setlist',
@@ -147,7 +150,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       )
                     : ReorderableListView.builder(
                         padding: const EdgeInsets.all(24),
-                        itemCount: currentSetlist.scores.length,
+                        itemCount: setlistScores.length,
                         proxyDecorator: (child, index, animation) {
                           return AnimatedBuilder(
                             animation: animation,
@@ -166,14 +169,14 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         },
                         onReorder: (oldIndex, newIndex) {
                           if (newIndex > oldIndex) newIndex--;
-                          final newScores = List<Score>.from(currentSetlist.scores);
-                          final item = newScores.removeAt(oldIndex);
-                          newScores.insert(newIndex, item);
-                          ref.read(setlistsProvider.notifier).reorderSetlist(currentSetlist.id, newScores);
+                          final newScoreIds = List<String>.from(currentSetlist.scoreIds);
+                          final item = newScoreIds.removeAt(oldIndex);
+                          newScoreIds.insert(newIndex, item);
+                          ref.read(setlistsProvider.notifier).reorderSetlist(currentSetlist.id, newScoreIds);
                         },
                         itemBuilder: (context, index) {
-                          final score = currentSetlist.scores[index];
-                          return _buildReorderableItem(context, index, score, currentSetlist);
+                          final score = setlistScores[index];
+                          return _buildReorderableItem(context, index, score, setlistScores, currentSetlist);
                         },
                       ),
               ),
@@ -378,7 +381,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  Widget _buildReorderableItem(BuildContext context, int index, Score score, Setlist currentSetlist) {
+  Widget _buildReorderableItem(BuildContext context, int index, Score score, List<Score> setlistScores, Setlist currentSetlist) {
     return Container(
       key: ValueKey(score.id),
       margin: const EdgeInsets.only(bottom: 10),
@@ -396,7 +399,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
               MaterialPageRoute(
                 builder: (context) => ScoreViewerScreen(
                   score: score,
-                  setlistScores: currentSetlist.scores,
+                  setlistScores: setlistScores,
                   currentIndex: index,
                   setlistName: currentSetlist.name,
                 ),
@@ -506,13 +509,44 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
+  List<Score> _sortScores(List<Score> scores, SortState sortState, Map<String, DateTime> recentlyOpened) {
+    final sorted = List<Score>.from(scores);
+    
+    switch (sortState.type) {
+      case SortType.recentCreated:
+        sorted.sort((a, b) => sortState.ascending 
+            ? a.dateAdded.compareTo(b.dateAdded)
+            : b.dateAdded.compareTo(a.dateAdded));
+        break;
+      case SortType.alphabetical:
+        sorted.sort((a, b) => sortState.ascending
+            ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+            : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        break;
+      case SortType.recentOpened:
+        sorted.sort((a, b) {
+          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
+          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
+          return sortState.ascending
+              ? aOpened.compareTo(bOpened)
+              : bOpened.compareTo(aOpened);
+        });
+        break;
+    }
+    return sorted;
+  }
+
   Widget _buildAddScoreModal(List<Score> allScores, Setlist setlist) {
-    final availableScores = allScores.where((score) => !setlist.scores.any((s) => s.id == score.id)).toList();
-    final filteredScores = _addScoreSearchQuery.isEmpty
+    final sortState = ref.watch(scoreSortProvider);
+    final recentlyOpened = ref.watch(recentlyOpenedScoresProvider);
+    
+    final availableScores = allScores.where((score) => !setlist.scoreIds.contains(score.id)).toList();
+    final searchedScores = _addScoreSearchQuery.isEmpty
         ? availableScores
         : availableScores.where((score) =>
             score.title.toLowerCase().contains(_addScoreSearchQuery.toLowerCase()) ||
             score.composer.toLowerCase().contains(_addScoreSearchQuery.toLowerCase())).toList();
+    final filteredScores = _sortScores(searchedScores, sortState, recentlyOpened);
 
     return Stack(
       children: [

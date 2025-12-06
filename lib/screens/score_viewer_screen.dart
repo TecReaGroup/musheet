@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../models/score.dart';
 import '../models/annotation.dart';
+import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/metronome_widget.dart';
 import '../utils/icon_mappings.dart';
@@ -67,10 +68,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   final List<double> _penWidths = [1.0, 2.0, 3.0, 4.0, 6.0];
 
+  // Track last saved BPM to avoid unnecessary updates
+  int _lastSavedBpm = 120;
+
   @override
   void initState() {
     super.initState();
-    _metronomeController = MetronomeController();
+    // Initialize metronome with score's saved BPM
+    _lastSavedBpm = widget.score.bpm;
+    _metronomeController = MetronomeController(bpm: widget.score.bpm);
     _metronomeController!.addListener(_onMetronomeChanged);
     _initAnnotations();
     _loadPdfDocument();
@@ -78,7 +84,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   
   void _onMetronomeChanged() {
     // Update UI when metronome state changes
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      
+      // Save BPM to score when it changes
+      // Since setlists now use references (scoreIds), updating scores provider is enough
+      final currentBpm = _metronomeController?.bpm ?? 120;
+      if (currentBpm != _lastSavedBpm) {
+        _lastSavedBpm = currentBpm;
+        ref.read(scoresProvider.notifier).updateBpm(widget.score.id, currentBpm);
+      }
+    }
   }
   
   void _initAnnotations() {

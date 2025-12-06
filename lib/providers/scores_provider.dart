@@ -54,6 +54,15 @@ class ScoresNotifier extends Notifier<List<Score>> {
       return s;
     }).toList();
   }
+
+  void updateBpm(String scoreId, int bpm) {
+    state = state.map((s) {
+      if (s.id == scoreId) {
+        return s.copyWith(bpm: bpm);
+      }
+      return s;
+    }).toList();
+  }
 }
 
 final scoresProvider = NotifierProvider<ScoresNotifier, List<Score>>(() {

@@ -14,14 +14,14 @@ class SetlistsNotifier extends Notifier<List<Setlist>> {
           id: '1',
           name: 'Winter Concert 2024',
           description: 'Holiday performance repertoire',
-          scores: [scores[0], scores[1]],
+          scoreIds: [scores[0].id, scores[1].id],
           dateCreated: DateTime(2024, 11, 1),
         ),
         Setlist(
           id: '2',
           name: 'Wedding Ceremony',
           description: 'Classical wedding music',
-          scores: [scores[2], scores[3]],
+          scoreIds: [scores[2].id, scores[3].id],
           dateCreated: DateTime(2024, 11, 28),
         ),
       ];
@@ -34,7 +34,7 @@ class SetlistsNotifier extends Notifier<List<Setlist>> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       description: description,
-      scores: [],
+      scoreIds: [],
       dateCreated: DateTime.now(),
     );
     state = [...state, newSetlist];
@@ -47,9 +47,12 @@ class SetlistsNotifier extends Notifier<List<Setlist>> {
   void addScoreToSetlist(String setlistId, Score score) {
     state = state.map((setlist) {
       if (setlist.id == setlistId) {
-        return setlist.copyWith(
-          scores: [...setlist.scores, score],
-        );
+        // Avoid duplicates
+        if (!setlist.scoreIds.contains(score.id)) {
+          return setlist.copyWith(
+            scoreIds: [...setlist.scoreIds, score.id],
+          );
+        }
       }
       return setlist;
     }).toList();
@@ -59,17 +62,17 @@ class SetlistsNotifier extends Notifier<List<Setlist>> {
     state = state.map((setlist) {
       if (setlist.id == setlistId) {
         return setlist.copyWith(
-          scores: setlist.scores.where((s) => s.id != scoreId).toList(),
+          scoreIds: setlist.scoreIds.where((id) => id != scoreId).toList(),
         );
       }
       return setlist;
     }).toList();
   }
 
-  void reorderSetlist(String setlistId, List<Score> newScores) {
+  void reorderSetlist(String setlistId, List<String> newScoreIds) {
     state = state.map((setlist) {
       if (setlist.id == setlistId) {
-        return setlist.copyWith(scores: newScores);
+        return setlist.copyWith(scoreIds: newScoreIds);
       }
       return setlist;
     }).toList();
@@ -90,4 +93,19 @@ class SetlistsNotifier extends Notifier<List<Setlist>> {
 
 final setlistsProvider = NotifierProvider<SetlistsNotifier, List<Setlist>>(() {
   return SetlistsNotifier();
+});
+
+/// Helper provider to get scores for a setlist by resolving scoreIds to Score objects
+final setlistScoresProvider = Provider.family<List<Score>, String>((ref, setlistId) {
+  final setlists = ref.watch(setlistsProvider);
+  final allScores = ref.watch(scoresProvider);
+  
+  final setlist = setlists.where((s) => s.id == setlistId).firstOrNull;
+  if (setlist == null) return [];
+  
+  // Resolve scoreIds to Score objects, maintaining order
+  return setlist.scoreIds
+      .map((id) => allScores.where((s) => s.id == id).firstOrNull)
+      .whereType<Score>()
+      .toList();
 });
