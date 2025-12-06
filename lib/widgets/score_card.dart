@@ -66,6 +66,9 @@ class ScoreCard extends StatelessWidget {
   }
 
   Widget _buildIcon() {
+    // Get thumbnail from first instrument score
+    final thumbnail = score.firstInstrumentScore?.thumbnail;
+    
     return Container(
       width: compact ? 40 : 48,
       height: compact ? 40 : 48,
@@ -73,11 +76,11 @@ class ScoreCard extends StatelessWidget {
         color: AppColors.blue50,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: score.thumbnail != null
+      child: thumbnail != null
           ? ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: Image.network(
-                score.thumbnail!,
+                thumbnail,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) =>
                     const Icon(Icons.music_note, size: 24, color: AppColors.blue600),
@@ -88,6 +91,9 @@ class ScoreCard extends StatelessWidget {
   }
 
   Widget _buildInfo() {
+    // Get total annotation count across all instrument scores
+    final annotationCount = score.totalAnnotationCount;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -125,7 +131,7 @@ class ScoreCard extends StatelessWidget {
           ),
         ],
         // Annotations Badge (if has annotations)
-        if (score.annotations != null && score.annotations!.isNotEmpty) ...[
+        if (annotationCount > 0) ...[
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -143,7 +149,7 @@ class ScoreCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '${score.annotations!.length} annotation${score.annotations!.length == 1 ? '' : 's'}',
+                  '$annotationCount annotation${annotationCount == 1 ? '' : 's'}',
                   style: const TextStyle(
                     fontSize: 10,
                     color: AppColors.blue600,

@@ -13,6 +13,7 @@ import '../utils/icon_mappings.dart';
 
 class ScoreViewerScreen extends ConsumerStatefulWidget {
   final Score score;
+  final InstrumentScore? instrumentScore;
   final List<Score>? setlistScores;
   final int? currentIndex;
   final String? setlistName;
@@ -20,6 +21,7 @@ class ScoreViewerScreen extends ConsumerStatefulWidget {
   const ScoreViewerScreen({
     super.key,
     required this.score,
+    this.instrumentScore,
     this.setlistScores,
     this.currentIndex,
     this.setlistName,
@@ -47,8 +49,13 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   bool _showMetronome = false;
   bool _showSetlistNav = false;
   bool _showPenOptions = false;
+  bool _showInstrumentPicker = false;
   ScrollController? _setlistScrollController;
+  ScrollController? _instrumentScrollController;
   bool _showUI = false;
+  
+  // Current instrument score being viewed
+  InstrumentScore? _currentInstrumentScore;
   
   // Page indicator auto-hide
   bool _showPageIndicator = false;
@@ -74,6 +81,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   @override
   void initState() {
     super.initState();
+    // Initialize current instrument score
+    _currentInstrumentScore = widget.instrumentScore ?? widget.score.firstInstrumentScore;
     // Initialize metronome with score's saved BPM
     _lastSavedBpm = widget.score.bpm;
     _metronomeController = MetronomeController(bpm: widget.score.bpm);
@@ -98,8 +107,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
   
   void _initAnnotations() {
-    // Initialize annotations from score (assuming annotations contain page info)
-    final annotations = widget.score.annotations ?? [];
+    // Initialize annotations from current instrument score
+    _pageAnnotations.clear();
+    final annotations = _currentInstrumentScore?.annotations ?? [];
     for (final annotation in annotations) {
       final page = annotation.page;
       _pageAnnotations[page] ??= [];
@@ -129,7 +139,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Future<void> _loadPdfDocument() async {
-    final pdfPath = widget.score.pdfUrl;
+    final pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
     if (pdfPath.isEmpty) {
       setState(() {
         _pdfError = 'No PDF file specified';
@@ -154,6 +164,29 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         _pdfError = 'Failed to load PDF: $e';
       });
     }
+  }
+
+  void _switchInstrument(InstrumentScore instrumentScore) async {
+    if (instrumentScore.id == _currentInstrumentScore?.id) {
+      setState(() => _showInstrumentPicker = false);
+      return;
+    }
+    
+    // Dispose old document
+    _pdfDocument?.dispose();
+    
+    setState(() {
+      _currentInstrumentScore = instrumentScore;
+      _pdfDocument = null;
+      _currentPage = 1;
+      _totalPages = 0;
+      _pdfError = null;
+      _showInstrumentPicker = false;
+    });
+    
+    // Reload annotations and PDF for new instrument
+    _initAnnotations();
+    await _loadPdfDocument();
   }
 
   @override
@@ -249,20 +282,6 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           ),
         ),
       );
-    }
-  }
-
-  void _goToPreviousScore() {
-    if (widget.currentIndex != null && widget.currentIndex! > 0) {
-      _navigateToScore(widget.currentIndex! - 1);
-    }
-  }
-
-  void _goToNextScore() {
-    if (widget.currentIndex != null &&
-        widget.setlistScores != null &&
-        widget.currentIndex! < widget.setlistScores!.length - 1) {
-      _navigateToScore(widget.currentIndex! + 1);
     }
   }
 
@@ -396,6 +415,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             if (_showMetronome) _buildMetronomeModal(),
             if (_showSetlistNav && widget.setlistScores != null)
               _buildSetlistNavModal(),
+            if (_showInstrumentPicker)
+              _buildInstrumentPickerModal(),
           ],
         ),
     );
@@ -431,7 +452,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Widget _buildPdfViewer() {
-    final pdfPath = widget.score.pdfUrl;
+    final pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
     
     // Check if it's a valid file path
     if (pdfPath.isEmpty) {
@@ -496,10 +517,24 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           }
         } else {
           setState(() {
+            // Check if any modal is open
+            final anyModalOpen = _showMetronome || _showSetlistNav || _showInstrumentPicker;
             // Close any open modals
             _showMetronome = false;
             _showSetlistNav = false;
-            _showUI = !_showUI;
+            _showInstrumentPicker = false;
+            _showPenOptions = false;
+            // Dispose scroll controllers
+            _instrumentScrollController?.dispose();
+            _instrumentScrollController = null;
+            _setlistScrollController?.dispose();
+            _setlistScrollController = null;
+            // If any modal was open, also hide toolbar; otherwise toggle UI
+            if (anyModalOpen) {
+              _showUI = false;
+            } else {
+              _showUI = !_showUI;
+            }
           });
         }
       },
@@ -561,50 +596,145 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 8, 16, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(AppIcons.chevronLeft, color: AppColors.gray700),
-            onPressed: () => Navigator.pop(context),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  widget.score.title,
-                  style: const TextStyle(
-                    color: AppColors.gray900,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  widget.score.composer,
-                  style: const TextStyle(
-                    color: AppColors.gray500,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+    void closeAllMenus() {
+      setState(() {
+        _showMetronome = false;
+        _showPenOptions = false;
+        _showSetlistNav = false;
+        _showInstrumentPicker = false;
+        _instrumentScrollController?.dispose();
+        _instrumentScrollController = null;
+        _setlistScrollController?.dispose();
+        _setlistScrollController = null;
+      });
+    }
+
+    return GestureDetector(
+      onTap: closeAllMenus,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 8, 16, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-          ),
-          // Setlist navigation button or placeholder
+          ],
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(AppIcons.chevronLeft, color: AppColors.gray700),
+              onPressed: () => Navigator.pop(context),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: Center(
+                child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.score.title,
+                          style: const TextStyle(
+                            color: AppColors.gray900,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                          icon: Icon(
+                            _showInstrumentPicker ? AppIcons.chevronUp : AppIcons.chevronDown,
+                            size: 18,
+                            color: AppColors.gray500,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _showInstrumentPicker = !_showInstrumentPicker;
+                              if (_showInstrumentPicker) {
+                                _showMetronome = false;
+                                _showSetlistNav = false;
+                                _showPenOptions = false;
+                                _setlistScrollController?.dispose();
+                                _setlistScrollController = null;
+                                // Create scroll controller and scroll to current instrument
+                                const itemHeight = 48.0;
+                                const listHeight = 168.0;
+                                const listPadding = 12.0;
+                                final currentIndex = widget.score.instrumentScores.indexWhere(
+                                  (s) => s.id == _currentInstrumentScore?.id
+                                );
+                                final totalContentHeight = widget.score.instrumentScores.length * itemHeight + listPadding;
+                                final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
+                                final centerOffset = ((currentIndex >= 0 ? currentIndex : 0) * itemHeight - (listHeight - itemHeight) / 2).clamp(0.0, maxScrollOffset);
+                                _instrumentScrollController = ScrollController(initialScrollOffset: centerOffset);
+                              } else {
+                                _instrumentScrollController?.dispose();
+                                _instrumentScrollController = null;
+                              }
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.score.composer,
+                            style: const TextStyle(
+                              color: AppColors.gray500,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Text(
+                          ' · ',
+                          style: TextStyle(
+                            color: AppColors.gray500,
+                            fontSize: 12,
+                          ),
+                        ),
+                        Flexible(
+                          child: Text(
+                            _currentInstrumentScore?.instrumentDisplayName ?? '',
+                            style: const TextStyle(
+                              color: AppColors.gray500,
+                              fontSize: 12,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Setlist navigation button or placeholder
           if (widget.setlistScores != null)
             IconButton(
               icon: Icon(
@@ -616,16 +746,21 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   _showSetlistNav = !_showSetlistNav;
                   if (_showSetlistNav) {
                     _showMetronome = false;
+                    _showInstrumentPicker = false;
+                    _showPenOptions = false;
+                    _instrumentScrollController?.dispose();
+                    _instrumentScrollController = null;
                     // Create scroll controller and scroll to current item
-                    // Each item is ~52px (padding 8*2 + content ~36)
-                    // List height is 194px, so max visible is ~3.5 items
-                    const itemHeight = 52.0;
-                    const listHeight = 194.0;
+                    // Each item is ~48px (padding 10*2 + content ~28)
+                    // List height is 168px (3.5 items)
+                    const itemHeight = 48.0;
+                    const listHeight = 168.0;
                     const listPadding = 12.0; // vertical padding 6*2
                     final totalContentHeight = widget.setlistScores!.length * itemHeight + listPadding;
                     final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
-                    final targetOffset = ((widget.currentIndex ?? 0) * itemHeight).clamp(0.0, maxScrollOffset);
-                    _setlistScrollController = ScrollController(initialScrollOffset: targetOffset);
+                    // Center the current item: offset = itemTop - (listHeight - itemHeight) / 2
+                    final centerOffset = ((widget.currentIndex ?? 0) * itemHeight - (listHeight - itemHeight) / 2).clamp(0.0, maxScrollOffset);
+                    _setlistScrollController = ScrollController(initialScrollOffset: centerOffset);
                   } else {
                     _setlistScrollController?.dispose();
                     _setlistScrollController = null;
@@ -637,21 +772,33 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             const SizedBox(width: 48),
         ],
       ),
+      ),
     );
   }
 
   Widget _buildToolbar() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+    return GestureDetector(
+      onTap: () {
+        // Tap on toolbar empty area: close any open menus but keep toolbar visible
+        setState(() {
+          _showMetronome = false;
+          _showPenOptions = false;
+          _showSetlistNav = false;
+          _showInstrumentPicker = false;
+        });
+      },
+      behavior: HitTestBehavior.translucent,
+      child: Container(
+        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
       ),
       child: Row(
         children: [
@@ -725,9 +872,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               onPressed: () {
                 setState(() {
                   _showMetronome = !_showMetronome;
-                  // Close other modals
+                  // Close other modals when opening metronome
                   if (_showMetronome) {
                     _showSetlistNav = false;
+                    _showInstrumentPicker = false;
+                    _showPenOptions = false;
+                    _instrumentScrollController?.dispose();
+                    _instrumentScrollController = null;
+                    _setlistScrollController?.dispose();
+                    _setlistScrollController = null;
                   }
                 });
               },
@@ -743,6 +896,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               onPressed: _exitEditMode,
             ),
         ],
+      ),
       ),
     );
   }
@@ -790,6 +944,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             // Select pen tool and show color picker
             _selectedTool = 'pen';
             _showPenOptions = true;
+            // Close other modals when opening pen options
+            _showMetronome = false;
+            _showInstrumentPicker = false;
+            _showSetlistNav = false;
+            _instrumentScrollController?.dispose();
+            _instrumentScrollController = null;
+            _setlistScrollController?.dispose();
+            _setlistScrollController = null;
           }
         });
       },
@@ -995,18 +1157,126 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     );
   }
 
-  Widget _buildSetlistNavModal() {
-    // Each card is approximately 52px (padding 8*2 + content ~36)
-    // 3.5 cards = ~182px, plus list padding 6*2 = 194px
-    const double listHeight = 194;
-    
+  Widget _buildInstrumentPickerModal() {
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 56,
-      right: 12,
+      top: MediaQuery.of(context).padding.top + 72,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: 260,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(AppIcons.piano, color: AppColors.gray400, size: 18),
+                      SizedBox(width: 10),
+                      Text(
+                        'Switch Instrument',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Instrument list
+                SizedBox(
+                  height: 168,
+                  child: ListView.builder(
+                    controller: _instrumentScrollController,
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    itemCount: widget.score.instrumentScores.length,
+                    itemBuilder: (context, index) {
+                      final instrumentScore = widget.score.instrumentScores[index];
+                      final isCurrent = instrumentScore.id == _currentInstrumentScore?.id;
+                      return InkWell(
+                        onTap: () => _switchInstrument(instrumentScore),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          color: isCurrent ? AppColors.blue50 : Colors.transparent,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  color: isCurrent ? AppColors.blue500 : AppColors.gray100,
+                                  borderRadius: BorderRadius.circular(7),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: TextStyle(
+                                      color: isCurrent ? Colors.white : AppColors.gray600,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  instrumentScore.instrumentDisplayName,
+                                  style: TextStyle(
+                                    color: isCurrent ? AppColors.blue600 : AppColors.gray900,
+                                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              if (isCurrent)
+                                const Icon(
+                                  AppIcons.check,
+                                  size: 18,
+                                  color: AppColors.blue500,
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSetlistNavModal() {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 72,
+      right: 16,
       child: Material(
         color: Colors.transparent,
         child: Container(
-          width: 280,
+          width: 260,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -1023,7 +1293,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             children: [
               // Header
               Container(
-                padding: const EdgeInsets.fromLTRB(18, 8, 6, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: AppColors.gray100)),
                 ),
@@ -1043,18 +1313,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(AppIcons.close, size: 18, color: AppColors.gray400),
-                      onPressed: () => setState(() => _showSetlistNav = false),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                    ),
                   ],
                 ),
               ),
-              // Score list with fixed height
+              // Score list
               SizedBox(
-                height: listHeight,
+                height: 168,
                 child: ListView.builder(
                   controller: _setlistScrollController,
                   padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1064,20 +1328,22 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     final isCurrent = index == widget.currentIndex;
                     return InkWell(
                       onTap: () {
+                        _setlistScrollController?.dispose();
+                        _setlistScrollController = null;
                         setState(() => _showSetlistNav = false);
                         _navigateToScore(index);
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         color: isCurrent ? AppColors.blue50 : Colors.transparent,
                         child: Row(
                           children: [
                             Container(
-                              width: 26,
-                              height: 26,
+                              width: 28,
+                              height: 28,
                               decoration: BoxDecoration(
                                 color: isCurrent ? AppColors.blue500 : AppColors.gray100,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(7),
                               ),
                               child: Center(
                                 child: Text(
@@ -1085,38 +1351,30 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                                   style: TextStyle(
                                     color: isCurrent ? Colors.white : AppColors.gray600,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 11,
+                                    fontSize: 13,
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    score.title,
-                                    style: TextStyle(
-                                      color: isCurrent ? AppColors.blue600 : AppColors.gray900,
-                                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Text(
-                                    score.composer,
-                                    style: const TextStyle(
-                                      color: AppColors.gray500,
-                                      fontSize: 11,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
+                              child: Text(
+                                score.title,
+                                style: TextStyle(
+                                  color: isCurrent ? AppColors.blue600 : AppColors.gray900,
+                                  fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            if (isCurrent)
+                              const Icon(
+                                AppIcons.check,
+                                size: 18,
+                                color: AppColors.blue500,
+                              ),
                           ],
                         ),
                       ),
@@ -1124,78 +1382,6 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   },
                 ),
               ),
-              // Navigation buttons - matching style
-              if (widget.currentIndex != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    border: Border(top: BorderSide(color: AppColors.gray100)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 36,
-                          child: OutlinedButton(
-                            onPressed: widget.currentIndex! > 0 
-                                ? () {
-                                    setState(() => _showSetlistNav = false);
-                                    _goToPreviousScore();
-                                  }
-                                : null,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.gray700,
-                              side: const BorderSide(color: AppColors.gray200),
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(AppIcons.arrowBack, size: 14),
-                                SizedBox(width: 4),
-                                Text('Prev', style: TextStyle(fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SizedBox(
-                          height: 36,
-                          child: OutlinedButton(
-                            onPressed: widget.currentIndex! < widget.setlistScores!.length - 1
-                                ? () {
-                                    setState(() => _showSetlistNav = false);
-                                    _goToNextScore();
-                                  }
-                                : null,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.gray700,
-                              side: const BorderSide(color: AppColors.gray200),
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(24),
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('Next', style: TextStyle(fontSize: 12)),
-                                SizedBox(width: 4),
-                                Icon(AppIcons.arrowForward, size: 14),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),

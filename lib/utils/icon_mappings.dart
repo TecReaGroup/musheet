@@ -48,12 +48,17 @@ class AppIcons {
   static const musicNote = LucideIcons.music;
   static const metronome = LucideIcons.drum;
   static const playArrow = LucideIcons.play;
+  static const play = LucideIcons.play;
   static const stop = LucideIcons.square;
   static const pause = LucideIcons.pause;
   static const mic = LucideIcons.mic;
   static const micOff = LucideIcons.micOff;
   static const speed = LucideIcons.gauge;
   static const playlistPlay = LucideIcons.listMusic;
+  static const piano = LucideIcons.piano;
+  
+  // People & User
+  static const person = LucideIcons.user;
   
   // Editing & Drawing
   static const undo = LucideIcons.undo;

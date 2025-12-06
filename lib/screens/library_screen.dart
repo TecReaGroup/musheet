@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
 import 'setlist_detail_screen.dart';
+import 'score_detail_screen.dart';
 import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
@@ -149,12 +150,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   final TextEditingController _scoreComposerController = TextEditingController();
   final TextEditingController _customInstrumentController = TextEditingController();
   final FocusNode _customInstrumentFocusNode = FocusNode();
+  final FocusNode _scoreTitleFocusNode = FocusNode();
+  final FocusNode _scoreComposerFocusNode = FocusNode();
+  final GlobalKey _titleFieldKey = GlobalKey();
+  final GlobalKey _composerFieldKey = GlobalKey();
   String? _selectedPdfPath;
   String? _selectedPdfName;
   InstrumentType _selectedInstrument = InstrumentType.vocal;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+  
+  // Autocomplete state
+  List<Score> _titleSuggestions = [];
+  List<String> _composerSuggestions = [];
+  bool _showTitleSuggestions = false;
+  bool _showComposerSuggestions = false;
+  Score? _matchedScore; // If title + composer matches an existing score
+  Set<String> _disabledInstruments = {}; // Instruments already in matched score
 
   @override
   void initState() {
@@ -177,10 +190,129 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     _scoreComposerController.dispose();
     _customInstrumentController.dispose();
     _customInstrumentFocusNode.dispose();
+    _scoreTitleFocusNode.dispose();
+    _scoreComposerFocusNode.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose;
     _drawerController.dispose();
     super.dispose();
+  }
+
+  void _updateTitleSuggestions(String query) {
+    final suggestions = ref.read(scoresProvider.notifier).getSuggestionsByTitle(query);
+    setState(() {
+      _titleSuggestions = suggestions;
+      _showTitleSuggestions = suggestions.isNotEmpty && query.isNotEmpty;
+    });
+    _checkForMatchedScore();
+  }
+
+  void _updateComposerSuggestions(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _composerSuggestions = [];
+        _showComposerSuggestions = false;
+      });
+      _checkForMatchedScore();
+      return;
+    }
+    
+    // Get all unique composers that match the query
+    final scores = ref.read(scoresProvider);
+    final queryLower = query.toLowerCase();
+    final composers = scores
+        .map((s) => s.composer)
+        .where((c) => c.toLowerCase().contains(queryLower))
+        .toSet()
+        .take(5)
+        .toList();
+    
+    setState(() {
+      _composerSuggestions = composers;
+      _showComposerSuggestions = composers.isNotEmpty;
+    });
+    _checkForMatchedScore();
+  }
+
+  void _checkForMatchedScore() {
+    final title = _scoreTitleController.text.trim();
+    final composer = _scoreComposerController.text.trim();
+    
+    if (title.isEmpty) {
+      setState(() {
+        _matchedScore = null;
+        _disabledInstruments = {};
+      });
+      return;
+    }
+    
+    final composerToCheck = composer.isEmpty ? 'Unknown' : composer;
+    final matched = ref.read(scoresProvider.notifier).findByTitleAndComposer(title, composerToCheck);
+    
+    setState(() {
+      _matchedScore = matched;
+      if (matched != null) {
+        _disabledInstruments = matched.existingInstrumentKeys;
+        // Auto-select first available instrument if current is disabled
+        // But don't auto-switch if user is typing in "Other" custom instrument field
+        if (_selectedInstrument != InstrumentType.other && 
+            _isInstrumentDisabled(_selectedInstrument, _customInstrumentController.text)) {
+          _selectedInstrument = _findFirstAvailableInstrument();
+        }
+      } else {
+        _disabledInstruments = {};
+      }
+    });
+  }
+
+  bool _isInstrumentDisabled(InstrumentType type, String customInstrument) {
+    if (_matchedScore == null) return false;
+    final key = type == InstrumentType.other && customInstrument.isNotEmpty
+        ? customInstrument.toLowerCase().trim()
+        : type.name;
+    return _disabledInstruments.contains(key);
+  }
+
+  InstrumentType _findFirstAvailableInstrument() {
+    for (final type in InstrumentType.values) {
+      if (type != InstrumentType.other && !_disabledInstruments.contains(type.name)) {
+        return type;
+      }
+    }
+    return InstrumentType.other;
+  }
+
+  void _selectSuggestion(Score score) {
+    setState(() {
+      _scoreTitleController.text = score.title;
+      _scoreComposerController.text = score.composer;
+      _showTitleSuggestions = false;
+      _showComposerSuggestions = false;
+    });
+    _checkForMatchedScore();
+  }
+
+  void _selectComposerSuggestion(String composer) {
+    setState(() {
+      _scoreComposerController.text = composer;
+      _showComposerSuggestions = false;
+    });
+    _checkForMatchedScore();
+  }
+
+  void _resetCreateScoreModal() {
+    _scoreTitleController.clear();
+    _scoreComposerController.clear();
+    _customInstrumentController.clear();
+    _selectedPdfPath = null;
+    _selectedPdfName = null;
+    _selectedInstrument = InstrumentType.vocal;
+    _titleSuggestions = [];
+    _composerSuggestions = [];
+    _showTitleSuggestions = false;
+    _showComposerSuggestions = false;
+    _matchedScore = null;
+    _disabledInstruments = {};
   }
 
   void _toggleDrawer() {
@@ -262,6 +394,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         _selectedPdfName = file.name;
         if (_scoreTitleController.text.isEmpty) {
           _scoreTitleController.text = file.name.replaceAll('.pdf', '');
+          _updateTitleSuggestions(_scoreTitleController.text);
         }
       });
     }
@@ -270,23 +403,43 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   void _handleCreateScore() {
     if (_scoreTitleController.text.trim().isEmpty || _selectedPdfPath == null) return;
     
-    final newScore = Score(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      title: _scoreTitleController.text.trim(),
-      composer: _scoreComposerController.text.trim().isEmpty ? 'Unknown' : _scoreComposerController.text.trim(),
+    // Check if instrument is disabled (already exists)
+    if (_isInstrumentDisabled(_selectedInstrument, _customInstrumentController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This instrument already exists for this score')),
+      );
+      return;
+    }
+    
+    final title = _scoreTitleController.text.trim();
+    final composer = _scoreComposerController.text.trim().isEmpty ? 'Unknown' : _scoreComposerController.text.trim();
+    final now = DateTime.now();
+    
+    // Create the instrument score
+    final instrumentScore = InstrumentScore(
+      id: '${now.millisecondsSinceEpoch}-is',
       pdfUrl: _selectedPdfPath!,
-      dateAdded: DateTime.now(),
       instrumentType: _selectedInstrument,
       customInstrument: _selectedInstrument == InstrumentType.other ? _customInstrumentController.text.trim() : null,
+      dateAdded: now,
     );
-    ref.read(scoresProvider.notifier).addScore(newScore);
     
-    _scoreTitleController.clear();
-    _scoreComposerController.clear();
-    _customInstrumentController.clear();
-    _selectedPdfPath = null;
-    _selectedPdfName = null;
-    _selectedInstrument = InstrumentType.vocal;
+    if (_matchedScore != null) {
+      // Add instrument score to existing score
+      ref.read(scoresProvider.notifier).addInstrumentScore(_matchedScore!.id, instrumentScore);
+    } else {
+      // Create new score with instrument score
+      final newScore = Score(
+        id: now.millisecondsSinceEpoch.toString(),
+        title: title,
+        composer: composer,
+        dateAdded: now,
+        instrumentScores: [instrumentScore],
+      );
+      ref.read(scoresProvider.notifier).addScore(newScore);
+    }
+    
+    _resetCreateScoreModal();
     ref.read(showCreateScoreModalProvider.notifier).state = false;
   }
 
@@ -557,7 +710,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           final score = sortedScores[index];
           return _buildSwipeableItem(
             id: score.id,
-            child: _LibraryScoreCard(score: score),
+            child: _LibraryScoreCard(
+              score: score,
+              onArrowTap: () {
+                // Arrow tap: go to detail screen
+                ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => ScoreDetailScreen(score: score),
+                  ),
+                );
+              },
+            ),
             onDelete: () => _handleDelete(score.id, true),
             onTap: () {
               if (!_hasSwiped) {
@@ -1145,6 +1309,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   }
 
   Widget _buildCreateScoreModal() {
+    final isInstrumentDisabled = _isInstrumentDisabled(_selectedInstrument, _customInstrumentController.text);
+    
     return Stack(
       children: [
         Positioned.fill(
@@ -1154,14 +1320,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               final currentFocus = FocusScope.of(context);
               if (currentFocus.hasFocus) {
                 currentFocus.unfocus();
+                setState(() {
+                  _showTitleSuggestions = false;
+                  _showComposerSuggestions = false;
+                });
               } else {
+                _resetCreateScoreModal();
                 ref.read(showCreateScoreModalProvider.notifier).state = false;
-                _scoreTitleController.clear();
-                _scoreComposerController.clear();
-                _customInstrumentController.clear();
-                _selectedPdfPath = null;
-                _selectedPdfName = null;
-                _selectedInstrument = InstrumentType.vocal;
               }
             },
             child: Container(color: Colors.black.withValues(alpha: 0.1)),
@@ -1169,7 +1334,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         ),
         Center(
           child: GestureDetector(
-            onTap: () => FocusScope.of(context).unfocus(),
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              setState(() {
+                _showTitleSuggestions = false;
+                _showComposerSuggestions = false;
+              });
+            },
             child: Container(
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxWidth: 400),
@@ -1217,25 +1388,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                         child: const Icon(AppIcons.musicNote, color: Colors.white, size: 22),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('New Score', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
-                            SizedBox(height: 2),
-                            Text('Add a new score', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                            Text(
+                              _matchedScore != null ? 'Add Instrument' : 'New Score',
+                              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _matchedScore != null 
+                                  ? 'Add to "${_matchedScore!.title}"'
+                                  : 'Add a new score',
+                              style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
                         ),
                       ),
                       IconButton(
                         onPressed: () {
+                          _resetCreateScoreModal();
                           ref.read(showCreateScoreModalProvider.notifier).state = false;
-                          _scoreTitleController.clear();
-                          _scoreComposerController.clear();
-                          _customInstrumentController.clear();
-                          _selectedPdfPath = null;
-                          _selectedPdfName = null;
-                          _selectedInstrument = InstrumentType.vocal;
                         },
                         icon: const Icon(AppIcons.close, color: AppColors.gray400),
                       ),
@@ -1245,9 +1421,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Title field
                       TextField(
+                        key: _titleFieldKey,
                         controller: _scoreTitleController,
+                        focusNode: _scoreTitleFocusNode,
+                        onChanged: (value) {
+                          _updateTitleSuggestions(value);
+                        },
+                        onTap: () {
+                          setState(() {
+                            _showComposerSuggestions = false;
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'Score title',
                           hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
@@ -1261,8 +1449,19 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                         ),
                       ),
                       const SizedBox(height: 12),
+                      // Composer field
                       TextField(
+                        key: _composerFieldKey,
                         controller: _scoreComposerController,
+                        focusNode: _scoreComposerFocusNode,
+                        onChanged: (value) {
+                          _updateComposerSuggestions(value);
+                        },
+                        onTap: () {
+                          setState(() {
+                            _showTitleSuggestions = false;
+                          });
+                        },
                         decoration: InputDecoration(
                           hintText: 'Composer (optional)',
                           hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
@@ -1280,7 +1479,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                       Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: AppColors.gray50,
+                          color: isInstrumentDisabled ? AppColors.gray100 : AppColors.gray50,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
@@ -1291,13 +1490,42 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                     controller: _customInstrumentController,
                                     focusNode: _customInstrumentFocusNode,
                                     autofocus: false,
-                                    decoration: const InputDecoration(
+                                    onChanged: (_) {
+                                      _checkForMatchedScore();
+                                      setState(() {});
+                                    },
+                                    decoration: InputDecoration(
                                       hintText: 'Enter instrument name',
-                                      hintStyle: TextStyle(color: AppColors.gray400, fontSize: 15),
-                                      border: InputBorder.none,
+                                      hintStyle: TextStyle(
+                                        color: isInstrumentDisabled ? Colors.red.shade300 : AppColors.gray400, 
+                                        fontSize: 15,
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                        borderSide: BorderSide(
+                                          color: isInstrumentDisabled ? Colors.red.shade400 : AppColors.blue500,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      enabledBorder: isInstrumentDisabled 
+                                        ? OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: BorderSide(color: Colors.red.shade400, width: 1.5),
+                                          )
+                                        : OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: BorderSide.none,
+                                          ),
                                       filled: true,
-                                      fillColor: AppColors.gray50,
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                      fillColor: isInstrumentDisabled ? AppColors.gray100 : AppColors.gray50,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                    ),
+                                    style: TextStyle(
+                                      color: isInstrumentDisabled ? Colors.red.shade600 : null,
                                     ),
                                   )
                                 : IgnorePointer(
@@ -1306,11 +1534,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                         text: _selectedInstrument.name[0].toUpperCase() + _selectedInstrument.name.substring(1),
                                       ),
                                       readOnly: true,
-                                      decoration: const InputDecoration(
+                                      decoration: InputDecoration(
                                         border: InputBorder.none,
                                         filled: true,
-                                        fillColor: AppColors.gray50,
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                        fillColor: isInstrumentDisabled ? AppColors.gray100 : AppColors.gray50,
+                                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                                         isDense: false,
                                       ),
                                     ),
@@ -1326,8 +1554,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 clipBehavior: Clip.antiAlias,
                                 onOpened: () {
-                                  // Unfocus any input field when opening the menu
                                   FocusManager.instance.primaryFocus?.unfocus();
+                                  setState(() {
+                                    _showTitleSuggestions = false;
+                                    _showComposerSuggestions = false;
+                                  });
                                 },
                                 itemBuilder: (context) {
                                   final items = InstrumentType.values;
@@ -1335,6 +1566,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                     final index = entry.key;
                                     final type = entry.value;
                                     final isSelected = _selectedInstrument == type;
+                                    final isDisabled = type != InstrumentType.other && 
+                                        _disabledInstruments.contains(type.name);
                                     final isFirst = index == 0;
                                     final isLast = index == items.length - 1;
                                     final borderRadius = BorderRadius.vertical(
@@ -1344,6 +1577,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                     
                                     return PopupMenuItem(
                                       value: type,
+                                      enabled: !isDisabled,
                                       height: 44,
                                       padding: EdgeInsets.zero,
                                       child: ClipRRect(
@@ -1352,7 +1586,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                           color: isSelected ? AppColors.gray100 : Colors.transparent,
                                           child: InkWell(
                                             borderRadius: borderRadius,
-                                            onTap: () {
+                                            onTap: isDisabled ? null : () {
                                               FocusManager.instance.primaryFocus?.unfocus();
                                               Navigator.pop(context, type);
                                             },
@@ -1361,9 +1595,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                               height: 44,
                                               alignment: Alignment.centerLeft,
                                               padding: const EdgeInsets.symmetric(horizontal: 16),
-                                              child: Text(
-                                                type.name[0].toUpperCase() + type.name.substring(1),
-                                                style: const TextStyle(color: AppColors.gray700, fontSize: 15),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
+                                                      type.name[0].toUpperCase() + type.name.substring(1),
+                                                      style: TextStyle(
+                                                        color: isDisabled ? AppColors.gray300 : AppColors.gray700,
+                                                        fontSize: 15,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  if (isDisabled)
+                                                    const Icon(AppIcons.check, size: 16, color: AppColors.gray300),
+                                                ],
                                               ),
                                             ),
                                           ),
@@ -1373,7 +1618,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                   }).toList();
                                 },
                                 onSelected: (value) {
-                                  // Unfocus everything first
                                   FocusManager.instance.primaryFocus?.unfocus();
                                   setState(() {
                                     _selectedInstrument = value;
@@ -1383,7 +1627,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                       _customInstrumentController.clear();
                                     }
                                   });
-                                  // Double ensure unfocus after rebuild
                                   WidgetsBinding.instance.addPostFrameCallback((_) {
                                     FocusManager.instance.primaryFocus?.unfocus();
                                   });
@@ -1393,6 +1636,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           ],
                         ),
                       ),
+                      // Warning if instrument is disabled
+                      if (isInstrumentDisabled)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            'This instrument already exists for this score',
+                            style: TextStyle(fontSize: 12, color: AppColors.red500),
+                          ),
+                        ),
                       const SizedBox(height: 12),
                       // PDF select button
                       SizedBox(
@@ -1423,13 +1675,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
+                                _resetCreateScoreModal();
                                 ref.read(showCreateScoreModalProvider.notifier).state = false;
-                                _scoreTitleController.clear();
-                                _scoreComposerController.clear();
-                                _customInstrumentController.clear();
-                                _selectedPdfPath = null;
-                                _selectedPdfName = null;
-                                _selectedInstrument = InstrumentType.vocal;
                               },
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: AppColors.gray200),
@@ -1442,7 +1689,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           const SizedBox(width: 12),
                           Expanded(
                             child: ElevatedButton(
-                              onPressed: _selectedPdfPath != null ? _handleCreateScore : null,
+                              onPressed: (_selectedPdfPath != null && !isInstrumentDisabled) ? _handleCreateScore : null,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.blue500,
                                 foregroundColor: Colors.white,
@@ -1452,7 +1699,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                               ),
-                              child: const Text('Create', style: TextStyle(fontWeight: FontWeight.w600)),
+                              child: Text(
+                                _matchedScore != null ? 'Add' : 'Create',
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ),
                         ],
@@ -1465,6 +1715,107 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           ),
         ),
         ),
+        // Floating title suggestions overlay
+        if (_showTitleSuggestions && _titleSuggestions.isNotEmpty)
+          Builder(
+            builder: (context) {
+              final RenderBox? renderBox = _titleFieldKey.currentContext?.findRenderObject() as RenderBox?;
+              if (renderBox == null) return const SizedBox.shrink();
+              final position = renderBox.localToGlobal(Offset.zero);
+              final size = renderBox.size;
+              return Positioned(
+                top: position.dy + size.height + 4,
+                left: position.dx,
+                width: size.width,
+                child: Material(
+                  elevation: 16,
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.gray200),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: _titleSuggestions.map((score) => InkWell(
+                            onTap: () => _selectSuggestion(score),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    score.title,
+                                    style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                                  ),
+                                  Text(
+                                    score.composer,
+                                    style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        // Floating composer suggestions overlay
+        if (_showComposerSuggestions && _composerSuggestions.isNotEmpty)
+          Builder(
+            builder: (context) {
+              final RenderBox? renderBox = _composerFieldKey.currentContext?.findRenderObject() as RenderBox?;
+              if (renderBox == null) return const SizedBox.shrink();
+              final position = renderBox.localToGlobal(Offset.zero);
+              final size = renderBox.size;
+              return Positioned(
+                top: position.dy + size.height + 4,
+                left: position.dx,
+                width: size.width,
+                child: Material(
+                  elevation: 16,
+                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.white,
+                  child: Container(
+                    constraints: const BoxConstraints(maxHeight: 150),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.gray200),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: _composerSuggestions.map((composer) => InkWell(
+                            onTap: () => _selectComposerSuggestion(composer),
+                            child: Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                              child: Text(
+                                composer,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
+                          )).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
       ],
     );
   }
@@ -1543,8 +1894,9 @@ class _LibrarySetlistCard extends StatelessWidget {
 
 class _LibraryScoreCard extends StatelessWidget {
   final Score score;
+  final VoidCallback? onArrowTap;
 
-  const _LibraryScoreCard({required this.score});
+  const _LibraryScoreCard({required this.score, this.onArrowTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1553,7 +1905,7 @@ class _LibraryScoreCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
       child: Row(
         children: [
           Container(
@@ -1591,6 +1943,17 @@ class _LibraryScoreCard extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: AppColors.gray400),
                 ),
               ],
+            ),
+          ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onArrowTap,
+              borderRadius: BorderRadius.circular(20),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+              ),
             ),
           ),
         ],

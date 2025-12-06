@@ -420,7 +420,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     onLongPress: () {},
                     onDoubleTap: () {},
                     child: Container(
-                      width: 56,
+                      width: 48,
                       height: 56,
                       color: Colors.transparent,
                       child: const Center(
@@ -429,7 +429,6 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 0),
                 Container(
                   width: 28,
                   height: 28,

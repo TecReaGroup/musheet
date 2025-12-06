@@ -1,84 +1,86 @@
-import 'annotation.dart';
+import 'instrument_score.dart';
 
-enum InstrumentType { vocal, keyboard, bass, drums, guitar, other }
+// Re-export InstrumentType and InstrumentScore so existing imports still work
+export 'instrument_score.dart' show InstrumentType, InstrumentScore;
 
 class Score {
   final String id;
   final String title;
   final String composer;
-  final String pdfUrl;
-  final String? thumbnail;
   final DateTime dateAdded;
-  final List<Annotation>? annotations;
   final int bpm;
-  final InstrumentType instrumentType;
-  final String? customInstrument;
+  final List<InstrumentScore> instrumentScores;
 
   Score({
     required this.id,
     required this.title,
     required this.composer,
-    required this.pdfUrl,
-    this.thumbnail,
     required this.dateAdded,
-    this.annotations,
     this.bpm = 120,
-    this.instrumentType = InstrumentType.vocal,
-    this.customInstrument,
+    this.instrumentScores = const [],
   });
+
+  /// Get score key for matching (lowercase title + composer)
+  String get scoreKey => '${title.toLowerCase().trim()}|${composer.toLowerCase().trim()}';
+
+  /// Get all existing instrument keys in this score
+  Set<String> get existingInstrumentKeys =>
+      instrumentScores.map((s) => s.instrumentKey).toSet();
+
+  /// Check if an instrument already exists in this score
+  bool hasInstrument(InstrumentType type, String? customInstrument) {
+    final key = type == InstrumentType.other && customInstrument != null
+        ? customInstrument.toLowerCase().trim()
+        : type.name;
+    return existingInstrumentKeys.contains(key);
+  }
+
+  /// Get the first instrument score (for backward compatibility)
+  InstrumentScore? get firstInstrumentScore =>
+      instrumentScores.isNotEmpty ? instrumentScores.first : null;
+
+  /// Get total annotation count across all instrument scores
+  int get totalAnnotationCount => instrumentScores.fold(
+        0,
+        (sum, s) => sum + (s.annotations?.length ?? 0),
+      );
 
   Score copyWith({
     String? id,
     String? title,
     String? composer,
-    String? pdfUrl,
-    String? thumbnail,
     DateTime? dateAdded,
-    List<Annotation>? annotations,
     int? bpm,
-    InstrumentType? instrumentType,
-    String? customInstrument,
+    List<InstrumentScore>? instrumentScores,
   }) =>
       Score(
         id: id ?? this.id,
         title: title ?? this.title,
         composer: composer ?? this.composer,
-        pdfUrl: pdfUrl ?? this.pdfUrl,
-        thumbnail: thumbnail ?? this.thumbnail,
         dateAdded: dateAdded ?? this.dateAdded,
-        annotations: annotations ?? this.annotations,
         bpm: bpm ?? this.bpm,
-        instrumentType: instrumentType ?? this.instrumentType,
-        customInstrument: customInstrument ?? this.customInstrument,
+        instrumentScores: instrumentScores ?? this.instrumentScores,
       );
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'title': title,
         'composer': composer,
-        'pdfUrl': pdfUrl,
-        'thumbnail': thumbnail,
         'dateAdded': dateAdded.toIso8601String(),
-        'annotations': annotations?.map((a) => a.toJson()).toList(),
         'bpm': bpm,
-        'instrumentType': instrumentType.name,
-        'customInstrument': customInstrument,
+        'instrumentScores': instrumentScores.map((s) => s.toJson()).toList(),
       };
 
   factory Score.fromJson(Map<String, dynamic> json) => Score(
         id: json['id'],
         title: json['title'],
         composer: json['composer'],
-        pdfUrl: json['pdfUrl'],
-        thumbnail: json['thumbnail'],
         dateAdded: DateTime.parse(json['dateAdded']),
-        annotations: json['annotations'] != null
-            ? (json['annotations'] as List).map((a) => Annotation.fromJson(a)).toList()
-            : null,
         bpm: json['bpm'] ?? 120,
-        instrumentType: json['instrumentType'] != null
-            ? InstrumentType.values.firstWhere((e) => e.name == json['instrumentType'], orElse: () => InstrumentType.vocal)
-            : InstrumentType.vocal,
-        customInstrument: json['customInstrument'],
+        instrumentScores: json['instrumentScores'] != null
+            ? (json['instrumentScores'] as List)
+                .map((s) => InstrumentScore.fromJson(s))
+                .toList()
+            : [],
       );
 }
