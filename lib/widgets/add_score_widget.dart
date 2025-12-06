@@ -1,0 +1,931 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:file_picker/file_picker.dart';
+import '../providers/scores_provider.dart';
+import '../theme/app_colors.dart';
+import '../models/score.dart';
+import '../utils/icon_mappings.dart';
+
+/// A reusable widget for adding new scores or instrument sheets.
+/// 
+/// For library screen (New Score): showTitleComposer = true
+/// For score detail screen (Add Instrument): showTitleComposer = false
+class AddScoreWidget extends ConsumerStatefulWidget {
+  const AddScoreWidget({
+    super.key,
+    required this.onClose,
+    required this.onSuccess,
+    this.showTitleComposer = true,
+    this.existingScore,
+    this.disabledInstruments = const {},
+    this.headerIcon = AppIcons.musicNote,
+    this.headerIconGradient = const [AppColors.blue400, AppColors.blue600],
+    this.headerGradient = const [AppColors.blue50, Colors.white],
+    this.headerTitle,
+    this.headerSubtitle,
+    this.confirmButtonText,
+  });
+
+  /// Callback when modal is closed/cancelled
+  final VoidCallback onClose;
+  
+  /// Callback when score/instrument is successfully added
+  final VoidCallback onSuccess;
+  
+  /// Whether to show title and composer fields
+  /// true for New Score modal in library
+  /// false for Add Instrument modal in score detail
+  final bool showTitleComposer;
+  
+  /// If provided, the instrument will be added to this score
+  /// Used when showTitleComposer = false
+  final Score? existingScore;
+  
+  /// Set of instrument keys that are already in use (for disabling)
+  final Set<String> disabledInstruments;
+  
+  /// Icon for the header
+  final IconData headerIcon;
+  
+  /// Gradient colors for header icon background
+  final List<Color> headerIconGradient;
+  
+  /// Gradient colors for header background
+  final List<Color> headerGradient;
+  
+  /// Custom header title (optional)
+  final String? headerTitle;
+  
+  /// Custom header subtitle (optional)
+  final String? headerSubtitle;
+  
+  /// Custom confirm button text (optional)
+  final String? confirmButtonText;
+
+  @override
+  ConsumerState<AddScoreWidget> createState() => _AddScoreWidgetState();
+}
+
+class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
+  // Controllers
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _composerController = TextEditingController();
+  final TextEditingController _customInstrumentController = TextEditingController();
+  
+  // Focus nodes
+  final FocusNode _titleFocusNode = FocusNode();
+  final FocusNode _composerFocusNode = FocusNode();
+  final FocusNode _customInstrumentFocusNode = FocusNode();
+
+  void _toggleInstrumentDropdown() {
+    // First unfocus any active text field and close keyboard
+    _titleFocusNode.unfocus();
+    _composerFocusNode.unfocus();
+    _customInstrumentFocusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+    
+    setState(() {
+      _showInstrumentDropdown = !_showInstrumentDropdown;
+      _showTitleSuggestions = false;
+      _showComposerSuggestions = false;
+    });
+  }
+
+  void _closeInstrumentDropdown() {
+    if (_showInstrumentDropdown) {
+      setState(() {
+        _showInstrumentDropdown = false;
+      });
+    }
+  }
+
+  void _selectInstrument(InstrumentType type) {
+    // First unfocus any active text field
+    _titleFocusNode.unfocus();
+    _composerFocusNode.unfocus();
+    _customInstrumentFocusNode.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+    
+    setState(() {
+      _selectedInstrument = type;
+      _customInstrumentController.clear();
+      _showInstrumentDropdown = false;
+    });
+  }
+  
+  // Global keys for positioning suggestions
+  final GlobalKey _titleFieldKey = GlobalKey();
+  final GlobalKey _composerFieldKey = GlobalKey();
+  final GlobalKey _instrumentFieldKey = GlobalKey();
+  
+  // State
+  bool _showInstrumentDropdown = false;
+  String? _selectedPdfPath;
+  String? _selectedPdfName;
+  InstrumentType _selectedInstrument = InstrumentType.vocal;
+  
+  // Autocomplete state (only used when showTitleComposer = true)
+  List<Score> _titleSuggestions = [];
+  List<String> _composerSuggestions = [];
+  bool _showTitleSuggestions = false;
+  bool _showComposerSuggestions = false;
+  Score? _matchedScore;
+  Set<String> _disabledInstruments = {};
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize disabled instruments from widget property
+    _disabledInstruments = Set.from(widget.disabledInstruments);
+    
+    // If we have an existing score, find first available instrument
+    if (widget.existingScore != null || _disabledInstruments.isNotEmpty) {
+      if (_disabledInstruments.contains(_selectedInstrument.name)) {
+        _selectedInstrument = _findFirstAvailableInstrument();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _composerController.dispose();
+    _customInstrumentController.dispose();
+    _titleFocusNode.dispose();
+    _composerFocusNode.dispose();
+    _customInstrumentFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _updateTitleSuggestions(String query) {
+    final suggestions = ref.read(scoresProvider.notifier).getSuggestionsByTitle(query);
+    setState(() {
+      _titleSuggestions = suggestions;
+      _showTitleSuggestions = suggestions.isNotEmpty && query.isNotEmpty;
+    });
+    _checkForMatchedScore();
+  }
+
+  void _updateComposerSuggestions(String query) {
+    if (query.isEmpty) {
+      setState(() {
+        _composerSuggestions = [];
+        _showComposerSuggestions = false;
+      });
+      _checkForMatchedScore();
+      return;
+    }
+    
+    // Get all unique composers that match the query
+    final scores = ref.read(scoresProvider);
+    final queryLower = query.toLowerCase();
+    final composers = scores
+        .map((s) => s.composer)
+        .where((c) => c.toLowerCase().contains(queryLower))
+        .toSet()
+        .take(5)
+        .toList();
+    
+    setState(() {
+      _composerSuggestions = composers;
+      _showComposerSuggestions = composers.isNotEmpty;
+    });
+    _checkForMatchedScore();
+  }
+
+  void _checkForMatchedScore() {
+    // Only check for matched score when showing title/composer fields
+    if (!widget.showTitleComposer) return;
+    
+    final title = _titleController.text.trim();
+    final composer = _composerController.text.trim();
+    
+    if (title.isEmpty) {
+      setState(() {
+        _matchedScore = null;
+        _disabledInstruments = {};
+      });
+      return;
+    }
+    
+    final composerToCheck = composer.isEmpty ? 'Unknown' : composer;
+    final matched = ref.read(scoresProvider.notifier).findByTitleAndComposer(title, composerToCheck);
+    
+    setState(() {
+      _matchedScore = matched;
+      if (matched != null) {
+        _disabledInstruments = matched.existingInstrumentKeys;
+        // Auto-select first available instrument if current is disabled
+        if (_selectedInstrument != InstrumentType.other && 
+            _isInstrumentDisabled(_selectedInstrument, _customInstrumentController.text)) {
+          _selectedInstrument = _findFirstAvailableInstrument();
+        }
+      } else {
+        _disabledInstruments = {};
+      }
+    });
+  }
+
+  bool _isInstrumentDisabled(InstrumentType type, String customInstrument) {
+    // Use widget's disabled instruments when not showing title/composer
+    final disabledSet = widget.showTitleComposer 
+        ? _disabledInstruments 
+        : widget.disabledInstruments;
+    
+    if (disabledSet.isEmpty) return false;
+    
+    final key = type == InstrumentType.other && customInstrument.isNotEmpty
+        ? customInstrument.toLowerCase().trim()
+        : type.name;
+    return disabledSet.contains(key);
+  }
+
+  InstrumentType _findFirstAvailableInstrument() {
+    final disabledSet = widget.showTitleComposer 
+        ? _disabledInstruments 
+        : widget.disabledInstruments;
+    
+    for (final type in InstrumentType.values) {
+      if (type != InstrumentType.other && !disabledSet.contains(type.name)) {
+        return type;
+      }
+    }
+    return InstrumentType.other;
+  }
+
+  void _selectSuggestion(Score score) {
+    setState(() {
+      _titleController.text = score.title;
+      _composerController.text = score.composer;
+      _showTitleSuggestions = false;
+      _showComposerSuggestions = false;
+    });
+    _checkForMatchedScore();
+  }
+
+  void _selectComposerSuggestion(String composer) {
+    setState(() {
+      _composerController.text = composer;
+      _showComposerSuggestions = false;
+    });
+    _checkForMatchedScore();
+  }
+
+  Future<void> _handleSelectPdf() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf'],
+    );
+    
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.first;
+      setState(() {
+        _selectedPdfPath = file.path;
+        _selectedPdfName = file.name;
+        if (widget.showTitleComposer && _titleController.text.isEmpty) {
+          _titleController.text = file.name.replaceAll('.pdf', '');
+          _updateTitleSuggestions(_titleController.text);
+        }
+      });
+    }
+  }
+
+  void _handleConfirm() {
+    if (_selectedPdfPath == null) return;
+    
+    // Check if instrument is disabled
+    if (_isInstrumentDisabled(_selectedInstrument, _customInstrumentController.text)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This instrument already exists for this score')),
+      );
+      return;
+    }
+    
+    final now = DateTime.now();
+    
+    // Create the instrument score
+    final instrumentScore = InstrumentScore(
+      id: '${now.millisecondsSinceEpoch}-is',
+      pdfUrl: _selectedPdfPath!,
+      instrumentType: _selectedInstrument,
+      customInstrument: _selectedInstrument == InstrumentType.other 
+          ? _customInstrumentController.text.trim() 
+          : null,
+      dateAdded: now,
+    );
+    
+    if (widget.showTitleComposer) {
+      // Library screen mode: create new score or add to matched score
+      final title = _titleController.text.trim();
+      if (title.isEmpty) return;
+      
+      final composer = _composerController.text.trim().isEmpty 
+          ? 'Unknown' 
+          : _composerController.text.trim();
+      
+      if (_matchedScore != null) {
+        // Add instrument score to existing score
+        ref.read(scoresProvider.notifier).addInstrumentScore(_matchedScore!.id, instrumentScore);
+      } else {
+        // Create new score with instrument score
+        final newScore = Score(
+          id: now.millisecondsSinceEpoch.toString(),
+          title: title,
+          composer: composer,
+          dateAdded: now,
+          instrumentScores: [instrumentScore],
+        );
+        ref.read(scoresProvider.notifier).addScore(newScore);
+      }
+    } else {
+      // Score detail screen mode: add to existing score
+      if (widget.existingScore != null) {
+        ref.read(scoresProvider.notifier).addInstrumentScore(
+          widget.existingScore!.id, 
+          instrumentScore,
+        );
+      }
+    }
+    
+    widget.onSuccess();
+  }
+
+  String get _headerTitle {
+    if (widget.headerTitle != null) return widget.headerTitle!;
+    if (!widget.showTitleComposer) return 'Add Instrument';
+    return _matchedScore != null ? 'Add Instrument' : 'New Score';
+  }
+
+  String get _headerSubtitle {
+    if (widget.headerSubtitle != null) return widget.headerSubtitle!;
+    if (!widget.showTitleComposer && widget.existingScore != null) {
+      return 'Add to "${widget.existingScore!.title}"';
+    }
+    return _matchedScore != null 
+        ? 'Add to "${_matchedScore!.title}"'
+        : 'Add a new score';
+  }
+
+  String get _confirmText {
+    if (widget.confirmButtonText != null) return widget.confirmButtonText!;
+    if (!widget.showTitleComposer) return 'Add';
+    return _matchedScore != null ? 'Add' : 'Create';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isInstrumentDisabled = _isInstrumentDisabled(
+      _selectedInstrument, 
+      _customInstrumentController.text,
+    );
+    final canConfirm = widget.showTitleComposer
+        ? (_selectedPdfPath != null && 
+           _titleController.text.trim().isNotEmpty && 
+           !isInstrumentDisabled)
+        : (_selectedPdfPath != null && !isInstrumentDisabled);
+
+    return Stack(
+      children: [
+        // Backdrop
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () {
+              final currentFocus = FocusScope.of(context);
+              if (currentFocus.hasFocus || _showInstrumentDropdown) {
+                currentFocus.unfocus();
+                setState(() {
+                  _showTitleSuggestions = false;
+                  _showComposerSuggestions = false;
+                  _showInstrumentDropdown = false;
+                });
+              } else {
+                widget.onClose();
+              }
+            },
+            child: Container(color: Colors.black.withValues(alpha: 0.1)),
+          ),
+        ),
+        // Modal
+        Center(
+          child: GestureDetector(
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              setState(() {
+                _showTitleSuggestions = false;
+                _showComposerSuggestions = false;
+                _showInstrumentDropdown = false;
+              });
+            },
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              constraints: const BoxConstraints(maxWidth: 400),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 60,
+                    offset: const Offset(0, 20),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildHeader(),
+                  _buildContent(isInstrumentDisabled, canConfirm),
+                ],
+              ),
+            ),
+          ),
+        ),
+        // Title suggestions overlay
+        if (widget.showTitleComposer && _showTitleSuggestions && _titleSuggestions.isNotEmpty)
+          _buildTitleSuggestions(),
+        // Composer suggestions overlay
+        if (widget.showTitleComposer && _showComposerSuggestions && _composerSuggestions.isNotEmpty)
+          _buildComposerSuggestions(),
+        // Instrument dropdown overlay
+        if (_showInstrumentDropdown)
+          _buildInstrumentSuggestions(),
+      ],
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: widget.headerGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+        border: Border(bottom: BorderSide(color: AppColors.gray100)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: widget.headerIconGradient,
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(widget.headerIcon, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _headerTitle,
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _headerSubtitle,
+                  style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: widget.onClose,
+            icon: const Icon(AppIcons.close, color: AppColors.gray400),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(bool isInstrumentDisabled, bool canConfirm) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title field (only when showTitleComposer = true)
+          if (widget.showTitleComposer) ...[
+            TextField(
+              key: _titleFieldKey,
+              controller: _titleController,
+              focusNode: _titleFocusNode,
+              onChanged: _updateTitleSuggestions,
+              onTap: () {
+                setState(() {
+                  _showComposerSuggestions = false;
+                  _showInstrumentDropdown = false;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Score title',
+                hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                filled: true,
+                fillColor: AppColors.gray50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Composer field
+            TextField(
+              key: _composerFieldKey,
+              controller: _composerController,
+              focusNode: _composerFocusNode,
+              onChanged: _updateComposerSuggestions,
+              onTap: () {
+                setState(() {
+                  _showTitleSuggestions = false;
+                  _showInstrumentDropdown = false;
+                });
+              },
+              decoration: InputDecoration(
+                hintText: 'Composer (optional)',
+                hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                filled: true,
+                fillColor: AppColors.gray50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          // Instrument dropdown
+          _buildInstrumentDropdown(isInstrumentDisabled),
+          // Warning if instrument is disabled
+          if (isInstrumentDisabled)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                'This instrument already exists for this score',
+                style: TextStyle(fontSize: 12, color: AppColors.red500),
+              ),
+            ),
+          const SizedBox(height: 12),
+          // PDF select button
+          _buildPdfSelectButton(),
+          const SizedBox(height: 24),
+          // Action buttons
+          _buildActionButtons(canConfirm),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstrumentDropdown(bool isInstrumentDisabled) {
+    // Use ListenableBuilder to rebuild when focus changes
+    return ListenableBuilder(
+      listenable: _customInstrumentFocusNode,
+      builder: (context, child) {
+        final isFocused = _customInstrumentFocusNode.hasFocus;
+        final showBlueBorder = _selectedInstrument == InstrumentType.other && isFocused && !isInstrumentDisabled;
+        
+        return GestureDetector(
+          key: _instrumentFieldKey,
+          onTap: _selectedInstrument != InstrumentType.other ? _toggleInstrumentDropdown : null,
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: isInstrumentDisabled ? AppColors.gray100 : AppColors.gray50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isInstrumentDisabled 
+                    ? Colors.red.shade400 
+                    : (showBlueBorder ? AppColors.blue500 : AppColors.gray200),
+                width: (isInstrumentDisabled || showBlueBorder) ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _selectedInstrument == InstrumentType.other
+                      ? TextField(
+                          controller: _customInstrumentController,
+                          focusNode: _customInstrumentFocusNode,
+                          autofocus: false,
+                          onTap: _closeInstrumentDropdown,
+                          onChanged: (_) {
+                            if (widget.showTitleComposer) {
+                              _checkForMatchedScore();
+                            }
+                            setState(() {});
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Enter instrument name',
+                            hintStyle: TextStyle(
+                              color: isInstrumentDisabled ? Colors.red.shade300 : AppColors.gray400,
+                              fontSize: 15,
+                            ),
+                            border: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            filled: true,
+                            fillColor: Colors.transparent,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                          style: TextStyle(
+                            color: isInstrumentDisabled ? Colors.red.shade600 : null,
+                          ),
+                        )
+                  : IgnorePointer(
+                      child: TextField(
+                        controller: TextEditingController(
+                          text: _selectedInstrument.name[0].toUpperCase() + 
+                              _selectedInstrument.name.substring(1),
+                        ),
+                        readOnly: true,
+                        canRequestFocus: false,
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          filled: true,
+                          fillColor: Colors.transparent,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        ),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: isInstrumentDisabled ? Colors.red.shade600 : AppColors.gray700,
+                        ),
+                      ),
+                    ),
+            ),
+            // Dropdown toggle button
+            GestureDetector(
+              onTap: _toggleInstrumentDropdown,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(2, 12, 12, 12),
+                child: Icon(
+                  _showInstrumentDropdown ? AppIcons.chevronUp : AppIcons.chevronDown, 
+                  size: 20, 
+                  color: AppColors.gray400,
+                ),
+              ),
+            ),
+          ],
+        ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInstrumentSuggestions() {
+    return Builder(
+      builder: (context) {
+        final RenderBox? renderBox = _instrumentFieldKey.currentContext?.findRenderObject() as RenderBox?;
+        if (renderBox == null) return const SizedBox.shrink();
+        final position = renderBox.localToGlobal(Offset.zero);
+        final size = renderBox.size;
+        
+        final items = InstrumentType.values;
+        final disabledSet = widget.showTitleComposer 
+            ? _disabledInstruments 
+            : widget.disabledInstruments;
+        
+        return Positioned(
+          top: position.dy + size.height + 4,
+          left: position.dx,
+          width: size.width,
+          child: Material(
+            elevation: 16,
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 250),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: items.map((type) {
+                      final isSelected = _selectedInstrument == type;
+                      final isDisabled = type != InstrumentType.other && 
+                          disabledSet.contains(type.name);
+                      
+                      return InkWell(
+                        onTap: isDisabled ? null : () => _selectInstrument(type),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          color: isSelected ? AppColors.gray100 : null,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  type.name[0].toUpperCase() + type.name.substring(1),
+                                  style: TextStyle(
+                                    color: isDisabled ? AppColors.gray300 : AppColors.gray700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                              if (isDisabled)
+                                const Icon(AppIcons.check, size: 16, color: AppColors.gray300),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPdfSelectButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _handleSelectPdf,
+        icon: Icon(
+          _selectedPdfPath != null ? AppIcons.check : AppIcons.upload,
+          size: 18,
+        ),
+        label: Text(
+          _selectedPdfName ?? 'Select PDF File',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _selectedPdfPath != null ? AppColors.blue600 : AppColors.blue500,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(bool canConfirm) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: widget.onClose,
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppColors.gray200),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: ElevatedButton(
+            onPressed: canConfirm ? _handleConfirm : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.blue500,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.gray200,
+              disabledForegroundColor: AppColors.gray400,
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: Text(
+              _confirmText,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTitleSuggestions() {
+    return Builder(
+      builder: (context) {
+        final RenderBox? renderBox = _titleFieldKey.currentContext?.findRenderObject() as RenderBox?;
+        if (renderBox == null) return const SizedBox.shrink();
+        final position = renderBox.localToGlobal(Offset.zero);
+        final size = renderBox.size;
+        return Positioned(
+          top: position.dy + size.height + 4,
+          left: position.dx,
+          width: size.width,
+          child: Material(
+            elevation: 16,
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 150),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _titleSuggestions.map((score) => InkWell(
+                      onTap: () => _selectSuggestion(score),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              score.title,
+                              style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                            ),
+                            Text(
+                              score.composer,
+                              style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildComposerSuggestions() {
+    return Builder(
+      builder: (context) {
+        final RenderBox? renderBox = _composerFieldKey.currentContext?.findRenderObject() as RenderBox?;
+        if (renderBox == null) return const SizedBox.shrink();
+        final position = renderBox.localToGlobal(Offset.zero);
+        final size = renderBox.size;
+        return Positioned(
+          top: position.dy + size.height + 4,
+          left: position.dx,
+          width: size.width,
+          child: Material(
+            elevation: 16,
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.white,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 150),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: _composerSuggestions.map((composer) => InkWell(
+                      onTap: () => _selectComposerSuggestion(composer),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Text(
+                          composer,
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}

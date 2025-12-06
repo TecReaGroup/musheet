@@ -9,6 +9,7 @@ import '../models/score.dart';
 import '../models/setlist.dart';
 import '../app.dart';
 import 'score_viewer_screen.dart';
+import 'score_detail_screen.dart';
 import 'setlist_detail_screen.dart';
 import 'library_screen.dart'
     show
@@ -660,7 +661,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           },
           borderRadius: BorderRadius.circular(12),
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
             decoration: BoxDecoration(
               border: Border.all(color: AppColors.gray200),
               borderRadius: BorderRadius.circular(12),
@@ -712,6 +713,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                     ],
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ScoreDetailScreen(score: score),
+                        ),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+                    ),
                   ),
                 ),
               ],

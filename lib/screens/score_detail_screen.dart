@@ -5,6 +5,7 @@ import '../models/score.dart';
 import '../providers/scores_provider.dart';
 import '../providers/setlists_provider.dart';
 import '../theme/app_colors.dart';
+import '../widgets/add_score_widget.dart';
 import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
 
@@ -19,6 +20,8 @@ class ScoreDetailScreen extends ConsumerStatefulWidget {
 
 class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   bool _showEditModal = false;
+  bool _showAddInstrumentModal = false;
+  Set<String> _disabledInstruments = {};
   final TextEditingController _editTitleController = TextEditingController();
   final TextEditingController _editComposerController = TextEditingController();
 
@@ -31,6 +34,18 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
 
   String _formatDate(DateTime date) {
     return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+  }
+
+  void _openAddInstrumentModal(Score score) {
+    // Build disabled instruments set from existing instrument scores
+    _disabledInstruments = score.instrumentScores.map((is_) {
+      if (is_.instrumentType == InstrumentType.other && is_.customInstrument != null) {
+        return is_.customInstrument!.toLowerCase().trim();
+      }
+      return is_.instrumentType.name;
+    }).toSet();
+    
+    setState(() => _showAddInstrumentModal = true);
   }
 
   void _openEditModal(Score score) {
@@ -382,9 +397,51 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                   ],
                 ),
               ),
+              // Bottom add button
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: AppColors.gray100)),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _openAddInstrumentModal(currentScore),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.blue500,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(AppIcons.add, size: 22),
+                          SizedBox(width: 8),
+                          Text('Add Instrument Sheet', style: TextStyle(fontSize: 16)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           if (_showEditModal) _buildEditModal(currentScore),
+          if (_showAddInstrumentModal) 
+            AddScoreWidget(
+              showTitleComposer: false,
+              existingScore: currentScore,
+              disabledInstruments: _disabledInstruments,
+              headerIcon: AppIcons.add,
+              headerTitle: 'Add Instrument Sheet',
+              headerSubtitle: 'Select instrument and import PDF',
+              confirmButtonText: 'Add',
+              onClose: () => setState(() => _showAddInstrumentModal = false),
+              onSuccess: () => setState(() => _showAddInstrumentModal = false),
+            ),
         ],
       ),
     );
@@ -511,43 +568,46 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Delete button
-                GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Delete Instrument Sheet'),
-                        content: const Text('Are you sure you want to delete this instrument sheet? This action cannot be undone.'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              ref.read(scoresProvider.notifier).deleteInstrumentScore(score.id, instrumentScore.id);
-                              Navigator.pop(context);
-                            },
-                            child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
-                          ),
-                        ],
+                // Delete button (disabled when only one instrument)
+                if (score.instrumentScores.length > 1)
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Instrument Sheet'),
+                          content: const Text('Are you sure you want to delete this instrument sheet? This action cannot be undone.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                ref.read(scoresProvider.notifier).deleteInstrumentScore(score.id, instrumentScore.id);
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    );
-                  },
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
+                      child: const Icon(
+                        AppIcons.delete,
+                        size: 18,
+                        color: AppColors.red500,
+                      ),
                     ),
-                    child: const Icon(
-                      AppIcons.delete,
-                      size: 18,
-                      color: AppColors.red500,
-                    ),
-                  ),
-                ),
+                  )
+                else
+                  const SizedBox(width: 32),
               ],
             ),
           ),
