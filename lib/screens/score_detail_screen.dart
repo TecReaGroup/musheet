@@ -22,7 +22,9 @@ class ScoreDetailScreen extends ConsumerStatefulWidget {
 class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   bool _showEditModal = false;
   bool _showAddInstrumentModal = false;
+  bool _showCopyInstrumentModal = false;
   Set<String> _disabledInstruments = {};
+  InstrumentScore? _instrumentToCopy;
   final TextEditingController _editTitleController = TextEditingController();
   final TextEditingController _editComposerController = TextEditingController();
 
@@ -47,6 +49,21 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
     }).toSet();
     
     setState(() => _showAddInstrumentModal = true);
+  }
+
+  void _openCopyInstrumentModal(Score score, InstrumentScore instrumentScore) {
+    // Build disabled instruments set from existing instrument scores
+    _disabledInstruments = score.instrumentScores.map((is_) {
+      if (is_.instrumentType == InstrumentType.other && is_.customInstrument != null) {
+        return is_.customInstrument!.toLowerCase().trim();
+      }
+      return is_.instrumentType.name;
+    }).toSet();
+    
+    setState(() {
+      _instrumentToCopy = instrumentScore;
+      _showCopyInstrumentModal = true;
+    });
   }
 
   void _openEditModal(Score score) {
@@ -431,7 +448,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
             ],
           ),
           if (_showEditModal) _buildEditModal(currentScore),
-          if (_showAddInstrumentModal) 
+          if (_showAddInstrumentModal)
             AddScoreWidget(
               showTitleComposer: false,
               existingScore: currentScore,
@@ -443,6 +460,8 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
               onClose: () => setState(() => _showAddInstrumentModal = false),
               onSuccess: () => setState(() => _showAddInstrumentModal = false),
             ),
+          if (_showCopyInstrumentModal && _instrumentToCopy != null)
+            _buildCopyInstrumentModal(currentScore, _instrumentToCopy!),
         ],
       ),
     );
@@ -575,6 +594,23 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // Copy button
+                GestureDetector(
+                  onTap: () => _openCopyInstrumentModal(score, instrumentScore),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      AppIcons.copy,
+                      size: 18,
+                      color: AppColors.blue500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 // Delete button (disabled when only one instrument)
                 if (score.instrumentScores.length > 1)
                   GestureDetector(
@@ -837,6 +873,21 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCopyInstrumentModal(Score score, InstrumentScore sourceInstrument) {
+    return AddScoreWidget(
+      showTitleComposer: false,
+      existingScore: score,
+      disabledInstruments: _disabledInstruments,
+      sourceInstrumentToCopy: sourceInstrument,
+      headerIcon: AppIcons.copy,
+      headerTitle: 'Copy Instrument Sheet',
+      headerSubtitle: 'Copy "${sourceInstrument.instrumentDisplayName}" to another instrument',
+      confirmButtonText: 'Copy',
+      onClose: () => setState(() => _showCopyInstrumentModal = false),
+      onSuccess: () => setState(() => _showCopyInstrumentModal = false),
     );
   }
 }

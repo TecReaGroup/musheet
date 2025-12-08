@@ -19,6 +19,7 @@ class AddScoreWidget extends ConsumerStatefulWidget {
     this.showTitleComposer = true,
     this.existingScore,
     this.disabledInstruments = const {},
+    this.sourceInstrumentToCopy,
     this.headerIcon = AppIcons.musicNote,
     this.headerIconGradient = const [AppColors.blue400, AppColors.blue600],
     this.headerGradient = const [AppColors.blue50, Colors.white],
@@ -44,6 +45,10 @@ class AddScoreWidget extends ConsumerStatefulWidget {
   
   /// Set of instrument keys that are already in use (for disabling)
   final Set<String> disabledInstruments;
+  
+  /// If provided, the PDF from this instrument will be copied (copy mode)
+  /// In copy mode, PDF selection is skipped and this instrument's PDF is used
+  final InstrumentScore? sourceInstrumentToCopy;
   
   /// Icon for the header
   final IconData headerIcon;
@@ -139,6 +144,12 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     super.initState();
     // Initialize disabled instruments from widget property
     _disabledInstruments = Set.from(widget.disabledInstruments);
+    
+    // If in copy mode, auto-set the PDF from source instrument
+    if (widget.sourceInstrumentToCopy != null) {
+      _selectedPdfPath = widget.sourceInstrumentToCopy!.pdfUrl;
+      _selectedPdfName = widget.sourceInstrumentToCopy!.pdfUrl.split('/').last;
+    }
   }
   
   void _initializeDefaultInstrument() {
@@ -310,7 +321,12 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   }
 
   void _handleConfirm() {
-    if (_selectedPdfPath == null) return;
+    // In copy mode, PDF is already set from source instrument
+    // In normal mode, user must select a PDF
+    if (_selectedPdfPath == null && widget.sourceInstrumentToCopy == null) return;
+    
+    // Use source PDF if in copy mode
+    final pdfPath = widget.sourceInstrumentToCopy?.pdfUrl ?? _selectedPdfPath!;
     
     // Check if instrument is disabled
     if (_isInstrumentDisabled(_selectedInstrument!, _customInstrumentController.text)) {
@@ -325,10 +341,10 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     // Create the instrument score
     final instrumentScore = InstrumentScore(
       id: '${now.millisecondsSinceEpoch}-is',
-      pdfUrl: _selectedPdfPath!,
+      pdfUrl: pdfPath,
       instrumentType: _selectedInstrument!,
-      customInstrument: _selectedInstrument == InstrumentType.other 
-          ? _customInstrumentController.text.trim() 
+      customInstrument: _selectedInstrument == InstrumentType.other
+          ? _customInstrumentController.text.trim()
           : null,
       dateAdded: now,
     );
@@ -402,11 +418,13 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       _selectedInstrument!,
       _customInstrumentController.text,
     );
+    // In copy mode, PDF is already set, so we don't need to check _selectedPdfPath
+    final hasPdf = widget.sourceInstrumentToCopy != null || _selectedPdfPath != null;
     final canConfirm = widget.showTitleComposer
-        ? (_selectedPdfPath != null && 
-           _titleController.text.trim().isNotEmpty && 
+        ? (hasPdf &&
+           _titleController.text.trim().isNotEmpty &&
            !isInstrumentDisabled)
-        : (_selectedPdfPath != null && !isInstrumentDisabled);
+        : (hasPdf && !isInstrumentDisabled);
 
     return Stack(
       children: [
@@ -605,8 +623,33 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
               ),
             ),
           const SizedBox(height: 12),
-          // PDF select button
-          _buildPdfSelectButton(),
+          // PDF select button (only show if not in copy mode)
+          if (widget.sourceInstrumentToCopy == null)
+            _buildPdfSelectButton(),
+          if (widget.sourceInstrumentToCopy != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: Row(
+                children: [
+                  Icon(AppIcons.check, size: 18, color: AppColors.blue500),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _selectedPdfName ?? 'PDF file',
+                      style: const TextStyle(fontSize: 15, color: AppColors.gray700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 24),
           // Action buttons
           _buildActionButtons(canConfirm),

@@ -48,6 +48,7 @@ class AppIcons {
   static const delete = LucideIcons.trash2;
   static const share = LucideIcons.share2;
   static const check = LucideIcons.check;
+  static const copy = LucideIcons.copy;
   
   // Navigation & Direction
   static const chevronRight = LucideIcons.chevronRight;
