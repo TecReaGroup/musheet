@@ -99,6 +99,34 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     final currentPage = ref.watch(currentPageProvider);
+    final teamEnabled = ref.watch(teamEnabledProvider);
+
+    // If team is disabled and current page is team, redirect to settings
+    if (!teamEnabled && currentPage == AppPage.team) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(currentPageProvider.notifier).state = AppPage.settings;
+        }
+      });
+    }
+
+    // Calculate the actual index for IndexedStack
+    final int stackIndex;
+    if (teamEnabled) {
+      stackIndex = currentPage.index;
+    } else {
+      // When team is disabled: Home=0, Library=1, Settings=2
+      switch (currentPage) {
+        case AppPage.home:
+          stackIndex = 0;
+        case AppPage.library:
+          stackIndex = 1;
+        case AppPage.team:
+          stackIndex = 2; // Will be redirected to settings
+        case AppPage.settings:
+          stackIndex = 2;
+      }
+    }
 
     // Ensure system UI style is applied on every build
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -124,12 +152,12 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         extendBody: true,
         extendBodyBehindAppBar: true,
         body: IndexedStack(
-          index: currentPage.index,
-          children: const [
-            HomeScreen(),
-            LibraryScreen(),
-            TeamScreen(),
-            SettingsScreen(),
+          index: stackIndex,
+          children: [
+            const HomeScreen(),
+            const LibraryScreen(),
+            if (teamEnabled) const TeamScreen(),
+            const SettingsScreen(),
           ],
         ),
         bottomNavigationBar: Container(
@@ -152,29 +180,30 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
               highlightColor: Colors.transparent,
             ),
             child: BottomNavigationBar(
-              currentIndex: currentPage.index,
+              currentIndex: _getAdjustedIndex(currentPage, teamEnabled),
               onTap: (index) {
-                ref.read(currentPageProvider.notifier).state = AppPage.values[index];
+                ref.read(currentPageProvider.notifier).state = _getPageFromIndex(index, teamEnabled);
               },
               type: BottomNavigationBarType.fixed,
               elevation: 0,
-              items: const [
-                BottomNavigationBarItem(
+              items: [
+                const BottomNavigationBarItem(
                   icon: Icon(AppIcons.homeOutlined),
                   activeIcon: Icon(AppIcons.home),
                   label: 'Home',
                 ),
-                BottomNavigationBarItem(
+                const BottomNavigationBarItem(
                   icon: Icon(AppIcons.libraryMusicOutlined),
                   activeIcon: Icon(AppIcons.libraryMusic),
                   label: 'Library',
                 ),
-                BottomNavigationBarItem(
-                  icon: Icon(AppIcons.peopleOutline),
-                  activeIcon: Icon(AppIcons.people),
-                  label: 'Team',
-                ),
-                BottomNavigationBarItem(
+                if (teamEnabled)
+                  const BottomNavigationBarItem(
+                    icon: Icon(AppIcons.peopleOutline),
+                    activeIcon: Icon(AppIcons.people),
+                    label: 'Team',
+                  ),
+                const BottomNavigationBarItem(
                   icon: Icon(AppIcons.settingsOutlined),
                   activeIcon: Icon(AppIcons.settings),
                   label: 'Settings',
@@ -185,5 +214,44 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         ),
       ),
     );
+  }
+
+  // Helper to get adjusted index for bottom navigation
+  int _getAdjustedIndex(AppPage page, bool teamEnabled) {
+    if (teamEnabled) {
+      return page.index;
+    } else {
+      // When team is disabled: Home=0, Library=1, Settings=2
+      switch (page) {
+        case AppPage.home:
+          return 0;
+        case AppPage.library:
+          return 1;
+        case AppPage.team:
+          return 2; // Should not happen, but default to settings
+        case AppPage.settings:
+          return 2;
+      }
+    }
+  }
+
+  // Helper to get page from bottom navigation index
+  AppPage _getPageFromIndex(int index, bool teamEnabled) {
+    if (teamEnabled) {
+      // Team enabled: Home=0, Library=1, Team=2, Settings=3
+      return AppPage.values[index];
+    } else {
+      // Team disabled: Home=0, Library=1, Settings=2
+      switch (index) {
+        case 0:
+          return AppPage.home;
+        case 1:
+          return AppPage.library;
+        case 2:
+          return AppPage.settings;
+        default:
+          return AppPage.home;
+      }
+    }
   }
 }

@@ -48,6 +48,54 @@ class TeamsNotifier extends Notifier<List<TeamData>> {
     }
     return [];
   }
+
+  /// Leave all teams - clears all team data including scores and setlists
+  void leaveAllTeams() {
+    state = [];
+  }
+
+  /// Rejoin teams - reinitialize with mock data
+  void rejoinTeams() {
+    final scores = ref.read(scoresProvider);
+    final setlists = ref.read(setlistsProvider);
+    
+    if (scores.isNotEmpty && setlists.isNotEmpty) {
+      state = [
+        TeamData(
+          id: '1',
+          name: 'Symphony Orchestra',
+          members: [
+            TeamMember(id: '1', name: 'You', email: 'you@example.com', role: 'admin'),
+            TeamMember(id: '2', name: 'John Smith', email: 'john@example.com', role: 'member'),
+            TeamMember(id: '3', name: 'Sarah Chen', email: 'sarah@example.com', role: 'admin'),
+          ],
+          sharedScores: scores.isNotEmpty ? [scores[0]] : [],
+          sharedSetlists: setlists.isNotEmpty ? [setlists[0]] : [],
+        ),
+        TeamData(
+          id: '2',
+          name: 'Chamber Ensemble',
+          members: [
+            TeamMember(id: '1', name: 'You', email: 'you@example.com', role: 'admin'),
+            TeamMember(id: '4', name: 'Emma Wilson', email: 'emma@example.com', role: 'member'),
+          ],
+          sharedScores: scores.length >= 3 ? [scores[1], scores[2]] : [],
+          sharedSetlists: [],
+        ),
+        TeamData(
+          id: '3',
+          name: 'Jazz Quartet',
+          members: [
+            TeamMember(id: '1', name: 'You', email: 'you@example.com', role: 'member'),
+            TeamMember(id: '5', name: 'Mike Johnson', email: 'mike@example.com', role: 'admin'),
+            TeamMember(id: '6', name: 'Lisa Brown', email: 'lisa@example.com', role: 'member'),
+          ],
+          sharedScores: scores.length >= 4 ? [scores[3]] : [],
+          sharedSetlists: setlists.length >= 2 ? [setlists[1]] : [],
+        ),
+      ];
+    }
+  }
 }
 
 final teamsProvider = NotifierProvider<TeamsNotifier, List<TeamData>>(() {

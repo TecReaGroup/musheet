@@ -4,7 +4,7 @@ import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../models/instrument_score.dart';
-import 'library_screen.dart' show preferredInstrumentProvider;
+import 'library_screen.dart' show preferredInstrumentProvider, teamEnabledProvider;
 import 'instrument_preference_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -128,6 +128,54 @@ class SettingsScreen extends ConsumerWidget {
                     },
                     showDivider: true,
                     isFirst: true,
+                  );
+                },
+              ),
+              Consumer(
+                builder: (context, ref, child) {
+                  final teamEnabled = ref.watch(teamEnabledProvider);
+                  
+                  return SettingsListItem(
+                    icon: AppIcons.people,
+                    label: 'Enable Team',
+                    trailing: GestureDetector(
+                      onTap: () {
+                        ref.read(teamEnabledProvider.notifier).setTeamEnabled(!teamEnabled);
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 44,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          color: teamEnabled ? AppColors.blue500 : AppColors.gray300,
+                        ),
+                        child: AnimatedAlign(
+                          duration: const Duration(milliseconds: 200),
+                          alignment: teamEnabled ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            margin: const EdgeInsets.symmetric(horizontal: 2),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    onTap: () {
+                      ref.read(teamEnabledProvider.notifier).setTeamEnabled(!teamEnabled);
+                    },
+                    showDivider: true,
                   );
                 },
               ),

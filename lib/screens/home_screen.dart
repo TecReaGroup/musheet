@@ -20,6 +20,7 @@ import 'library_screen.dart'
         lastOpenedScoreInSetlistProvider,
         lastOpenedInstrumentInScoreProvider,
         preferredInstrumentProvider,
+        teamEnabledProvider,
         getBestInstrumentIndex;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
@@ -88,6 +89,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final searchQuery = ref.watch(searchQueryProvider);
     final searchScope = ref.watch(searchScopeProvider);
     final hasUnreadNotifications = ref.watch(hasUnreadNotificationsProvider);
+    final teamEnabled = ref.watch(teamEnabledProvider);
+
+    // If team is disabled and search scope is team, switch to library
+    if (!teamEnabled && searchScope == SearchScope.team) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(searchScopeProvider.notifier).state = SearchScope.library;
+      });
+    }
 
     // Get recently opened records
     final recentlyOpenedSetlists = ref.watch(recentlyOpenedSetlistsProvider);
@@ -333,6 +342,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     List<Setlist> setlists,
     SearchScope scope,
   ) {
+    final teamEnabled = ref.watch(teamEnabledProvider);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -343,19 +354,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               'Search Results',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
             ),
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.gray100,
-                borderRadius: BorderRadius.circular(8),
+            // Only show scope switcher if team is enabled
+            if (teamEnabled)
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    _buildScopeButton('Library', SearchScope.library, scope),
+                    _buildScopeButton('Team', SearchScope.team, scope),
+                  ],
+                ),
               ),
-              padding: const EdgeInsets.all(4),
-              child: Row(
-                children: [
-                  _buildScopeButton('Library', SearchScope.library, scope),
-                  _buildScopeButton('Team', SearchScope.team, scope),
-                ],
-              ),
-            ),
           ],
         ),
         const SizedBox(height: 16),

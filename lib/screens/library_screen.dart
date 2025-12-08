@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/scores_provider.dart';
 import '../providers/setlists_provider.dart';
+import '../providers/teams_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
@@ -163,11 +164,29 @@ class PreferredInstrumentNotifier extends Notifier<String?> {
   }
 }
 
+// Track whether team feature is enabled
+class TeamEnabledNotifier extends Notifier<bool> {
+  @override
+  bool build() => true; // Default: team feature is enabled
+  
+  void setTeamEnabled(bool enabled) {
+    state = enabled;
+    // When disabling team, leave all teams and clear their data
+    if (!enabled) {
+      ref.read(teamsProvider.notifier).leaveAllTeams();
+    } else {
+      // When re-enabling team, rejoin teams
+      ref.read(teamsProvider.notifier).rejoinTeams();
+    }
+  }
+}
+
 final recentlyOpenedSetlistsProvider = NotifierProvider<RecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(RecentlyOpenedSetlistsNotifier.new);
 final recentlyOpenedScoresProvider = NotifierProvider<RecentlyOpenedScoresNotifier, Map<String, DateTime>>(RecentlyOpenedScoresNotifier.new);
 final lastOpenedScoreInSetlistProvider = NotifierProvider<LastOpenedScoreInSetlistNotifier, Map<String, int>>(LastOpenedScoreInSetlistNotifier.new);
 final lastOpenedInstrumentInScoreProvider = NotifierProvider<LastOpenedInstrumentInScoreNotifier, Map<String, int>>(LastOpenedInstrumentInScoreNotifier.new);
 final preferredInstrumentProvider = NotifierProvider<PreferredInstrumentNotifier, String?>(PreferredInstrumentNotifier.new);
+final teamEnabledProvider = NotifierProvider<TeamEnabledNotifier, bool>(TeamEnabledNotifier.new);
 
 // Helper function to get the best instrument index for a score
 // Priority: 1. Last opened > 2. User preferred > 3. Vocal > 4. Default (first)
