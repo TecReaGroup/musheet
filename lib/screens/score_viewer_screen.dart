@@ -886,9 +886,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   : null,
             )
           else
-            _buildToolButton(
+            _buildToolButtonWithWidget(
               key: const ValueKey('metronome_button'),
-              icon: AppIcons.metronome,
+              iconWidget: AppIcons.metronomeIcon(
+                size: 22,
+                color: _metronomeController?.isPlaying ?? false
+                    ? AppColors.blue500
+                    : AppColors.gray500,
+              ),
               isActive: _metronomeController?.isPlaying ?? false,
               activeColor: AppColors.blue500,
               onPressed: () {
@@ -1037,6 +1042,31 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     ? activeColor
                     : AppColors.gray500,
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolButtonWithWidget({
+    Key? key,
+    required Widget iconWidget,
+    bool isActive = false,
+    bool isDisabled = false,
+    Color activeColor = AppColors.blue500,
+    VoidCallback? onPressed,
+  }) {
+    return Material(
+      key: key,
+      color: isActive ? activeColor.withValues(alpha: 0.1) : Colors.transparent,
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: isDisabled ? null : onPressed,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          child: iconWidget,
         ),
       ),
     );

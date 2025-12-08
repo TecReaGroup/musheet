@@ -103,7 +103,7 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
                   displayName: 'No Preference',
                   subtitle: 'Use default order',
                   isSelected: preferredInstrument == null,
-                  icon: AppIcons.close,
+                  icon: AppIcons.circleSlash,
                 ),
                 const SizedBox(height: 12),
                 const Padding(
@@ -118,20 +118,33 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-                // Instrument options
-                ...InstrumentType.values.map((type) {
+                // Instrument options (excluding 'other')
+                ...InstrumentType.values.where((type) => type != InstrumentType.other).map((type) {
                   final instrumentKey = type.name;
                   final displayName = type.name[0].toUpperCase() + type.name.substring(1);
+                  final isSelected = preferredInstrument == instrumentKey;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildInstrumentOption(
-                      context: context,
-                      ref: ref,
-                      instrumentKey: instrumentKey,
-                      displayName: displayName,
-                      isSelected: preferredInstrument == instrumentKey,
-                      icon: _getInstrumentIcon(type),
-                    ),
+                    child: type == InstrumentType.bass
+                        ? _buildInstrumentOptionWithWidget(
+                            context: context,
+                            ref: ref,
+                            instrumentKey: instrumentKey,
+                            displayName: displayName,
+                            isSelected: isSelected,
+                            iconWidget: AppIcons.bassGuitar(
+                              size: 20,
+                              color: isSelected ? Colors.white : AppColors.gray600,
+                            ),
+                          )
+                        : _buildInstrumentOption(
+                            context: context,
+                            ref: ref,
+                            instrumentKey: instrumentKey,
+                            displayName: displayName,
+                            isSelected: isSelected,
+                            icon: _getInstrumentIcon(type),
+                          ),
                   );
                 }),
               ],
@@ -224,18 +237,98 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildInstrumentOptionWithWidget({
+    required BuildContext context,
+    required WidgetRef ref,
+    required String? instrumentKey,
+    required String displayName,
+    String? subtitle,
+    required bool isSelected,
+    required Widget iconWidget,
+  }) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: () {
+          ref.read(preferredInstrumentProvider.notifier).setPreferredInstrument(instrumentKey);
+          Navigator.pop(context);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: isSelected ? AppColors.blue500 : AppColors.gray200,
+              width: isSelected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            color: isSelected ? AppColors.blue50 : Colors.white,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.blue500 : AppColors.gray100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: iconWidget,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        color: isSelected ? AppColors.blue600 : AppColors.gray900,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isSelected ? AppColors.blue500 : AppColors.gray500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (isSelected)
+                const Icon(
+                  AppIcons.check,
+                  size: 20,
+                  color: AppColors.blue500,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   IconData _getInstrumentIcon(InstrumentType type) {
     switch (type) {
       case InstrumentType.vocal:
         return AppIcons.mic;
       case InstrumentType.keyboard:
-        return AppIcons.piano;
+        return AppIcons.keyboardMusic;
       case InstrumentType.drums:
-        return AppIcons.musicNote;
+        return AppIcons.drum;
       case InstrumentType.bass:
-        return AppIcons.musicNote;
+        return AppIcons.musicNote; // This won't be used, handled separately
       case InstrumentType.guitar:
-        return AppIcons.musicNote;
+        return AppIcons.guitar;
       case InstrumentType.other:
         return AppIcons.musicNote;
     }

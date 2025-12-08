@@ -1,8 +1,32 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Icon mappings from Material Icons to Lucide Icons
 /// This ensures consistent icon usage across the app matching Figma design
 class AppIcons {
+  // Custom SVG Icons
+  static Widget bassGuitar({double size = 24, Color? color}) {
+    return SvgPicture.asset(
+      'assets/icons/bass_guitar.svg',
+      width: size,
+      height: size,
+      colorFilter: color != null
+          ? ColorFilter.mode(color, BlendMode.srcIn)
+          : null,
+    );
+  }
+  
+  static Widget metronomeIcon({double size = 24, Color? color}) {
+    return SvgPicture.asset(
+      'assets/icons/metronome.svg',
+      width: size,
+      height: size,
+      colorFilter: color != null
+          ? ColorFilter.mode(color, BlendMode.srcIn)
+          : null,
+    );
+  }
   // Navigation (bottom bar)
   static const home = LucideIcons.house;
   static const homeOutlined = LucideIcons.house;
@@ -20,7 +44,7 @@ class AppIcons {
   static const add = LucideIcons.plus;
   static const close = LucideIcons.x;
   static const search = LucideIcons.search;
-  static const edit = LucideIcons.pencil;
+  static const edit = LucideIcons.squarePen;
   static const delete = LucideIcons.trash2;
   static const share = LucideIcons.share2;
   static const check = LucideIcons.check;
@@ -46,6 +70,7 @@ class AppIcons {
   
   // Music & Media
   static const musicNote = LucideIcons.music;
+  // metronome is now a Widget method (metronomeIcon) - kept for backwards compatibility
   static const metronome = LucideIcons.drum;
   static const playArrow = LucideIcons.play;
   static const play = LucideIcons.play;
@@ -56,6 +81,10 @@ class AppIcons {
   static const speed = LucideIcons.gauge;
   static const playlistPlay = LucideIcons.listMusic;
   static const piano = LucideIcons.piano;
+  static const keyboardMusic = LucideIcons.piano;
+  static const drum = LucideIcons.drum;
+  static const guitar = LucideIcons.guitar;
+  static const circleSlash = LucideIcons.circleSlash;
   
   // People & User
   static const person = LucideIcons.user;

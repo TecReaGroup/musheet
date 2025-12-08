@@ -5,6 +5,7 @@ import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../utils/icon_mappings.dart';
+import '../screens/library_screen.dart' show preferredInstrumentProvider;
 
 /// A reusable widget for adding new scores or instrument sheets.
 /// 
@@ -122,7 +123,8 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   bool _showInstrumentDropdown = false;
   String? _selectedPdfPath;
   String? _selectedPdfName;
-  InstrumentType _selectedInstrument = InstrumentType.vocal;
+  InstrumentType? _selectedInstrument; // Changed to nullable
+  bool _isInitialized = false; // Track if instrument has been initialized
   
   // Autocomplete state (only used when showTitleComposer = true)
   List<Score> _titleSuggestions = [];
@@ -137,13 +139,30 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     super.initState();
     // Initialize disabled instruments from widget property
     _disabledInstruments = Set.from(widget.disabledInstruments);
+  }
+  
+  void _initializeDefaultInstrument() {
+    if (_isInitialized) return;
+    _isInitialized = true;
     
-    // If we have an existing score, find first available instrument
-    if (widget.existingScore != null || _disabledInstruments.isNotEmpty) {
-      if (_disabledInstruments.contains(_selectedInstrument.name)) {
-        _selectedInstrument = _findFirstAvailableInstrument();
+    final preferredInstrumentKey = ref.read(preferredInstrumentProvider);
+    
+    // Priority 1: Use preferred instrument if set and available
+    if (preferredInstrumentKey != null) {
+      final preferredType = InstrumentType.values.firstWhere(
+        (type) => type.name == preferredInstrumentKey,
+        orElse: () => InstrumentType.vocal,
+      );
+      
+      // Check if preferred instrument is not disabled
+      if (!_disabledInstruments.contains(preferredType.name)) {
+        _selectedInstrument = preferredType;
+        return;
       }
     }
+    
+    // Priority 2: Find first available instrument
+    _selectedInstrument = _findFirstAvailableInstrument();
   }
 
   @override
@@ -217,7 +236,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
         _disabledInstruments = matched.existingInstrumentKeys;
         // Auto-select first available instrument if current is disabled
         if (_selectedInstrument != InstrumentType.other && 
-            _isInstrumentDisabled(_selectedInstrument, _customInstrumentController.text)) {
+            _isInstrumentDisabled(_selectedInstrument!, _customInstrumentController.text)) {
           _selectedInstrument = _findFirstAvailableInstrument();
         }
       } else {
@@ -294,7 +313,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     if (_selectedPdfPath == null) return;
     
     // Check if instrument is disabled
-    if (_isInstrumentDisabled(_selectedInstrument, _customInstrumentController.text)) {
+    if (_isInstrumentDisabled(_selectedInstrument!, _customInstrumentController.text)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('This instrument already exists for this score')),
       );
@@ -307,7 +326,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     final instrumentScore = InstrumentScore(
       id: '${now.millisecondsSinceEpoch}-is',
       pdfUrl: _selectedPdfPath!,
-      instrumentType: _selectedInstrument,
+      instrumentType: _selectedInstrument!,
       customInstrument: _selectedInstrument == InstrumentType.other 
           ? _customInstrumentController.text.trim() 
           : null,
@@ -374,8 +393,13 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
 
   @override
   Widget build(BuildContext context) {
+    // Initialize instrument on first build when ref is available
+    if (!_isInitialized) {
+      _initializeDefaultInstrument();
+    }
+    
     final isInstrumentDisabled = _isInstrumentDisabled(
-      _selectedInstrument, 
+      _selectedInstrument!,
       _customInstrumentController.text,
     );
     final canConfirm = widget.showTitleComposer
@@ -597,11 +621,11 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       listenable: _customInstrumentFocusNode,
       builder: (context, child) {
         final isFocused = _customInstrumentFocusNode.hasFocus;
-        final showBlueBorder = _selectedInstrument == InstrumentType.other && isFocused && !isInstrumentDisabled;
+        final showBlueBorder = _selectedInstrument! == InstrumentType.other && isFocused && !isInstrumentDisabled;
         
         return GestureDetector(
           key: _instrumentFieldKey,
-          onTap: _selectedInstrument != InstrumentType.other ? _toggleInstrumentDropdown : null,
+          onTap: _selectedInstrument! != InstrumentType.other ? _toggleInstrumentDropdown : null,
           child: Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -617,7 +641,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
             child: Row(
               children: [
                 Expanded(
-                  child: _selectedInstrument == InstrumentType.other
+                  child: _selectedInstrument! == InstrumentType.other
                       ? TextField(
                           controller: _customInstrumentController,
                           focusNode: _customInstrumentFocusNode,
@@ -649,8 +673,8 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
                   : IgnorePointer(
                       child: TextField(
                         controller: TextEditingController(
-                          text: _selectedInstrument.name[0].toUpperCase() + 
-                              _selectedInstrument.name.substring(1),
+                          text: _selectedInstrument!.name[0].toUpperCase() +
+                              _selectedInstrument!.name.substring(1),
                         ),
                         readOnly: true,
                         canRequestFocus: false,
@@ -723,7 +747,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: items.map((type) {
-                      final isSelected = _selectedInstrument == type;
+                      final isSelected = _selectedInstrument! == type;
                       final isDisabled = type != InstrumentType.other && 
                           disabledSet.contains(type.name);
                       

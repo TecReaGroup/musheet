@@ -41,6 +41,9 @@ dependencies:
   # Routing
   go_router: ^17.0.0
   
+  # SVG Support
+  flutter_svg: ^2.0.10
+  
   # PDF Display
   pdfrx: ^1.1.29
   syncfusion_flutter_pdfviewer: ^31.2.16
@@ -102,6 +105,7 @@ flutter:
   # Assets
   assets:
     - assets/sounds/
+    - assets/icons/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

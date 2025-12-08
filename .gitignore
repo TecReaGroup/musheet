@@ -33,6 +33,7 @@ migrate_working_dir/
 /build/
 /coverage/
 /design/
+todo
 
 # Symbolication related
 app.*.symbols
