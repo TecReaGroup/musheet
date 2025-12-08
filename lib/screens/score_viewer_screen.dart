@@ -319,13 +319,13 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       // Extend body behind system UI for fullscreen effect
       extendBodyBehindAppBar: true,
       extendBody: true,
-      backgroundColor: AppColors.gray100,
+      backgroundColor: AppColors.gray50,
       body: Stack(
         children: [
           // PDF viewer with clean background extending to status bar
           Positioned.fill(
             child: Container(
-              color: AppColors.gray100,
+              color: AppColors.gray50,
               child: _buildPdfViewer(),
             ),
           ),
@@ -435,7 +435,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             ),
             if (_showPenOptions) _buildPenOptions(),
             if (_showMetronome) _buildMetronomeModal(),
-            if (_showSetlistNav && widget.setlistScores != null)
+            if (_showSetlistNav && (widget.setlistScores != null || widget.score.instrumentScores.length > 1))
               _buildSetlistNavModal(),
             if (_showInstrumentPicker)
               _buildInstrumentPickerModal(),
@@ -584,7 +584,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppColors.gray100,
+                color: AppColors.gray50,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -756,8 +756,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 ),
               ),
             ),
-            // Setlist navigation button or placeholder
-          if (widget.setlistScores != null)
+            // Setlist navigation button - always show when there are multiple scores OR instruments
+          if (widget.setlistScores != null || widget.score.instrumentScores.length > 1)
             IconButton(
               icon: Icon(
                 AppIcons.playlistPlay,
@@ -778,7 +778,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     const itemHeight = 48.0;
                     const listHeight = 168.0;
                     const listPadding = 12.0; // vertical padding 6*2
-                    final totalContentHeight = widget.setlistScores!.length * itemHeight + listPadding;
+                    final scores = widget.setlistScores ?? [widget.score];
+                    final totalContentHeight = scores.length * itemHeight + listPadding;
                     final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
                     // Center the current item: offset = itemTop - (listHeight - itemHeight) / 2
                     final centerOffset = ((widget.currentIndex ?? 0) * itemHeight - (listHeight - itemHeight) / 2).clamp(0.0, maxScrollOffset);
@@ -1141,7 +1142,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               Container(
                 width: double.infinity,
                 height: 1,
-                color: AppColors.gray100,
+                color: AppColors.gray50,
               ),
               const SizedBox(height: 16),
               // Width selection row
@@ -1237,7 +1238,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                    border: Border(bottom: BorderSide(color: AppColors.gray50)),
                   ),
                   child: const Row(
                     children: [
@@ -1275,7 +1276,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                                 width: 28,
                                 height: 28,
                                 decoration: BoxDecoration(
-                                  color: isCurrent ? AppColors.blue500 : AppColors.gray100,
+                                  color: isCurrent ? AppColors.blue500 : AppColors.gray50,
                                   borderRadius: BorderRadius.circular(7),
                                 ),
                                 child: Center(
@@ -1322,6 +1323,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Widget _buildSetlistNavModal() {
+    // Use provided setlist scores or create a single-item list with current score
+    final scores = widget.setlistScores ?? [widget.score];
+    final hasSetlist = widget.setlistScores != null;
+
     return Positioned(
       top: MediaQuery.of(context).padding.top + 72,
       right: 16,
@@ -1343,28 +1348,30 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header
+              // Header - always show icon, show title only if from setlist
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                  border: Border(bottom: BorderSide(color: AppColors.gray50)),
                 ),
                 child: Row(
                   children: [
                     const Icon(AppIcons.setlistIcon, color: AppColors.gray400, size: 18),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.setlistName ?? 'Setlist',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.gray900,
+                    if (hasSetlist && widget.setlistName != null && widget.setlistName!.isNotEmpty) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.setlistName!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.gray900,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -1374,17 +1381,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 child: ListView.builder(
                   controller: _setlistScrollController,
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  itemCount: widget.setlistScores!.length,
+                  itemCount: scores.length,
                   itemBuilder: (context, index) {
-                    final score = widget.setlistScores![index];
-                    final isCurrent = index == widget.currentIndex;
+                    final score = scores[index];
+                    final isCurrent = hasSetlist ? (index == widget.currentIndex) : true;
                     return InkWell(
-                      onTap: () {
+                      onTap: hasSetlist ? () {
                         _setlistScrollController?.dispose();
                         _setlistScrollController = null;
                         setState(() => _showSetlistNav = false);
                         _navigateToScore(index);
-                      },
+                      } : null,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         color: isCurrent ? AppColors.blue50 : Colors.transparent,
@@ -1394,7 +1401,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: isCurrent ? AppColors.blue500 : AppColors.gray100,
+                                color: isCurrent ? AppColors.blue500 : AppColors.gray50,
                                 borderRadius: BorderRadius.circular(7),
                               ),
                               child: Center(
@@ -1784,6 +1791,9 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
                           document: widget.document,
                           pageNumber: widget.pageNumber,
                           alignment: Alignment.center,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                          ),
                         ),
                         // Annotation layer
                         Positioned.fill(

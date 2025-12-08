@@ -5,6 +5,7 @@ import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../utils/icon_mappings.dart';
+import '../utils/photo_to_pdf.dart';
 import '../screens/library_screen.dart' show preferredInstrumentProvider;
 
 /// A reusable widget for adding new scores or instrument sheets.
@@ -130,6 +131,8 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   String? _selectedPdfName;
   InstrumentType? _selectedInstrument; // Changed to nullable
   bool _isInitialized = false; // Track if instrument has been initialized
+  bool _isConverting = false; // Track if photo is being converted to PDF
+  bool _wasConvertedFromImage = false; // Track if the file was converted from image
   
   // Autocomplete state (only used when showTitleComposer = true)
   List<Score> _titleSuggestions = [];
@@ -304,19 +307,61 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   Future<void> _handleSelectPdf() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf'],
+      allowedExtensions: ['pdf', ...PhotoToPdfConverter.supportedImageExtensions],
     );
     
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
-      setState(() {
-        _selectedPdfPath = file.path;
-        _selectedPdfName = file.name;
-        if (widget.showTitleComposer && _titleController.text.isEmpty) {
-          _titleController.text = file.name.replaceAll('.pdf', '');
-          _updateTitleSuggestions(_titleController.text);
+      final filePath = file.path;
+      
+      if (filePath == null) return;
+      
+      // Check if it's an image file that needs conversion
+      if (PhotoToPdfConverter.isImageFile(filePath)) {
+        setState(() {
+          _isConverting = true;
+        });
+        
+        try {
+          // Convert image to PDF
+          final pdfPath = await PhotoToPdfConverter.convertImageToPdf(filePath);
+          
+          setState(() {
+            _selectedPdfPath = pdfPath;
+            _selectedPdfName = file.name;
+            _wasConvertedFromImage = true;
+            _isConverting = false;
+            
+            if (widget.showTitleComposer && _titleController.text.isEmpty) {
+              // Remove extension from filename for title
+              final baseName = file.name.split('.').first;
+              _titleController.text = baseName;
+              _updateTitleSuggestions(_titleController.text);
+            }
+          });
+        } catch (e) {
+          setState(() {
+            _isConverting = false;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Failed to convert image: $e')),
+            );
+          }
         }
-      });
+      } else {
+        // It's already a PDF
+        setState(() {
+          _selectedPdfPath = filePath;
+          _selectedPdfName = file.name;
+          _wasConvertedFromImage = false;
+          
+          if (widget.showTitleComposer && _titleController.text.isEmpty) {
+            _titleController.text = file.name.replaceAll('.pdf', '');
+            _updateTitleSuggestions(_titleController.text);
+          }
+        });
+      }
     }
   }
 
@@ -829,6 +874,35 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   }
 
   Widget _buildPdfSelectButton() {
+    if (_isConverting) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: AppColors.gray100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.blue500),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              'Converting image to PDF...',
+              style: TextStyle(color: AppColors.gray600),
+            ),
+          ],
+        ),
+      );
+    }
+    
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
@@ -837,10 +911,31 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
           _selectedPdfPath != null ? AppIcons.check : AppIcons.upload,
           size: 18,
         ),
-        label: Text(
-          _selectedPdfName ?? 'Select PDF File',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                _selectedPdfName ?? 'Select PDF or Image',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (_wasConvertedFromImage && _selectedPdfPath != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Converted',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ],
         ),
         style: ElevatedButton.styleFrom(
           backgroundColor: _selectedPdfPath != null ? AppColors.blue600 : AppColors.blue500,

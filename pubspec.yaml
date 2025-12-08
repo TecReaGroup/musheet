@@ -66,6 +66,10 @@ dependencies:
   receive_sharing_intent: ^1.5.0
   path_provider: ^2.1.0
   
+  # PDF Generation
+  pdf: ^3.11.3
+  image: ^4.3.0
+  
   # UI Components
   wakelock_plus: ^1.2.0
   
