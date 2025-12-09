@@ -6,26 +6,7 @@ import 'scores_provider.dart';
 class SetlistsNotifier extends Notifier<List<Setlist>> {
   @override
   List<Setlist> build() {
-    // Initialize with mock data based on available scores
-    final scores = ref.read(scoresProvider);
-    if (scores.length >= 4) {
-      return [
-        Setlist(
-          id: '1',
-          name: 'Winter Concert 2024',
-          description: 'Holiday performance repertoire',
-          scoreIds: [scores[0].id, scores[1].id],
-          dateCreated: DateTime(2024, 11, 1),
-        ),
-        Setlist(
-          id: '2',
-          name: 'Wedding Ceremony',
-          description: 'Classical wedding music',
-          scoreIds: [scores[2].id, scores[3].id],
-          dateCreated: DateTime(2024, 11, 28),
-        ),
-      ];
-    }
+    // Return empty list - no preset test data
     return [];
   }
 

@@ -5,87 +5,8 @@ import '../models/annotation.dart';
 class ScoresNotifier extends Notifier<List<Score>> {
   @override
   List<Score> build() {
-    // Return initial mock data with new structure
-    return [
-      Score(
-        id: '1',
-        title: 'Moonlight Sonata',
-        composer: 'Ludwig van Beethoven',
-        dateAdded: DateTime(2024, 11, 15),
-        bpm: 60,
-        instrumentScores: [
-          InstrumentScore(
-            id: '1-1',
-            pdfUrl: '/sample.pdf',
-            instrumentType: InstrumentType.keyboard,
-            dateAdded: DateTime(2024, 11, 15),
-          ),
-        ],
-      ),
-      Score(
-        id: '2',
-        title: 'Clair de Lune',
-        composer: 'Claude Debussy',
-        dateAdded: DateTime(2024, 11, 20),
-        bpm: 66,
-        instrumentScores: [
-          InstrumentScore(
-            id: '2-1',
-            pdfUrl: '/sample.pdf',
-            instrumentType: InstrumentType.keyboard,
-            dateAdded: DateTime(2024, 11, 20),
-          ),
-          InstrumentScore(
-            id: '2-2',
-            pdfUrl: '/sample.pdf',
-            instrumentType: InstrumentType.vocal,
-            dateAdded: DateTime(2024, 11, 21),
-          ),
-        ],
-      ),
-      Score(
-        id: '3',
-        title: 'Für Elise',
-        composer: 'Ludwig van Beethoven',
-        dateAdded: DateTime(2024, 11, 25),
-        bpm: 125,
-        instrumentScores: [
-          InstrumentScore(
-            id: '3-1',
-            pdfUrl: '/sample.pdf',
-            instrumentType: InstrumentType.keyboard,
-            dateAdded: DateTime(2024, 11, 25),
-          ),
-        ],
-      ),
-      Score(
-        id: '4',
-        title: 'Canon in D',
-        composer: 'Johann Pachelbel',
-        dateAdded: DateTime(2024, 11, 28),
-        bpm: 54,
-        instrumentScores: [
-          InstrumentScore(
-            id: '4-1',
-            pdfUrl: '/sample.pdf',
-            instrumentType: InstrumentType.vocal,
-            dateAdded: DateTime(2024, 11, 28),
-          ),
-          InstrumentScore(
-            id: '4-2',
-            pdfUrl: '/sample.pdf',
-            instrumentType: InstrumentType.guitar,
-            dateAdded: DateTime(2024, 11, 28),
-          ),
-          InstrumentScore(
-            id: '4-3',
-            pdfUrl: '/sample.pdf',
-            instrumentType: InstrumentType.bass,
-            dateAdded: DateTime(2024, 11, 29),
-          ),
-        ],
-      ),
-    ];
+    // Return empty list - no preset test data
+    return [];
   }
 
   /// Find existing score by title and composer (case-insensitive)

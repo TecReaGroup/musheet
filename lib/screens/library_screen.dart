@@ -479,25 +479,24 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               ),
             ],
           ),
-          if ((activeTab == LibraryTab.setlists && setlists.isNotEmpty) ||
-              (activeTab == LibraryTab.scores && scores.isNotEmpty))
-            Positioned(
-              bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight*0.75,
-              right: 28,
-              child: FloatingActionButton(
-                onPressed: () {
-                  if (activeTab == LibraryTab.setlists) {
-                    ref.read(showCreateSetlistModalProvider.notifier).state = true;
-                  } else {
-                    ref.read(showCreateScoreModalProvider.notifier).state = true;
-                  }
-                },
-                elevation: 2,
-                highlightElevation: 4,
-                backgroundColor: AppColors.blue500,
-                child: const Icon(AppIcons.add, size: 28),
-              ),
+          // Show FAB for both empty and non-empty states
+          Positioned(
+            bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight*0.75,
+            right: 28,
+            child: FloatingActionButton(
+              onPressed: () {
+                if (activeTab == LibraryTab.setlists) {
+                  ref.read(showCreateSetlistModalProvider.notifier).state = true;
+                } else {
+                  ref.read(showCreateScoreModalProvider.notifier).state = true;
+                }
+              },
+              elevation: 2,
+              highlightElevation: 4,
+              backgroundColor: AppColors.blue500,
+              child: const Icon(AppIcons.add, size: 28),
             ),
+          ),
           if (showCreateSetlistModal) _buildCreateSetlistModal(),
           if (showCreateScoreModal)
             AddScoreWidget(
@@ -519,11 +518,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
   Widget _buildSetlistsTab(List<Setlist> setlists) {
     if (setlists.isEmpty) {
-      return EmptyState.setlists(
-        action: ElevatedButton(
-          onPressed: () => ref.read(showCreateSetlistModalProvider.notifier).state = true,
-          child: const Text('Create Setlist'),
-        ),
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+        child: EmptyState.setlists(),
       );
     }
 
@@ -592,12 +589,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
   Widget _buildScoresTab(List<Score> scores) {
     if (scores.isEmpty) {
-      return EmptyState.scores(
-        action: ElevatedButton.icon(
-          onPressed: () => ref.read(showCreateScoreModalProvider.notifier).state = true,
-          icon: const Icon(AppIcons.add),
-          label: const Text('Add Score'),
-        ),
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+        child: EmptyState.scores(),
       );
     }
 
