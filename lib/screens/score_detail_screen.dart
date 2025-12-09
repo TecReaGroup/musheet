@@ -74,7 +74,8 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scores = ref.watch(scoresProvider);
+    // Use scoresListProvider for synchronous access
+    final scores = ref.watch(scoresListProvider);
     final setlists = ref.watch(setlistsProvider);
     final currentScore = scores.firstWhere(
       (s) => s.id == widget.score.id,

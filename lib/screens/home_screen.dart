@@ -81,7 +81,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scores = ref.watch(scoresProvider);
+    // Use scoresListProvider for synchronous access
+    final scores = ref.watch(scoresListProvider);
     final setlists = ref.watch(setlistsProvider);
     final currentTeam = ref.watch(currentTeamProvider);
     final searchQuery = ref.watch(searchQueryProvider);

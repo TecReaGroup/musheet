@@ -291,7 +291,8 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     }
     
     // Get all unique composers that match the query
-    final scores = ref.read(scoresProvider);
+    // Use scoresListProvider for synchronous access
+    final scores = ref.read(scoresListProvider);
     final queryLower = query.toLowerCase();
     final composers = scores
         .map((s) => s.composer)

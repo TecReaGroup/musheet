@@ -72,6 +72,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   // Preview size for export scaling
   Size _previewSize = Size.zero;
 
+  // Cached provider notifier for safe dispose usage
+  ScoresNotifier? _scoresNotifier;
+
   final List<Color> _penColors = [
     Colors.black,
     const Color(0xFFEF4444),
@@ -97,6 +100,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     _metronomeController!.addListener(_onMetronomeChanged);
     _initAnnotations();
     _loadPdfDocument();
+    
+    // Cache the notifier for safe dispose usage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scoresNotifier = ref.read(scoresProvider.notifier);
+    });
   }
   
   void _onMetronomeChanged() {
@@ -205,11 +213,36 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   @override
   void dispose() {
+    // Save annotations before disposing if we were in edit mode
+    if (_isDrawMode) {
+      _saveAnnotationsSync();
+    }
+    
     _pageIndicatorTimer?.cancel();
     _metronomeController?.removeListener(_onMetronomeChanged);
     _metronomeController?.dispose();
     _pdfDocument?.dispose();
     super.dispose();
+  }
+
+  /// Synchronous version for dispose - uses cached notifier for safe access
+  void _saveAnnotationsSync() {
+    if (_currentInstrumentScore == null || _scoresNotifier == null) return;
+    
+    // Collect all annotations from all pages
+    final allAnnotations = <Annotation>[];
+    for (final entry in _pageAnnotations.entries) {
+      for (final annotation in entry.value) {
+        allAnnotations.add(annotation);
+      }
+    }
+    
+    // Save to database via cached notifier (safe during dispose)
+    _scoresNotifier!.updateAnnotations(
+      widget.score.id,
+      _currentInstrumentScore!.id,
+      allAnnotations,
+    );
   }
 
   void _onPenColorSelected(Color color) {
@@ -249,6 +282,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         _pageUndoStacks[_currentPage] ??= [];
         _pageUndoStacks[_currentPage]!.add(last);
       });
+      // Save immediately after undo
+      _saveAnnotations();
     }
   }
 
@@ -260,6 +295,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         _pageAnnotations[_currentPage] ??= [];
         _pageAnnotations[_currentPage]!.add(last);
       });
+      // Save immediately after redo
+      _saveAnnotations();
     }
   }
   
@@ -270,6 +307,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       // Clear undo stack when new annotation is added
       _pageUndoStacks[_currentPage]?.clear();
     });
+    // Save immediately after adding annotation
+    _saveAnnotations();
   }
 
   /// Handle share button press - export PDF with annotations and share
@@ -573,6 +612,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           _pageUndoStacks[_currentPage] ??= [];
           _pageUndoStacks[_currentPage]!.add(annotation);
         });
+        // Save immediately after erasing
+        _saveAnnotations();
       },
       onTap: () {
         if (_isDrawMode) {
@@ -985,11 +1026,34 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   void _exitEditMode() {
+    // Save annotations to database
+    _saveAnnotations();
+    
     setState(() {
       _isDrawMode = false;
       _selectedTool = 'none';
       _showPenOptions = false;
     });
+  }
+
+  /// Save all annotations for the current instrument score to the database
+  void _saveAnnotations() {
+    if (_currentInstrumentScore == null) return;
+    
+    // Collect all annotations from all pages
+    final allAnnotations = <Annotation>[];
+    for (final entry in _pageAnnotations.entries) {
+      for (final annotation in entry.value) {
+        allAnnotations.add(annotation);
+      }
+    }
+    
+    // Save to database via provider
+    ref.read(scoresProvider.notifier).updateAnnotations(
+      widget.score.id,
+      _currentInstrumentScore!.id,
+      allAnnotations,
+    );
   }
 
   void _clearCurrentPageAnnotations() {
@@ -1003,6 +1067,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       // Clear all annotations on current page
       _pageAnnotations[_currentPage] = [];
     });
+    // Save immediately after clearing
+    _saveAnnotations();
   }
 
   Widget _buildColorPickerButton() {

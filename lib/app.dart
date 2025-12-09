@@ -12,6 +12,9 @@ import 'screens/library_screen.dart';
 import 'screens/home_screen.dart';
 import 'utils/icon_mappings.dart';
 import 'router/app_router.dart';
+import 'providers/storage_providers.dart';
+import 'providers/scores_provider.dart';
+import 'providers/setlists_provider.dart';
 
 enum AppPage { home, library, team, settings }
 
@@ -41,13 +44,152 @@ class MuSheetApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(goRouterProvider);
+    // Watch the storage initializer to trigger initialization
+    final storageInit = ref.watch(storageInitializerProvider);
     
-    return MaterialApp.router(
-      title: 'MuSheet',
-      theme: AppTheme.lightTheme,
-      debugShowCheckedModeBanner: false,
-      routerConfig: router,
+    // Watch the scores provider to trigger initial load
+    final scoresAsync = ref.watch(scoresProvider);
+    
+    // Watch the setlists provider to trigger initial load
+    final setlistsAsync = ref.watch(setlistsAsyncProvider);
+    
+    return storageInit.when(
+      loading: () => MaterialApp(
+        title: 'MuSheet',
+        theme: AppTheme.lightTheme,
+        debugShowCheckedModeBanner: false,
+        home: const _SplashScreen(),
+      ),
+      error: (error, stack) => MaterialApp(
+        title: 'MuSheet',
+        theme: AppTheme.lightTheme,
+        debugShowCheckedModeBanner: false,
+        home: _ErrorScreen(error: error.toString()),
+      ),
+      data: (_) => scoresAsync.when(
+        loading: () => MaterialApp(
+          title: 'MuSheet',
+          theme: AppTheme.lightTheme,
+          debugShowCheckedModeBanner: false,
+          home: const _SplashScreen(),
+        ),
+        error: (error, stack) => MaterialApp(
+          title: 'MuSheet',
+          theme: AppTheme.lightTheme,
+          debugShowCheckedModeBanner: false,
+          home: _ErrorScreen(error: error.toString()),
+        ),
+        data: (_) => setlistsAsync.when(
+          loading: () => MaterialApp(
+            title: 'MuSheet',
+            theme: AppTheme.lightTheme,
+            debugShowCheckedModeBanner: false,
+            home: const _SplashScreen(),
+          ),
+          error: (error, stack) => MaterialApp(
+            title: 'MuSheet',
+            theme: AppTheme.lightTheme,
+            debugShowCheckedModeBanner: false,
+            home: _ErrorScreen(error: error.toString()),
+          ),
+          data: (_) {
+            final router = ref.watch(goRouterProvider);
+            return MaterialApp.router(
+              title: 'MuSheet',
+              theme: AppTheme.lightTheme,
+              debugShowCheckedModeBanner: false,
+              routerConfig: router,
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Splash screen shown during storage initialization
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // App logo or name
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [
+                  Color(0xFF3B82F6),
+                  Color(0xFF14B8A6),
+                  Color(0xFF10B981),
+                ],
+              ).createShader(bounds),
+              child: const Text(
+                'MuSheet',
+                style: TextStyle(
+                  fontSize: 48,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Error screen shown when initialization fails
+class _ErrorScreen extends StatelessWidget {
+  final String error;
+  
+  const _ErrorScreen({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Colors.red,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to initialize',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                error,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

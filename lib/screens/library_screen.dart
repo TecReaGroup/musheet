@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/scores_provider.dart';
 import '../providers/setlists_provider.dart';
 import '../providers/teams_provider.dart';
+import '../providers/storage_providers.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
@@ -103,32 +104,53 @@ final showCreateScoreModalProvider = NotifierProvider<ShowCreateScoreModalNotifi
 final setlistSortProvider = NotifierProvider<SetlistSortNotifier, SortState>(SetlistSortNotifier.new);
 final scoreSortProvider = NotifierProvider<ScoreSortNotifier, SortState>(ScoreSortNotifier.new);
 
-// 最近打开记录 - 使用 Notifier
+// 最近打开记录 - 使用 Notifier with persistence
 class RecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
   @override
-  Map<String, DateTime> build() => {};
+  Map<String, DateTime> build() {
+    // Load from preferences
+    final prefs = ref.watch(preferencesProvider);
+    return prefs?.getRecentlyOpenedSetlists() ?? {};
+  }
   
   void recordOpen(String id) {
     state = {...state, id: DateTime.now()};
+    // Save to preferences
+    final prefs = ref.read(preferencesProvider);
+    prefs?.setRecentlyOpenedSetlists(state);
   }
 }
 
 class RecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
   @override
-  Map<String, DateTime> build() => {};
+  Map<String, DateTime> build() {
+    // Load from preferences
+    final prefs = ref.watch(preferencesProvider);
+    return prefs?.getRecentlyOpenedScores() ?? {};
+  }
   
   void recordOpen(String id) {
     state = {...state, id: DateTime.now()};
+    // Save to preferences
+    final prefs = ref.read(preferencesProvider);
+    prefs?.setRecentlyOpenedScores(state);
   }
 }
 
 // Track last opened score index per setlist
 class LastOpenedScoreInSetlistNotifier extends Notifier<Map<String, int>> {
   @override
-  Map<String, int> build() => {};
+  Map<String, int> build() {
+    // Load from preferences
+    final prefs = ref.watch(preferencesProvider);
+    return prefs?.getLastOpenedScoreInSetlist() ?? {};
+  }
   
   void recordLastOpened(String setlistId, int scoreIndex) {
     state = {...state, setlistId: scoreIndex};
+    // Save to preferences
+    final prefs = ref.read(preferencesProvider);
+    prefs?.setLastOpenedScoreInSetlist(state);
   }
   
   int? getLastOpened(String setlistId) => state[setlistId];
@@ -137,26 +159,43 @@ class LastOpenedScoreInSetlistNotifier extends Notifier<Map<String, int>> {
 // Track last opened instrument index per score
 class LastOpenedInstrumentInScoreNotifier extends Notifier<Map<String, int>> {
   @override
-  Map<String, int> build() => {};
+  Map<String, int> build() {
+    // Load from preferences
+    final prefs = ref.watch(preferencesProvider);
+    return prefs?.getLastOpenedInstrumentInScore() ?? {};
+  }
   
   void recordLastOpened(String scoreId, int instrumentIndex) {
     state = {...state, scoreId: instrumentIndex};
+    // Save to preferences
+    final prefs = ref.read(preferencesProvider);
+    prefs?.setLastOpenedInstrumentInScore(state);
   }
   
   int? getLastOpened(String scoreId) => state[scoreId];
   
   void clearAll() {
     state = {};
+    // Save to preferences
+    final prefs = ref.read(preferencesProvider);
+    prefs?.setLastOpenedInstrumentInScore(state);
   }
 }
 
 // Track user's preferred instrument type
 class PreferredInstrumentNotifier extends Notifier<String?> {
   @override
-  String? build() => null; // null means no preference set
+  String? build() {
+    // Load from preferences
+    final prefs = ref.watch(preferencesProvider);
+    return prefs?.getPreferredInstrument();
+  }
   
   void setPreferredInstrument(String? instrumentKey) {
     state = instrumentKey;
+    // Save to preferences
+    final prefs = ref.read(preferencesProvider);
+    prefs?.setPreferredInstrument(instrumentKey);
     // Clear all last opened instrument records when preference changes
     // This ensures the new preference takes effect immediately
     ref.read(lastOpenedInstrumentInScoreProvider.notifier).clearAll();
@@ -166,10 +205,17 @@ class PreferredInstrumentNotifier extends Notifier<String?> {
 // Track whether team feature is enabled
 class TeamEnabledNotifier extends Notifier<bool> {
   @override
-  bool build() => true; // Default: team feature is enabled
+  bool build() {
+    // Load from preferences
+    final prefs = ref.watch(preferencesProvider);
+    return prefs?.isTeamEnabled() ?? true;
+  }
   
   void setTeamEnabled(bool enabled) {
     state = enabled;
+    // Save to preferences
+    final prefs = ref.read(preferencesProvider);
+    prefs?.setTeamEnabled(enabled);
     // When disabling team, leave all teams and clear their data
     if (!enabled) {
       ref.read(teamsProvider.notifier).leaveAllTeams();
@@ -339,7 +385,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   void _handleCreateSetlist() {
     if (_nameController.text.trim().isEmpty) return;
     
-    ref.read(setlistsProvider.notifier).createSetlist(
+    ref.read(setlistsAsyncProvider.notifier).createSetlist(
       _nameController.text.trim(),
       _descriptionController.text.trim(),
     );
@@ -365,7 +411,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               if (isScore) {
                 ref.read(scoresProvider.notifier).deleteScore(id);
               } else {
-                ref.read(setlistsProvider.notifier).deleteSetlist(id);
+                ref.read(setlistsAsyncProvider.notifier).deleteSetlist(id);
               }
               setState(() {
                 _swipedItemId = null;
@@ -382,7 +428,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
-    final scores = ref.watch(scoresProvider);
+    // Use scoresListProvider for synchronous access
+    final scores = ref.watch(scoresListProvider);
     final setlists = ref.watch(setlistsProvider);
     final activeTab = ref.watch(libraryTabProvider);
     final showCreateSetlistModal = ref.watch(showCreateSetlistModalProvider);

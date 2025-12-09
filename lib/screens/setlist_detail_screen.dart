@@ -48,7 +48,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scores = ref.watch(scoresProvider);
+    // Use scoresListProvider for synchronous access
+    final scores = ref.watch(scoresListProvider);
     final setlists = ref.watch(setlistsProvider);
     final currentSetlist = setlists.firstWhere(
       (s) => s.id == widget.setlist.id,
@@ -172,7 +173,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           final newScoreIds = List<String>.from(currentSetlist.scoreIds);
                           final item = newScoreIds.removeAt(oldIndex);
                           newScoreIds.insert(newIndex, item);
-                          ref.read(setlistsProvider.notifier).reorderSetlist(currentSetlist.id, newScoreIds);
+                          ref.read(setlistsAsyncProvider.notifier).reorderSetlist(currentSetlist.id, newScoreIds);
                         },
                         itemBuilder: (context, index) {
                           final score = setlistScores[index];
@@ -350,7 +351,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                             child: ElevatedButton(
                               onPressed: () {
                                 if (_editNameController.text.trim().isNotEmpty) {
-                                  ref.read(setlistsProvider.notifier).updateSetlist(
+                                  ref.read(setlistsAsyncProvider.notifier).updateSetlist(
                                     setlist.id,
                                     name: _editNameController.text.trim(),
                                     description: _editDescriptionController.text.trim(),
@@ -484,7 +485,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           ),
                           TextButton(
                             onPressed: () {
-                              ref.read(setlistsProvider.notifier).removeScoreFromSetlist(currentSetlist.id, score.id);
+                              ref.read(setlistsAsyncProvider.notifier).removeScoreFromSetlist(currentSetlist.id, score.id);
                               Navigator.pop(context);
                             },
                             child: const Text('Remove', style: TextStyle(color: AppColors.red500)),
@@ -714,7 +715,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                                 borderRadius: BorderRadius.circular(16),
                                 child: InkWell(
                                   onTap: () {
-                                    ref.read(setlistsProvider.notifier).addScoreToSetlist(setlist.id, score);
+                                    ref.read(setlistsAsyncProvider.notifier).addScoreToSetlist(setlist.id, score);
                                     setState(() {
                                       _showAddModal = false;
                                       _addScoreSearchQuery = '';

@@ -7,7 +7,8 @@ class TeamsNotifier extends Notifier<List<TeamData>> {
   @override
   List<TeamData> build() {
     // Initialize with mock data based on available scores and setlists
-    final scores = ref.read(scoresProvider);
+    // Use scoresListProvider for synchronous access
+    final scores = ref.read(scoresListProvider);
     final setlists = ref.read(setlistsProvider);
     
     if (scores.isNotEmpty && setlists.isNotEmpty) {
@@ -56,7 +57,8 @@ class TeamsNotifier extends Notifier<List<TeamData>> {
 
   /// Rejoin teams - reinitialize with mock data
   void rejoinTeams() {
-    final scores = ref.read(scoresProvider);
+    // Use scoresListProvider for synchronous access
+    final scores = ref.read(scoresListProvider);
     final setlists = ref.read(setlistsProvider);
     
     if (scores.isNotEmpty && setlists.isNotEmpty) {
