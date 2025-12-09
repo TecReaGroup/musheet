@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 import 'screens/home_screen.dart';
@@ -31,6 +35,17 @@ class ClearSearchRequestNotifier extends Notifier<int> {
 
 final clearSearchRequestProvider = NotifierProvider<ClearSearchRequestNotifier, int>(ClearSearchRequestNotifier.new);
 
+// Provider to store shared file path from sharing intent
+class SharedFilePathNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void setPath(String? path) => state = path;
+  void clear() => state = null;
+}
+
+final sharedFilePathProvider = NotifierProvider<SharedFilePathNotifier, String?>(SharedFilePathNotifier.new);
+
 class MuSheetApp extends ConsumerWidget {
   const MuSheetApp({super.key});
 
@@ -54,6 +69,97 @@ class MainScaffold extends ConsumerStatefulWidget {
 
 class _MainScaffoldState extends ConsumerState<MainScaffold> {
   bool _isSnackBarVisible = false;
+  StreamSubscription? _intentDataStreamSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initSharingIntent();
+  }
+
+  @override
+  void dispose() {
+    _intentDataStreamSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _initSharingIntent() {
+    // Delay initial media check to ensure app is fully initialized
+    // This prevents UI freeze when app is launched via share intent
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+
+      // Handle shared files when app is opened from sharing
+      ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
+        if (value.isNotEmpty && mounted) {
+          _handleSharedFiles(value);
+        }
+      }).catchError((e) {
+        debugPrint('Error getting initial media: $e');
+      });
+    });
+
+    // Handle shared files when app is already running
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen(
+      (List<SharedMediaFile> value) {
+        if (value.isNotEmpty && mounted) {
+          _handleSharedFiles(value);
+        }
+      },
+      onError: (err) {
+        debugPrint('Error receiving shared files: $err');
+      },
+    );
+  }
+
+  Future<void> _handleSharedFiles(List<SharedMediaFile> sharedFiles) async {
+    // Only handle the first file for now
+    final file = sharedFiles.first;
+    final filePath = file.path;
+
+    // Check if it's a PDF or image file
+    final extension = filePath.split('.').last.toLowerCase();
+    final isPdf = extension == 'pdf';
+    final isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
+
+    if (isPdf || isImage) {
+      try {
+        // Copy shared file to app's documents directory to ensure it's accessible
+        final sourceFile = File(filePath);
+        if (!await sourceFile.exists()) {
+          debugPrint('Shared file does not exist: $filePath');
+          return;
+        }
+
+        final directory = await getApplicationDocumentsDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = filePath.split('/').last.split('\\').last;
+        final destPath = '${directory.path}${Platform.pathSeparator}shared_${timestamp}_$fileName';
+
+        // Copy file to app directory
+        await sourceFile.copy(destPath);
+
+        // Navigate to Library page and show add score modal
+        if (mounted) {
+          // First, pop all pushed routes to return to main scaffold
+          Navigator.of(context).popUntil((route) => route.isFirst);
+
+          // Switch to Library tab with Scores selected
+          ref.read(currentPageProvider.notifier).state = AppPage.library;
+          ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
+
+          // Set shared file path and trigger modal in LibraryScreen
+          ref.read(sharedFilePathProvider.notifier).setPath(destPath);
+          ref.read(showCreateScoreModalProvider.notifier).state = true;
+        }
+      } catch (e) {
+        debugPrint('Error handling shared file: $e');
+      }
+    }
+
+    // Clear the intent to prevent re-processing
+    ReceiveSharingIntent.instance.reset();
+  }
 
   Future<bool> _onWillPop() async {
     final searchQuery = ref.read(searchQueryProvider);
@@ -147,20 +253,22 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           SystemNavigator.pop();
         }
       },
-      child: Scaffold(
-        // Extend content to bottom system navigation bar area
-        extendBody: true,
-        extendBodyBehindAppBar: true,
-        body: IndexedStack(
-          index: stackIndex,
-          children: [
-            const HomeScreen(),
-            const LibraryScreen(),
-            if (teamEnabled) const TeamScreen(),
-            const SettingsScreen(),
-          ],
-        ),
-        bottomNavigationBar: Container(
+      child: Stack(
+        children: [
+          Scaffold(
+            // Extend content to bottom system navigation bar area
+            extendBody: true,
+            extendBodyBehindAppBar: true,
+            body: IndexedStack(
+              index: stackIndex,
+              children: [
+                const HomeScreen(),
+                const LibraryScreen(),
+                if (teamEnabled) const TeamScreen(),
+                const SettingsScreen(),
+              ],
+            ),
+            bottomNavigationBar: Container(
           decoration: BoxDecoration(
             // Add white background to ensure bottom navigation bar is visible
             color: Colors.white,
@@ -212,6 +320,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             ),
           ),
         ),
+        ),
+        ],
       ),
     );
   }

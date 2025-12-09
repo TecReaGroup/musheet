@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/teams_provider.dart';
@@ -198,7 +200,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           ConstrainedBox(
-                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width - 150),
+                            constraints: BoxConstraints(
+                              // Ensure maxWidth never goes negative on very small screens
+                              maxWidth: math.max(0.0, MediaQuery.of(context).size.width - 150),
+                            ),
                             child: Text(
                               currentTeam.name,
                               style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: AppColors.gray700),

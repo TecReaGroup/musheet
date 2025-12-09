@@ -27,6 +27,7 @@ class AddScoreWidget extends ConsumerStatefulWidget {
     this.headerTitle,
     this.headerSubtitle,
     this.confirmButtonText,
+    this.presetFilePath,
   });
 
   /// Callback when modal is closed/cancelled
@@ -68,6 +69,9 @@ class AddScoreWidget extends ConsumerStatefulWidget {
   
   /// Custom confirm button text (optional)
   final String? confirmButtonText;
+
+  /// Preset file path from sharing intent (PDF or image)
+  final String? presetFilePath;
 
   @override
   ConsumerState<AddScoreWidget> createState() => _AddScoreWidgetState();
@@ -147,11 +151,88 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     super.initState();
     // Initialize disabled instruments from widget property
     _disabledInstruments = Set.from(widget.disabledInstruments);
-    
+
     // If in copy mode, auto-set the PDF from source instrument
     if (widget.sourceInstrumentToCopy != null) {
       _selectedPdfPath = widget.sourceInstrumentToCopy!.pdfUrl;
       _selectedPdfName = widget.sourceInstrumentToCopy!.pdfUrl.split('/').last;
+    }
+
+    // If preset file path is provided (from sharing intent)
+    // Use addPostFrameCallback to ensure widget is fully built before processing
+    if (widget.presetFilePath != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _handlePresetFile(widget.presetFilePath!);
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AddScoreWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Handle new preset file path when widget is updated (e.g., new share while modal is open)
+    if (widget.presetFilePath != null &&
+        widget.presetFilePath != oldWidget.presetFilePath) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _handlePresetFile(widget.presetFilePath!);
+        }
+      });
+    }
+  }
+
+  Future<void> _handlePresetFile(String filePath) async {
+    final fileName = filePath.split('/').last.split('\\').last;
+
+    // Check if it's an image file that needs conversion
+    if (PhotoToPdfConverter.isImageFile(filePath)) {
+      setState(() {
+        _isConverting = true;
+      });
+
+      try {
+        // Convert image to PDF
+        final pdfPath = await PhotoToPdfConverter.convertImageToPdf(filePath);
+
+        if (mounted) {
+          setState(() {
+            _selectedPdfPath = pdfPath;
+            _selectedPdfName = fileName;
+            _wasConvertedFromImage = true;
+            _isConverting = false;
+
+            if (widget.showTitleComposer && _titleController.text.isEmpty) {
+              // Remove extension from filename for title
+              final baseName = fileName.split('.').first;
+              _titleController.text = baseName;
+              _updateTitleSuggestions(_titleController.text);
+            }
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isConverting = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to convert image: $e')),
+          );
+        }
+      }
+    } else {
+      // It's already a PDF
+      setState(() {
+        _selectedPdfPath = filePath;
+        _selectedPdfName = fileName;
+        _wasConvertedFromImage = false;
+
+        if (widget.showTitleComposer && _titleController.text.isEmpty) {
+          _titleController.text = fileName.replaceAll('.pdf', '');
+          _updateTitleSuggestions(_titleController.text);
+        }
+      });
     }
   }
   

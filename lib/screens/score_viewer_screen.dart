@@ -480,7 +480,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             ),
             if (_showPenOptions) _buildPenOptions(),
             if (_showMetronome) _buildMetronomeModal(),
-            if (_showSetlistNav && (widget.setlistScores != null || widget.score.instrumentScores.length > 1))
+            if (_showSetlistNav)
               _buildSetlistNavModal(),
             if (_showInstrumentPicker)
               _buildInstrumentPickerModal(),
@@ -804,12 +804,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 ),
               ),
             ),
-            // Setlist navigation button - always show when there are multiple scores OR instruments
-          if (widget.setlistScores != null || widget.score.instrumentScores.length > 1)
+            // Setlist/Score navigation button - always show
             IconButton(
               icon: Icon(
-                AppIcons.playlistPlay,
-                color: _showSetlistNav ? AppColors.blue500 : AppColors.gray700,
+                widget.setlistScores != null ? AppIcons.playlistPlay : AppIcons.musicNote,
+                color: _showSetlistNav ? AppColors.blue500 : AppColors.gray500,
               ),
               onPressed: () {
                 setState(() {
@@ -838,9 +837,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   }
                 });
               },
-            )
-          else
-            const SizedBox(width: 48),
+            ),
         ],
       ),
       ),
@@ -1396,7 +1393,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Header - always show icon, show title only if from setlist
+              // Header - show different icon and title based on context
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                 decoration: const BoxDecoration(
@@ -1404,22 +1401,26 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(AppIcons.setlistIcon, color: AppColors.gray400, size: 18),
-                    if (hasSetlist && widget.setlistName != null && widget.setlistName!.isNotEmpty) ...[
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          widget.setlistName!,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.gray900,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                    Icon(
+                      hasSetlist ? AppIcons.setlistIcon : AppIcons.musicNote,
+                      color: AppColors.gray400,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        hasSetlist && widget.setlistName != null && widget.setlistName!.isNotEmpty
+                            ? widget.setlistName!
+                            : 'Single Score',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray900,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ),

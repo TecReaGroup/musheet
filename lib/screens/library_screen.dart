@@ -12,6 +12,7 @@ import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
+import '../app.dart' show sharedFilePathProvider;
 
 enum LibraryTab { scores, setlists }
 
@@ -500,14 +501,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               ),
             ),
           if (showCreateSetlistModal) _buildCreateSetlistModal(),
-          if (showCreateScoreModal) 
+          if (showCreateScoreModal)
             AddScoreWidget(
               showTitleComposer: true,
+              presetFilePath: ref.watch(sharedFilePathProvider),
               onClose: () {
                 ref.read(showCreateScoreModalProvider.notifier).state = false;
+                ref.read(sharedFilePathProvider.notifier).clear();
               },
               onSuccess: () {
                 ref.read(showCreateScoreModalProvider.notifier).state = false;
+                ref.read(sharedFilePathProvider.notifier).clear();
               },
             ),
         ],
