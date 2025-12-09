@@ -10,8 +10,9 @@ import '../providers/scores_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/metronome_widget.dart';
 import '../utils/icon_mappings.dart';
+import '../utils/pdf_export_service.dart';
 import '../providers/setlists_provider.dart';
-import 'library_screen.dart' show lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider;
+import 'library_screen.dart' show lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider, preferredInstrumentProvider, getBestInstrumentIndex;
 
 class ScoreViewerScreen extends ConsumerStatefulWidget {
   final Score score;
@@ -65,6 +66,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   
   // Metronome controller - persists across modal open/close
   MetronomeController? _metronomeController;
+
+  // Preview size for export scaling
+  Size _previewSize = Size.zero;
 
   final List<Color> _penColors = [
     Colors.black,
@@ -266,6 +270,37 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     });
   }
 
+  /// Handle share button press - export PDF with annotations and share
+  void _handleShare() async {
+    final pdfPath = _currentInstrumentScore?.pdfUrl;
+    if (pdfPath == null || pdfPath.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('无法获取 PDF 文件路径')),
+      );
+      return;
+    }
+
+    // Collect all annotations from all pages
+    final allAnnotations = <int, List<Annotation>>{};
+    for (final entry in _pageAnnotations.entries) {
+      if (entry.value.isNotEmpty) {
+        allAnnotations[entry.key] = entry.value;
+      }
+    }
+
+    // Generate title for exported file
+    final instrumentName = _currentInstrumentScore?.instrumentDisplayName ?? '';
+    final exportTitle = '${widget.score.title}_$instrumentName';
+
+    await PdfExportService.exportAndShare(
+      pdfPath: pdfPath,
+      annotations: allAnnotations,
+      title: exportTitle,
+      context: context,
+      previewSize: _previewSize,
+    );
+  }
+
   void _navigateToScore(int index) async {
     if (widget.setlistScores != null && index >= 0 && index < widget.setlistScores!.length) {
       // Record the score index being navigated to in the setlist
@@ -281,23 +316,33 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         );
         ref.read(lastOpenedScoreInSetlistProvider.notifier).recordLastOpened(currentSetlist.id, index);
       }
-      
+
       // Stop and destroy metronome before navigating to properly release audio resources
       _metronomeController?.stop();
       _metronomeController?.removeListener(_onMetronomeChanged);
       _metronomeController?.dispose();
       _metronomeController = null;
-      
+
       // Small delay to allow audio resources to be fully released
       await Future.delayed(const Duration(milliseconds: 50));
-      
+
       if (!mounted) return;
-      
+
+      // Get the best instrument for the target score
+      final targetScore = widget.setlistScores![index];
+      final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(targetScore.id);
+      final preferredInstrument = ref.read(preferredInstrumentProvider);
+      final bestInstrumentIndex = getBestInstrumentIndex(targetScore, lastOpenedInstrumentIndex, preferredInstrument);
+      final instrumentScore = targetScore.instrumentScores.isNotEmpty
+          ? targetScore.instrumentScores[bestInstrumentIndex]
+          : null;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (context) => ScoreViewerScreen(
-            score: widget.setlistScores![index],
+            score: targetScore,
+            instrumentScore: instrumentScore,
             setlistScores: widget.setlistScores,
             currentIndex: index,
             setlistName: widget.setlistName,
@@ -569,6 +614,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         if (_currentPage > 1) {
           _goToPage(_currentPage - 1);
         }
+      },
+      onSizeChanged: (size) {
+        _previewSize = size;
       },
     );
   }
@@ -1429,10 +1477,23 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                               ),
                             ),
                             if (isCurrent)
-                              const Icon(
-                                AppIcons.check,
-                                size: 18,
-                                color: AppColors.blue500,
+                              Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    setState(() => _showSetlistNav = false);
+                                    _handleShare();
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    child: const Icon(
+                                      AppIcons.share,
+                                      size: 18,
+                                      color: AppColors.blue500,
+                                    ),
+                                  ),
+                                ),
                               ),
                           ],
                         ),
@@ -1465,6 +1526,7 @@ class PdfPageWrapper extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onSwipeLeft;
   final VoidCallback onSwipeRight;
+  final Function(Size)? onSizeChanged;
 
   const PdfPageWrapper({
     super.key,
@@ -1480,6 +1542,7 @@ class PdfPageWrapper extends StatefulWidget {
     required this.onTap,
     required this.onSwipeLeft,
     required this.onSwipeRight,
+    this.onSizeChanged,
   });
 
   @override
@@ -1690,7 +1753,7 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
     if (_contentSize == Size.zero) return;
     final normalizedX = point.dx / _contentSize.width;
     final normalizedY = point.dy / _contentSize.height;
-    final eraseRadius = 20.0 / _contentSize.width; // Normalize erase radius
+    final eraseRadius = 5.0 / _contentSize.width; // Normalize erase radius
     
     for (final annotation in widget.annotations) {
       if (annotation.points == null) continue;
@@ -1780,8 +1843,12 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
                   // This ensures annotations are visible on first render
                   if (_contentSize != constraints.biggest) {
                     _contentSize = constraints.biggest;
+                    // Notify parent of size change for export scaling
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      widget.onSizeChanged?.call(_contentSize);
+                    });
                   }
-                  
+
                   return Container(
                     color: Colors.white,
                     child: Stack(
