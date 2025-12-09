@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
 import '../models/score.dart';
 import '../models/annotation.dart';
@@ -12,6 +13,7 @@ import '../widgets/metronome_widget.dart';
 import '../utils/icon_mappings.dart';
 import '../utils/pdf_export_service.dart';
 import '../providers/setlists_provider.dart';
+import '../router/app_router.dart';
 import 'library_screen.dart' show lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider, preferredInstrumentProvider, getBestInstrumentIndex;
 
 class ScoreViewerScreen extends ConsumerStatefulWidget {
@@ -337,17 +339,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           ? targetScore.instrumentScores[bestInstrumentIndex]
           : null;
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ScoreViewerScreen(
-            score: targetScore,
-            instrumentScore: instrumentScore,
-            setlistScores: widget.setlistScores,
-            currentIndex: index,
-            setlistName: widget.setlistName,
-          ),
-        ),
+      context.replace(
+        AppRoutes.scoreViewer,
+        extra: {
+          'score': targetScore,
+          'instrumentScore': instrumentScore,
+          'setlistScores': widget.setlistScores,
+          'currentIndex': index,
+          'setlistName': widget.setlistName,
+        },
       );
     }
   }

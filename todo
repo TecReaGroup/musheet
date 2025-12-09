@@ -1,0 +1,56 @@
+done:
+freferred instrument:
+  no preference: circle-slash
+  keyboard: keyboard-music
+  drums: drum
+  bass: bass_guitar (personal svg icon)
+  guitar: guitar
+
+update edit icon:
+  setlist and score edit icon: lucide square-pen
+
+copy instrument & fix open with red instrument choice(and then change to normal):
+  lucide icon: lucide copy
+  position: in the left of the delete icon
+
+Team mode bool choice:
+  todo: add a choice to choose open team use or personal use
+
+support import photo:
+  todo: also allow user to choose photo from file manager(not only PDF)
+
+support export pdf:
+  todo: allow user to export score's pdf file after annotation
+
+support share in file:
+  todo: allow user to share score to musheet
+  use: 
+
+refactor the code:
+  todo: use riverpod and go_router to manage state
+
+
+todo:
+local database:
+  package: drift:^2.30.0
+  todo: Hybrid Storage:Design a storage architecture to implement persistent storage.
+# Implement a Hybrid Storage Strategy.
+# Tech Stack:
+# State Management: Flutter Riverpod
+# Navigation: go_router
+# Database: Drift
+# Local Storage: path_provider, shared_preferences
+# Storage Strategy Requirements:
+# User Settings & Lightweight Data (e.g., Auth Token, Theme Mode, User Name, important riverpod): Store using shared_preferences.
+# PDF image e.g. Binary Files: Store the actual .pdf files in the Local File System (using path_provider to get the AppDocumentDirectory).
+# score setlist and related riverpod state(like lastOpenedScore, lastOpenedInstrument and other useful state) Metadata : Store in Drift.
+
+
+update packages:
+  todo: update packages to latest version
+
+reuse UI/UX:
+
+English comment and texts:
+
+i18n international support:

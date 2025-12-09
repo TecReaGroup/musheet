@@ -8,9 +8,7 @@ import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
 import '../app.dart';
-import 'score_viewer_screen.dart';
-import 'score_detail_screen.dart';
-import 'setlist_detail_screen.dart';
+import '../router/app_router.dart';
 import 'library_screen.dart'
     show
         LibraryTab,
@@ -173,107 +171,111 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       child: Column(
         children: [
-          Padding(
-            // Add top safe area padding to position content below status bar
-            padding: EdgeInsets.fromLTRB(
-              16,
-              12 + MediaQuery.of(context).padding.top,
-              16,
-              24,
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        colors: [
-                          Color(0xFF3B82F6),
-                          Color(0xFF14B8A6),
-                          Color(0xFF10B981),
-                        ],
-                      ).createShader(bounds),
-                      child: Text(
-                        'MuSheet',
-                        style: GoogleFonts.righteous(
-                          fontSize: 36,
-                          color: Colors.white,
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _searchFocusNode.unfocus(),
+            child: Padding(
+              // Add top safe area padding to position content below status bar
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12 + MediaQuery.of(context).padding.top,
+                16,
+                24,
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [
+                            Color(0xFF3B82F6),
+                            Color(0xFF14B8A6),
+                            Color(0xFF10B981),
+                          ],
+                        ).createShader(bounds),
+                        child: Text(
+                          'MuSheet',
+                          style: GoogleFonts.righteous(
+                            fontSize: 36,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      onPressed: () =>
-                          ref
-                                  .read(hasUnreadNotificationsProvider.notifier)
-                                  .state =
-                              false,
-                      icon: Stack(
-                        children: [
-                          const Icon(
-                            AppIcons.notificationsOutlined,
-                            size: 24,
-                            color: AppColors.gray600,
-                          ),
-                          if (hasUnreadNotifications)
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: AppColors.red500,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 1.5,
+                      IconButton(
+                        onPressed: () =>
+                            ref
+                                    .read(hasUnreadNotificationsProvider.notifier)
+                                    .state =
+                                false,
+                        icon: Stack(
+                          children: [
+                            const Icon(
+                              AppIcons.notificationsOutlined,
+                              size: 24,
+                              color: AppColors.gray600,
+                            ),
+                            if (hasUnreadNotifications)
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.red500,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1.5,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  onChanged: (value) =>
-                      ref.read(searchQueryProvider.notifier).state = value,
-                  decoration: InputDecoration(
-                    hintText: 'Search scores and setlists...',
-                    hintStyle: const TextStyle(color: AppColors.gray400),
-                    prefixIcon: const Icon(
-                      AppIcons.search,
-                      color: AppColors.gray400,
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.gray200),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.gray200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                        color: AppColors.blue400,
-                        width: 2,
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    onChanged: (value) =>
+                        ref.read(searchQueryProvider.notifier).state = value,
+                    decoration: InputDecoration(
+                      hintText: 'Search scores and setlists...',
+                      hintStyle: const TextStyle(color: AppColors.gray400),
+                      prefixIcon: const Icon(
+                        AppIcons.search,
+                        color: AppColors.gray400,
                       ),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.gray200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppColors.gray200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: AppColors.blue400,
+                          width: 2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           Expanded(
@@ -449,8 +451,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onTap: () {
                   ref.read(libraryTabProvider.notifier).state =
                       LibraryTab.scores;
-                  ref.read(currentPageProvider.notifier).state =
-                      AppPage.library;
+                  AppNavigation.navigateToLibrary(context);
                 },
               ),
             ),
@@ -461,8 +462,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onTap: () {
                   ref.read(libraryTabProvider.notifier).state =
                       LibraryTab.setlists;
-                  ref.read(currentPageProvider.notifier).state =
-                      AppPage.library;
+                  AppNavigation.navigateToLibrary(context);
                 },
               ),
             ),
@@ -579,26 +579,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               final bestInstrumentIndex = getBestInstrumentIndex(selectedScore, lastOpenedInstrumentIndex, preferredInstrument);
               final instrumentScore = selectedScore.instrumentScores.isNotEmpty ? selectedScore.instrumentScores[bestInstrumentIndex] : null;
               
-              Navigator.push(
+              AppNavigation.navigateToScoreViewer(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => ScoreViewerScreen(
-                    score: selectedScore,
-                    instrumentScore: instrumentScore,
-                    setlistScores: setlistScores,
-                    currentIndex: validIndex,
-                    setlistName: setlist.name,
-                  ),
-                ),
+                score: selectedScore,
+                instrumentScore: instrumentScore,
+                setlistScores: setlistScores,
+                currentIndex: validIndex,
+                setlistName: setlist.name,
               );
             } else {
               // Empty setlist: go to detail screen
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SetlistDetailScreen(setlist: setlist),
-                ),
-              );
+              AppNavigation.navigateToSetlistDetail(context, setlist);
             }
           },
           borderRadius: BorderRadius.circular(12),
@@ -652,12 +643,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: InkWell(
                     onTap: () {
                       // Arrow tap: go to detail screen
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SetlistDetailScreen(setlist: setlist),
-                        ),
-                      );
+                      AppNavigation.navigateToSetlistDetail(context, setlist);
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: const Padding(
@@ -688,14 +674,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
             final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
             
-            Navigator.push(
+            AppNavigation.navigateToScoreViewer(
               context,
-              MaterialPageRoute(
-                builder: (context) => ScoreViewerScreen(
-                  score: score,
-                  instrumentScore: instrumentScore,
-                ),
-              ),
+              score: score,
+              instrumentScore: instrumentScore,
             );
           },
           borderRadius: BorderRadius.circular(12),
@@ -758,12 +740,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ScoreDetailScreen(score: score),
-                        ),
-                      );
+                      AppNavigation.navigateToScoreDetail(context, score);
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: const Padding(

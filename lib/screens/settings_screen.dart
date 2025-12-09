@@ -5,7 +5,7 @@ import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../models/instrument_score.dart';
 import 'library_screen.dart' show preferredInstrumentProvider, teamEnabledProvider;
-import 'instrument_preference_screen.dart';
+import '../router/app_router.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -119,12 +119,7 @@ class SettingsScreen extends ConsumerWidget {
                       ],
                     ),
                     onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const InstrumentPreferenceScreen(),
-                        ),
-                      );
+                      AppNavigation.navigateToInstrumentPreference(context);
                     },
                     showDivider: true,
                     isFirst: true,

@@ -34,7 +34,6 @@ migrate_working_dir/
 /coverage/
 /design/
 /.claude/
-todo
 
 # Symbolication related
 app.*.symbols

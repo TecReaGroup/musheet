@@ -9,9 +9,8 @@ import '../models/setlist.dart';
 import '../models/score.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
-import 'setlist_detail_screen.dart';
-import 'score_viewer_screen.dart';
 import 'library_screen.dart' show SortType, SortState;
+import '../router/app_router.dart';
 
 enum TeamTab { setlists, scores, members }
 
@@ -345,12 +344,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
               child: InkWell(
                 onTap: () {
                   ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SetlistDetailScreen(setlist: setlist),
-                    ),
-                  );
+                  AppNavigation.navigateToSetlistDetail(context, setlist);
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
@@ -428,11 +422,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
               child: InkWell(
                 onTap: () {
                   ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-                  Navigator.push(
+                  AppNavigation.navigateToScoreViewer(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => ScoreViewerScreen(score: score),
-                    ),
+                    score: score,
                   );
                 },
                 borderRadius: BorderRadius.circular(12),

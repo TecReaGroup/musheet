@@ -6,8 +6,8 @@ import '../providers/scores_provider.dart';
 import '../providers/setlists_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/add_score_widget.dart';
-import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
+import '../router/app_router.dart';
 import 'library_screen.dart' show lastOpenedInstrumentInScoreProvider;
 
 class ScoreDetailScreen extends ConsumerStatefulWidget {
@@ -493,14 +493,10 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
             // Note: When clicking from score detail, we use the clicked instrument directly
             // The smart selection logic (recent > preferred > default) is only used
             // when opening a score from cards/lists where no specific instrument is chosen
-            Navigator.push(
+            AppNavigation.navigateToScoreViewer(
               context,
-              MaterialPageRoute(
-                builder: (context) => ScoreViewerScreen(
-                  score: score,
-                  instrumentScore: instrumentScore,
-                ),
-              ),
+              score: score,
+              instrumentScore: instrumentScore,
             );
           },
           borderRadius: BorderRadius.circular(12),

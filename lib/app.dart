@@ -3,27 +3,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
-import 'screens/home_screen.dart';
 import 'screens/library_screen.dart';
-import 'screens/team_screen.dart';
-import 'screens/settings_screen.dart';
+import 'screens/home_screen.dart';
 import 'utils/icon_mappings.dart';
+import 'router/app_router.dart';
 
 enum AppPage { home, library, team, settings }
-
-class CurrentPageNotifier extends Notifier<AppPage> {
-  @override
-  AppPage build() => AppPage.home;
-  
-  @override
-  set state(AppPage newState) => super.state = newState;
-}
-
-final currentPageProvider = NotifierProvider<CurrentPageNotifier, AppPage>(CurrentPageNotifier.new);
 
 // Notifier to signal search clear request
 class ClearSearchRequestNotifier extends Notifier<int> {
@@ -51,17 +41,21 @@ class MuSheetApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return MaterialApp(
+    final router = ref.watch(goRouterProvider);
+    
+    return MaterialApp.router(
       title: 'MuSheet',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      home: const MainScaffold(),
+      routerConfig: router,
     );
   }
 }
 
 class MainScaffold extends ConsumerStatefulWidget {
-  const MainScaffold({super.key});
+  final Widget child;
+  
+  const MainScaffold({super.key, required this.child});
 
   @override
   ConsumerState<MainScaffold> createState() => _MainScaffoldState();
@@ -141,11 +135,10 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
         // Navigate to Library page and show add score modal
         if (mounted) {
-          // First, pop all pushed routes to return to main scaffold
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          // Navigate to library using go_router
+          context.go(AppRoutes.library);
 
-          // Switch to Library tab with Scores selected
-          ref.read(currentPageProvider.notifier).state = AppPage.library;
+          // Switch to Scores tab
           ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
 
           // Set shared file path and trigger modal in LibraryScreen
@@ -168,7 +161,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     if (searchQuery.isNotEmpty) {
       ref.read(searchQueryProvider.notifier).state = '';
       ref.read(clearSearchRequestProvider.notifier).trigger();
-      ref.read(currentPageProvider.notifier).state = AppPage.home;
+      context.go(AppRoutes.home);
       return false;
     }
     
@@ -204,34 +197,19 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final currentPage = ref.watch(currentPageProvider);
     final teamEnabled = ref.watch(teamEnabledProvider);
+    final currentLocation = GoRouterState.of(context).uri.path;
+    
+    // Determine current page from location
+    AppPage currentPage = _getPageFromLocation(currentLocation);
 
     // If team is disabled and current page is team, redirect to settings
     if (!teamEnabled && currentPage == AppPage.team) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          ref.read(currentPageProvider.notifier).state = AppPage.settings;
+          context.go(AppRoutes.settings);
         }
       });
-    }
-
-    // Calculate the actual index for IndexedStack
-    final int stackIndex;
-    if (teamEnabled) {
-      stackIndex = currentPage.index;
-    } else {
-      // When team is disabled: Home=0, Library=1, Settings=2
-      switch (currentPage) {
-        case AppPage.home:
-          stackIndex = 0;
-        case AppPage.library:
-          stackIndex = 1;
-        case AppPage.team:
-          stackIndex = 2; // Will be redirected to settings
-        case AppPage.settings:
-          stackIndex = 2;
-      }
     }
 
     // Ensure system UI style is applied on every build
@@ -259,15 +237,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             // Extend content to bottom system navigation bar area
             extendBody: true,
             extendBodyBehindAppBar: true,
-            body: IndexedStack(
-              index: stackIndex,
-              children: [
-                const HomeScreen(),
-                const LibraryScreen(),
-                if (teamEnabled) const TeamScreen(),
-                const SettingsScreen(),
-              ],
-            ),
+            body: widget.child,
             bottomNavigationBar: Container(
           decoration: BoxDecoration(
             // Add white background to ensure bottom navigation bar is visible
@@ -290,7 +260,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             child: BottomNavigationBar(
               currentIndex: _getAdjustedIndex(currentPage, teamEnabled),
               onTap: (index) {
-                ref.read(currentPageProvider.notifier).state = _getPageFromIndex(index, teamEnabled);
+                final page = _getPageFromIndex(index, teamEnabled);
+                _navigateToPage(context, page);
               },
               type: BottomNavigationBarType.fixed,
               elevation: 0,
@@ -362,6 +333,40 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         default:
           return AppPage.home;
       }
+    }
+  }
+
+  // Get page from current location
+  AppPage _getPageFromLocation(String location) {
+    switch (location) {
+      case AppRoutes.home:
+        return AppPage.home;
+      case AppRoutes.library:
+        return AppPage.library;
+      case AppRoutes.team:
+        return AppPage.team;
+      case AppRoutes.settings:
+        return AppPage.settings;
+      default:
+        return AppPage.home;
+    }
+  }
+
+  // Navigate to page using go_router
+  void _navigateToPage(BuildContext context, AppPage page) {
+    switch (page) {
+      case AppPage.home:
+        context.go(AppRoutes.home);
+        break;
+      case AppPage.library:
+        context.go(AppRoutes.library);
+        break;
+      case AppPage.team:
+        context.go(AppRoutes.team);
+        break;
+      case AppPage.settings:
+        context.go(AppRoutes.settings);
+        break;
     }
   }
 }

@@ -6,13 +6,11 @@ import '../providers/teams_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
-import 'setlist_detail_screen.dart';
-import 'score_detail_screen.dart';
-import 'score_viewer_screen.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
 import '../app.dart' show sharedFilePathProvider;
+import '../router/app_router.dart';
 
 enum LibraryTab { scores, setlists }
 
@@ -552,11 +550,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               onArrowTap: () {
                 // Arrow tap: go to detail screen
                 ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => SetlistDetailScreen(setlist: setlist),
-                  ),
-                );
+                AppNavigation.navigateToSetlistDetail(context, setlist);
               },
             ),
             onDelete: () => _handleDelete(setlist.id, false),
@@ -577,24 +571,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                   final bestInstrumentIndex = getBestInstrumentIndex(selectedScore, lastOpenedInstrumentIndex, preferredInstrument);
                   final instrumentScore = selectedScore.instrumentScores.isNotEmpty ? selectedScore.instrumentScores[bestInstrumentIndex] : null;
                   
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => ScoreViewerScreen(
-                        score: selectedScore,
-                        instrumentScore: instrumentScore,
-                        setlistScores: setlistScores,
-                        currentIndex: validIndex,
-                        setlistName: setlist.name,
-                      ),
-                    ),
+                  AppNavigation.navigateToScoreViewer(
+                    context,
+                    score: selectedScore,
+                    instrumentScore: instrumentScore,
+                    setlistScores: setlistScores,
+                    currentIndex: validIndex,
+                    setlistName: setlist.name,
                   );
                 } else {
                   // Empty setlist: go to detail screen
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => SetlistDetailScreen(setlist: setlist),
-                    ),
-                  );
+                  AppNavigation.navigateToSetlistDetail(context, setlist);
                 }
               }
             },
@@ -635,11 +622,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               onArrowTap: () {
                 // Arrow tap: go to detail screen
                 ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => ScoreDetailScreen(score: score),
-                  ),
-                );
+                AppNavigation.navigateToScoreDetail(context, score);
               },
             ),
             onDelete: () => _handleDelete(score.id, true),
@@ -652,14 +635,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
                 final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
                 
-                Navigator.push(
+                AppNavigation.navigateToScoreViewer(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => ScoreViewerScreen(
-                      score: score,
-                      instrumentScore: instrumentScore,
-                    ),
-                  ),
+                  score: score,
+                  instrumentScore: instrumentScore,
                 );
               }
             },
