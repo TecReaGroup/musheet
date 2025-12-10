@@ -1,24 +1,24 @@
 /// MuSheet Widgets Library
-/// 
-/// 统一导出所有可复用的组件
-/// 
-/// 使用方法:
+///
+/// Unified export of all reusable components
+///
+/// Usage:
 /// ```dart
 /// import 'package:musheet/widgets/widgets.dart';
 /// ```
 library;
 
-// Loading widgets - 加载状态组件
+// Loading widgets - Loading state components
 export 'loading_widgets.dart';
 
-// Common widgets - 通用组件
+// Common widgets - Common components
 export 'common_widgets.dart';
 
-// Score card - 乐谱卡片 (保留原有组件，向后兼容)
+// Score card - Score card (retained for backward compatibility)
 export 'score_card.dart';
 
-// Setlist card - 曲单卡片 (保留原有组件，向后兼容)
+// Setlist card - Setlist card (retained for backward compatibility)
 export 'setlist_card.dart';
 
-// Metronome widget - 节拍器组件
+// Metronome widget - Metronome component
 export 'metronome_widget.dart';

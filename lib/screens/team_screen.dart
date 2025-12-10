@@ -38,7 +38,7 @@ class ShowInviteModalNotifier extends Notifier<bool> {
   set state(bool newState) => super.state = newState;
 }
 
-// Team 排序状态 providers
+// Team sort state providers
 class TeamSetlistSortNotifier extends Notifier<SortState> {
   @override
   SortState build() => const SortState();
@@ -65,7 +65,7 @@ class TeamScoreSortNotifier extends Notifier<SortState> {
   }
 }
 
-// 最近打开记录
+// Recently opened records
 class TeamRecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
   @override
   Map<String, DateTime> build() => {};

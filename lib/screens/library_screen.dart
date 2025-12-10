@@ -15,10 +15,10 @@ import '../router/app_router.dart';
 
 enum LibraryTab { scores, setlists }
 
-// 排序类型
+// Sort type
 enum SortType { recentCreated, alphabetical, recentOpened }
 
-// 排序状态
+// Sort state
 class SortState {
   final SortType type;
   final bool ascending;
@@ -65,17 +65,17 @@ class ShowCreateScoreModalNotifier extends Notifier<bool> {
   set state(bool newState) => super.state = newState;
 }
 
-// 排序状态 providers
+// Sort state providers
 class SetlistSortNotifier extends Notifier<SortState> {
   @override
   SortState build() => const SortState();
-  
+
   void setSort(SortType type) {
     if (state.type == type) {
-      // 同类型点击，切换升降序
+      // Same type clicked, toggle ascending/descending
       state = state.copyWith(ascending: !state.ascending);
     } else {
-      // 不同类型：字母排序默认升序（A→Z），其他默认降序（最新在前）
+      // Different type: alphabetical defaults to ascending (A→Z), others default to descending (newest first)
       final defaultAscending = type == SortType.alphabetical;
       state = SortState(type: type, ascending: defaultAscending);
     }
@@ -85,12 +85,12 @@ class SetlistSortNotifier extends Notifier<SortState> {
 class ScoreSortNotifier extends Notifier<SortState> {
   @override
   SortState build() => const SortState();
-  
+
   void setSort(SortType type) {
     if (state.type == type) {
       state = state.copyWith(ascending: !state.ascending);
     } else {
-      // 不同类型：字母排序默认升序（A→Z），其他默认降序（最新在前）
+      // Different type: alphabetical defaults to ascending (A→Z), others default to descending (newest first)
       final defaultAscending = type == SortType.alphabetical;
       state = SortState(type: type, ascending: defaultAscending);
     }
@@ -104,7 +104,7 @@ final showCreateScoreModalProvider = NotifierProvider<ShowCreateScoreModalNotifi
 final setlistSortProvider = NotifierProvider<SetlistSortNotifier, SortState>(SetlistSortNotifier.new);
 final scoreSortProvider = NotifierProvider<ScoreSortNotifier, SortState>(ScoreSortNotifier.new);
 
-// 最近打开记录 - 使用 Notifier with persistence
+// Recently opened records - using Notifier with persistence
 class RecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
   @override
   Map<String, DateTime> build() {
@@ -343,8 +343,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     });
   }
 
-  static const double _swipeThreshold = 32.0; // 触发阈值
-  static const double _swipeMaxOffset = 64.0; // 最大滑动距离
+  static const double _swipeThreshold = 32.0; // Trigger threshold
+  static const double _swipeMaxOffset = 64.0; // Maximum swipe distance
 
   void _handleSwipeUpdate(Offset position) {
     if (_dragStart == null || !_isDragging) return;
@@ -1022,14 +1022,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         borderRadius: BorderRadius.circular(12),
         child: Stack(
           children: [
-            // 红色背景 + 删除按钮
+            // Red background + delete button
             Positioned.fill(
               child: Container(
                 color: AppColors.red500,
                 child: Row(
                   children: [
                     const Spacer(),
-                    // 垃圾桶居中于露出的区域 (宽度 = -offset)
+                    // Center trash icon in exposed area (width = -offset)
                     SizedBox(
                       width: -offset,
                       child: AnimatedOpacity(
@@ -1052,7 +1052,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 ),
               ),
             ),
-            // 卡片内容
+            // Card content
             GestureDetector(
               onHorizontalDragStart: (details) => _handleSwipeStart(id, details.globalPosition),
               onHorizontalDragUpdate: (details) => _handleSwipeUpdate(details.globalPosition),

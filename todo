@@ -46,16 +46,15 @@ local database:
 update packages:
   todo: update packages to latest version
 
+
 todo:
 complete settings page:
+i18n international support:
 
 team mode:
+Serverpod backend:
+  todo: user information authentication and data storage
 
 reuse UI/UX:
 
-English comment and texts:
-
-i18n international support:
-
-Serverpod backend:
-  todo: user information authentication and data storage
+English comments and texts:

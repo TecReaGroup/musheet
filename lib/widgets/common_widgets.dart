@@ -3,12 +3,12 @@ import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 
 // ============================================================================
-// ICON CONTAINERS - 统一的图标容器样式
+// ICON CONTAINERS - Unified icon container styles
 // ============================================================================
 
-/// 渐变图标容器 - 用于卡片中的图标显示
-/// 
-/// 使用示例:
+/// Gradient icon container - for icon display in cards
+///
+/// Usage example:
 /// ```dart
 /// GradientIconBox(
 ///   icon: AppIcons.musicNote,
@@ -34,7 +34,7 @@ class GradientIconBox extends StatelessWidget {
     this.borderRadius = 12,
   });
 
-  /// Score 类型的图标盒子 (蓝色渐变)
+  /// Score type icon box (blue gradient)
   factory GradientIconBox.score({
     Key? key,
     double size = 48,
@@ -50,7 +50,7 @@ class GradientIconBox extends StatelessWidget {
     );
   }
 
-  /// Setlist 类型的图标盒子 (绿色渐变)
+  /// Setlist type icon box (green gradient)
   factory GradientIconBox.setlist({
     Key? key,
     double size = 48,
@@ -84,7 +84,7 @@ class GradientIconBox extends StatelessWidget {
   }
 }
 
-/// 圆形头像图标 - 用于用户/团队成员头像
+/// Circular avatar icon - for user/team member avatars
 class AvatarIcon extends StatelessWidget {
   final String initial;
   final double size;
@@ -123,12 +123,12 @@ class AvatarIcon extends StatelessWidget {
 }
 
 // ============================================================================
-// TAB BUTTONS - 统一的 Tab 按钮样式
+// TAB BUTTONS - Unified tab button styles
 // ============================================================================
 
-/// 统一的 Tab 按钮组件
-/// 
-/// 替代 `_TabButton` 和 `_TeamTabButton`
+/// Unified tab button component
+///
+/// Replaces `_TabButton` and `_TeamTabButton`
 class AppTabButton extends StatelessWidget {
   final String label;
   final IconData icon;
@@ -178,10 +178,10 @@ class AppTabButton extends StatelessWidget {
 }
 
 // ============================================================================
-// CARDS - 统一的卡片组件
+// CARDS - Unified card components
 // ============================================================================
 
-/// 基础列表卡片 - 带图标、标题、副标题和可选尾部
+/// Base list card - with icon, title, subtitle and optional trailing
 class ListCard extends StatelessWidget {
   final Widget leading;
   final String title;
@@ -264,7 +264,7 @@ class ListCard extends StatelessWidget {
   }
 }
 
-/// Score 卡片快捷组件
+/// Score card shortcut component
 class ScoreListCard extends StatelessWidget {
   final String title;
   final String composer;
@@ -296,7 +296,7 @@ class ScoreListCard extends StatelessWidget {
   }
 }
 
-/// Setlist 卡片快捷组件
+/// Setlist card shortcut component
 class SetlistListCard extends StatelessWidget {
   final String name;
   final String description;
@@ -334,10 +334,10 @@ class SetlistListCard extends StatelessWidget {
 }
 
 // ============================================================================
-// SETTINGS ITEMS - 设置项组件
+// SETTINGS ITEMS - Settings item components
 // ============================================================================
 
-/// 设置列表项
+/// Settings list item
 class SettingsListItem extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -360,7 +360,7 @@ class SettingsListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 根据位置计算圆角
+    // Calculate border radius based on position
     final borderRadius = BorderRadius.vertical(
       top: isFirst ? const Radius.circular(12) : Radius.zero,
       bottom: isLast ? const Radius.circular(12) : Radius.zero,
@@ -393,7 +393,7 @@ class SettingsListItem extends StatelessWidget {
   }
 }
 
-/// 设置组容器
+/// Settings group container
 class SettingsGroup extends StatelessWidget {
   final String? title;
   final List<Widget> children;
@@ -438,10 +438,10 @@ class SettingsGroup extends StatelessWidget {
 }
 
 // ============================================================================
-// EMPTY STATES - 空状态组件
+// EMPTY STATES - Empty state components
 // ============================================================================
 
-/// 通用空状态组件
+/// Generic empty state component
 class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -458,7 +458,7 @@ class EmptyState extends StatelessWidget {
     this.iconColor = AppColors.gray300,
   });
 
-  /// 空 Scores 状态
+  /// Empty Scores state
   factory EmptyState.scores({
     Key? key,
     Widget? action,
@@ -472,7 +472,7 @@ class EmptyState extends StatelessWidget {
     );
   }
 
-  /// 空 Setlists 状态
+  /// Empty Setlists state
   factory EmptyState.setlists({
     Key? key,
     Widget? action,
@@ -486,7 +486,7 @@ class EmptyState extends StatelessWidget {
     );
   }
 
-  /// 搜索无结果状态
+  /// No search results state
   factory EmptyState.noSearchResults({Key? key}) {
     return EmptyState(
       key: key,
@@ -531,10 +531,10 @@ class EmptyState extends StatelessWidget {
 }
 
 // ============================================================================
-// MODALS - 模态框组件
+// MODALS - Modal components
 // ============================================================================
 
-/// 底部弹出的半透明遮罩层
+/// Semi-transparent backdrop overlay
 class ModalBackdrop extends StatelessWidget {
   final VoidCallback onTap;
   final double opacity;
@@ -556,7 +556,7 @@ class ModalBackdrop extends StatelessWidget {
   }
 }
 
-/// 居中弹窗容器
+/// Centered modal container
 class CenteredModal extends StatelessWidget {
   final Widget child;
   final double widthFactor;
@@ -600,7 +600,7 @@ class CenteredModal extends StatelessWidget {
   }
 }
 
-/// 底部弹窗容器
+/// Bottom sheet modal container
 class BottomSheetModal extends StatelessWidget {
   final Widget child;
   final double? maxWidth;
@@ -635,10 +635,10 @@ class BottomSheetModal extends StatelessWidget {
 }
 
 // ============================================================================
-// PAGE HEADERS - 页面头部组件
+// PAGE HEADERS - Page header components
 // ============================================================================
 
-/// 标准页面头部
+/// Standard page header
 class PageHeader extends StatelessWidget {
   final String title;
   final String? subtitle;
@@ -696,10 +696,10 @@ class PageHeader extends StatelessWidget {
 }
 
 // ============================================================================
-// STAT CARDS - 统计卡片组件
+// STAT CARDS - Statistics card components
 // ============================================================================
 
-/// 首页统计卡片
+/// Home page statistics card
 class StatCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -722,7 +722,7 @@ class StatCard extends StatelessWidget {
     this.onTap,
   });
 
-  /// Scores 统计卡片
+  /// Scores statistics card
   factory StatCard.scores({
     Key? key,
     required int count,
@@ -741,7 +741,7 @@ class StatCard extends StatelessWidget {
     );
   }
 
-  /// Setlists 统计卡片
+  /// Setlists statistics card
   factory StatCard.setlists({
     Key? key,
     required int count,
@@ -794,10 +794,10 @@ class StatCard extends StatelessWidget {
 }
 
 // ============================================================================
-// SECTION HEADERS - 区块标题组件
+// SECTION HEADERS - Section header components
 // ============================================================================
 
-/// 带图标的区块标题
+/// Section header with icon
 class SectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -833,10 +833,10 @@ class SectionHeader extends StatelessWidget {
 }
 
 // ============================================================================
-// NUMBER BADGE - 数字标记组件
+// NUMBER BADGE - Number badge components
 // ============================================================================
 
-/// 圆形数字标记
+/// Circular number badge
 class NumberBadge extends StatelessWidget {
   final int number;
   final double size;
@@ -875,10 +875,10 @@ class NumberBadge extends StatelessWidget {
 }
 
 // ============================================================================
-// TOOL BUTTONS - 工具按钮组件
+// TOOL BUTTONS - Tool button components
 // ============================================================================
 
-/// 工具栏按钮
+/// Toolbar button
 class ToolButton extends StatelessWidget {
   final IconData icon;
   final bool isActive;

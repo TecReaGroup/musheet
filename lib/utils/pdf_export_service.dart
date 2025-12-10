@@ -74,7 +74,7 @@ class PdfExportService {
         await channel.invokeMethod('shareFileInNewTask', {
           'filePath': exportedPath,
           'mimeType': 'application/pdf',
-          'title': '分享 PDF',
+          'title': 'Share PDF',
         });
       } else {
         // iOS and other platforms use share_plus
@@ -98,7 +98,7 @@ class PdfExportService {
       if (context.mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: $e')),
+          SnackBar(content: Text('Export failed: $e')),
         );
       }
     }

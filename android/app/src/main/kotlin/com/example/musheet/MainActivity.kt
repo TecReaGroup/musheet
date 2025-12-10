@@ -17,7 +17,7 @@ class MainActivity : FlutterActivity() {
             if (call.method == "shareFileInNewTask") {
                 val filePath = call.argument<String>("filePath")
                 val mimeType = call.argument<String>("mimeType") ?: "application/pdf"
-                val title = call.argument<String>("title") ?: "分享"
+                val title = call.argument<String>("title") ?: "Share"
 
                 if (filePath != null) {
                     shareFileInNewTask(filePath, mimeType, title)

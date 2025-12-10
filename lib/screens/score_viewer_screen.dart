@@ -316,7 +316,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     final pdfPath = _currentInstrumentScore?.pdfUrl;
     if (pdfPath == null || pdfPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('无法获取 PDF 文件路径')),
+        const SnackBar(content: Text('Cannot get PDF file path')),
       );
       return;
     }
