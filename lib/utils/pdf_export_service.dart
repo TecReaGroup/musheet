@@ -244,7 +244,7 @@ class PdfExportService {
       final pdfImage = await page.render(
         fullWidth: renderWidth,
         fullHeight: renderHeight,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.white.toARGB32(),
       );
 
       if (pdfImage == null) continue;

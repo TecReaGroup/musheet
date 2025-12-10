@@ -45,15 +45,15 @@ dependencies:
   flutter_svg: ^2.0.10
   
   # PDF Display
-  pdfrx: ^1.1.29
-  syncfusion_flutter_pdfviewer: ^31.2.16
+  pdfrx: ^2.2.17
+  syncfusion_flutter_pdfviewer: ^31.2.18
   
   # Hand-writing/Annotation
   scribble: ^0.10.0
   perfect_freehand: ^2.0.0
   
   # Local Database - Drift (SQLite)
-  drift: ^2.20.0
+  drift: ^2.30.0
   sqlite3_flutter_libs: ^0.5.0
   path: ^1.9.0
   
@@ -79,11 +79,11 @@ dependencies:
   wakelock_plus: ^1.4.0
   
   # Utilities
-  shared_preferences: ^2.2.0
+  shared_preferences: ^2.5.4
   google_fonts: ^6.1.0
   uuid: ^4.0.0
   lucide_icons_flutter: ^3.1.7
-  flutter_soloud: ^3.4.5
+  flutter_soloud: ^3.4.6
   metronome: ^2.0.7
 
 dev_dependencies:
@@ -98,8 +98,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   
   # Code generation
-  build_runner: ^2.4.0
-  drift_dev: ^2.20.0
+  build_runner: ^2.10.4
+  drift_dev: ^2.30.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -29,8 +29,6 @@ support share in file:
 refactor the code:
   todo: use riverpod and go_router to manage state
 
-
-todo:
 local database:
   package: drift:^2.30.0
   todo: Hybrid Storage:Design a storage architecture to implement persistent storage.
@@ -45,9 +43,13 @@ local database:
 # PDF image e.g. Binary Files: Store the actual .pdf files in the Local File System (using path_provider to get the AppDocumentDirectory).
 # score setlist and related riverpod state(like lastOpenedScore, lastOpenedInstrument and other useful state) Metadata : Store in Drift.
 
-
 update packages:
   todo: update packages to latest version
+
+todo:
+complete settings page:
+
+team mode:
 
 reuse UI/UX:
 
@@ -56,3 +58,4 @@ English comment and texts:
 i18n international support:
 
 Serverpod backend:
+  todo: user information authentication and data storage

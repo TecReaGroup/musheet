@@ -481,7 +481,7 @@ class EmptyState extends StatelessWidget {
       key: key,
       icon: AppIcons.setlistIcon,
       title: 'No setlists yet',
-      subtitle: 'Create a setlist to organize your performance repertoire',
+      subtitle: 'Create a setlist to organize your scores',
       action: action,
     );
   }
