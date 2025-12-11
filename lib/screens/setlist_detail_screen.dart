@@ -27,6 +27,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   final FocusNode _addScoreSearchFocusNode = FocusNode();
   final TextEditingController _editNameController = TextEditingController();
   final TextEditingController _editDescriptionController = TextEditingController();
+  String? _editErrorMessage;
 
   @override
   void dispose() {
@@ -43,7 +44,19 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   void _openEditModal(Setlist setlist) {
     _editNameController.text = setlist.name;
     _editDescriptionController.text = setlist.description;
+    _editErrorMessage = null;
     setState(() => _showEditModal = true);
+  }
+
+  // Check if another setlist with the same name exists (excluding current setlist)
+  bool _isDuplicateSetlist(String name, String currentSetlistId) {
+    final setlists = ref.read(setlistsProvider);
+    final normalizedName = name.trim().toLowerCase();
+
+    return setlists.any((s) =>
+      s.id != currentSetlistId &&
+      s.name.toLowerCase() == normalizedName
+    );
   }
 
   @override
@@ -304,6 +317,12 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       TextField(
                         controller: _editNameController,
                         autofocus: true,
+                        onChanged: (_) {
+                          // Clear error message when user types
+                          if (_editErrorMessage != null) {
+                            setState(() => _editErrorMessage = null);
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: 'Setlist name',
                           hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
@@ -332,6 +351,18 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
                       ),
+                      // Error message
+                      if (_editErrorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            _editErrorMessage!,
+                            style: const TextStyle(
+                              color: AppColors.red500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 24),
                       Row(
                         children: [
@@ -350,14 +381,23 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                if (_editNameController.text.trim().isNotEmpty) {
-                                  ref.read(setlistsAsyncProvider.notifier).updateSetlist(
-                                    setlist.id,
-                                    name: _editNameController.text.trim(),
-                                    description: _editDescriptionController.text.trim(),
-                                  );
-                                  setState(() => _showEditModal = false);
+                                final name = _editNameController.text.trim();
+                                if (name.isEmpty) return;
+
+                                // Check for duplicate
+                                if (_isDuplicateSetlist(name, setlist.id)) {
+                                  setState(() {
+                                    _editErrorMessage = 'A setlist with this name already exists';
+                                  });
+                                  return;
                                 }
+
+                                ref.read(setlistsAsyncProvider.notifier).updateSetlist(
+                                  setlist.id,
+                                  name: name,
+                                  description: _editDescriptionController.text.trim(),
+                                );
+                                setState(() => _showEditModal = false);
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.emerald500,

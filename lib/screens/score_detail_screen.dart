@@ -27,6 +27,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   InstrumentScore? _instrumentToCopy;
   final TextEditingController _editTitleController = TextEditingController();
   final TextEditingController _editComposerController = TextEditingController();
+  String? _editErrorMessage;
 
   @override
   void dispose() {
@@ -69,7 +70,21 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   void _openEditModal(Score score) {
     _editTitleController.text = score.title;
     _editComposerController.text = score.composer;
+    _editErrorMessage = null;
     setState(() => _showEditModal = true);
+  }
+
+  // Check if another score with the same title and composer exists (excluding current score)
+  bool _isDuplicateScore(String title, String composer, String currentScoreId) {
+    final scores = ref.read(scoresListProvider);
+    final normalizedTitle = title.trim().toLowerCase();
+    final normalizedComposer = (composer.trim().isEmpty ? 'Unknown' : composer.trim()).toLowerCase();
+
+    return scores.any((s) =>
+      s.id != currentScoreId &&
+      s.title.toLowerCase() == normalizedTitle &&
+      s.composer.toLowerCase() == normalizedComposer
+    );
   }
 
   @override
@@ -762,6 +777,12 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                       TextField(
                         controller: _editTitleController,
                         autofocus: true,
+                        onChanged: (_) {
+                          // Clear error message when user types
+                          if (_editErrorMessage != null) {
+                            setState(() => _editErrorMessage = null);
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: 'Score title',
                           hintStyle: const TextStyle(
@@ -783,6 +804,12 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: _editComposerController,
+                        onChanged: (_) {
+                          // Clear error message when user types
+                          if (_editErrorMessage != null) {
+                            setState(() => _editErrorMessage = null);
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: 'Composer',
                           hintStyle: const TextStyle(
@@ -801,6 +828,18 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                           ),
                         ),
                       ),
+                      // Error message
+                      if (_editErrorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            _editErrorMessage!,
+                            style: const TextStyle(
+                              color: AppColors.red500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 24),
                       Row(
                         children: [
@@ -832,16 +871,27 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                           Expanded(
                             child: ElevatedButton(
                               onPressed: () {
-                                if (_editTitleController.text.trim().isNotEmpty) {
-                                  ref.read(scoresProvider.notifier).updateScore(
-                                    score.id,
-                                    title: _editTitleController.text.trim(),
-                                    composer: _editComposerController.text.trim().isEmpty
-                                        ? 'Unknown'
-                                        : _editComposerController.text.trim(),
-                                  );
-                                  setState(() => _showEditModal = false);
+                                final title = _editTitleController.text.trim();
+                                if (title.isEmpty) return;
+
+                                final composer = _editComposerController.text.trim().isEmpty
+                                    ? 'Unknown'
+                                    : _editComposerController.text.trim();
+
+                                // Check for duplicate
+                                if (_isDuplicateScore(title, composer, score.id)) {
+                                  setState(() {
+                                    _editErrorMessage = 'A score with this title and composer already exists';
+                                  });
+                                  return;
                                 }
+
+                                ref.read(scoresProvider.notifier).updateScore(
+                                  score.id,
+                                  title: title,
+                                  composer: composer,
+                                );
+                                setState(() => _showEditModal = false);
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.blue500,

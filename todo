@@ -46,14 +46,17 @@ local database:
 update packages:
   todo: update packages to latest version
 
+bug:
+  fix: edit score page can same as existing score
 
 todo:
+
 complete settings page:
 i18n international support:
 
 team mode:
 Serverpod backend:
-  todo: user information authentication and data storage
+  todo: user information authentication and data storage(use CRDT plan)
 
 reuse UI/UX:
 

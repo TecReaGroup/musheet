@@ -287,7 +287,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   //Setlist modal controllers
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  
+  String? _createSetlistErrorMessage;
+
   // Search
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -384,14 +385,27 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
 
   void _handleCreateSetlist() {
     if (_nameController.text.trim().isEmpty) return;
-    
+
+    // Check for duplicate setlist name
+    final setlists = ref.read(setlistsProvider);
+    final normalizedName = _nameController.text.trim().toLowerCase();
+    final isDuplicate = setlists.any((s) => s.name.toLowerCase() == normalizedName);
+
+    if (isDuplicate) {
+      setState(() {
+        _createSetlistErrorMessage = 'A setlist with this name already exists';
+      });
+      return;
+    }
+
     ref.read(setlistsAsyncProvider.notifier).createSetlist(
       _nameController.text.trim(),
       _descriptionController.text.trim(),
     );
-    
+
     _nameController.clear();
     _descriptionController.clear();
+    _createSetlistErrorMessage = null;
     ref.read(showCreateSetlistModalProvider.notifier).state = false;
   }
 
@@ -1101,6 +1115,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 ref.read(showCreateSetlistModalProvider.notifier).state = false;
                 _nameController.clear();
                 _descriptionController.clear();
+                _createSetlistErrorMessage = null;
               }
             },
             child: Container(color: Colors.black.withValues(alpha: 0.1)),
@@ -1171,6 +1186,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           ref.read(showCreateSetlistModalProvider.notifier).state = false;
                           _nameController.clear();
                           _descriptionController.clear();
+                          _createSetlistErrorMessage = null;
                         },
                         icon: const Icon(AppIcons.close, color: AppColors.gray400),
                       ),
@@ -1183,6 +1199,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                     children: [
                       TextField(
                         controller: _nameController,
+                        onChanged: (_) {
+                          // Clear error message when user types
+                          if (_createSetlistErrorMessage != null) {
+                            setState(() => _createSetlistErrorMessage = null);
+                          }
+                        },
                         decoration: InputDecoration(
                           hintText: 'Setlist name',
                           hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
@@ -1211,6 +1233,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         ),
                       ),
+                      // Error message
+                      if (_createSetlistErrorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            _createSetlistErrorMessage!,
+                            style: const TextStyle(
+                              color: AppColors.red500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 24),
                       Row(
                         children: [
@@ -1220,6 +1254,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                                 ref.read(showCreateSetlistModalProvider.notifier).state = false;
                                 _nameController.clear();
                                 _descriptionController.clear();
+                                _createSetlistErrorMessage = null;
                               },
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: AppColors.gray200),
