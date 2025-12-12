@@ -955,6 +955,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     );
   }
 
+  /// Check if import button should be disabled (when file is from share intent)
+  bool get _isImportDisabled => widget.presetFilePath != null && _selectedPdfPath != null;
+
   Widget _buildPdfSelectButton() {
     if (_isConverting) {
       return Container(
@@ -984,11 +987,12 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
         ),
       );
     }
-    
+
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: _handleSelectPdf,
+        // Disable import when file is from share intent (user must close and reopen to import different file)
+        onPressed: _isImportDisabled ? null : _handleSelectPdf,
         icon: Icon(
           _selectedPdfPath != null ? AppIcons.check : AppIcons.upload,
           size: 18,
@@ -1022,6 +1026,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
         style: ElevatedButton.styleFrom(
           backgroundColor: _selectedPdfPath != null ? AppColors.blue600 : AppColors.blue500,
           foregroundColor: Colors.white,
+          // Show disabled state when import is disabled (file from share intent)
+          disabledBackgroundColor: AppColors.blue600,
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
           elevation: 0,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),

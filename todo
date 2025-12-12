@@ -49,6 +49,12 @@ update packages:
 bug:
   fix: edit score page can same as existing score
 
+Update:
+  when share score to musheet ban the import button(don't allow user to import score again)
+
+Add:
+  Icon: assets/icons/app_icon.svg
+
 todo:
 
 complete settings page:
