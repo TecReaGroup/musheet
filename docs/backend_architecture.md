@@ -20,25 +20,38 @@
 
 ### 1.1 核心理念
 
-**团队内部管理模式**：专为乐团、乐队、教会敬拜团等音乐团队设计，由团队管理员统一管理所有成员账号，成员间可协作共享乐谱资源。
+**多团队管理模式**：一个服务器可创建多个团队，成员可同时属于多个团队。适用于音乐学校、教会、演出公司等需要管理多个乐团/乐队的场景。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    团队内部管理模式                          │
+│                      多团队管理模式                          │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│   管理员 (团长/指挥/负责人)                                  │
+│   服务器管理员 (系统级)                                      │
 │     │                                                       │
-│     ├── 创建成员账号 (分配用户名+初始密码)                   │
-│     ├── 管理成员权限 (普通成员/管理员)                       │
-│     ├── 查看团队使用统计                                     │
-│     └── 管理共享资源                                         │
+│     ├── 创建/管理团队 (Team A, Team B, Team C...)           │
+│     ├── 创建成员账号                                         │
+│     ├── 分配成员到团队 (一个成员可属于多个团队)              │
+│     └── 设置团队管理员                                       │
 │                                                             │
-│   普通成员 (乐手/歌手)                                       │
-│     │                                                       │
+│   ┌──────────────────┐  ┌──────────────────┐                │
+│   │     Team A       │  │     Team B       │                │
+│   │   (交响乐团)     │  │   (室内乐团)     │                │
+│   ├──────────────────┤  ├──────────────────┤                │
+│   │ 团队管理员       │  │ 团队管理员       │                │
+│   │ ├── 管理团队资源 │  │ ├── 管理团队资源 │                │
+│   │ └── 邀请成员加入 │  │ └── 邀请成员加入 │                │
+│   │                  │  │                  │                │
+│   │ 成员 (可跨团队)  │  │ 成员 (可跨团队)  │                │
+│   │ ├── 小明 ────────┼──┼── 小明           │                │
+│   │ ├── 小红         │  │ ├── 小华         │                │
+│   │ └── 小刚         │  │ └── 小刚 ────────┼── (同属两团队) │
+│   └──────────────────┘  └──────────────────┘                │
+│                                                             │
+│   成员权限:                                                  │
 │     ├── 管理个人乐谱库                                       │
-│     ├── 向团队共享乐谱/演出单                                │
-│     ├── 访问团队共享资源                                     │
+│     ├── 向所属团队共享资源                                   │
+│     ├── 访问所属团队的共享资源                               │
 │     └── 仅能修改自己的密码                                   │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -49,6 +62,8 @@
 | 决策项 | 选择 | 说明 |
 |--------|------|------|
 | **部署模式** | 私有化部署 (Docker) | 团队自行部署到内网/私有服务器 |
+| **团队模式** | 多团队 | 一个服务器可创建多个团队 |
+| **成员归属** | 多团队成员 | 成员可同时属于多个团队 |
 | **账号管理** | 管理员统一管理 | 无自助注册，管理员创建所有账号 |
 | **认证方式** | 用户名 + 密码 | 简单直接，适合团队内部使用 |
 | **用户权限** | 仅改密码 | 普通成员只能修改自己的密码 |
@@ -163,6 +178,29 @@ musheet/                         # Flutter App (现有项目)
 Serverpod 使用 YAML 定义模型，自动生成 Dart 类：
 
 ```yaml
+# musheet_server/lib/src/protocol/user.yaml
+class: User
+table: users
+fields:
+  username: String
+  passwordHash: String
+  displayName: String?        # 显示名称 (昵称)
+  avatarPath: String?         # 头像存储路径
+  bio: String?                # 个人简介
+  preferredInstrument: String? # 偏好乐器类型
+  isAdmin: bool               # 系统管理员
+  isDisabled: bool            # 账号是否被禁用
+  mustChangePassword: bool    # 首次登录需改密码
+  lastLoginAt: DateTime?      # 最后登录时间
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  user_username_idx:
+    fields: username
+    unique: true
+```
+
+```yaml
 # musheet_server/lib/src/protocol/score.yaml
 class: Score
 table: scores
@@ -223,6 +261,40 @@ fields:
   userId: int, relation(parent=user)
   usedBytes: int             # 已使用字节
   lastCalculatedAt: DateTime
+```
+
+```yaml
+# musheet_server/lib/src/protocol/team.yaml
+class: Team
+table: teams
+fields:
+  name: String
+  description: String?
+  avatarPath: String?
+  createdBy: int, relation(parent=user)  # 创建者 (系统管理员)
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  team_name_idx:
+    fields: name
+    unique: true
+```
+
+```yaml
+# musheet_server/lib/src/protocol/team_member.yaml
+class: TeamMember
+table: team_members
+fields:
+  teamId: int, relation(parent=team)
+  userId: int, relation(parent=user)
+  role: String               # 'admin' | 'member'
+  joinedAt: DateTime
+indexes:
+  team_member_unique_idx:
+    fields: teamId, userId
+    unique: true
+  team_member_user_idx:
+    fields: userId
 ```
 
 ### 3.2 API 端点设计
@@ -440,7 +512,200 @@ class AuthEndpoint extends Endpoint {
 }
 ```
 
-### 3.4 管理员用户管理端点
+### 3.4 个人资料端点
+
+```dart
+// musheet_server/lib/src/endpoints/profile_endpoint.dart
+
+class ProfileEndpoint extends Endpoint {
+
+  @override
+  bool get requireLogin => true;
+
+  /// 获取当前用户资料
+  Future<UserProfile> getProfile(Session session) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final user = await User.db.findById(session, userId);
+    if (user == null) throw UserNotFoundException();
+
+    // 获取用户所属团队
+    final memberships = await TeamMember.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+
+    final teams = <TeamInfo>[];
+    for (final m in memberships) {
+      final team = await Team.db.findById(session, m.teamId);
+      if (team != null) {
+        teams.add(TeamInfo(
+          id: team.id!,
+          name: team.name,
+          role: m.role,
+        ));
+      }
+    }
+
+    // 获取存储使用情况
+    final storage = await UserStorage.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+
+    return UserProfile(
+      id: user.id!,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarPath != null
+          ? _getAvatarUrl(user.avatarPath!)
+          : null,
+      bio: user.bio,
+      preferredInstrument: user.preferredInstrument,
+      teams: teams,
+      storageUsedBytes: storage.isNotEmpty ? storage.first.usedBytes : 0,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt,
+    );
+  }
+
+  /// 更新个人资料
+  Future<UserProfile> updateProfile(
+    Session session, {
+    String? displayName,
+    String? bio,
+    String? preferredInstrument,
+  }) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final user = await User.db.findById(session, userId);
+    if (user == null) throw UserNotFoundException();
+
+    // 更新字段 (只更新提供的字段)
+    if (displayName != null) user.displayName = displayName;
+    if (bio != null) user.bio = bio;
+    if (preferredInstrument != null) user.preferredInstrument = preferredInstrument;
+    user.updatedAt = DateTime.now();
+
+    await User.db.update(session, user);
+
+    return await getProfile(session);
+  }
+
+  /// 上传头像
+  Future<AvatarUploadResult> uploadAvatar(
+    Session session,
+    ByteData imageData,
+    String fileName,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证文件类型
+    final extension = fileName.split('.').last.toLowerCase();
+    if (!['jpg', 'jpeg', 'png', 'webp'].contains(extension)) {
+      throw InvalidImageFormatException();
+    }
+
+    // 验证文件大小 (最大 2MB)
+    if (imageData.lengthInBytes > 2 * 1024 * 1024) {
+      throw ImageTooLargeException();
+    }
+
+    // 删除旧头像
+    final user = await User.db.findById(session, userId);
+    if (user!.avatarPath != null) {
+      await _deleteFile(user.avatarPath!);
+    }
+
+    // 保存新头像 (生成唯一文件名)
+    final uniqueName = '${userId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+    final path = 'avatars/$uniqueName';
+    await _saveFile(path, imageData);
+
+    // 生成缩略图 (可选，用于列表显示)
+    final thumbPath = 'avatars/thumbs/$uniqueName';
+    await _generateThumbnail(path, thumbPath, size: 150);
+
+    // 更新用户记录
+    user.avatarPath = path;
+    user.updatedAt = DateTime.now();
+    await User.db.update(session, user);
+
+    return AvatarUploadResult(
+      success: true,
+      avatarUrl: _getAvatarUrl(path),
+      thumbnailUrl: _getAvatarUrl(thumbPath),
+    );
+  }
+
+  /// 删除头像
+  Future<bool> deleteAvatar(Session session) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final user = await User.db.findById(session, userId);
+    if (user == null || user.avatarPath == null) return false;
+
+    // 删除文件
+    await _deleteFile(user.avatarPath!);
+    await _deleteFile('avatars/thumbs/${user.avatarPath!.split('/').last}');
+
+    // 清空头像路径
+    user.avatarPath = null;
+    user.updatedAt = DateTime.now();
+    await User.db.update(session, user);
+
+    return true;
+  }
+
+  /// 获取其他用户的公开资料 (团队成员可见)
+  Future<PublicUserProfile> getPublicProfile(Session session, int targetUserId) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 检查是否同属一个团队
+    final myTeams = await TeamMember.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+    final targetTeams = await TeamMember.db.find(
+      session,
+      where: (t) => t.userId.equals(targetUserId),
+    );
+
+    final myTeamIds = myTeams.map((t) => t.teamId).toSet();
+    final targetTeamIds = targetTeams.map((t) => t.teamId).toSet();
+    final commonTeams = myTeamIds.intersection(targetTeamIds);
+
+    if (commonTeams.isEmpty) {
+      throw PermissionDeniedException();  // 无共同团队，不可查看
+    }
+
+    final user = await User.db.findById(session, targetUserId);
+    if (user == null) throw UserNotFoundException();
+
+    return PublicUserProfile(
+      id: user.id!,
+      username: user.username,
+      displayName: user.displayName,
+      avatarUrl: user.avatarPath != null ? _getAvatarUrl(user.avatarPath!) : null,
+      bio: user.bio,
+      preferredInstrument: user.preferredInstrument,
+    );
+  }
+
+  // === 辅助方法 ===
+
+  String _getAvatarUrl(String path) {
+    return '${Platform.environment['SERVER_URL']}/files/$path';
+  }
+}
+```
+
+### 3.5 管理员用户管理端点
 
 ```dart
 // musheet_server/lib/src/endpoints/admin_user_endpoint.dart
@@ -629,13 +894,13 @@ class AdminUserEndpoint extends Endpoint {
 │ passwordHash    │
 │ displayName     │
 │ avatarPath      │
-│ isAdmin         │  ← 第一个用户自动为 true
+│ isAdmin         │  ← 系统管理员 (第一个用户自动为 true)
 │ isDisabled      │  ← 管理员可禁用用户
 │ mustChangePassword│ ← 首次登录需改密码
 │ createdAt       │
 └────────┬────────┘
          │
-         │ 1:N
+         │ 1:N (个人数据)
          ▼
 ┌─────────────────┐       ┌─────────────────┐
 │     scores      │       │    setlists     │
@@ -685,25 +950,42 @@ class AdminUserEndpoint extends Endpoint {
 │ updatedAt       │
 └─────────────────┘
 
-┌─────────────────┐       ┌─────────────────┐
-│     teams       │       │  team_members   │
-├─────────────────┤       ├─────────────────┤
-│ id (PK)         │──────<│ teamId (FK)     │
-│ name            │       │ userId (FK)     │
-│ ownerId (FK)    │       │ role            │
-│ inviteCode      │       │ joinedAt        │
-│ createdAt       │       └─────────────────┘
+===== 多团队系统 (团队间资源独立) =====
+
+┌─────────────────┐
+│     teams       │  ← 一个服务器可有多个团队
+├─────────────────┤
+│ id (PK)         │
+│ name            │
+│ description     │
+│ avatarPath      │
+│ createdBy (FK)  │  ← 系统管理员创建
+│ createdAt       │
+│ updatedAt       │
 └────────┬────────┘
          │
-         │ N:M
+         │ N:M (成员可属于多个团队)
          ▼
+┌─────────────────┐
+│  team_members   │
+├─────────────────┤
+│ id (PK)         │
+│ teamId (FK)     │──────┐
+│ userId (FK)     │──────┼── 复合唯一索引
+│ role            │      │  'admin' | 'member'
+│ joinedAt        │
+└─────────────────┘
+
+===== 团队共享资源 (每个团队独立) =====
+
 ┌─────────────────┐       ┌─────────────────┐
 │  team_scores    │       │ team_setlists   │
 ├─────────────────┤       ├─────────────────┤
-│ teamId (FK)     │       │ teamId (FK)     │
+│ id (PK)         │       │ id (PK)         │
+│ teamId (FK)     │       │ teamId (FK)     │  ← 资源属于特定团队
 │ scoreId (FK)    │       │ setlistId (FK)  │
-│ sharedBy (FK)   │       │ sharedBy (FK)   │
-│ permissions     │       │ permissions     │
+│ sharedBy (FK)   │       │ sharedBy (FK)   │  ← 谁共享的
+│ permissions     │       │ permissions     │  ← 'view' | 'edit'
 │ sharedAt        │       │ sharedAt        │
 └─────────────────┘       └─────────────────┘
 ```
@@ -715,12 +997,282 @@ class AdminUserEndpoint extends Endpoint {
 CREATE INDEX idx_scores_user_updated ON scores(user_id, updated_at);
 CREATE INDEX idx_annotations_instrument_updated ON annotations(instrument_score_id, updated_at);
 
--- 团队查询优化
+-- 多团队查询优化
 CREATE INDEX idx_team_members_user ON team_members(user_id);
+CREATE INDEX idx_team_members_team ON team_members(team_id);
 CREATE INDEX idx_team_scores_team ON team_scores(team_id);
+CREATE INDEX idx_team_setlists_team ON team_setlists(team_id);
 
 -- 存储统计
 CREATE INDEX idx_instrument_scores_user_size ON instrument_scores(score_id) INCLUDE (file_size);
+```
+
+### 4.3 团队管理端点
+
+```dart
+// musheet_server/lib/src/endpoints/team_endpoint.dart
+
+class TeamEndpoint extends Endpoint {
+
+  @override
+  bool get requireLogin => true;
+
+  // ===== 系统管理员操作 =====
+
+  /// 创建团队 (仅系统管理员)
+  Future<Team> createTeam(
+    Session session,
+    String name,
+    String? description,
+  ) async {
+    await _requireSystemAdmin(session);
+
+    // 检查团队名是否已存在
+    final existing = await Team.db.find(
+      session,
+      where: (t) => t.name.equals(name),
+    );
+    if (existing.isNotEmpty) {
+      throw TeamNameExistsException();
+    }
+
+    final userId = await session.auth.authenticatedUserId;
+    final team = Team(
+      name: name,
+      description: description,
+      createdBy: userId!,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await Team.db.insert(session, team);
+
+    return team;
+  }
+
+  /// 获取所有团队 (仅系统管理员)
+  Future<List<Team>> getAllTeams(Session session) async {
+    await _requireSystemAdmin(session);
+    return await Team.db.find(session);
+  }
+
+  /// 添加成员到团队 (仅系统管理员)
+  Future<TeamMember> addMemberToTeam(
+    Session session,
+    int teamId,
+    int userId,
+    String role,  // 'admin' | 'member'
+  ) async {
+    await _requireSystemAdmin(session);
+
+    // 检查是否已是成员
+    final existing = await TeamMember.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.userId.equals(userId),
+    );
+    if (existing.isNotEmpty) {
+      throw AlreadyTeamMemberException();
+    }
+
+    final member = TeamMember(
+      teamId: teamId,
+      userId: userId,
+      role: role,
+      joinedAt: DateTime.now(),
+    );
+    await TeamMember.db.insert(session, member);
+
+    return member;
+  }
+
+  /// 从团队移除成员 (仅系统管理员)
+  Future<bool> removeMemberFromTeam(
+    Session session,
+    int teamId,
+    int userId,
+  ) async {
+    await _requireSystemAdmin(session);
+
+    final members = await TeamMember.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.userId.equals(userId),
+    );
+    if (members.isEmpty) return false;
+
+    await TeamMember.db.deleteRow(session, members.first);
+    return true;
+  }
+
+  /// 更新成员角色 (仅系统管理员)
+  Future<bool> updateMemberRole(
+    Session session,
+    int teamId,
+    int userId,
+    String role,
+  ) async {
+    await _requireSystemAdmin(session);
+
+    final members = await TeamMember.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.userId.equals(userId),
+    );
+    if (members.isEmpty) return false;
+
+    members.first.role = role;
+    await TeamMember.db.update(session, members.first);
+    return true;
+  }
+
+  /// 获取团队成员列表 (仅系统管理员)
+  Future<List<TeamMemberInfo>> getTeamMembers(Session session, int teamId) async {
+    await _requireSystemAdmin(session);
+
+    final members = await TeamMember.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId),
+    );
+
+    // 获取用户信息
+    final result = <TeamMemberInfo>[];
+    for (final m in members) {
+      final user = await User.db.findById(session, m.userId);
+      if (user != null) {
+        result.add(TeamMemberInfo(
+          userId: user.id!,
+          username: user.username,
+          displayName: user.displayName,
+          role: m.role,
+          joinedAt: m.joinedAt,
+        ));
+      }
+    }
+    return result;
+  }
+
+  /// 获取用户所属的团队列表 (仅系统管理员)
+  Future<List<Team>> getUserTeams(Session session, int userId) async {
+    await _requireSystemAdmin(session);
+
+    final memberships = await TeamMember.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+
+    final teams = <Team>[];
+    for (final m in memberships) {
+      final team = await Team.db.findById(session, m.teamId);
+      if (team != null) teams.add(team);
+    }
+    return teams;
+  }
+
+  // ===== 普通用户操作 =====
+
+  /// 获取我所属的团队列表
+  Future<List<TeamWithRole>> getMyTeams(Session session) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final memberships = await TeamMember.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+
+    final result = <TeamWithRole>[];
+    for (final m in memberships) {
+      final team = await Team.db.findById(session, m.teamId);
+      if (team != null) {
+        result.add(TeamWithRole(
+          team: team,
+          role: m.role,
+        ));
+      }
+    }
+    return result;
+  }
+
+  /// 获取团队共享的乐谱 (仅团队成员可访问)
+  Future<List<Score>> getTeamScores(Session session, int teamId) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证是否为团队成员
+    if (!await _isTeamMember(session, teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    final teamScores = await TeamScore.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId),
+    );
+
+    final scores = <Score>[];
+    for (final ts in teamScores) {
+      final score = await Score.db.findById(session, ts.scoreId);
+      if (score != null) scores.add(score);
+    }
+    return scores;
+  }
+
+  /// 向团队共享乐谱 (仅团队成员可操作)
+  Future<bool> shareScoreToTeam(
+    Session session,
+    int teamId,
+    int scoreId,
+    String permissions,  // 'view' | 'edit'
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证是否为团队成员
+    if (!await _isTeamMember(session, teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    // 验证乐谱所有权
+    final score = await Score.db.findById(session, scoreId);
+    if (score == null || score.userId != userId) {
+      throw PermissionDeniedException();
+    }
+
+    // 检查是否已共享
+    final existing = await TeamScore.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.scoreId.equals(scoreId),
+    );
+    if (existing.isNotEmpty) {
+      throw AlreadySharedException();
+    }
+
+    final teamScore = TeamScore(
+      teamId: teamId,
+      scoreId: scoreId,
+      sharedBy: userId,
+      permissions: permissions,
+      sharedAt: DateTime.now(),
+    );
+    await TeamScore.db.insert(session, teamScore);
+
+    return true;
+  }
+
+  // ===== 辅助方法 =====
+
+  Future<void> _requireSystemAdmin(Session session) async {
+    final userId = await session.auth.authenticatedUserId;
+    final user = await User.db.findById(session, userId);
+    if (user == null || !user.isAdmin) {
+      throw PermissionDeniedException();
+    }
+  }
+
+  Future<bool> _isTeamMember(Session session, int teamId, int userId) async {
+    final members = await TeamMember.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.userId.equals(userId),
+    );
+    return members.isNotEmpty;
+  }
+}
 ```
 
 ---
@@ -1274,6 +1826,371 @@ class SyncStatusIndicator extends ConsumerWidget {
 }
 ```
 
+### 7.4 个人资料 UI
+
+```dart
+// lib/providers/profile_provider.dart
+
+@riverpod
+class ProfileNotifier extends _$ProfileNotifier {
+  @override
+  Future<UserProfile?> build() async {
+    if (!ServerpodClientService.isLoggedIn) return null;
+    return await ServerpodClientService.client.profile.getProfile();
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = AsyncData(await ServerpodClientService.client.profile.getProfile());
+  }
+
+  Future<void> updateProfile({
+    String? displayName,
+    String? bio,
+    String? preferredInstrument,
+  }) async {
+    final result = await ServerpodClientService.client.profile.updateProfile(
+      displayName: displayName,
+      bio: bio,
+      preferredInstrument: preferredInstrument,
+    );
+    state = AsyncData(result);
+  }
+
+  Future<void> uploadAvatar(File imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    final result = await ServerpodClientService.client.profile.uploadAvatar(
+      ByteData.view(bytes.buffer),
+      imageFile.path.split('/').last,
+    );
+    if (result.success) {
+      await refresh();
+    }
+  }
+
+  Future<void> deleteAvatar() async {
+    await ServerpodClientService.client.profile.deleteAvatar();
+    await refresh();
+  }
+}
+```
+
+```dart
+// lib/screens/profile_screen.dart
+
+class ProfileScreen extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(profileNotifierProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('个人资料'),
+        actions: [
+          IconButton(
+            icon: Icon(LucideIcons.edit),
+            onPressed: () => _showEditDialog(context, ref),
+          ),
+        ],
+      ),
+      body: profileAsync.when(
+        data: (profile) => profile == null
+            ? Center(child: Text('请先登录'))
+            : _buildProfileContent(context, ref, profile),
+        loading: () => Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('加载失败: $e')),
+      ),
+    );
+  }
+
+  Widget _buildProfileContent(BuildContext context, WidgetRef ref, UserProfile profile) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(24),
+      child: Column(
+        children: [
+          // 头像区域
+          _buildAvatarSection(context, ref, profile),
+          SizedBox(height: 24),
+
+          // 基本信息卡片
+          Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoRow('用户名', profile.username),
+                  Divider(),
+                  _buildInfoRow('显示名称', profile.displayName ?? '未设置'),
+                  Divider(),
+                  _buildInfoRow('个人简介', profile.bio ?? '未设置'),
+                  Divider(),
+                  _buildInfoRow('偏好乐器', profile.preferredInstrument ?? '未设置'),
+                  Divider(),
+                  _buildInfoRow('存储使用', _formatBytes(profile.storageUsedBytes)),
+                  Divider(),
+                  _buildInfoRow('注册时间', _formatDate(profile.createdAt)),
+                  if (profile.lastLoginAt != null) ...[
+                    Divider(),
+                    _buildInfoRow('最后登录', _formatDate(profile.lastLoginAt!)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 16),
+
+          // 所属团队卡片
+          Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('所属团队', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 12),
+                  if (profile.teams.isEmpty)
+                    Text('暂无团队', style: TextStyle(color: AppColors.gray500))
+                  else
+                    ...profile.teams.map((team) => ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: AppColors.indigo100,
+                        child: Text(team.name[0], style: TextStyle(color: AppColors.indigo600)),
+                      ),
+                      title: Text(team.name),
+                      trailing: Chip(
+                        label: Text(team.role == 'admin' ? '管理员' : '成员'),
+                        backgroundColor: team.role == 'admin'
+                            ? AppColors.emerald100
+                            : AppColors.gray100,
+                      ),
+                    )),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 24),
+
+          // 修改密码按钮
+          OutlinedButton.icon(
+            onPressed: () => _showChangePasswordDialog(context, ref),
+            icon: Icon(LucideIcons.lock),
+            label: Text('修改密码'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarSection(BuildContext context, WidgetRef ref, UserProfile profile) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => _showAvatarOptions(context, ref),
+          child: Stack(
+            children: [
+              CircleAvatar(
+                radius: 60,
+                backgroundColor: AppColors.gray200,
+                backgroundImage: profile.avatarUrl != null
+                    ? NetworkImage(profile.avatarUrl!)
+                    : null,
+                child: profile.avatarUrl == null
+                    ? Icon(LucideIcons.user, size: 48, color: AppColors.gray500)
+                    : null,
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.blue500,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(LucideIcons.camera, size: 16, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 12),
+        Text(
+          profile.displayName ?? profile.username,
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        if (profile.bio != null) ...[
+          SizedBox(height: 4),
+          Text(profile.bio!, style: TextStyle(color: AppColors.gray600)),
+        ],
+      ],
+    );
+  }
+
+  void _showAvatarOptions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: Icon(LucideIcons.camera),
+            title: Text('拍照'),
+            onTap: () async {
+              Navigator.pop(context);
+              final picker = ImagePicker();
+              final image = await picker.pickImage(source: ImageSource.camera);
+              if (image != null) {
+                ref.read(profileNotifierProvider.notifier).uploadAvatar(File(image.path));
+              }
+            },
+          ),
+          ListTile(
+            leading: Icon(LucideIcons.image),
+            title: Text('从相册选择'),
+            onTap: () async {
+              Navigator.pop(context);
+              final picker = ImagePicker();
+              final image = await picker.pickImage(source: ImageSource.gallery);
+              if (image != null) {
+                ref.read(profileNotifierProvider.notifier).uploadAvatar(File(image.path));
+              }
+            },
+          ),
+          ListTile(
+            leading: Icon(LucideIcons.trash, color: AppColors.red500),
+            title: Text('删除头像', style: TextStyle(color: AppColors.red500)),
+            onTap: () {
+              Navigator.pop(context);
+              ref.read(profileNotifierProvider.notifier).deleteAvatar();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: AppColors.gray600)),
+          Text(value, style: TextStyle(fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+}
+```
+
+```dart
+// lib/screens/edit_profile_screen.dart
+
+class EditProfileScreen extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
+  final _displayNameController = TextEditingController();
+  final _bioController = TextEditingController();
+  String? _selectedInstrument;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = ref.read(profileNotifierProvider).valueOrNull;
+    if (profile != null) {
+      _displayNameController.text = profile.displayName ?? '';
+      _bioController.text = profile.bio ?? '';
+      _selectedInstrument = profile.preferredInstrument;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('编辑资料'),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : _saveProfile,
+            child: _saving
+                ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text('保存'),
+          ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: _displayNameController,
+              decoration: InputDecoration(
+                labelText: '显示名称',
+                hintText: '输入你的昵称',
+              ),
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: _bioController,
+              decoration: InputDecoration(
+                labelText: '个人简介',
+                hintText: '简单介绍一下自己',
+              ),
+              maxLines: 3,
+              maxLength: 200,
+            ),
+            SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedInstrument,
+              decoration: InputDecoration(labelText: '偏好乐器'),
+              items: [
+                DropdownMenuItem(value: 'vocal', child: Text('人声')),
+                DropdownMenuItem(value: 'keyboard', child: Text('键盘')),
+                DropdownMenuItem(value: 'guitar', child: Text('吉他')),
+                DropdownMenuItem(value: 'bass', child: Text('贝斯')),
+                DropdownMenuItem(value: 'drums', child: Text('鼓')),
+                DropdownMenuItem(value: 'other', child: Text('其他')),
+              ],
+              onChanged: (value) => setState(() => _selectedInstrument = value),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _saveProfile() async {
+    setState(() => _saving = true);
+
+    try {
+      await ref.read(profileNotifierProvider.notifier).updateProfile(
+        displayName: _displayNameController.text.trim().isEmpty
+            ? null
+            : _displayNameController.text.trim(),
+        bio: _bioController.text.trim().isEmpty
+            ? null
+            : _bioController.text.trim(),
+        preferredInstrument: _selectedInstrument,
+      );
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存失败: $e')),
+      );
+    } finally {
+      setState(() => _saving = false);
+    }
+  }
+}
+```
+
 ---
 
 ## 8. Web 管理面板
@@ -1282,26 +2199,35 @@ class SyncStatusIndicator extends ConsumerWidget {
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    MuSheet 团队管理面板                       │
+│                    MuSheet 管理面板                          │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  📊 Dashboard (仪表盘)                                       │
-│  ├── 团队成员总数 / 活跃成员                                 │
+│  ├── 团队总数 / 成员总数 / 活跃成员                          │
 │  ├── 乐谱总数 / 演出单总数                                   │
 │  ├── 共享资源统计                                            │
 │  └── 系统健康状态                                            │
 │                                                             │
-│  👥 Members (成员管理) ★ 核心功能                            │
+│  🏢 Teams (团队管理) ★ 核心功能                              │
+│  ├── 团队列表 (创建/编辑/删除)                               │
+│  ├── 团队成员配置                                            │
+│  │   ├── 添加成员到团队                                      │
+│  │   ├── 从团队移除成员                                      │
+│  │   └── 设置成员角色 (管理员/普通成员)                       │
+│  └── 团队资源统计                                            │
+│                                                             │
+│  👥 Members (成员管理)                                       │
 │  ├── 成员列表 (搜索/筛选)                                    │
 │  ├── 创建新成员 (用户名+初始密码)                            │
-│  ├── 重置成员密码 (生成临时密码)                             │
+│  ├── 查看成员所属团队                                        │
+│  ├── 批量分配成员到团队                                      │
+│  ├── 重置成员密码                                            │
 │  ├── 禁用/启用成员                                           │
-│  ├── 设置管理员权限                                          │
 │  └── 删除成员                                                │
 │                                                             │
 │  📚 Resources (共享资源)                                     │
-│  ├── 团队共享乐谱列表                                        │
-│  ├── 团队共享演出单                                          │
+│  ├── 按团队查看共享乐谱                                      │
+│  ├── 按团队查看共享演出单                                    │
 │  └── 资源使用统计                                            │
 │                                                             │
 │  💾 Storage (存储统计)                                       │
@@ -1310,7 +2236,6 @@ class SyncStatusIndicator extends ConsumerWidget {
 │  └── 大文件列表                                              │
 │                                                             │
 │  ⚙️ Settings (系统设置)                                      │
-│  ├── 团队信息配置                                            │
 │  ├── 服务器信息                                              │
 │  └── 数据备份/恢复                                           │
 │                                                             │
@@ -1342,6 +2267,9 @@ class AdminApp extends StatelessWidget {
         builder: (context, state, child) => AdminShell(child: child),
         routes: [
           GoRoute(path: '/', builder: (_, __) => DashboardScreen()),
+          GoRoute(path: '/teams', builder: (_, __) => TeamsScreen()),
+          GoRoute(path: '/teams/:id', builder: (_, state) =>
+            TeamDetailScreen(teamId: state.pathParameters['id']!)),
           GoRoute(path: '/members', builder: (_, __) => MembersScreen()),
           GoRoute(path: '/members/:id', builder: (_, state) =>
             MemberDetailScreen(userId: state.pathParameters['id']!)),
@@ -1369,14 +2297,21 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('团队概览', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+            Text('系统概览', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
             SizedBox(height: 24),
 
             // 统计卡片
             Row(
               children: [
                 Expanded(child: StatCard(
-                  title: '团队成员',
+                  title: '团队数量',
+                  value: '${data.totalTeams}',
+                  icon: LucideIcons.building,
+                  color: Colors.indigo,
+                )),
+                SizedBox(width: 16),
+                Expanded(child: StatCard(
+                  title: '成员总数',
                   value: '${data.totalMembers}',
                   icon: LucideIcons.users,
                   color: Colors.blue,
@@ -1390,13 +2325,6 @@ class DashboardScreen extends ConsumerWidget {
                 )),
                 SizedBox(width: 16),
                 Expanded(child: StatCard(
-                  title: '共享乐谱',
-                  value: '${data.sharedScores}',
-                  icon: LucideIcons.share,
-                  color: Colors.orange,
-                )),
-                SizedBox(width: 16),
-                Expanded(child: StatCard(
                   title: '总乐谱数',
                   value: '${data.totalScores}',
                   icon: LucideIcons.music,
@@ -1405,24 +2333,51 @@ class DashboardScreen extends ConsumerWidget {
               ],
             ),
 
-            SizedBox(height: 32),
+            SizedBox(height: 24),
 
-            // 最近活动
-            Card(
-              child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('成员活动趋势', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                    SizedBox(height: 16),
-                    SizedBox(
-                      height: 300,
-                      child: ActivityChart(data: data.activityTrend),
+            // 团队概览
+            Row(
+              children: [
+                Expanded(
+                  child: Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('团队列表', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                          SizedBox(height: 16),
+                          ...data.teams.map((team) => ListTile(
+                            leading: CircleAvatar(child: Text(team.name[0])),
+                            title: Text(team.name),
+                            subtitle: Text('${team.memberCount} 成员'),
+                            trailing: Text('${team.sharedScores} 共享乐谱'),
+                          )),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                SizedBox(width: 16),
+                Expanded(
+                  child: Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('成员活动趋势', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                          SizedBox(height: 16),
+                          SizedBox(
+                            height: 200,
+                            child: ActivityChart(data: data.activityTrend),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1449,44 +2404,80 @@ class AdminEndpoint extends Endpoint {
 
   /// 获取仪表盘统计
   Future<DashboardStats> getDashboardStats(Session session) async {
+    final totalTeams = await Team.db.count(session);
     final totalMembers = await User.db.count(session);
     final activeMembers7d = await _countActiveUsers(session, days: 7);
     final totalScores = await Score.db.count(session);
-    final sharedScores = await _countSharedScores(session);
     final totalStorageUsed = await _sumStorageUsed(session);
     final activityTrend = await _getActivityTrend(session, days: 30);
 
+    // 获取团队概览
+    final teams = await Team.db.find(session);
+    final teamSummaries = <TeamSummary>[];
+    for (final team in teams) {
+      final memberCount = await TeamMember.db.count(
+        session,
+        where: (t) => t.teamId.equals(team.id!),
+      );
+      final sharedScores = await TeamScore.db.count(
+        session,
+        where: (t) => t.teamId.equals(team.id!),
+      );
+      teamSummaries.add(TeamSummary(
+        id: team.id!,
+        name: team.name,
+        memberCount: memberCount,
+        sharedScores: sharedScores,
+      ));
+    }
+
     return DashboardStats(
+      totalTeams: totalTeams,
       totalMembers: totalMembers,
       activeMembers7d: activeMembers7d,
       totalScores: totalScores,
-      sharedScores: sharedScores,
       totalStorageUsed: totalStorageUsed,
       activityTrend: activityTrend,
+      teams: teamSummaries,
     );
   }
 
-  /// 获取成员列表
-  Future<PaginatedResult<UserInfo>> getMembers(
+  /// 获取成员列表 (包含所属团队信息)
+  Future<PaginatedResult<MemberInfo>> getMembers(
     Session session, {
     int page = 1,
     int pageSize = 20,
     String? search,
-    String? sortBy,
+    int? teamId,  // 可选：按团队筛选
   }) async {
-    // ... 分页查询逻辑
+    // 分页查询逻辑，包含每个成员所属的团队列表
   }
 
-  /// 获取共享资源统计
-  Future<SharedResourcesStats> getSharedResourcesStats(Session session) async {
-    final sharedScores = await TeamScore.db.count(session);
-    final sharedSetlists = await TeamSetlist.db.count(session);
-    final topContributors = await _getTopContributors(session, limit: 10);
+  /// 获取成员详情 (包含所属团队)
+  Future<MemberDetail> getMemberDetail(Session session, int userId) async {
+    final user = await User.db.findById(session, userId);
+    if (user == null) throw UserNotFoundException();
 
-    return SharedResourcesStats(
-      sharedScores: sharedScores,
-      sharedSetlists: sharedSetlists,
-      topContributors: topContributors,
+    // 获取成员所属的所有团队
+    final memberships = await TeamMember.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+
+    final teams = <TeamWithRole>[];
+    for (final m in memberships) {
+      final team = await Team.db.findById(session, m.teamId);
+      if (team != null) {
+        teams.add(TeamWithRole(
+          team: team,
+          role: m.role,
+        ));
+      }
+    }
+
+    return MemberDetail(
+      user: user,
+      teams: teams,
     );
   }
 }
@@ -2001,7 +2992,7 @@ git pull
 docker-compose up -d --build
 ```
 
-**团队使用流程：**
+**多团队使用流程：**
 
 1. **管理员部署服务器**
    - 安装 Docker 并运行部署脚本
@@ -2009,25 +3000,35 @@ docker-compose up -d --build
 
 2. **管理员初始化**
    - 首次访问管理面板 `http://192.168.1.100:8082`
-   - 创建管理员账号 (自动成为管理员)
+   - 创建系统管理员账号 (自动成为管理员)
 
-3. **创建团队成员账号**
+3. **创建团队**
+   - 在管理面板中创建团队 (如"交响乐团"、"室内乐团")
+   - 每个团队的资源相互独立
+
+4. **创建成员账号**
    - 在管理面板中添加成员
    - 为每个成员分配用户名和初始密码
 
-4. **成员配置客户端**
+5. **分配成员到团队**
+   - 将成员添加到对应团队
+   - 一个成员可以属于多个团队
+   - 设置成员在团队中的角色 (管理员/普通成员)
+
+6. **成员配置客户端**
    - 安装 MuSheet App
    - 首次启动时输入服务器地址
    - 使用管理员分配的账号登录
    - 首次登录时修改密码
 
-5. **开始协作**
+7. **开始协作**
    - 成员管理个人乐谱库
-   - 向团队共享乐谱和演出单
-   - 访问团队共享资源
+   - 向所属团队共享乐谱和演出单
+   - 访问所属团队的共享资源
+   - 团队间资源相互隔离
 
 ---
 
-*文档版本: 2.0*
+*文档版本: 2.1*
 *更新日期: 2024-12*
-*模式: 团队内部管理*
+*模式: 多团队管理*

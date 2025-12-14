@@ -1,6 +1,6 @@
 {
-    "name": "musheet",
-    "short_name": "musheet",
+    "name": "MuSheet",
+    "short_name": "MuSheet",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

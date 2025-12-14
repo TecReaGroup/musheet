@@ -10,7 +10,7 @@ void main() async {
   // Initialize pdfrx (required for pdfrx 2.x)
   pdfrxFlutterInitialize();
 
-  // Set system UI style: transparent status bar and navigation bar
+  // Set system UI style: transparent status bar and navigation bar6
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     // Status bar
     statusBarColor: Colors.transparent,
