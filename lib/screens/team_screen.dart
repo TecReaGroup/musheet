@@ -100,7 +100,7 @@ class TeamScreen extends ConsumerStatefulWidget {
 }
 
 class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProviderStateMixin {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
@@ -125,7 +125,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _drawerController.dispose();
@@ -145,13 +145,13 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
   }
 
   void _handleInvite() {
-    if (_emailController.text.trim().isEmpty) return;
+    if (_usernameController.text.trim().isEmpty) return;
     
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Invitation sent to ${_emailController.text}')),
+      SnackBar(content: Text('Invitation sent to ${_usernameController.text}')),
     );
     
-    _emailController.clear();
+    _usernameController.clear();
     ref.read(showInviteModalProvider.notifier).state = false;
   }
 
@@ -834,7 +834,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           ],
                         ],
                       ),
-                      Text(member.email, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
+                      Text(member.username, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
                     ],
                   ),
                 ),
@@ -974,7 +974,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
           child: GestureDetector(
             onTap: () {
               ref.read(showInviteModalProvider.notifier).state = false;
-              _emailController.clear();
+              _usernameController.clear();
             },
             child: Container(color: Colors.black.withValues(alpha: 0.5)),
           ),
@@ -999,7 +999,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                     IconButton(
                       onPressed: () {
                         ref.read(showInviteModalProvider.notifier).state = false;
-                        _emailController.clear();
+                        _usernameController.clear();
                       },
                       icon: const Icon(AppIcons.close),
                     ),
@@ -1007,10 +1007,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: _emailController,
+                  controller: _usernameController,
                   decoration: InputDecoration(
-                    hintText: 'Email address',
-                    prefixIcon: const Icon(AppIcons.email, color: AppColors.gray400),
+                    hintText: 'Username',
+                    prefixIcon: const Icon(AppIcons.person, color: AppColors.gray400),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
@@ -1021,7 +1021,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                       child: OutlinedButton(
                         onPressed: () {
                           ref.read(showInviteModalProvider.notifier).state = false;
-                          _emailController.clear();
+                          _usernameController.clear();
                         },
                         child: const Text('Cancel'),
                       ),

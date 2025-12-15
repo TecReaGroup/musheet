@@ -1,0 +1,59 @@
+# MuSheet Server Production Configuration
+
+# API Server Configuration
+apiServer:
+  port: 8080
+  publicHost: localhost
+  publicPort: 8080
+  publicScheme: http
+
+# Max request size - at root level for Serverpod to recognize
+maxRequestSize: 104857600  # 50 MB - needed for PDF uploads
+
+# Insights Server (Admin Panel)
+insightsServer:
+  port: 8081
+  publicHost: localhost
+  publicPort: 8081
+  publicScheme: http
+
+# Web Server (Optional)
+webServer:
+  port: 8082
+  publicHost: localhost
+  publicPort: 8082
+  publicScheme: http
+
+# Database Configuration
+database:
+  host: ${DATABASE_HOST:localhost}
+  port: ${DATABASE_PORT:5432}
+  name: ${DATABASE_NAME:musheet}
+  user: ${DATABASE_USER:musheet}
+  requireSsl: false
+
+# Redis Configuration
+redis:
+  enabled: true
+  host: ${REDIS_HOST:localhost}
+  port: ${REDIS_PORT:6379}
+  password: ${REDIS_PASSWORD:}
+
+# Session Configuration
+session:
+  persistentSessionMaxAge: 2592000  # 30 days in seconds
+  userSessionMaxAge: 86400  # 24 hours in seconds
+
+# File Storage Configuration  
+storage:
+  local:
+    path: /app/uploads
+    maxFileSize: 104857600  # 100 MB
+    allowedExtensions:
+      - pdf
+      - png
+      - jpg
+      - jpeg
+
+# Logging Configuration
+logging: normal

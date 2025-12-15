@@ -16,6 +16,8 @@ import 'router/app_router.dart';
 import 'providers/storage_providers.dart';
 import 'providers/scores_provider.dart';
 import 'providers/setlists_provider.dart';
+import 'providers/auth_provider.dart';
+import 'providers/sync_provider.dart';
 
 enum AppPage { home, library, team, settings }
 
@@ -94,6 +96,20 @@ class MuSheetApp extends ConsumerWidget {
         ),
       );
     }
+
+    // Trigger background session restoration (non-blocking)
+    // This will validate the auth token with the server in the background
+    Future.microtask(() async {
+      // First initialize auth from preferences (requires preferences to be loaded)
+      await ref.read(authProvider.notifier).initializeFromPreferences();
+      // Then restore session with network validation
+      await ref.read(authProvider.notifier).restoreSession();
+      // Start background sync if logged in
+      final syncService = ref.read(syncServiceProvider);
+      if (syncService != null) {
+        syncService.startBackgroundSync();
+      }
+    });
 
     final router = ref.watch(goRouterProvider);
     return AnnotatedRegion<SystemUiOverlayStyle>(

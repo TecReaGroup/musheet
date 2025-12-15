@@ -1,0 +1,20 @@
+class: Annotation
+table: annotations
+fields:
+  instrumentScoreId: int, relation(parent=instrument_scores)
+  userId: int
+  pageNumber: int
+  type: String
+  data: String
+  positionX: double
+  positionY: double
+  width: double?
+  height: double?
+  color: String?
+  vectorClock: String?
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  annotation_inst_score_idx:
+    fields: instrumentScoreId
+    type: btree

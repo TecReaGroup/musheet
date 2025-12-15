@@ -1,0 +1,19 @@
+class: User
+table: users
+fields:
+  username: String
+  passwordHash: String
+  displayName: String?
+  avatarPath: String?
+  bio: String?
+  preferredInstrument: String?
+  isAdmin: bool
+  isDisabled: bool
+  mustChangePassword: bool
+  lastLoginAt: DateTime?
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  user_username_idx:
+    fields: username
+    unique: true

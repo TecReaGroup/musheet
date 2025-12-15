@@ -1,0 +1,4 @@
+class: TeamWithRole
+fields:
+  team: Team
+  role: String

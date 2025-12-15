@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/score.dart';
 import '../models/annotation.dart';
 import 'storage_providers.dart';
+import 'sync_provider.dart';
 
 /// Helper to extract value from AsyncValue
 List<Score> _getScoresValue(AsyncValue<List<Score>> asyncValue) {
@@ -60,22 +61,33 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
   /// Add a new score
   Future<void> addScore(Score score) async {
     final dbService = ref.read(databaseServiceProvider);
-    
+
     // Insert into database
     await dbService.insertScore(score);
-    
+
     // Update state
     final currentScores = _getScoresValue(state);
     state = AsyncData([...currentScores, score]);
+
+    // Trigger background sync
+    _triggerSync();
+  }
+
+  /// Trigger background sync if available
+  void _triggerSync() {
+    final syncService = ref.read(syncServiceProvider);
+    if (syncService != null) {
+      syncService.syncNow();
+    }
   }
 
   /// Add instrument score to existing score
   Future<void> addInstrumentScore(String scoreId, InstrumentScore instrumentScore) async {
     final dbService = ref.read(databaseServiceProvider);
-    
+
     // Insert into database
     await dbService.addInstrumentScore(scoreId, instrumentScore);
-    
+
     // Update state
     final currentScores = _getScoresValue(state);
     state = AsyncData(currentScores.map((s) {
@@ -86,35 +98,41 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
       }
       return s;
     }).toList());
+
+    // Trigger sync
+    _triggerSync();
   }
 
   /// Delete a score
   Future<void> deleteScore(String scoreId) async {
     final dbService = ref.read(databaseServiceProvider);
     final fileService = ref.read(fileStorageServiceProvider);
-    
+
     // Delete files
     await fileService.deleteScoreFiles(scoreId);
-    
+
     // Delete from database (cascade deletes instrument scores and annotations)
     await dbService.deleteScore(scoreId);
-    
+
     // Update state
     final currentScores = _getScoresValue(state);
     state = AsyncData(currentScores.where((s) => s.id != scoreId).toList());
+
+    // Trigger sync
+    _triggerSync();
   }
 
   /// Delete a specific instrument score from a score
   Future<void> deleteInstrumentScore(String scoreId, String instrumentScoreId) async {
     final dbService = ref.read(databaseServiceProvider);
     final fileService = ref.read(fileStorageServiceProvider);
-    
+
     // Delete files
     await fileService.deleteInstrumentScoreFiles(scoreId, instrumentScoreId);
-    
+
     // Delete from database
     await dbService.deleteInstrumentScore(instrumentScoreId);
-    
+
     // Update state
     final currentScores = _getScoresValue(state);
     state = AsyncData(currentScores.map((s) {
@@ -126,6 +144,9 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
       }
       return s;
     }).toList());
+
+    // Trigger sync
+    _triggerSync();
   }
 
   /// Reorder instrument scores within a score
@@ -148,10 +169,10 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
   /// Update annotations for an instrument score
   Future<void> updateAnnotations(String scoreId, String instrumentScoreId, List<Annotation> annotations) async {
     final dbService = ref.read(databaseServiceProvider);
-    
+
     // Update in database
     await dbService.updateAnnotations(instrumentScoreId, annotations);
-    
+
     // Update state
     final currentScores = _getScoresValue(state);
     state = AsyncData(currentScores.map((s) {
@@ -167,19 +188,22 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
       }
       return s;
     }).toList());
+
+    // Trigger sync
+    _triggerSync();
   }
 
   /// Update score BPM
   Future<void> updateBpm(String scoreId, int bpm) async {
     final dbService = ref.read(databaseServiceProvider);
-    
+
     // Get current score
     final currentScores = _getScoresValue(state);
     final score = currentScores.firstWhere((s) => s.id == scoreId);
-    
+
     // Update in database
     await dbService.updateScore(score.copyWith(bpm: bpm));
-    
+
     // Update state
     state = AsyncData(currentScores.map((s) {
       if (s.id == scoreId) {
@@ -187,6 +211,9 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
       }
       return s;
     }).toList());
+
+    // Trigger sync
+    _triggerSync();
   }
 
   /// Update score title and/or composer
@@ -196,18 +223,18 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
     String? composer,
   }) async {
     final dbService = ref.read(databaseServiceProvider);
-    
+
     // Get current score
     final currentScores = _getScoresValue(state);
     final score = currentScores.firstWhere((s) => s.id == scoreId);
-    
+
     // Update in database
     final updatedScore = score.copyWith(
       title: title ?? score.title,
       composer: composer ?? score.composer,
     );
     await dbService.updateScore(updatedScore);
-    
+
     // Update state
     state = AsyncData(currentScores.map((s) {
       if (s.id == scoreId) {
@@ -215,6 +242,9 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
       }
       return s;
     }).toList());
+
+    // Trigger sync
+    _triggerSync();
   }
 
   /// Refresh scores from database

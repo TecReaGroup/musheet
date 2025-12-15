@@ -6,6 +6,8 @@ class PreferenceKeys {
   static const String themeMode = 'theme_mode';
   static const String userName = 'user_name';
   static const String authToken = 'auth_token';
+  static const String authUserId = 'auth_user_id';
+  static const String serverUrl = 'backend_server_url';
   static const String defaultInstrument = 'default_instrument';
   static const String onboardingCompleted = 'onboarding_completed';
   static const String metronomeSoundEnabled = 'metronome_sound_enabled';
@@ -19,6 +21,7 @@ class PreferenceKeys {
   static const String recentlyOpenedSetlists = 'recently_opened_setlists';
   static const String lastOpenedScoreInSetlist = 'last_opened_score_in_setlist';
   static const String lastOpenedInstrumentInScore = 'last_opened_instrument_in_score';
+  static const String lastSyncTime = 'last_sync_time';
 }
 
 /// Theme mode options
@@ -87,6 +90,53 @@ class PreferencesService {
   bool isAuthenticated() {
     final token = getAuthToken();
     return token != null && token.isNotEmpty;
+  }
+
+  // ============== Auth User ID ==============
+
+  /// Get the auth user ID
+  int? getAuthUserId() {
+    return _prefs.getInt(PreferenceKeys.authUserId);
+  }
+
+  /// Set the auth user ID
+  Future<bool> setAuthUserId(int? userId) {
+    if (userId == null) {
+      return _prefs.remove(PreferenceKeys.authUserId);
+    }
+    return _prefs.setInt(PreferenceKeys.authUserId, userId);
+  }
+
+  // ============== Server URL ==============
+
+  /// Get the backend server URL
+  String? getServerUrl() {
+    return _prefs.getString(PreferenceKeys.serverUrl);
+  }
+
+  /// Set the backend server URL
+  Future<bool> setServerUrl(String? url) {
+    if (url == null) {
+      return _prefs.remove(PreferenceKeys.serverUrl);
+    }
+    return _prefs.setString(PreferenceKeys.serverUrl, url);
+  }
+
+  // ============== Last Sync Time ==============
+
+  /// Get the last sync time
+  DateTime? getLastSyncTime() {
+    final millis = _prefs.getInt(PreferenceKeys.lastSyncTime);
+    if (millis == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(millis);
+  }
+
+  /// Set the last sync time
+  Future<bool> setLastSyncTime(DateTime? time) {
+    if (time == null) {
+      return _prefs.remove(PreferenceKeys.lastSyncTime);
+    }
+    return _prefs.setInt(PreferenceKeys.lastSyncTime, time.millisecondsSinceEpoch);
   }
 
   // ============== Default Instrument ==============

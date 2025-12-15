@@ -8,6 +8,13 @@ class Scores extends Table {
   IntColumn get bpm => integer().withDefault(const Constant(120))();
   DateTimeColumn get dateAdded => dateTime()();
 
+  // Sync fields
+  IntColumn get version => integer().withDefault(const Constant(1))();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
+  IntColumn get serverId => integer().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+  DateTimeColumn get deletedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

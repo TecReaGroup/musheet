@@ -1,14 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../router/app_router.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/sync_provider.dart';
 
-class CloudSyncScreen extends StatelessWidget {
+class CloudSyncScreen extends ConsumerStatefulWidget {
   const CloudSyncScreen({super.key});
 
   @override
+  ConsumerState<CloudSyncScreen> createState() => _CloudSyncScreenState();
+}
+
+class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
+  bool _isSyncing = false;
+  String? _syncMessage;
+
+  Future<void> _triggerSync() async {
+    final syncService = ref.read(syncServiceProvider);
+    if (syncService == null) {
+      setState(() {
+        _syncMessage = 'Sync service not available';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = null;
+    });
+
+    try {
+      final result = await syncService.syncNow();
+      setState(() {
+        _isSyncing = false;
+        if (result.success) {
+          _syncMessage = 'Synced: ${result.uploadedCount} uploaded, ${result.downloadedCount} downloaded';
+        } else {
+          _syncMessage = result.errorMessage ?? 'Sync failed';
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isSyncing = false;
+        _syncMessage = 'Error: $e';
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final authData = ref.watch(authProvider);
+    final isLoggedIn = authData.isAuthenticated;
+    final syncStatus = ref.watch(syncStatusProvider);
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -20,7 +67,7 @@ class CloudSyncScreen extends StatelessWidget {
         backgroundColor: Colors.white,
         body: Column(
           children: [
-            // Fixed header with back button
+            // Header
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -56,42 +103,50 @@ class CloudSyncScreen extends StatelessWidget {
                 ),
               ),
             ),
-            // Content - centered illustration and message
+            // Content
             Expanded(
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
+                  padding: const EdgeInsets.all(32),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Cloud icon with decorative container
+                      // Status icon
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: 120,
+                        height: 120,
                         decoration: BoxDecoration(
-                          color: AppColors.blue50,
+                          color: isLoggedIn
+                              ? AppColors.emerald50
+                              : AppColors.gray100,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          AppIcons.cloud,
-                          size: 48,
-                          color: AppColors.blue400,
+                        child: Icon(
+                          isLoggedIn ? AppIcons.cloud : AppIcons.cloudOff,
+                          size: 56,
+                          color: isLoggedIn
+                              ? AppColors.emerald500
+                              : AppColors.gray400,
                         ),
                       ),
                       const SizedBox(height: 32),
-                      // Title
-                      const Text(
-                        'Sync Your Music',
+                      // Status text
+                      Text(
+                        isLoggedIn ? 'Cloud Sync On' : 'Cloud Sync Off',
                         style: TextStyle(
-                          fontSize: 22,
+                          fontSize: 24,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.gray900,
+                          color: isLoggedIn
+                              ? AppColors.emerald600
+                              : AppColors.gray600,
                         ),
                       ),
                       const SizedBox(height: 12),
                       // Description
                       Text(
-                        'Sign in to sync your scores, setlists, and annotations across all your devices. Your data will be securely stored in the cloud.',
+                        isLoggedIn
+                            ? 'Your scores and setlists are syncing automatically'
+                            : 'Sign in to sync your data across devices',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 15,
@@ -99,47 +154,116 @@ class CloudSyncScreen extends StatelessWidget {
                           height: 1.5,
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      // Sign in button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // TODO: Implement sign in
-                          },
+                      const SizedBox(height: 40),
+                      // Status indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isLoggedIn
+                              ? AppColors.emerald50
+                              : AppColors.gray100,
+                          borderRadius: BorderRadius.circular(100),
+                          border: Border.all(
+                            color: isLoggedIn
+                                ? AppColors.emerald200
+                                : AppColors.gray200,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: isLoggedIn
+                                    ? AppColors.emerald500
+                                    : AppColors.gray400,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              isLoggedIn ? 'Connected' : 'Not connected',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: isLoggedIn
+                                    ? AppColors.emerald600
+                                    : AppColors.gray600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Sync button (only show when logged in)
+                      if (isLoggedIn) ...[
+                        const SizedBox(height: 32),
+                        ElevatedButton.icon(
+                          onPressed: _isSyncing ? null : _triggerSync,
+                          icon: _isSyncing
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Icon(AppIcons.sync),
+                          label: Text(_isSyncing ? 'Syncing...' : 'Sync Now'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.blue500,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            elevation: 0,
                           ),
-                          child: const Text(
-                            'Sign In',
+                        ),
+                        // Last sync info
+                        if (syncStatus.lastSyncAt != null) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Last synced: ${_formatTime(syncStatus.lastSyncAt!)}',
                             style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: AppColors.gray500,
                             ),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      // Create account link
-                      TextButton(
-                        onPressed: () {
-                          // TODO: Implement create account
-                        },
-                        child: Text(
-                          'Create an account',
-                          style: TextStyle(
-                            fontSize: 15,
-                            color: AppColors.blue500,
-                            fontWeight: FontWeight.w500,
+                        ],
+                        // Sync message
+                        if (_syncMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _syncMessage!.startsWith('Error') || _syncMessage!.startsWith('Sync failed')
+                                  ? AppColors.red50
+                                  : AppColors.blue50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              _syncMessage!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: _syncMessage!.startsWith('Error') || _syncMessage!.startsWith('Sync failed')
+                                    ? AppColors.red600
+                                    : AppColors.blue600,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                        ],
+                      ],
                     ],
                   ),
                 ),
@@ -149,5 +273,20 @@ class CloudSyncScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final diff = now.difference(time);
+
+    if (diff.inMinutes < 1) {
+      return 'Just now';
+    } else if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} min ago';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours} hour${diff.inHours == 1 ? '' : 's'} ago';
+    } else {
+      return '${time.month}/${time.day} ${time.hour}:${time.minute.toString().padLeft(2, '0')}';
+    }
   }
 }

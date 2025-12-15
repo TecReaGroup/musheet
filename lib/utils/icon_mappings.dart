@@ -112,6 +112,7 @@ class AppIcons {
   // Settings & System
   static const bluetooth = LucideIcons.bluetooth;
   static const cloud = LucideIcons.cloud;
+  static const cloudOff = LucideIcons.cloudOff;
   static const helpOutline = LucideIcons.handHelping;
   static const infoOutline = LucideIcons.info;
   static const globe = LucideIcons.globe;
@@ -121,6 +122,10 @@ class AppIcons {
   static const mail = LucideIcons.mail;
   static const bug = LucideIcons.bug;
   static const lightbulb = LucideIcons.lightbulb;
+  static const refreshCw = LucideIcons.refreshCw;
+  static const sync = LucideIcons.refreshCcw;
+  static const wifi = LucideIcons.wifi;
+  static const wifiOff = LucideIcons.wifiOff;
   
   // Special
   static const workspacePremium = LucideIcons.award;

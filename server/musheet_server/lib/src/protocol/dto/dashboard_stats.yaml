@@ -1,0 +1,8 @@
+class: DashboardStats
+fields:
+  totalTeams: int
+  totalMembers: int
+  activeMembers7d: int
+  totalScores: int
+  totalStorageUsed: int
+  teams: List<TeamSummary>

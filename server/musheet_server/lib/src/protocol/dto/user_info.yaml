@@ -1,0 +1,8 @@
+class: UserInfo
+fields:
+  id: int
+  username: String
+  displayName: String?
+  isAdmin: bool
+  isDisabled: bool
+  createdAt: DateTime

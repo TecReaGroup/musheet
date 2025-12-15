@@ -1,0 +1,6 @@
+class: AvatarUploadResult
+fields:
+  success: bool
+  avatarUrl: String?
+  thumbnailUrl: String?
+  errorMessage: String?

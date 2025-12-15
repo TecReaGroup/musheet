@@ -1,0 +1,8 @@
+class: TeamMemberInfo
+fields:
+  userId: int
+  username: String
+  displayName: String?
+  avatarUrl: String?
+  role: String
+  joinedAt: DateTime

@@ -101,7 +101,7 @@ class BluetoothDevicesScreen extends StatelessWidget {
                         width: double.infinity,
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            // TODO: Implement Bluetooth scanning
+                            // Implement Bluetooth scanning
                           },
                           icon: const Icon(AppIcons.search, size: 20),
                           label: const Text(

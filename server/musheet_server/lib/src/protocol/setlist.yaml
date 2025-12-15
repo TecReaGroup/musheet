@@ -1,0 +1,13 @@
+class: Setlist
+table: setlists
+fields:
+  userId: int, relation(parent=users)
+  name: String
+  description: String?
+  createdAt: DateTime
+  updatedAt: DateTime
+  deletedAt: DateTime?
+indexes:
+  setlist_user_idx:
+    fields: userId
+    type: btree

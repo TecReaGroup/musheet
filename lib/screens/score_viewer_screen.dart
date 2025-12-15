@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:pdfrx/pdfrx.dart';
 import '../models/score.dart';
 import '../models/annotation.dart';
 import '../providers/scores_provider.dart';
+import '../providers/sync_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/metronome_widget.dart';
 import '../utils/icon_mappings.dart';
@@ -154,14 +156,45 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Future<void> _loadPdfDocument() async {
-    final pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
-    if (pdfPath.isEmpty) {
+    final instrumentScoreId = _currentInstrumentScore?.id;
+    var pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
+
+    if (pdfPath.isEmpty || instrumentScoreId == null) {
       setState(() {
         _pdfError = 'No PDF file specified';
       });
       return;
     }
-    
+
+    // Check if PDF file exists locally
+    if (!pdfPath.startsWith('http://') && !pdfPath.startsWith('https://')) {
+      final file = File(pdfPath);
+      if (!await file.exists()) {
+        // Try to download from server
+        final syncService = ref.read(syncServiceProvider);
+        if (syncService != null) {
+          setState(() {
+            _pdfError = null;  // Clear error while downloading
+          });
+
+          final downloadedPath = await syncService.downloadPdfForInstrumentScore(instrumentScoreId);
+          if (downloadedPath != null) {
+            pdfPath = downloadedPath;
+          } else {
+            setState(() {
+              _pdfError = 'PDF file not found locally or on server';
+            });
+            return;
+          }
+        } else {
+          setState(() {
+            _pdfError = 'PDF file not found: $pdfPath';
+          });
+          return;
+        }
+      }
+    }
+
     try {
       PdfDocument doc;
       if (pdfPath.startsWith('http://') || pdfPath.startsWith('https://')) {

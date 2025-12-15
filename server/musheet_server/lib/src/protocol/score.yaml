@@ -1,0 +1,19 @@
+class: Score
+table: scores
+fields:
+  userId: int, relation(parent=users)
+  title: String
+  composer: String?
+  bpm: int?
+  createdAt: DateTime
+  updatedAt: DateTime
+  deletedAt: DateTime?
+  version: int
+  syncStatus: String?
+indexes:
+  score_user_idx:
+    fields: userId
+    type: btree
+  score_user_updated_idx:
+    fields: userId, updatedAt
+    type: btree

@@ -58,8 +58,76 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, ScoreEntity> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, title, composer, bpm, dateAdded];
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    title,
+    composer,
+    bpm,
+    dateAdded,
+    version,
+    syncStatus,
+    serverId,
+    updatedAt,
+    deletedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -107,6 +175,36 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, ScoreEntity> {
     } else if (isInserting) {
       context.missing(_dateAddedMeta);
     }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -136,6 +234,26 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, ScoreEntity> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}date_added'],
       )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -151,12 +269,22 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
   final String composer;
   final int bpm;
   final DateTime dateAdded;
+  final int version;
+  final String syncStatus;
+  final int? serverId;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
   const ScoreEntity({
     required this.id,
     required this.title,
     required this.composer,
     required this.bpm,
     required this.dateAdded,
+    required this.version,
+    required this.syncStatus,
+    this.serverId,
+    this.updatedAt,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -166,6 +294,17 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
     map['composer'] = Variable<String>(composer);
     map['bpm'] = Variable<int>(bpm);
     map['date_added'] = Variable<DateTime>(dateAdded);
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -176,6 +315,17 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       composer: Value(composer),
       bpm: Value(bpm),
       dateAdded: Value(dateAdded),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -190,6 +340,11 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       composer: serializer.fromJson<String>(json['composer']),
       bpm: serializer.fromJson<int>(json['bpm']),
       dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -201,6 +356,11 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       'composer': serializer.toJson<String>(composer),
       'bpm': serializer.toJson<int>(bpm),
       'dateAdded': serializer.toJson<DateTime>(dateAdded),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'serverId': serializer.toJson<int?>(serverId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -210,12 +370,22 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
     String? composer,
     int? bpm,
     DateTime? dateAdded,
+    int? version,
+    String? syncStatus,
+    Value<int?> serverId = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => ScoreEntity(
     id: id ?? this.id,
     title: title ?? this.title,
     composer: composer ?? this.composer,
     bpm: bpm ?? this.bpm,
     dateAdded: dateAdded ?? this.dateAdded,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   ScoreEntity copyWithCompanion(ScoresCompanion data) {
     return ScoreEntity(
@@ -224,6 +394,13 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       composer: data.composer.present ? data.composer.value : this.composer,
       bpm: data.bpm.present ? data.bpm.value : this.bpm,
       dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -234,13 +411,29 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
           ..write('title: $title, ')
           ..write('composer: $composer, ')
           ..write('bpm: $bpm, ')
-          ..write('dateAdded: $dateAdded')
+          ..write('dateAdded: $dateAdded, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, title, composer, bpm, dateAdded);
+  int get hashCode => Object.hash(
+    id,
+    title,
+    composer,
+    bpm,
+    dateAdded,
+    version,
+    syncStatus,
+    serverId,
+    updatedAt,
+    deletedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -249,7 +442,12 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
           other.title == this.title &&
           other.composer == this.composer &&
           other.bpm == this.bpm &&
-          other.dateAdded == this.dateAdded);
+          other.dateAdded == this.dateAdded &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.serverId == this.serverId &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
 }
 
 class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
@@ -258,6 +456,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
   final Value<String> composer;
   final Value<int> bpm;
   final Value<DateTime> dateAdded;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<int?> serverId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const ScoresCompanion({
     this.id = const Value.absent(),
@@ -265,6 +468,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     this.composer = const Value.absent(),
     this.bpm = const Value.absent(),
     this.dateAdded = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   ScoresCompanion.insert({
@@ -273,6 +481,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     required String composer,
     this.bpm = const Value.absent(),
     required DateTime dateAdded,
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        title = Value(title),
@@ -284,6 +497,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     Expression<String>? composer,
     Expression<int>? bpm,
     Expression<DateTime>? dateAdded,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<int>? serverId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -292,6 +510,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
       if (composer != null) 'composer': composer,
       if (bpm != null) 'bpm': bpm,
       if (dateAdded != null) 'date_added': dateAdded,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (serverId != null) 'server_id': serverId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -302,6 +525,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     Value<String>? composer,
     Value<int>? bpm,
     Value<DateTime>? dateAdded,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<int?>? serverId,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return ScoresCompanion(
@@ -310,6 +538,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
       composer: composer ?? this.composer,
       bpm: bpm ?? this.bpm,
       dateAdded: dateAdded ?? this.dateAdded,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      serverId: serverId ?? this.serverId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -332,6 +565,21 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     if (dateAdded.present) {
       map['date_added'] = Variable<DateTime>(dateAdded.value);
     }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -346,6 +594,11 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
           ..write('composer: $composer, ')
           ..write('bpm: $bpm, ')
           ..write('dateAdded: $dateAdded, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -436,6 +689,75 @@ class $InstrumentScoresTable extends InstrumentScores
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pdfSyncStatusMeta = const VerificationMeta(
+    'pdfSyncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> pdfSyncStatus = GeneratedColumn<String>(
+    'pdf_sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _pdfHashMeta = const VerificationMeta(
+    'pdfHash',
+  );
+  @override
+  late final GeneratedColumn<String> pdfHash = GeneratedColumn<String>(
+    'pdf_hash',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -445,6 +767,12 @@ class $InstrumentScoresTable extends InstrumentScores
     pdfPath,
     thumbnail,
     dateAdded,
+    version,
+    syncStatus,
+    serverId,
+    pdfSyncStatus,
+    pdfHash,
+    updatedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -513,6 +841,45 @@ class $InstrumentScoresTable extends InstrumentScores
     } else if (isInserting) {
       context.missing(_dateAddedMeta);
     }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('pdf_sync_status')) {
+      context.handle(
+        _pdfSyncStatusMeta,
+        pdfSyncStatus.isAcceptableOrUnknown(
+          data['pdf_sync_status']!,
+          _pdfSyncStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_hash')) {
+      context.handle(
+        _pdfHashMeta,
+        pdfHash.isAcceptableOrUnknown(data['pdf_hash']!, _pdfHashMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -550,6 +917,30 @@ class $InstrumentScoresTable extends InstrumentScores
         DriftSqlType.dateTime,
         data['${effectivePrefix}date_added'],
       )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      pdfSyncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_sync_status'],
+      )!,
+      pdfHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_hash'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
     );
   }
 
@@ -568,6 +959,12 @@ class InstrumentScoreEntity extends DataClass
   final String pdfPath;
   final String? thumbnail;
   final DateTime dateAdded;
+  final int version;
+  final String syncStatus;
+  final int? serverId;
+  final String pdfSyncStatus;
+  final String? pdfHash;
+  final DateTime? updatedAt;
   const InstrumentScoreEntity({
     required this.id,
     required this.scoreId,
@@ -576,6 +973,12 @@ class InstrumentScoreEntity extends DataClass
     required this.pdfPath,
     this.thumbnail,
     required this.dateAdded,
+    required this.version,
+    required this.syncStatus,
+    this.serverId,
+    required this.pdfSyncStatus,
+    this.pdfHash,
+    this.updatedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -591,6 +994,18 @@ class InstrumentScoreEntity extends DataClass
       map['thumbnail'] = Variable<String>(thumbnail);
     }
     map['date_added'] = Variable<DateTime>(dateAdded);
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    map['pdf_sync_status'] = Variable<String>(pdfSyncStatus);
+    if (!nullToAbsent || pdfHash != null) {
+      map['pdf_hash'] = Variable<String>(pdfHash);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
     return map;
   }
 
@@ -607,6 +1022,18 @@ class InstrumentScoreEntity extends DataClass
           ? const Value.absent()
           : Value(thumbnail),
       dateAdded: Value(dateAdded),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      pdfSyncStatus: Value(pdfSyncStatus),
+      pdfHash: pdfHash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfHash),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
     );
   }
 
@@ -623,6 +1050,12 @@ class InstrumentScoreEntity extends DataClass
       pdfPath: serializer.fromJson<String>(json['pdfPath']),
       thumbnail: serializer.fromJson<String?>(json['thumbnail']),
       dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      pdfSyncStatus: serializer.fromJson<String>(json['pdfSyncStatus']),
+      pdfHash: serializer.fromJson<String?>(json['pdfHash']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
     );
   }
   @override
@@ -636,6 +1069,12 @@ class InstrumentScoreEntity extends DataClass
       'pdfPath': serializer.toJson<String>(pdfPath),
       'thumbnail': serializer.toJson<String?>(thumbnail),
       'dateAdded': serializer.toJson<DateTime>(dateAdded),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'serverId': serializer.toJson<int?>(serverId),
+      'pdfSyncStatus': serializer.toJson<String>(pdfSyncStatus),
+      'pdfHash': serializer.toJson<String?>(pdfHash),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
     };
   }
 
@@ -647,6 +1086,12 @@ class InstrumentScoreEntity extends DataClass
     String? pdfPath,
     Value<String?> thumbnail = const Value.absent(),
     DateTime? dateAdded,
+    int? version,
+    String? syncStatus,
+    Value<int?> serverId = const Value.absent(),
+    String? pdfSyncStatus,
+    Value<String?> pdfHash = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
   }) => InstrumentScoreEntity(
     id: id ?? this.id,
     scoreId: scoreId ?? this.scoreId,
@@ -657,6 +1102,12 @@ class InstrumentScoreEntity extends DataClass
     pdfPath: pdfPath ?? this.pdfPath,
     thumbnail: thumbnail.present ? thumbnail.value : this.thumbnail,
     dateAdded: dateAdded ?? this.dateAdded,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    pdfSyncStatus: pdfSyncStatus ?? this.pdfSyncStatus,
+    pdfHash: pdfHash.present ? pdfHash.value : this.pdfHash,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
   );
   InstrumentScoreEntity copyWithCompanion(InstrumentScoresCompanion data) {
     return InstrumentScoreEntity(
@@ -671,6 +1122,16 @@ class InstrumentScoreEntity extends DataClass
       pdfPath: data.pdfPath.present ? data.pdfPath.value : this.pdfPath,
       thumbnail: data.thumbnail.present ? data.thumbnail.value : this.thumbnail,
       dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      pdfSyncStatus: data.pdfSyncStatus.present
+          ? data.pdfSyncStatus.value
+          : this.pdfSyncStatus,
+      pdfHash: data.pdfHash.present ? data.pdfHash.value : this.pdfHash,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
 
@@ -683,7 +1144,13 @@ class InstrumentScoreEntity extends DataClass
           ..write('customInstrument: $customInstrument, ')
           ..write('pdfPath: $pdfPath, ')
           ..write('thumbnail: $thumbnail, ')
-          ..write('dateAdded: $dateAdded')
+          ..write('dateAdded: $dateAdded, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('pdfSyncStatus: $pdfSyncStatus, ')
+          ..write('pdfHash: $pdfHash, ')
+          ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
   }
@@ -697,6 +1164,12 @@ class InstrumentScoreEntity extends DataClass
     pdfPath,
     thumbnail,
     dateAdded,
+    version,
+    syncStatus,
+    serverId,
+    pdfSyncStatus,
+    pdfHash,
+    updatedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -708,7 +1181,13 @@ class InstrumentScoreEntity extends DataClass
           other.customInstrument == this.customInstrument &&
           other.pdfPath == this.pdfPath &&
           other.thumbnail == this.thumbnail &&
-          other.dateAdded == this.dateAdded);
+          other.dateAdded == this.dateAdded &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.serverId == this.serverId &&
+          other.pdfSyncStatus == this.pdfSyncStatus &&
+          other.pdfHash == this.pdfHash &&
+          other.updatedAt == this.updatedAt);
 }
 
 class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
@@ -719,6 +1198,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
   final Value<String> pdfPath;
   final Value<String?> thumbnail;
   final Value<DateTime> dateAdded;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<int?> serverId;
+  final Value<String> pdfSyncStatus;
+  final Value<String?> pdfHash;
+  final Value<DateTime?> updatedAt;
   final Value<int> rowid;
   const InstrumentScoresCompanion({
     this.id = const Value.absent(),
@@ -728,6 +1213,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     this.pdfPath = const Value.absent(),
     this.thumbnail = const Value.absent(),
     this.dateAdded = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.pdfSyncStatus = const Value.absent(),
+    this.pdfHash = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   InstrumentScoresCompanion.insert({
@@ -738,6 +1229,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     required String pdfPath,
     this.thumbnail = const Value.absent(),
     required DateTime dateAdded,
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.pdfSyncStatus = const Value.absent(),
+    this.pdfHash = const Value.absent(),
+    this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        scoreId = Value(scoreId),
@@ -752,6 +1249,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Expression<String>? pdfPath,
     Expression<String>? thumbnail,
     Expression<DateTime>? dateAdded,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<int>? serverId,
+    Expression<String>? pdfSyncStatus,
+    Expression<String>? pdfHash,
+    Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -762,6 +1265,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       if (pdfPath != null) 'pdf_path': pdfPath,
       if (thumbnail != null) 'thumbnail': thumbnail,
       if (dateAdded != null) 'date_added': dateAdded,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (serverId != null) 'server_id': serverId,
+      if (pdfSyncStatus != null) 'pdf_sync_status': pdfSyncStatus,
+      if (pdfHash != null) 'pdf_hash': pdfHash,
+      if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -774,6 +1283,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Value<String>? pdfPath,
     Value<String?>? thumbnail,
     Value<DateTime>? dateAdded,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<int?>? serverId,
+    Value<String>? pdfSyncStatus,
+    Value<String?>? pdfHash,
+    Value<DateTime?>? updatedAt,
     Value<int>? rowid,
   }) {
     return InstrumentScoresCompanion(
@@ -784,6 +1299,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       pdfPath: pdfPath ?? this.pdfPath,
       thumbnail: thumbnail ?? this.thumbnail,
       dateAdded: dateAdded ?? this.dateAdded,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      serverId: serverId ?? this.serverId,
+      pdfSyncStatus: pdfSyncStatus ?? this.pdfSyncStatus,
+      pdfHash: pdfHash ?? this.pdfHash,
+      updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -812,6 +1333,24 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     if (dateAdded.present) {
       map['date_added'] = Variable<DateTime>(dateAdded.value);
     }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (pdfSyncStatus.present) {
+      map['pdf_sync_status'] = Variable<String>(pdfSyncStatus.value);
+    }
+    if (pdfHash.present) {
+      map['pdf_hash'] = Variable<String>(pdfHash.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -828,6 +1367,12 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
           ..write('pdfPath: $pdfPath, ')
           ..write('thumbnail: $thumbnail, ')
           ..write('dateAdded: $dateAdded, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('pdfSyncStatus: $pdfSyncStatus, ')
+          ..write('pdfHash: $pdfHash, ')
+          ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1505,8 +2050,75 @@ class $SetlistsTable extends Setlists
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, description, dateCreated];
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    description,
+    dateCreated,
+    version,
+    syncStatus,
+    serverId,
+    updatedAt,
+    deletedAt,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1554,6 +2166,36 @@ class $SetlistsTable extends Setlists
     } else if (isInserting) {
       context.missing(_dateCreatedMeta);
     }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -1579,6 +2221,26 @@ class $SetlistsTable extends Setlists
         DriftSqlType.dateTime,
         data['${effectivePrefix}date_created'],
       )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
     );
   }
 
@@ -1593,11 +2255,21 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
   final String name;
   final String description;
   final DateTime dateCreated;
+  final int version;
+  final String syncStatus;
+  final int? serverId;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
   const SetlistEntity({
     required this.id,
     required this.name,
     required this.description,
     required this.dateCreated,
+    required this.version,
+    required this.syncStatus,
+    this.serverId,
+    this.updatedAt,
+    this.deletedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1606,6 +2278,17 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
     map['name'] = Variable<String>(name);
     map['description'] = Variable<String>(description);
     map['date_created'] = Variable<DateTime>(dateCreated);
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
     return map;
   }
 
@@ -1615,6 +2298,17 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       name: Value(name),
       description: Value(description),
       dateCreated: Value(dateCreated),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
     );
   }
 
@@ -1628,6 +2322,11 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String>(json['description']),
       dateCreated: serializer.fromJson<DateTime>(json['dateCreated']),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
     );
   }
   @override
@@ -1638,6 +2337,11 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String>(description),
       'dateCreated': serializer.toJson<DateTime>(dateCreated),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'serverId': serializer.toJson<int?>(serverId),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
     };
   }
 
@@ -1646,11 +2350,21 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
     String? name,
     String? description,
     DateTime? dateCreated,
+    int? version,
+    String? syncStatus,
+    Value<int?> serverId = const Value.absent(),
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
   }) => SetlistEntity(
     id: id ?? this.id,
     name: name ?? this.name,
     description: description ?? this.description,
     dateCreated: dateCreated ?? this.dateCreated,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
   );
   SetlistEntity copyWithCompanion(SetlistsCompanion data) {
     return SetlistEntity(
@@ -1662,6 +2376,13 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       dateCreated: data.dateCreated.present
           ? data.dateCreated.value
           : this.dateCreated,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
     );
   }
 
@@ -1671,13 +2392,28 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
-          ..write('dateCreated: $dateCreated')
+          ..write('dateCreated: $dateCreated, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, description, dateCreated);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    dateCreated,
+    version,
+    syncStatus,
+    serverId,
+    updatedAt,
+    deletedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1685,7 +2421,12 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
           other.id == this.id &&
           other.name == this.name &&
           other.description == this.description &&
-          other.dateCreated == this.dateCreated);
+          other.dateCreated == this.dateCreated &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.serverId == this.serverId &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
 }
 
 class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
@@ -1693,12 +2434,22 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
   final Value<String> name;
   final Value<String> description;
   final Value<DateTime> dateCreated;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<int?> serverId;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
   final Value<int> rowid;
   const SetlistsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.dateCreated = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SetlistsCompanion.insert({
@@ -1706,6 +2457,11 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     required String name,
     required String description,
     required DateTime dateCreated,
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -1716,6 +2472,11 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     Expression<String>? name,
     Expression<String>? description,
     Expression<DateTime>? dateCreated,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<int>? serverId,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1723,6 +2484,11 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
       if (name != null) 'name': name,
       if (description != null) 'description': description,
       if (dateCreated != null) 'date_created': dateCreated,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (serverId != null) 'server_id': serverId,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1732,6 +2498,11 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     Value<String>? name,
     Value<String>? description,
     Value<DateTime>? dateCreated,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<int?>? serverId,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
     Value<int>? rowid,
   }) {
     return SetlistsCompanion(
@@ -1739,6 +2510,11 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
       name: name ?? this.name,
       description: description ?? this.description,
       dateCreated: dateCreated ?? this.dateCreated,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      serverId: serverId ?? this.serverId,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1758,6 +2534,21 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     if (dateCreated.present) {
       map['date_created'] = Variable<DateTime>(dateCreated.value);
     }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1771,6 +2562,11 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('dateCreated: $dateCreated, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2263,6 +3059,272 @@ class AppStateCompanion extends UpdateCompanion<AppStateEntity> {
   }
 }
 
+class $SyncStateTable extends SyncState
+    with TableInfo<$SyncStateTable, SyncStateEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SyncStateTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [key, value, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'sync_state';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SyncStateEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  SyncStateEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SyncStateEntity(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $SyncStateTable createAlias(String alias) {
+    return $SyncStateTable(attachedDatabase, alias);
+  }
+}
+
+class SyncStateEntity extends DataClass implements Insertable<SyncStateEntity> {
+  final String key;
+  final String value;
+  final DateTime? updatedAt;
+  const SyncStateEntity({
+    required this.key,
+    required this.value,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<String>(value);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  SyncStateCompanion toCompanion(bool nullToAbsent) {
+    return SyncStateCompanion(
+      key: Value(key),
+      value: Value(value),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory SyncStateEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SyncStateEntity(
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<String>(json['value']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<String>(value),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  SyncStateEntity copyWith({
+    String? key,
+    String? value,
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => SyncStateEntity(
+    key: key ?? this.key,
+    value: value ?? this.value,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  SyncStateEntity copyWithCompanion(SyncStateCompanion data) {
+    return SyncStateEntity(
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStateEntity(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, value, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SyncStateEntity &&
+          other.key == this.key &&
+          other.value == this.value &&
+          other.updatedAt == this.updatedAt);
+}
+
+class SyncStateCompanion extends UpdateCompanion<SyncStateEntity> {
+  final Value<String> key;
+  final Value<String> value;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const SyncStateCompanion({
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SyncStateCompanion.insert({
+    required String key,
+    required String value,
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       value = Value(value);
+  static Insertable<SyncStateEntity> custom({
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SyncStateCompanion copyWith({
+    Value<String>? key,
+    Value<String>? value,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return SyncStateCompanion(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SyncStateCompanion(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2274,6 +3336,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SetlistsTable setlists = $SetlistsTable(this);
   late final $SetlistScoresTable setlistScores = $SetlistScoresTable(this);
   late final $AppStateTable appState = $AppStateTable(this);
+  late final $SyncStateTable syncState = $SyncStateTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2285,6 +3348,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     setlists,
     setlistScores,
     appState,
+    syncState,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2326,6 +3390,11 @@ typedef $$ScoresTableCreateCompanionBuilder =
       required String composer,
       Value<int> bpm,
       required DateTime dateAdded,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$ScoresTableUpdateCompanionBuilder =
@@ -2335,6 +3404,11 @@ typedef $$ScoresTableUpdateCompanionBuilder =
       Value<String> composer,
       Value<int> bpm,
       Value<DateTime> dateAdded,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -2415,6 +3489,31 @@ class $$ScoresTableFilterComposer
 
   ColumnFilters<DateTime> get dateAdded => $composableBuilder(
     column: $table.dateAdded,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2502,6 +3601,31 @@ class $$ScoresTableOrderingComposer
     column: $table.dateAdded,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$ScoresTableAnnotationComposer
@@ -2527,6 +3651,23 @@ class $$ScoresTableAnnotationComposer
 
   GeneratedColumn<DateTime> get dateAdded =>
       $composableBuilder(column: $table.dateAdded, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 
   Expression<T> instrumentScoresRefs<T extends Object>(
     Expression<T> Function($$InstrumentScoresTableAnnotationComposer a) f,
@@ -2615,6 +3756,11 @@ class $$ScoresTableTableManager
                 Value<String> composer = const Value.absent(),
                 Value<int> bpm = const Value.absent(),
                 Value<DateTime> dateAdded = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ScoresCompanion(
                 id: id,
@@ -2622,6 +3768,11 @@ class $$ScoresTableTableManager
                 composer: composer,
                 bpm: bpm,
                 dateAdded: dateAdded,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2631,6 +3782,11 @@ class $$ScoresTableTableManager
                 required String composer,
                 Value<int> bpm = const Value.absent(),
                 required DateTime dateAdded,
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ScoresCompanion.insert(
                 id: id,
@@ -2638,6 +3794,11 @@ class $$ScoresTableTableManager
                 composer: composer,
                 bpm: bpm,
                 dateAdded: dateAdded,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -2733,6 +3894,12 @@ typedef $$InstrumentScoresTableCreateCompanionBuilder =
       required String pdfPath,
       Value<String?> thumbnail,
       required DateTime dateAdded,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<String> pdfSyncStatus,
+      Value<String?> pdfHash,
+      Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
 typedef $$InstrumentScoresTableUpdateCompanionBuilder =
@@ -2744,6 +3911,12 @@ typedef $$InstrumentScoresTableUpdateCompanionBuilder =
       Value<String> pdfPath,
       Value<String?> thumbnail,
       Value<DateTime> dateAdded,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<String> pdfSyncStatus,
+      Value<String?> pdfHash,
+      Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
 
@@ -2839,6 +4012,36 @@ class $$InstrumentScoresTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfSyncStatus => $composableBuilder(
+    column: $table.pdfSyncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfHash => $composableBuilder(
+    column: $table.pdfHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$ScoresTableFilterComposer get scoreId {
     final $$ScoresTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -2927,6 +4130,36 @@ class $$InstrumentScoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfSyncStatus => $composableBuilder(
+    column: $table.pdfSyncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfHash => $composableBuilder(
+    column: $table.pdfHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$ScoresTableOrderingComposer get scoreId {
     final $$ScoresTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2981,6 +4214,28 @@ class $$InstrumentScoresTableAnnotationComposer
 
   GeneratedColumn<DateTime> get dateAdded =>
       $composableBuilder(column: $table.dateAdded, builder: (column) => column);
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<String> get pdfSyncStatus => $composableBuilder(
+    column: $table.pdfSyncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfHash =>
+      $composableBuilder(column: $table.pdfHash, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   $$ScoresTableAnnotationComposer get scoreId {
     final $$ScoresTableAnnotationComposer composer = $composerBuilder(
@@ -3068,6 +4323,12 @@ class $$InstrumentScoresTableTableManager
                 Value<String> pdfPath = const Value.absent(),
                 Value<String?> thumbnail = const Value.absent(),
                 Value<DateTime> dateAdded = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<String> pdfSyncStatus = const Value.absent(),
+                Value<String?> pdfHash = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InstrumentScoresCompanion(
                 id: id,
@@ -3077,6 +4338,12 @@ class $$InstrumentScoresTableTableManager
                 pdfPath: pdfPath,
                 thumbnail: thumbnail,
                 dateAdded: dateAdded,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                pdfSyncStatus: pdfSyncStatus,
+                pdfHash: pdfHash,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3088,6 +4355,12 @@ class $$InstrumentScoresTableTableManager
                 required String pdfPath,
                 Value<String?> thumbnail = const Value.absent(),
                 required DateTime dateAdded,
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<String> pdfSyncStatus = const Value.absent(),
+                Value<String?> pdfHash = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InstrumentScoresCompanion.insert(
                 id: id,
@@ -3097,6 +4370,12 @@ class $$InstrumentScoresTableTableManager
                 pdfPath: pdfPath,
                 thumbnail: thumbnail,
                 dateAdded: dateAdded,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                pdfSyncStatus: pdfSyncStatus,
+                pdfHash: pdfHash,
+                updatedAt: updatedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3621,6 +4900,11 @@ typedef $$SetlistsTableCreateCompanionBuilder =
       required String name,
       required String description,
       required DateTime dateCreated,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 typedef $$SetlistsTableUpdateCompanionBuilder =
@@ -3629,6 +4913,11 @@ typedef $$SetlistsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String> description,
       Value<DateTime> dateCreated,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
       Value<int> rowid,
     });
 
@@ -3681,6 +4970,31 @@ class $$SetlistsTableFilterComposer
 
   ColumnFilters<DateTime> get dateCreated => $composableBuilder(
     column: $table.dateCreated,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3738,6 +5052,31 @@ class $$SetlistsTableOrderingComposer
     column: $table.dateCreated,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SetlistsTableAnnotationComposer
@@ -3764,6 +5103,23 @@ class $$SetlistsTableAnnotationComposer
     column: $table.dateCreated,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
 
   Expression<T> setlistScoresRefs<T extends Object>(
     Expression<T> Function($$SetlistScoresTableAnnotationComposer a) f,
@@ -3823,12 +5179,22 @@ class $$SetlistsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<DateTime> dateCreated = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SetlistsCompanion(
                 id: id,
                 name: name,
                 description: description,
                 dateCreated: dateCreated,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3837,12 +5203,22 @@ class $$SetlistsTableTableManager
                 required String name,
                 required String description,
                 required DateTime dateCreated,
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SetlistsCompanion.insert(
                 id: id,
                 name: name,
                 description: description,
                 dateCreated: dateCreated,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4416,6 +5792,168 @@ typedef $$AppStateTableProcessedTableManager =
       AppStateEntity,
       PrefetchHooks Function()
     >;
+typedef $$SyncStateTableCreateCompanionBuilder =
+    SyncStateCompanion Function({
+      required String key,
+      required String value,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$SyncStateTableUpdateCompanionBuilder =
+    SyncStateCompanion Function({
+      Value<String> key,
+      Value<String> value,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$SyncStateTableFilterComposer
+    extends Composer<_$AppDatabase, $SyncStateTable> {
+  $$SyncStateTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SyncStateTableOrderingComposer
+    extends Composer<_$AppDatabase, $SyncStateTable> {
+  $$SyncStateTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SyncStateTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SyncStateTable> {
+  $$SyncStateTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$SyncStateTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SyncStateTable,
+          SyncStateEntity,
+          $$SyncStateTableFilterComposer,
+          $$SyncStateTableOrderingComposer,
+          $$SyncStateTableAnnotationComposer,
+          $$SyncStateTableCreateCompanionBuilder,
+          $$SyncStateTableUpdateCompanionBuilder,
+          (
+            SyncStateEntity,
+            BaseReferences<_$AppDatabase, $SyncStateTable, SyncStateEntity>,
+          ),
+          SyncStateEntity,
+          PrefetchHooks Function()
+        > {
+  $$SyncStateTableTableManager(_$AppDatabase db, $SyncStateTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SyncStateTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SyncStateTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SyncStateTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncStateCompanion(
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String value,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SyncStateCompanion.insert(
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SyncStateTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SyncStateTable,
+      SyncStateEntity,
+      $$SyncStateTableFilterComposer,
+      $$SyncStateTableOrderingComposer,
+      $$SyncStateTableAnnotationComposer,
+      $$SyncStateTableCreateCompanionBuilder,
+      $$SyncStateTableUpdateCompanionBuilder,
+      (
+        SyncStateEntity,
+        BaseReferences<_$AppDatabase, $SyncStateTable, SyncStateEntity>,
+      ),
+      SyncStateEntity,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -4432,4 +5970,6 @@ class $AppDatabaseManager {
       $$SetlistScoresTableTableManager(_db, _db.setlistScores);
   $$AppStateTableTableManager get appState =>
       $$AppStateTableTableManager(_db, _db.appState);
+  $$SyncStateTableTableManager get syncState =>
+      $$SyncStateTableTableManager(_db, _db.syncState);
 }

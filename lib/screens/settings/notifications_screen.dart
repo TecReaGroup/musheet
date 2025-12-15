@@ -101,7 +101,7 @@ class NotificationsScreen extends StatelessWidget {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Implement notification settings
+                            // Implement notification settings
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.emerald500,

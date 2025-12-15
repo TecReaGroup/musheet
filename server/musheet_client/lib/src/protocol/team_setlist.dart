@@ -1,0 +1,121 @@
+/* AUTOMATICALLY GENERATED CODE DO NOT MODIFY */
+/*   To generate run: "serverpod generate"    */
+
+// ignore_for_file: implementation_imports
+// ignore_for_file: library_private_types_in_public_api
+// ignore_for_file: non_constant_identifier_names
+// ignore_for_file: public_member_api_docs
+// ignore_for_file: type_literal_in_constant_pattern
+// ignore_for_file: use_super_parameters
+// ignore_for_file: invalid_use_of_internal_member
+
+// ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'package:serverpod_client/serverpod_client.dart' as _i1;
+
+abstract class TeamSetlist implements _i1.SerializableModel {
+  TeamSetlist._({
+    this.id,
+    required this.teamId,
+    required this.setlistId,
+    required this.sharedById,
+    required this.sharedAt,
+  });
+
+  factory TeamSetlist({
+    int? id,
+    required int teamId,
+    required int setlistId,
+    required int sharedById,
+    required DateTime sharedAt,
+  }) = _TeamSetlistImpl;
+
+  factory TeamSetlist.fromJson(Map<String, dynamic> jsonSerialization) {
+    return TeamSetlist(
+      id: jsonSerialization['id'] as int?,
+      teamId: jsonSerialization['teamId'] as int,
+      setlistId: jsonSerialization['setlistId'] as int,
+      sharedById: jsonSerialization['sharedById'] as int,
+      sharedAt: _i1.DateTimeJsonExtension.fromJson(
+        jsonSerialization['sharedAt'],
+      ),
+    );
+  }
+
+  /// The database id, set if the object has been inserted into the
+  /// database or if it has been fetched from the database. Otherwise,
+  /// the id will be null.
+  int? id;
+
+  int teamId;
+
+  int setlistId;
+
+  int sharedById;
+
+  DateTime sharedAt;
+
+  /// Returns a shallow copy of this [TeamSetlist]
+  /// with some or all fields replaced by the given arguments.
+  @_i1.useResult
+  TeamSetlist copyWith({
+    int? id,
+    int? teamId,
+    int? setlistId,
+    int? sharedById,
+    DateTime? sharedAt,
+  });
+  @override
+  Map<String, dynamic> toJson() {
+    return {
+      '__className__': 'TeamSetlist',
+      if (id != null) 'id': id,
+      'teamId': teamId,
+      'setlistId': setlistId,
+      'sharedById': sharedById,
+      'sharedAt': sharedAt.toJson(),
+    };
+  }
+
+  @override
+  String toString() {
+    return _i1.SerializationManager.encode(this);
+  }
+}
+
+class _Undefined {}
+
+class _TeamSetlistImpl extends TeamSetlist {
+  _TeamSetlistImpl({
+    int? id,
+    required int teamId,
+    required int setlistId,
+    required int sharedById,
+    required DateTime sharedAt,
+  }) : super._(
+         id: id,
+         teamId: teamId,
+         setlistId: setlistId,
+         sharedById: sharedById,
+         sharedAt: sharedAt,
+       );
+
+  /// Returns a shallow copy of this [TeamSetlist]
+  /// with some or all fields replaced by the given arguments.
+  @_i1.useResult
+  @override
+  TeamSetlist copyWith({
+    Object? id = _Undefined,
+    int? teamId,
+    int? setlistId,
+    int? sharedById,
+    DateTime? sharedAt,
+  }) {
+    return TeamSetlist(
+      id: id is int? ? id : this.id,
+      teamId: teamId ?? this.teamId,
+      setlistId: setlistId ?? this.setlistId,
+      sharedById: sharedById ?? this.sharedById,
+      sharedAt: sharedAt ?? this.sharedAt,
+    );
+  }
+}

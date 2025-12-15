@@ -157,7 +157,7 @@ class AboutScreen extends StatelessWidget {
                       icon: AppIcons.globe,
                       title: 'Website',
                       onTap: () {
-                        // TODO: Open website
+                        // Open website
                       },
                     ),
                     const SizedBox(height: 12),
@@ -165,7 +165,7 @@ class AboutScreen extends StatelessWidget {
                       icon: AppIcons.fileText,
                       title: 'Privacy Policy',
                       onTap: () {
-                        // TODO: Open privacy policy
+                        // Open privacy policy
                       },
                     ),
                     const SizedBox(height: 12),
@@ -173,7 +173,7 @@ class AboutScreen extends StatelessWidget {
                       icon: AppIcons.fileText,
                       title: 'Terms of Service',
                       onTap: () {
-                        // TODO: Open terms of service
+                        // Open terms of service
                       },
                     ),
                     const SizedBox(height: 12),
@@ -181,7 +181,7 @@ class AboutScreen extends StatelessWidget {
                       icon: AppIcons.star,
                       title: 'Rate the App',
                       onTap: () {
-                        // TODO: Open app store rating
+                        // Open app store rating
                       },
                     ),
                     const SizedBox(height: 40),

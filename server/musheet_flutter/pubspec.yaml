@@ -1,0 +1,20 @@
+name: musheet_flutter
+description: MuSheet Serverpod Flutter integration package
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  serverpod_flutter: ^2.0.0
+  musheet_client:
+    path: ../musheet_client
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  lints: ^3.0.0

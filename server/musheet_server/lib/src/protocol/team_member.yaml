@@ -1,0 +1,17 @@
+class: TeamMember
+table: team_members
+fields:
+  teamId: int, relation(parent=teams)
+  userId: int, relation(parent=users)
+  role: String
+  joinedAt: DateTime
+indexes:
+  team_member_team_idx:
+    fields: teamId
+    type: btree
+  team_member_user_idx:
+    fields: userId
+    type: btree
+  team_member_unique_idx:
+    fields: teamId, userId
+    unique: true

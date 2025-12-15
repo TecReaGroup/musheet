@@ -1,9 +1,12 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
+import 'services/backend_service.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +16,9 @@ void main() async {
 
   // Initialize pdfrx (required for pdfrx 2.x)
   pdfrxFlutterInitialize();
+
+  // Initialize backend service with saved URL if available
+  await _initializeBackend();
 
   // Set system UI style: transparent status bar and navigation bar
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -39,4 +45,29 @@ void main() async {
       child: MuSheetApp(),
     ),
   );
+}
+
+/// Initialize the backend service with saved URL
+Future<void> _initializeBackend() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUrl = prefs.getString('backend_server_url');
+    
+    // Only initialize if user has configured a server URL
+    if (savedUrl != null && savedUrl.isNotEmpty) {
+      BackendService.initialize(baseUrl: savedUrl);
+      
+      if (kDebugMode) {
+        debugPrint('Backend initialized with saved URL: $savedUrl');
+      }
+    } else {
+      if (kDebugMode) {
+        debugPrint('No server URL configured. User must set it in Settings.');
+      }
+    }
+  } catch (e) {
+    if (kDebugMode) {
+      debugPrint('Failed to initialize backend: $e');
+    }
+  }
 }

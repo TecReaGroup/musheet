@@ -4,14 +4,14 @@ import 'setlist.dart';
 class TeamMember {
   final String id;
   final String name;
-  final String email;
+  final String username;
   final String role; // 'admin' | 'member'
   final String? avatar;
 
   TeamMember({
     required this.id,
     required this.name,
-    required this.email,
+    required this.username,
     required this.role,
     this.avatar,
   });
@@ -19,7 +19,7 @@ class TeamMember {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
-        'email': email,
+        'username': username,
         'role': role,
         'avatar': avatar,
       };
@@ -27,7 +27,7 @@ class TeamMember {
   factory TeamMember.fromJson(Map<String, dynamic> json) => TeamMember(
         id: json['id'],
         name: json['name'],
-        email: json['email'],
+        username: json['username'],
         role: json['role'],
         avatar: json['avatar'],
       );

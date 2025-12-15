@@ -1,0 +1,14 @@
+class: Application
+table: applications
+fields:
+  appId: String
+  name: String
+  description: String?
+  iconPath: String?
+  isActive: bool
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  app_id_idx:
+    fields: appId
+    unique: true

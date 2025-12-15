@@ -1,0 +1,14 @@
+class: TeamSetlist
+table: team_setlists
+fields:
+  teamId: int, relation(parent=teams)
+  setlistId: int, relation(parent=setlists)
+  sharedById: int, relation(parent=users)
+  sharedAt: DateTime
+indexes:
+  team_setlist_team_idx:
+    fields: teamId
+    type: btree
+  team_setlist_unique_idx:
+    fields: teamId, setlistId
+    unique: true

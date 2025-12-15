@@ -1,0 +1,139 @@
+# MuSheet Server Docker Compose Configuration
+# For private/self-hosted deployment
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: musheet_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-musheet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-musheet_password}
+      POSTGRES_DB: ${POSTGRES_DB:-musheet}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./musheet_server/config/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-musheet} -d ${POSTGRES_DB:-musheet}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - musheet_network
+
+  # Redis for session management and caching
+  redis:
+    image: redis:7-alpine
+    container_name: musheet_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-musheet_redis_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-musheet_redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - musheet_network
+
+  # MuSheet API Server
+  musheet_server:
+    build:
+      context: ./musheet_server
+      dockerfile: Dockerfile
+    container_name: musheet_server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SERVERPOD_ENV: production
+      SERVERPOD_LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${POSTGRES_DB:-musheet}
+      DATABASE_USER: ${POSTGRES_USER:-musheet}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-musheet_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-musheet_redis_password}
+      JWT_SECRET: ${JWT_SECRET:-change_this_in_production}
+      STORAGE_PATH: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+      - logs_data:/app/logs
+    ports:
+      - "8080:8080"  # API
+      - "8081:8081"  # Insights
+      - "8082:8082"  # Web
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/status/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    networks:
+      - musheet_network
+
+  # Nginx Reverse Proxy (optional, for SSL termination)
+  nginx:
+    image: nginx:alpine
+    container_name: musheet_nginx
+    restart: unless-stopped
+    depends_on:
+      - musheet_server
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - uploads_data:/var/www/uploads:ro
+    networks:
+      - musheet_network
+    profiles:
+      - with-nginx
+
+  # Backup service (runs periodically)
+  backup:
+    image: postgres:15-alpine
+    container_name: musheet_backup
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-musheet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-musheet_password}
+      POSTGRES_DB: ${POSTGRES_DB:-musheet}
+      POSTGRES_HOST: postgres
+    volumes:
+      - backup_data:/backups
+      - ./scripts/backup.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c", "chmod +x /backup.sh && /backup.sh"]
+    networks:
+      - musheet_network
+    profiles:
+      - with-backup
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local
+  logs_data:
+    driver: local
+  backup_data:
+    driver: local
+
+networks:
+  musheet_network:
+    driver: bridge

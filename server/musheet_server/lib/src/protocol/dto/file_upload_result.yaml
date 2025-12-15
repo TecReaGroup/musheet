@@ -1,0 +1,5 @@
+class: FileUploadResult
+fields:
+  success: bool
+  path: String?
+  errorMessage: String?

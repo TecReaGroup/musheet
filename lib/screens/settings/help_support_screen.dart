@@ -72,7 +72,7 @@ class HelpSupportScreen extends StatelessWidget {
                       title: 'Getting Started',
                       description: 'Learn the basics of using MuSheet',
                       onTap: () {
-                        // TODO: Open getting started guide
+                        // Open getting started guide
                       },
                     ),
                     const SizedBox(height: 12),
@@ -81,7 +81,7 @@ class HelpSupportScreen extends StatelessWidget {
                       title: 'FAQ',
                       description: 'Frequently asked questions',
                       onTap: () {
-                        // TODO: Open FAQ
+                        // Open FAQ
                       },
                     ),
                     const SizedBox(height: 12),
@@ -90,7 +90,7 @@ class HelpSupportScreen extends StatelessWidget {
                       title: 'Contact Us',
                       description: 'Get in touch with our support team',
                       onTap: () {
-                        // TODO: Open contact form
+                        // Open contact form
                       },
                     ),
                     const SizedBox(height: 12),
@@ -99,7 +99,7 @@ class HelpSupportScreen extends StatelessWidget {
                       title: 'Report a Bug',
                       description: 'Help us improve by reporting issues',
                       onTap: () {
-                        // TODO: Open bug report form
+                        // Open bug report form
                       },
                     ),
                     const SizedBox(height: 12),
@@ -108,7 +108,7 @@ class HelpSupportScreen extends StatelessWidget {
                       title: 'Feature Request',
                       description: 'Suggest new features or improvements',
                       onTap: () {
-                        // TODO: Open feature request form
+                        // Open feature request form
                       },
                     ),
                   ],

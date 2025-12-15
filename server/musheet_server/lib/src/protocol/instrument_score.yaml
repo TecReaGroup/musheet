@@ -1,0 +1,14 @@
+class: InstrumentScore
+table: instrument_scores
+fields:
+  scoreId: int, relation(parent=scores)
+  instrumentName: String
+  pdfPath: String?
+  pdfHash: String?
+  orderIndex: int
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  instrument_score_idx:
+    fields: scoreId
+    type: btree

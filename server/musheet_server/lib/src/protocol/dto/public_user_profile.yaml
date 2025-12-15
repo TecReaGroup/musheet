@@ -1,0 +1,8 @@
+class: PublicUserProfile
+fields:
+  id: int
+  username: String
+  displayName: String?
+  avatarUrl: String?
+  bio: String?
+  preferredInstrument: String?

@@ -1,0 +1,14 @@
+class: TeamScore
+table: team_scores
+fields:
+  teamId: int, relation(parent=teams)
+  scoreId: int, relation(parent=scores)
+  sharedById: int, relation(parent=users)
+  sharedAt: DateTime
+indexes:
+  team_score_team_idx:
+    fields: teamId
+    type: btree
+  team_score_unique_idx:
+    fields: teamId, scoreId
+    unique: true

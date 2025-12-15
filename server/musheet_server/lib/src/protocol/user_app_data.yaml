@@ -1,0 +1,13 @@
+class: UserAppData
+table: user_app_data
+fields:
+  userId: int, relation(parent=users)
+  applicationId: int
+  preferences: String?
+  settings: String?
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  user_app_data_user_app_idx:
+    fields: userId, applicationId
+    unique: true

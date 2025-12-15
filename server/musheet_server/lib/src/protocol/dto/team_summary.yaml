@@ -1,0 +1,6 @@
+class: TeamSummary
+fields:
+  id: int
+  name: String
+  memberCount: int
+  sharedScores: int

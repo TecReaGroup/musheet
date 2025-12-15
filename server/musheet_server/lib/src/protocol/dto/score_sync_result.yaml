@@ -1,0 +1,5 @@
+class: ScoreSyncResult
+fields:
+  status: String
+  serverVersion: Score?
+  conflictData: Score?

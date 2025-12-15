@@ -1,0 +1,12 @@
+class: UserProfile
+fields:
+  id: int
+  username: String
+  displayName: String?
+  avatarUrl: String?
+  bio: String?
+  preferredInstrument: String?
+  teams: List<TeamInfo>
+  storageUsedBytes: int
+  createdAt: DateTime
+  lastLoginAt: DateTime?

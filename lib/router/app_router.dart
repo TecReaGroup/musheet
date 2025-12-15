@@ -14,6 +14,7 @@ import '../screens/settings/bluetooth_devices_screen.dart';
 import '../screens/settings/notifications_screen.dart';
 import '../screens/settings/help_support_screen.dart';
 import '../screens/settings/about_screen.dart';
+import '../screens/settings/backend_debug_screen.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
 import '../app.dart';
@@ -33,6 +34,7 @@ class AppRoutes {
   static const String notifications = '/notifications';
   static const String helpSupport = '/help-support';
   static const String about = '/about';
+  static const String backendDebug = '/backend-debug';
 }
 
 // Shell route key for the main scaffold with bottom navigation
@@ -114,6 +116,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.about,
             pageBuilder: (context, state) => const MaterialPage(
               child: AboutScreen(),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.backendDebug,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: BackendDebugScreen(),
             ),
           ),
         ],

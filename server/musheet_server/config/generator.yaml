@@ -1,0 +1,10 @@
+# Serverpod Generator Configuration
+# This enables the database module for model generation
+
+# Enable database support
+type: server
+
+# Enable database module for model generation
+modules:
+  serverpod:
+    nickname: s

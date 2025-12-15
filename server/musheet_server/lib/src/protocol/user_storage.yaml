@@ -1,0 +1,11 @@
+class: UserStorage
+table: user_storage
+fields:
+  userId: int, relation(parent=users)
+  usedBytes: int
+  quotaBytes: int
+  lastCalculatedAt: DateTime
+indexes:
+  user_storage_user_idx:
+    fields: userId
+    unique: true

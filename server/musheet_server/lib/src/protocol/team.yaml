@@ -1,0 +1,13 @@
+class: Team
+table: teams
+fields:
+  name: String
+  description: String?
+  inviteCode: String
+  createdById: int, relation(parent=users)
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  team_invite_code_idx:
+    fields: inviteCode
+    unique: true

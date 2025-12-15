@@ -1,0 +1,9 @@
+### Result of deleteAllUserData operation (DEBUG only)
+class: DeleteUserDataResult
+fields:
+  success: bool
+  deletedScores: int
+  deletedInstrumentScores: int
+  deletedAnnotations: int
+  deletedSetlists: int
+  deletedSetlistScores: int
