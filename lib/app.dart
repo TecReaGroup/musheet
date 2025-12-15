@@ -43,6 +43,15 @@ final sharedFilePathProvider = NotifierProvider<SharedFilePathNotifier, String?>
 class MuSheetApp extends ConsumerWidget {
   const MuSheetApp({super.key});
 
+  static const _systemUiStyle = SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.dark,
+    systemNavigationBarContrastEnforced: false,
+  );
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch the storage initializer to trigger initialization
@@ -62,30 +71,39 @@ class MuSheetApp extends ConsumerWidget {
     final hasError = storageInit.hasError || scoresAsync.hasError || setlistsAsync.hasError;
 
     if (isLoading) {
-      return MaterialApp(
-        title: 'MuSheet',
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        home: const SplashScreen(),
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: _systemUiStyle,
+        child: MaterialApp(
+          title: 'MuSheet',
+          theme: AppTheme.lightTheme,
+          debugShowCheckedModeBanner: false,
+          home: const SplashScreen(),
+        ),
       );
     }
 
     if (hasError) {
       final error = storageInit.error ?? scoresAsync.error ?? setlistsAsync.error;
-      return MaterialApp(
-        title: 'MuSheet',
-        theme: AppTheme.lightTheme,
-        debugShowCheckedModeBanner: false,
-        home: ErrorScreen(error: error.toString()),
+      return AnnotatedRegion<SystemUiOverlayStyle>(
+        value: _systemUiStyle,
+        child: MaterialApp(
+          title: 'MuSheet',
+          theme: AppTheme.lightTheme,
+          debugShowCheckedModeBanner: false,
+          home: ErrorScreen(error: error.toString()),
+        ),
       );
     }
 
     final router = ref.watch(goRouterProvider);
-    return MaterialApp.router(
-      title: 'MuSheet',
-      theme: AppTheme.lightTheme,
-      debugShowCheckedModeBanner: false,
-      routerConfig: router,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: _systemUiStyle,
+      child: MaterialApp.router(
+        title: 'MuSheet',
+        theme: AppTheme.lightTheme,
+        debugShowCheckedModeBanner: false,
+        routerConfig: router,
+      ),
     );
   }
 }
