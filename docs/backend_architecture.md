@@ -1,84 +1,77 @@
 # MuSheet 后端架构设计文档
 
-> **团队内部管理模式** - 专为乐团/乐队等团队私有化部署设计
+> **多应用平台架构** - 支持多个前端应用、多团队管理、个人云同步
 
-## 目录
+## 文档结构
 
-1. [设计决策总结](#1-设计决策总结)
-2. [技术栈选型](#2-技术栈选型)
-3. [Serverpod 架构设计](#3-serverpod-架构设计)
-4. [数据库设计](#4-数据库设计)
-5. [核心业务逻辑](#5-核心业务逻辑)
-6. [同步机制设计](#6-同步机制设计)
-7. [Flutter 客户端实现](#7-flutter-客户端实现)
-8. [Web 管理面板](#8-web-管理面板)
-9. [开发路线图](#9-开发路线图)
+本文档分为四个核心部分：
+
+| 部分 | 内容 | 说明 |
+|------|------|------|
+| **Part 1** | [服务器系统](#part-1-服务器系统) | 架构设计、管理功能、数据可视化、WebUI |
+| **Part 2** | [个人账户与云同步](#part-2-个人账户与云同步) | 用户资料、乐谱同步、跨应用认证 |
+| **Part 3** | [团队协作系统](#part-3-团队协作系统) | 团队乐谱/演出单管理、成员协作 |
+| **Part 4** | [多应用支持](#part-4-多应用支持) | 应用隔离、数据复用、扩展性设计 |
 
 ---
 
-## 1. 设计决策总结
+## 设计决策总结
 
-### 1.1 核心理念
+### 核心理念
 
-**多团队管理模式**：一个服务器可创建多个团队，成员可同时属于多个团队。适用于音乐学校、教会、演出公司等需要管理多个乐团/乐队的场景。
+**多应用平台架构**：服务器作为统一后端，支持多个前端应用（MuSheet 只是其中之一）。个人账户信息跨应用复用，应用数据相互隔离。
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      多团队管理模式                          │
+│                    多应用平台架构                            │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│   服务器管理员 (系统级)                                      │
-│     │                                                       │
-│     ├── 创建/管理团队 (Team A, Team B, Team C...)           │
-│     ├── 创建成员账号                                         │
-│     ├── 分配成员到团队 (一个成员可属于多个团队)              │
-│     └── 设置团队管理员                                       │
+│   ┌─────────────────────────────────────────────────────┐  │
+│   │                  统一后端服务器                       │  │
+│   │  ┌─────────────┬─────────────┬─────────────────┐    │  │
+│   │  │ 用户账户系统 │ 团队管理系统 │ 应用数据存储     │    │  │
+│   │  │ (跨应用共享) │ (跨应用共享) │ (按应用隔离)     │    │  │
+│   │  └─────────────┴─────────────┴─────────────────┘    │  │
+│   └─────────────────────────────────────────────────────┘  │
+│                            │                                │
+│            ┌───────────────┼───────────────┐                │
+│            ▼               ▼               ▼                │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│   │  MuSheet    │  │  Future App │  │  Future App │        │
+│   │  (乐谱管理)  │  │  (练习记录?) │  │  (演出管理?) │        │
+│   └─────────────┘  └─────────────┘  └─────────────┘        │
 │                                                             │
-│   ┌──────────────────┐  ┌──────────────────┐                │
-│   │     Team A       │  │     Team B       │                │
-│   │   (交响乐团)     │  │   (室内乐团)     │                │
-│   ├──────────────────┤  ├──────────────────┤                │
-│   │ 团队管理员       │  │ 团队管理员       │                │
-│   │ ├── 管理团队资源 │  │ ├── 管理团队资源 │                │
-│   │ └── 邀请成员加入 │  │ └── 邀请成员加入 │                │
-│   │                  │  │                  │                │
-│   │ 成员 (可跨团队)  │  │ 成员 (可跨团队)  │                │
-│   │ ├── 小明 ────────┼──┼── 小明           │                │
-│   │ ├── 小红         │  │ ├── 小华         │                │
-│   │ └── 小刚         │  │ └── 小刚 ────────┼── (同属两团队) │
-│   └──────────────────┘  └──────────────────┘                │
-│                                                             │
-│   成员权限:                                                  │
-│     ├── 管理个人乐谱库                                       │
-│     ├── 向所属团队共享资源                                   │
-│     ├── 访问所属团队的共享资源                               │
-│     └── 仅能修改自己的密码                                   │
+│   共享层:                       隔离层:                     │
+│   ├── 用户账户 (登录/资料/头像)  ├── 应用专属数据            │
+│   ├── 团队成员关系               ├── 同步状态                │
+│   └── 基础权限验证               └── 存储统计 (按应用)       │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 决策汇总
+### 决策汇总
 
-| 决策项 | 选择 | 说明 |
-|--------|------|------|
-| **部署模式** | 私有化部署 (Docker) | 团队自行部署到内网/私有服务器 |
-| **团队模式** | 多团队 | 一个服务器可创建多个团队 |
-| **成员归属** | 多团队成员 | 成员可同时属于多个团队 |
-| **账号管理** | 管理员统一管理 | 无自助注册，管理员创建所有账号 |
-| **认证方式** | 用户名 + 密码 | 简单直接，适合团队内部使用 |
-| **用户权限** | 仅改密码 | 普通成员只能修改自己的密码 |
-| **离线模式** | 完整功能 | 未登录时可完整使用本地功能 |
-| **同步策略** | LWW + CRDT | 元数据用简单策略，批注用 CRDT |
-| **团队协作** | 协作编辑 | 成员可直接编辑共享资源 |
-| **PDF 存储** | 本地优先 | 后台静默上传，无存储限制 |
-| **后端技术** | Serverpod | Dart 全栈，自带 Web 管理面板 |
-| **首个用户** | 自动成为管理员 | 部署后第一个注册的用户 |
+| 类别 | 决策项 | 选择 | 说明 |
+|------|--------|------|------|
+| **架构** | 架构模式 | 多应用平台 | 统一后端支持多个前端应用 |
+| **架构** | 账户系统 | 跨应用共享 | 一个账户可登录多个应用 |
+| **架构** | 数据隔离 | 按应用隔离 | 各应用数据独立，互不影响 |
+| **部署** | 部署模式 | 私有化 (Docker) | 团队自行部署到内网/私有服务器 |
+| **部署** | 后端技术 | Serverpod | Dart 全栈，自带 Web 管理面板 |
+| **团队** | 团队模式 | 多团队 | 一个服务器可创建多个团队 |
+| **团队** | 成员归属 | 多团队成员 | 成员可同时属于多个团队 |
+| **团队** | 共享权限 | 完全权限 | 所有成员对共享资源拥有完全权限 |
+| **团队** | 批注共享 | 全团队共享 | 批注对所有团队成员可见可编辑 |
+| **用户** | 账号管理 | 管理员统一管理 | 无自助注册，管理员创建账号 |
+| **用户** | 认证方式 | 用户名 + 密码 | 简单直接，适合内部使用 |
+| **同步** | 离线模式 | 完整功能 | 未登录时可完整使用本地功能 |
+| **同步** | 同步策略 | LWW + CRDT | 元数据用 LWW，批注用 CRDT |
 
 ---
 
-## 2. 技术栈选型
+# Part 1: 服务器系统
 
-### 2.1 为什么选择 Serverpod
+## 1.1 技术栈选型
 
 | 对比项 | Serverpod | Supabase | 自建 Node/Go |
 |--------|-----------|----------|--------------|
@@ -153,7 +146,7 @@ musheet/                         # Flutter App (现有项目)
     │       └── src/
     │           └── protocol/
     │
-    ├── musheet_admin/           # Flutter Web 管理面板
+    ├── musheet_admin/           # Flutter Web 管理面板，优先级较高
     │   └── lib/
     │       ├── screens/
     │       │   ├── dashboard/
@@ -976,18 +969,21 @@ class AdminUserEndpoint extends Endpoint {
 │ joinedAt        │
 └─────────────────┘
 
-===== 团队共享资源 (每个团队独立) =====
+===== 团队共享资源 (每个团队独立, 所有成员完全权限) =====
 
-┌─────────────────┐       ┌─────────────────┐
-│  team_scores    │       │ team_setlists   │
-├─────────────────┤       ├─────────────────┤
-│ id (PK)         │       │ id (PK)         │
-│ teamId (FK)     │       │ teamId (FK)     │  ← 资源属于特定团队
-│ scoreId (FK)    │       │ setlistId (FK)  │
-│ sharedBy (FK)   │       │ sharedBy (FK)   │  ← 谁共享的
-│ permissions     │       │ permissions     │  ← 'view' | 'edit'
-│ sharedAt        │       │ sharedAt        │
-└─────────────────┘       └─────────────────┘
+┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
+│  team_scores    │       │ team_setlists   │       │ team_annotations│
+├─────────────────┤       ├─────────────────┤       ├─────────────────┤
+│ id (PK)         │       │ id (PK)         │       │ id (PK)         │
+│ teamId (FK)     │       │ teamId (FK)     │       │ teamScoreId(FK) │ ← 关联团队乐谱
+│ scoreId (FK)    │       │ setlistId (FK)  │       │ instrumentScoreId│
+│ sharedBy (FK)   │       │ sharedBy (FK)   │       │ pageNumber      │
+│ sharedAt        │       │ sharedAt        │       │ annotationType  │
+└─────────────────┘       └─────────────────┘       │ color, points   │
+                                                    │ createdBy (FK)  │ ← 创建者
+                                                    │ updatedBy (FK)  │ ← 修改者
+                                                    │ vectorClock     │ ← CRDT
+                                                    └─────────────────┘
 ```
 
 ### 4.2 关键索引
@@ -1002,6 +998,9 @@ CREATE INDEX idx_team_members_user ON team_members(user_id);
 CREATE INDEX idx_team_members_team ON team_members(team_id);
 CREATE INDEX idx_team_scores_team ON team_scores(team_id);
 CREATE INDEX idx_team_setlists_team ON team_setlists(team_id);
+
+-- 团队批注索引
+CREATE INDEX idx_team_annotations_score ON team_annotations(team_score_id, instrument_score_id);
 
 -- 存储统计
 CREATE INDEX idx_instrument_scores_user_size ON instrument_scores(score_id) INCLUDE (file_size);
@@ -1277,9 +1276,13 @@ class TeamEndpoint extends Endpoint {
 
 ---
 
-## 5. 核心业务逻辑
+# Part 2: 个人账户与云同步
 
-### 5.1 用户管理与登录流程
+> 用户资料管理、乐谱同步、跨应用认证
+
+## 1. 核心业务逻辑
+
+### 1.1 用户管理与登录流程
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -1368,7 +1371,7 @@ class TeamEndpoint extends Endpoint {
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 首次同步 (本地数据迁移)
+### 1.2 首次同步 (本地数据迁移)
 
 ```dart
 /// 用户首次登录时，将本地数据迁移到云端
@@ -1412,7 +1415,7 @@ class InitialSyncService {
 }
 ```
 
-### 5.3 PDF 后台上传策略
+### 1.3 PDF 后台上传策略
 
 ```dart
 /// PDF 文件上传服务 (后台静默)
@@ -1478,7 +1481,7 @@ class PdfUploadService {
 }
 ```
 
-### 5.4 批注 CRDT 同步
+### 1.4 批注 CRDT 同步
 
 ```dart
 /// 批注冲突解决 (CRDT: 基于 ID 的合并)
@@ -1542,9 +1545,9 @@ class AnnotationSyncService {
 
 ---
 
-## 6. 同步机制设计
+## 2. 同步机制设计
 
-### 6.1 同步状态机
+### 2.1 同步状态机
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1570,7 +1573,7 @@ class AnnotationSyncService {
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 同步触发时机
+### 2.2 同步触发时机
 
 | 事件 | 同步行为 |
 |------|----------|
@@ -1581,7 +1584,7 @@ class AnnotationSyncService {
 | 网络恢复 | 处理 Pending 队列 |
 | 手动刷新 | 增量拉取 |
 
-### 6.3 冲突处理流程
+### 2.3 冲突处理流程
 
 ```dart
 enum ConflictResolution {
@@ -1616,9 +1619,9 @@ class ConflictResolver {
 
 ---
 
-## 7. Flutter 客户端实现
+## 3. Flutter 客户端实现
 
-### 7.1 新增 Service 层
+### 3.1 新增 Service 层
 
 ```dart
 // lib/services/serverpod_client.dart
@@ -1730,7 +1733,7 @@ class SyncService {
 }
 ```
 
-### 7.2 Provider 改造
+### 3.2 Provider 改造
 
 ```dart
 // lib/providers/auth_provider.dart
@@ -1786,7 +1789,7 @@ class SyncStateNotifier extends _$SyncStateNotifier {
 }
 ```
 
-### 7.3 UI 改造示例
+### 3.3 UI 改造示例
 
 ```dart
 // lib/widgets/sync_status_indicator.dart
@@ -1826,7 +1829,7 @@ class SyncStatusIndicator extends ConsumerWidget {
 }
 ```
 
-### 7.4 个人资料 UI
+### 3.4 个人资料 UI
 
 ```dart
 // lib/providers/profile_provider.dart
@@ -2193,6 +2196,743 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
 ---
 
+# Part 3: 团队协作系统
+
+> 团队乐谱/演出单管理、成员协作、共享资源
+
+## 1. 团队数据模型
+
+基于 MuSheet App 现有团队设计，后端需支持以下数据结构：
+
+### 1.1 权限模型
+
+**简化权限设计**：团队内所有成员对共享资源拥有完全权限，包括：
+- 查看/下载乐谱和演出单
+- 编辑乐谱元数据
+- 添加/修改/删除批注（批注全团队共享）
+- 共享新资源到团队
+- 取消自己共享的资源
+
+> 设计理念：团队协作场景中，成员之间需要完全信任和充分协作，简化权限模型可以减少使用摩擦。
+
+### 1.2 团队核心模型
+
+```yaml
+# musheet_server/lib/src/protocol/team_score.yaml
+class: TeamScore
+table: team_scores
+fields:
+  teamId: int, relation(parent=team)
+  scoreId: int, relation(parent=score)
+  sharedBy: int, relation(parent=user)    # 谁共享的
+  sharedAt: DateTime
+indexes:
+  team_score_unique_idx:
+    fields: teamId, scoreId
+    unique: true
+```
+
+```yaml
+# musheet_server/lib/src/protocol/team_setlist.yaml
+class: TeamSetlist
+table: team_setlists
+fields:
+  teamId: int, relation(parent=team)
+  setlistId: int, relation(parent=setlist)
+  sharedBy: int, relation(parent=user)
+  sharedAt: DateTime
+indexes:
+  team_setlist_unique_idx:
+    fields: teamId, setlistId
+    unique: true
+```
+
+```yaml
+# musheet_server/lib/src/protocol/team_annotation.yaml
+# 团队共享批注 - 所有团队成员可见和编辑
+class: TeamAnnotation
+table: team_annotations
+fields:
+  teamScoreId: int, relation(parent=team_score)  # 关联团队共享乐谱
+  instrumentScoreId: int                          # 具体分谱
+  pageNumber: int
+  annotationType: String      # 'drawing', 'erasing'
+  color: int?
+  strokeWidth: double?
+  points: List<double>        # 归一化坐标
+  createdBy: int, relation(parent=user)  # 创建者
+  updatedBy: int, relation(parent=user)  # 最后修改者
+  createdAt: DateTime
+  updatedAt: DateTime
+  # CRDT 相关字段 (支持多人同时编辑)
+  vectorClock: String?
+  originDeviceId: String?
+indexes:
+  team_annotation_instrument_idx:
+    fields: teamScoreId, instrumentScoreId, pageNumber
+```
+
+### 1.3 团队数据结构图
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Team 数据结构                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   TeamData                                                  │
+│   ├── id: String                                            │
+│   ├── name: String                                          │
+│   ├── members: List<TeamMember>                             │
+│   │   ├── id, name, email                                   │
+│   │   ├── role: 'admin' | 'member' (仅管理权限,非数据权限)  │
+│   │   └── avatar: String?                                   │
+│   ├── sharedScores: List<Score>          ← 团队共享乐谱      │
+│   │   ├── (完整 Score 对象，含 InstrumentScores)            │
+│   │   └── teamAnnotations: 团队共享批注 (所有成员可编辑)    │
+│   └── sharedSetlists: List<Setlist>      ← 团队演出单       │
+│       └── (Setlist 存储 scoreIds 引用)                      │
+│                                                             │
+│   权限模型：                                                │
+│   ├── 所有成员对共享资源拥有完全权限                        │
+│   ├── 批注全团队共享,任何成员可添加/编辑/删除               │
+│   └── role 仅用于团队管理 (添加/移除成员)                   │
+│                                                             │
+│   关系：                                                    │
+│   ├── 一个用户可属于多个团队                                 │
+│   ├── 一个团队可有多个成员                                   │
+│   ├── 成员可共享个人乐谱到团队                               │
+│   └── 团队间资源相互隔离                                     │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 2. 团队资源共享 API
+
+### 2.1 团队乐谱端点
+
+```dart
+// musheet_server/lib/src/endpoints/team_score_endpoint.dart
+
+class TeamScoreEndpoint extends Endpoint {
+
+  @override
+  bool get requireLogin => true;
+
+  /// 获取团队共享乐谱列表 (包含团队批注)
+  Future<List<TeamScoreWithAnnotations>> getTeamScores(Session session, int teamId) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证是否为团队成员
+    if (!await _isTeamMember(session, teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    // 获取团队共享的所有乐谱
+    final teamScores = await TeamScore.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId),
+    );
+
+    final result = <TeamScoreWithAnnotations>[];
+    for (final ts in teamScores) {
+      final score = await Score.db.findById(session, ts.scoreId);
+      if (score != null && score.deletedAt == null) {
+        // 加载完整的 InstrumentScores
+        score.instrumentScores = await InstrumentScore.db.find(
+          session,
+          where: (i) => i.scoreId.equals(score.id!),
+        );
+
+        // 加载团队批注
+        final teamAnnotations = await TeamAnnotation.db.find(
+          session,
+          where: (a) => a.teamScoreId.equals(ts.id!),
+        );
+
+        result.add(TeamScoreWithAnnotations(
+          teamScore: ts,
+          score: score,
+          annotations: teamAnnotations,
+        ));
+      }
+    }
+    return result;
+  }
+
+  /// 共享乐谱到团队 (所有成员自动拥有完全权限)
+  Future<TeamScore> shareScoreToTeam(
+    Session session,
+    int teamId,
+    int scoreId,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证团队成员资格
+    if (!await _isTeamMember(session, teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    // 验证乐谱所有权
+    final score = await Score.db.findById(session, scoreId);
+    if (score == null || score.userId != userId) {
+      throw PermissionDeniedException();
+    }
+
+    // 检查是否已共享
+    final existing = await TeamScore.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.scoreId.equals(scoreId),
+    );
+    if (existing.isNotEmpty) {
+      throw AlreadySharedException();
+    }
+
+    // 创建共享记录 (无权限字段,所有成员均有完全权限)
+    final teamScore = TeamScore(
+      teamId: teamId,
+      scoreId: scoreId,
+      sharedBy: userId,
+      sharedAt: DateTime.now(),
+    );
+    await TeamScore.db.insert(session, teamScore);
+
+    return teamScore;
+  }
+
+  /// 取消共享乐谱
+  Future<bool> unshareScoreFromTeam(
+    Session session,
+    int teamId,
+    int scoreId,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 查找共享记录
+    final teamScores = await TeamScore.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.scoreId.equals(scoreId),
+    );
+    if (teamScores.isEmpty) return false;
+
+    final teamScore = teamScores.first;
+
+    // 只有共享者或团队管理员可以取消共享
+    final isSharer = teamScore.sharedBy == userId;
+    final isTeamAdmin = await _isTeamAdmin(session, teamId, userId);
+    if (!isSharer && !isTeamAdmin) {
+      throw PermissionDeniedException();
+    }
+
+    // 删除关联的团队批注
+    await TeamAnnotation.db.delete(
+      session,
+      where: (a) => a.teamScoreId.equals(teamScore.id!),
+    );
+
+    await TeamScore.db.deleteRow(session, teamScore);
+    return true;
+  }
+}
+```
+
+### 2.2 团队批注端点
+
+```dart
+// musheet_server/lib/src/endpoints/team_annotation_endpoint.dart
+
+class TeamAnnotationEndpoint extends Endpoint {
+
+  @override
+  bool get requireLogin => true;
+
+  /// 获取团队乐谱的所有批注
+  Future<List<TeamAnnotation>> getTeamAnnotations(
+    Session session,
+    int teamScoreId,
+    int instrumentScoreId,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证团队成员资格 (通过 teamScore 获取 teamId)
+    final teamScore = await TeamScore.db.findById(session, teamScoreId);
+    if (teamScore == null) throw NotFoundException();
+
+    if (!await _isTeamMember(session, teamScore.teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    return await TeamAnnotation.db.find(
+      session,
+      where: (a) => a.teamScoreId.equals(teamScoreId) &
+                    a.instrumentScoreId.equals(instrumentScoreId),
+    );
+  }
+
+  /// 添加团队批注 (所有成员都可以添加)
+  Future<TeamAnnotation> addTeamAnnotation(
+    Session session,
+    TeamAnnotation annotation,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证团队成员资格
+    final teamScore = await TeamScore.db.findById(session, annotation.teamScoreId);
+    if (teamScore == null) throw NotFoundException();
+
+    if (!await _isTeamMember(session, teamScore.teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    annotation.createdBy = userId;
+    annotation.updatedBy = userId;
+    annotation.createdAt = DateTime.now();
+    annotation.updatedAt = DateTime.now();
+
+    await TeamAnnotation.db.insert(session, annotation);
+    return annotation;
+  }
+
+  /// 更新团队批注 (所有成员都可以编辑)
+  Future<TeamAnnotation> updateTeamAnnotation(
+    Session session,
+    TeamAnnotation annotation,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证团队成员资格
+    final teamScore = await TeamScore.db.findById(session, annotation.teamScoreId);
+    if (teamScore == null) throw NotFoundException();
+
+    if (!await _isTeamMember(session, teamScore.teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    annotation.updatedBy = userId;
+    annotation.updatedAt = DateTime.now();
+
+    await TeamAnnotation.db.update(session, annotation);
+    return annotation;
+  }
+
+  /// 删除团队批注 (所有成员都可以删除)
+  Future<bool> deleteTeamAnnotation(Session session, int annotationId) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final annotation = await TeamAnnotation.db.findById(session, annotationId);
+    if (annotation == null) return false;
+
+    // 验证团队成员资格
+    final teamScore = await TeamScore.db.findById(session, annotation.teamScoreId);
+    if (teamScore == null) throw NotFoundException();
+
+    if (!await _isTeamMember(session, teamScore.teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    await TeamAnnotation.db.deleteRow(session, annotation);
+    return true;
+  }
+
+  /// 批量同步团队批注 (CRDT 合并)
+  Future<List<TeamAnnotation>> syncTeamAnnotations(
+    Session session,
+    int teamScoreId,
+    int instrumentScoreId,
+    List<TeamAnnotation> clientAnnotations,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 验证团队成员资格
+    final teamScore = await TeamScore.db.findById(session, teamScoreId);
+    if (teamScore == null) throw NotFoundException();
+
+    if (!await _isTeamMember(session, teamScore.teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    // 获取服务器端批注
+    final serverAnnotations = await TeamAnnotation.db.find(
+      session,
+      where: (a) => a.teamScoreId.equals(teamScoreId) &
+                    a.instrumentScoreId.equals(instrumentScoreId),
+    );
+
+    // CRDT 合并
+    final merged = _mergeAnnotations(serverAnnotations, clientAnnotations);
+
+    // 更新服务器
+    for (final ann in merged) {
+      if (ann.id == null) {
+        ann.createdBy = userId;
+        ann.updatedBy = userId;
+        ann.createdAt = DateTime.now();
+        ann.updatedAt = DateTime.now();
+        await TeamAnnotation.db.insert(session, ann);
+      } else {
+        ann.updatedBy = userId;
+        ann.updatedAt = DateTime.now();
+        await TeamAnnotation.db.update(session, ann);
+      }
+    }
+
+    return merged;
+  }
+}
+```
+
+### 2.3 团队演出单端点
+
+```dart
+// musheet_server/lib/src/endpoints/team_setlist_endpoint.dart
+
+class TeamSetlistEndpoint extends Endpoint {
+
+  @override
+  bool get requireLogin => true;
+
+  /// 获取团队演出单列表
+  Future<List<Setlist>> getTeamSetlists(Session session, int teamId) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    if (!await _isTeamMember(session, teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    final teamSetlists = await TeamSetlist.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId),
+    );
+
+    final setlists = <Setlist>[];
+    for (final ts in teamSetlists) {
+      final setlist = await Setlist.db.findById(session, ts.setlistId);
+      if (setlist != null && setlist.deletedAt == null) {
+        setlists.add(setlist);
+      }
+    }
+    return setlists;
+  }
+
+  /// 共享演出单到团队 (所有成员自动拥有完全权限)
+  Future<TeamSetlist> shareSetlistToTeam(
+    Session session,
+    int teamId,
+    int setlistId,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    if (!await _isTeamMember(session, teamId, userId)) {
+      throw NotTeamMemberException();
+    }
+
+    // 验证演出单所有权
+    final setlist = await Setlist.db.findById(session, setlistId);
+    if (setlist == null || setlist.userId != userId) {
+      throw PermissionDeniedException();
+    }
+
+    // 检查是否已共享
+    final existing = await TeamSetlist.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId) & t.setlistId.equals(setlistId),
+    );
+    if (existing.isNotEmpty) {
+      throw AlreadySharedException();
+    }
+
+    // 创建共享记录 (无权限字段,所有成员均有完全权限)
+    final teamSetlist = TeamSetlist(
+      teamId: teamId,
+      setlistId: setlistId,
+      sharedBy: userId,
+      sharedAt: DateTime.now(),
+    );
+    await TeamSetlist.db.insert(session, teamSetlist);
+
+    return teamSetlist;
+  }
+
+  /// 取消共享演出单
+  Future<bool> unshareSetlistFromTeam(
+    Session session,
+    int teamId,
+    int setlistId,
+  ) async {
+    // 类似 unshareScoreFromTeam 逻辑
+  }
+}
+```
+
+## 3. Flutter 团队功能实现
+
+### 3.1 团队 Provider
+
+```dart
+// lib/providers/team_provider.dart
+
+@riverpod
+class TeamsNotifier extends _$TeamsNotifier {
+  @override
+  Future<List<TeamData>> build() async {
+    if (!ServerpodClientService.isLoggedIn) return [];
+
+    // 获取用户所属的所有团队
+    final teamsWithRole = await ServerpodClientService.client.team.getMyTeams();
+
+    final teamDataList = <TeamData>[];
+    for (final twr in teamsWithRole) {
+      // 获取团队成员
+      final members = await _fetchTeamMembers(twr.team.id!);
+      // 获取团队共享乐谱
+      final scores = await ServerpodClientService.client.teamScore.getTeamScores(twr.team.id!);
+      // 获取团队演出单
+      final setlists = await ServerpodClientService.client.teamSetlist.getTeamSetlists(twr.team.id!);
+
+      teamDataList.add(TeamData(
+        id: twr.team.id!.toString(),
+        name: twr.team.name,
+        members: members,
+        sharedScores: scores.map((s) => _toLocalScore(s)).toList(),
+        sharedSetlists: setlists.map((s) => _toLocalSetlist(s)).toList(),
+      ));
+    }
+
+    return teamDataList;
+  }
+
+  /// 共享乐谱到团队
+  Future<void> shareScoreToTeam(String teamId, Score score) async {
+    await ServerpodClientService.client.teamScore.shareScoreToTeam(
+      int.parse(teamId),
+      int.parse(score.id),
+    );
+    ref.invalidateSelf();
+  }
+
+  /// 共享演出单到团队
+  Future<void> shareSetlistToTeam(String teamId, Setlist setlist) async {
+    await ServerpodClientService.client.teamSetlist.shareSetlistToTeam(
+      int.parse(teamId),
+      int.parse(setlist.id),
+    );
+    ref.invalidateSelf();
+  }
+
+  /// 取消共享乐谱
+  Future<void> unshareScore(String teamId, String scoreId) async {
+    await ServerpodClientService.client.teamScore.unshareScoreFromTeam(
+      int.parse(teamId),
+      int.parse(scoreId),
+    );
+    ref.invalidateSelf();
+  }
+}
+
+// 当前选中的团队
+@riverpod
+class SelectedTeamNotifier extends _$SelectedTeamNotifier {
+  @override
+  TeamData? build() => null;
+
+  void select(TeamData team) => state = team;
+  void clear() => state = null;
+}
+```
+
+### 3.2 团队 UI 结构
+
+参考 MuSheet App 现有设计，团队页面包含三个 Tab：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Team Screen                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Header: Team Name + Team Switcher                   │   │
+│  │  [Current Team ▼]                                    │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Tabs: [Setlists] [Scores] [Members]                 │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  Tab Content:                                        │   │
+│  │                                                      │   │
+│  │  Setlists Tab:                                       │   │
+│  │  ├── List of shared setlists                         │   │
+│  │  ├── Each item: name, song count, shared by          │   │
+│  │  └── Actions: View, Share new, Remove                │   │
+│  │                                                      │   │
+│  │  Scores Tab:                                         │   │
+│  │  ├── Grid of shared scores                           │   │
+│  │  ├── Each item: thumbnail, title, composer           │   │
+│  │  └── Actions: View, Share new, Remove                │   │
+│  │                                                      │   │
+│  │  Members Tab:                                        │   │
+│  │  ├── List of team members                            │   │
+│  │  ├── Each item: avatar, name, role badge             │   │
+│  │  └── Role: Admin / Member                            │   │
+│  │                                                      │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  FAB: Share to Team (opens picker)                   │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 3.3 团队切换模态框
+
+```dart
+// lib/widgets/team_switcher_modal.dart
+
+class TeamSwitcherModal extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final teamsAsync = ref.watch(teamsNotifierProvider);
+    final selectedTeam = ref.watch(selectedTeamNotifierProvider);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Padding(
+            padding: EdgeInsets.all(20),
+            child: Text('Switch Team', style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+            )),
+          ),
+          Divider(height: 1),
+          // Team list
+          teamsAsync.when(
+            data: (teams) => ListView.builder(
+              shrinkWrap: true,
+              itemCount: teams.length,
+              itemBuilder: (context, index) {
+                final team = teams[index];
+                final isSelected = selectedTeam?.id == team.id;
+                return ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.indigo100,
+                    child: Text(team.name[0]),
+                  ),
+                  title: Text(team.name),
+                  subtitle: Text('${team.members.length} members'),
+                  trailing: isSelected
+                      ? Icon(Icons.check, color: AppColors.blue500)
+                      : null,
+                  onTap: () {
+                    ref.read(selectedTeamNotifierProvider.notifier).select(team);
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+            loading: () => CircularProgressIndicator(),
+            error: (e, _) => Text('Error: $e'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+## 4. 团队同步机制
+
+### 4.1 同步策略
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    团队数据同步                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  个人数据:                                                   │
+│  ├── 完整离线支持                                            │
+│  ├── 增量同步 (since last_synced)                           │
+│  ├── 冲突: LWW + CRDT                                       │
+│  └── 个人批注仅自己可见                                      │
+│                                                             │
+│  团队数据:                                                   │
+│  ├── 需要登录访问                                            │
+│  ├── 实时更新 (WebSocket 推送)                              │
+│  ├── 本地缓存 (支持离线查看)                                 │
+│  └── 批注: CRDT 合并 (支持多人同时编辑)                      │
+│                                                             │
+│  权限模型 (简化):                                            │
+│  ├── 所有成员对共享资源拥有完全权限                          │
+│  ├── 批注全团队共享,任何成员可添加/编辑/删除                 │
+│  ├── 只有共享者或团队管理员可取消共享                        │
+│  └── role 仅用于团队管理,不影响数据访问                      │
+│                                                             │
+│  团队批注同步:                                               │
+│  ├── 使用 CRDT (向量时钟) 合并多人编辑                       │
+│  ├── 记录创建者和最后修改者                                  │
+│  ├── 实时推送批注变更到所有在线成员                          │
+│  └── 离线编辑上线后自动合并                                  │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 4.2 实时通知
+
+```dart
+// musheet_server/lib/src/services/team_notification_service.dart
+
+class TeamNotificationService {
+
+  /// 当乐谱被共享到团队时，通知所有团队成员
+  Future<void> notifyScoreShared(
+    Session session,
+    int teamId,
+    Score score,
+    User sharedBy,
+  ) async {
+    final members = await TeamMember.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId),
+    );
+
+    for (final member in members) {
+      if (member.userId != sharedBy.id) {
+        // 通过 WebSocket 发送实时通知
+        session.messages.postMessage(
+          member.userId.toString(),
+          TeamNotification(
+            type: 'score_shared',
+            teamId: teamId,
+            scoreId: score.id!,
+            scoreTitle: score.title,
+            sharedByName: sharedBy.displayName ?? sharedBy.username,
+          ),
+        );
+      }
+    }
+  }
+}
+```
+
+---
+
 ## 8. Web 管理面板
 
 ### 8.1 功能规划
@@ -2479,6 +3219,721 @@ class AdminEndpoint extends Endpoint {
       user: user,
       teams: teams,
     );
+  }
+}
+```
+
+---
+
+# Part 4: 多应用支持
+
+> 应用隔离、数据复用、扩展性设计
+
+## 1. 多应用平台概述
+
+MuSheet 只是该统一后端平台支持的多个前端应用之一。平台设计为可扩展架构，支持未来添加更多应用（如练习记录、演出管理等），同时保持数据隔离和账户共享。
+
+### 1.1 平台架构图
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           多应用平台架构                                      │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                         统一后端平台                                  │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
+│  │  │                     共享层 (Shared Layer)                    │   │   │
+│  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │   │   │
+│  │  │  │  用户账户   │  │  团队成员   │  │     认证系统        │ │   │   │
+│  │  │  │  (跨应用)   │  │   关系     │  │  (Token + Session)  │ │   │   │
+│  │  │  └─────────────┘  └─────────────┘  └─────────────────────┘ │   │   │
+│  │  └─────────────────────────────────────────────────────────────┘   │   │
+│  │                                                                     │   │
+│  │  ┌─────────────────────────────────────────────────────────────┐   │   │
+│  │  │                    隔离层 (Isolated Layer)                   │   │   │
+│  │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │   │   │
+│  │  │  │  MuSheet    │  │  Future App │  │    Future App       │ │   │   │
+│  │  │  │  App Data   │  │  App Data   │  │    App Data         │ │   │   │
+│  │  │  │ (乐谱/批注) │  │  (练习?)    │  │    (演出?)          │ │   │   │
+│  │  │  └─────────────┘  └─────────────┘  └─────────────────────┘ │   │   │
+│  │  └─────────────────────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│            ┌───────────────────────┼───────────────────────┐                │
+│            ▼                       ▼                       ▼                │
+│   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐      │
+│   │    MuSheet      │     │   Practice App  │     │   Gig Manager   │      │
+│   │  (乐谱管理)      │     │   (练习记录)    │     │   (演出管理)    │      │
+│   │                 │     │                 │     │                 │      │
+│   │  ✓ 同一账号登录  │     │  ✓ 同一账号登录  │     │  ✓ 同一账号登录  │      │
+│   │  ✓ 共享用户资料  │     │  ✓ 共享用户资料  │     │  ✓ 共享用户资料  │      │
+│   │  ✓ 独立应用数据  │     │  ✓ 独立应用数据  │     │  ✓ 独立应用数据  │      │
+│   └─────────────────┘     └─────────────────┘     └─────────────────┘      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 共享 vs 隔离数据
+
+| 数据类型 | 存储方式 | 说明 |
+|----------|----------|------|
+| **用户账户** | 共享 | 用户名、密码、头像、基本资料 |
+| **团队成员关系** | 共享 | 用户属于哪些团队 |
+| **认证 Token** | 共享 | 一次登录，多应用有效 |
+| **用户偏好** | 按应用隔离 | 每个应用可有独立设置 |
+| **应用数据** | 按应用隔离 | 乐谱、批注、同步状态等 |
+| **存储统计** | 按应用隔离 | 每个应用独立计算 |
+
+---
+
+## 2. 应用注册系统
+
+### 2.1 应用数据模型
+
+```yaml
+# musheet_server/lib/src/protocol/application.yaml
+class: Application
+table: applications
+fields:
+  appId: String                  # 唯一标识 (如 'musheet', 'practice')
+  name: String                   # 显示名称
+  description: String?
+  iconPath: String?              # 应用图标
+  isActive: bool                 # 是否启用
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  app_id_idx:
+    fields: appId
+    unique: true
+```
+
+```yaml
+# musheet_server/lib/src/protocol/user_app_data.yaml
+class: UserAppData
+table: user_app_data
+fields:
+  userId: int, relation(parent=user)
+  appId: String                  # 关联的应用
+  preferences: String?           # JSON 格式的应用偏好
+  storageUsedBytes: int          # 该应用使用的存储
+  lastActiveAt: DateTime?
+  createdAt: DateTime
+  updatedAt: DateTime
+indexes:
+  user_app_unique_idx:
+    fields: userId, appId
+    unique: true
+```
+
+### 2.2 应用命名空间设计
+
+每个应用的数据表使用应用前缀进行隔离：
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         数据库表命名规范                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  共享表 (无前缀):                                                        │
+│  ├── users                    # 用户账户                                 │
+│  ├── teams                    # 团队定义                                 │
+│  ├── team_members             # 团队成员关系                             │
+│  ├── applications             # 应用注册表                               │
+│  └── user_app_data            # 用户-应用关联数据                        │
+│                                                                         │
+│  MuSheet 应用表 (musheet_ 前缀):                                         │
+│  ├── musheet_scores           # 乐谱                                    │
+│  ├── musheet_instrument_scores # 分谱                                   │
+│  ├── musheet_annotations      # 批注                                    │
+│  ├── musheet_setlists         # 演出单                                  │
+│  ├── musheet_team_scores      # 团队共享乐谱                             │
+│  └── musheet_team_setlists    # 团队共享演出单                           │
+│                                                                         │
+│  Practice App 表 (practice_ 前缀):                                       │
+│  ├── practice_sessions        # 练习会话                                 │
+│  ├── practice_goals           # 练习目标                                 │
+│  └── practice_statistics      # 练习统计                                 │
+│                                                                         │
+│  Gig Manager 表 (gig_ 前缀):                                             │
+│  ├── gig_events               # 演出事件                                 │
+│  ├── gig_venues               # 演出场地                                 │
+│  └── gig_contracts            # 演出合同                                 │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.3 应用注册 API
+
+```dart
+// musheet_server/lib/src/endpoints/application_endpoint.dart
+
+class ApplicationEndpoint extends Endpoint {
+
+  @override
+  bool get requireLogin => true;
+
+  /// 获取所有已注册应用 (仅管理员)
+  Future<List<Application>> getAllApplications(Session session) async {
+    await _requireAdmin(session);
+    return await Application.db.find(session);
+  }
+
+  /// 注册新应用 (仅管理员)
+  Future<Application> registerApplication(
+    Session session,
+    String appId,
+    String name,
+    String? description,
+  ) async {
+    await _requireAdmin(session);
+
+    // 验证 appId 格式 (小写字母、数字、下划线)
+    if (!RegExp(r'^[a-z][a-z0-9_]{2,20}$').hasMatch(appId)) {
+      throw InvalidAppIdException();
+    }
+
+    // 检查是否已存在
+    final existing = await Application.db.find(
+      session,
+      where: (t) => t.appId.equals(appId),
+    );
+    if (existing.isNotEmpty) {
+      throw AppAlreadyExistsException();
+    }
+
+    final app = Application(
+      appId: appId,
+      name: name,
+      description: description,
+      isActive: true,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await Application.db.insert(session, app);
+
+    return app;
+  }
+
+  /// 获取用户可访问的应用列表
+  Future<List<ApplicationInfo>> getMyApplications(Session session) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    // 获取所有活跃应用
+    final apps = await Application.db.find(
+      session,
+      where: (t) => t.isActive.equals(true),
+    );
+
+    // 获取用户在各应用的数据
+    final userAppData = await UserAppData.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+    final dataMap = {for (var d in userAppData) d.appId: d};
+
+    return apps.map((app) => ApplicationInfo(
+      appId: app.appId,
+      name: app.name,
+      description: app.description,
+      iconPath: app.iconPath,
+      storageUsedBytes: dataMap[app.appId]?.storageUsedBytes ?? 0,
+      lastActiveAt: dataMap[app.appId]?.lastActiveAt,
+    )).toList();
+  }
+
+  /// 获取用户在特定应用的偏好设置
+  Future<Map<String, dynamic>> getAppPreferences(
+    Session session,
+    String appId,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final data = await UserAppData.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) & t.appId.equals(appId),
+    );
+
+    if (data.isEmpty || data.first.preferences == null) {
+      return {};
+    }
+
+    return jsonDecode(data.first.preferences!) as Map<String, dynamic>;
+  }
+
+  /// 保存用户在特定应用的偏好设置
+  Future<void> saveAppPreferences(
+    Session session,
+    String appId,
+    Map<String, dynamic> preferences,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final existing = await UserAppData.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) & t.appId.equals(appId),
+    );
+
+    if (existing.isNotEmpty) {
+      existing.first.preferences = jsonEncode(preferences);
+      existing.first.updatedAt = DateTime.now();
+      await UserAppData.db.update(session, existing.first);
+    } else {
+      final data = UserAppData(
+        userId: userId,
+        appId: appId,
+        preferences: jsonEncode(preferences),
+        storageUsedBytes: 0,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await UserAppData.db.insert(session, data);
+    }
+  }
+}
+```
+
+---
+
+## 3. 跨应用认证
+
+### 3.1 认证流程
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         跨应用认证流程                                    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌─────────────┐                                                        │
+│  │   用户      │                                                        │
+│  └──────┬──────┘                                                        │
+│         │ 1. 登录 (用户名 + 密码)                                        │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                     统一认证服务                                  │   │
+│  │  ┌─────────────────────────────────────────────────────────┐   │   │
+│  │  │  验证凭证 → 生成 JWT Token (包含 appId 列表)             │   │   │
+│  │  │                                                         │   │   │
+│  │  │  Token 内容:                                            │   │   │
+│  │  │  {                                                      │   │   │
+│  │  │    "userId": 123,                                       │   │   │
+│  │  │    "username": "john",                                  │   │   │
+│  │  │    "isAdmin": false,                                    │   │   │
+│  │  │    "authorizedApps": ["musheet", "practice"],           │   │   │
+│  │  │    "exp": 1735689600                                    │   │   │
+│  │  │  }                                                      │   │   │
+│  │  └─────────────────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│         │                                                               │
+│         │ 2. 返回 Token                                                 │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                     客户端本地存储                                │   │
+│  │  ┌─────────────┐                                               │   │
+│  │  │  安全存储   │ ← Token 加密存储                               │   │
+│  │  │  (Keychain/ │                                               │   │
+│  │  │  Keystore)  │                                               │   │
+│  │  └─────────────┘                                               │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│         │                                                               │
+│         │ 3. 访问任意应用 (携带 Token)                                   │
+│         ▼                                                               │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                     应用 API 端点                                 │   │
+│  │  ┌─────────────────────────────────────────────────────────┐   │   │
+│  │  │  验证 Token → 检查 appId 是否在 authorizedApps 中        │   │   │
+│  │  │            → 允许/拒绝访问                               │   │   │
+│  │  └─────────────────────────────────────────────────────────┘   │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 认证中间件
+
+```dart
+// musheet_server/lib/src/services/app_auth_service.dart
+
+class AppAuthService {
+
+  /// 验证请求是否有权访问指定应用
+  static Future<bool> validateAppAccess(
+    Session session,
+    String appId,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) return false;
+
+    // 获取用户信息
+    final user = await User.db.findById(session, userId);
+    if (user == null || user.isDisabled) return false;
+
+    // 管理员可访问所有应用
+    if (user.isAdmin) return true;
+
+    // 检查应用是否启用
+    final apps = await Application.db.find(
+      session,
+      where: (t) => t.appId.equals(appId) & t.isActive.equals(true),
+    );
+    if (apps.isEmpty) return false;
+
+    // 普通用户默认可以访问所有活跃应用
+    // 如需更细粒度控制，可在此添加权限检查
+    return true;
+  }
+
+  /// 记录用户在应用的活动
+  static Future<void> recordAppActivity(
+    Session session,
+    String appId,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) return;
+
+    final existing = await UserAppData.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) & t.appId.equals(appId),
+    );
+
+    if (existing.isNotEmpty) {
+      existing.first.lastActiveAt = DateTime.now();
+      await UserAppData.db.update(session, existing.first);
+    } else {
+      final data = UserAppData(
+        userId: userId,
+        appId: appId,
+        storageUsedBytes: 0,
+        lastActiveAt: DateTime.now(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await UserAppData.db.insert(session, data);
+    }
+  }
+}
+```
+
+### 3.3 应用隔离端点基类
+
+```dart
+// musheet_server/lib/src/endpoints/app_endpoint_base.dart
+
+/// 应用专属端点基类，自动处理应用隔离和权限验证
+abstract class AppEndpointBase extends Endpoint {
+
+  /// 子类必须指定应用 ID
+  String get appId;
+
+  @override
+  bool get requireLogin => true;
+
+  /// 在每个方法调用前验证应用访问权限
+  Future<void> validateAccess(Session session) async {
+    final hasAccess = await AppAuthService.validateAppAccess(session, appId);
+    if (!hasAccess) {
+      throw AppAccessDeniedException(appId);
+    }
+
+    // 记录活动
+    await AppAuthService.recordAppActivity(session, appId);
+  }
+
+  /// 获取用户在此应用的存储使用量
+  Future<int> getStorageUsed(Session session) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) return 0;
+
+    final data = await UserAppData.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) & t.appId.equals(appId),
+    );
+
+    return data.isNotEmpty ? data.first.storageUsedBytes : 0;
+  }
+
+  /// 更新用户在此应用的存储使用量
+  Future<void> updateStorageUsed(Session session, int deltaBytes) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) return;
+
+    final existing = await UserAppData.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) & t.appId.equals(appId),
+    );
+
+    if (existing.isNotEmpty) {
+      existing.first.storageUsedBytes += deltaBytes;
+      await UserAppData.db.update(session, existing.first);
+    }
+  }
+}
+```
+
+---
+
+## 4. MuSheet 应用集成
+
+### 4.1 MuSheet 端点实现
+
+```dart
+// musheet_server/lib/src/endpoints/musheet/musheet_score_endpoint.dart
+
+/// MuSheet 乐谱端点 - 继承自应用基类
+class MusSheetScoreEndpoint extends AppEndpointBase {
+
+  @override
+  String get appId => 'musheet';
+
+  /// 获取用户乐谱列表
+  Future<List<MusSheetScore>> getScores(Session session, {DateTime? since}) async {
+    await validateAccess(session);
+
+    final userId = await session.auth.authenticatedUserId;
+
+    var query = MusSheetScore.db.find(
+      session,
+      where: (t) => t.userId.equals(userId!) & t.deletedAt.equals(null),
+    );
+
+    if (since != null) {
+      query = MusSheetScore.db.find(
+        session,
+        where: (t) => t.userId.equals(userId!) & t.updatedAt.greaterThan(since),
+      );
+    }
+
+    return await query;
+  }
+
+  /// 创建乐谱
+  Future<MusSheetScore> createScore(Session session, MusSheetScore score) async {
+    await validateAccess(session);
+
+    final userId = await session.auth.authenticatedUserId;
+    score.userId = userId!;
+    score.createdAt = DateTime.now();
+    score.updatedAt = DateTime.now();
+
+    await MusSheetScore.db.insert(session, score);
+    return score;
+  }
+
+  /// 上传 PDF 并更新存储统计
+  Future<void> uploadPdf(
+    Session session,
+    int instrumentScoreId,
+    ByteData fileData,
+    String fileName,
+  ) async {
+    await validateAccess(session);
+
+    final fileSize = fileData.lengthInBytes;
+
+    // 保存文件...
+    // await _saveFile(...);
+
+    // 更新应用存储统计
+    await updateStorageUsed(session, fileSize);
+  }
+}
+```
+
+### 4.2 应用数据表定义
+
+MuSheet 应用的数据表使用 `musheet_` 前缀：
+
+```yaml
+# musheet_server/lib/src/protocol/musheet/musheet_score.yaml
+class: MusSheetScore
+table: musheet_scores
+fields:
+  userId: int, relation(parent=user)
+  title: String
+  composer: String?
+  bpm: int?
+  createdAt: DateTime
+  updatedAt: DateTime
+  deletedAt: DateTime?
+  version: int
+  syncStatus: String?
+indexes:
+  musheet_score_user_idx:
+    fields: userId
+```
+
+```yaml
+# musheet_server/lib/src/protocol/musheet/musheet_instrument_score.yaml
+class: MusSheetInstrumentScore
+table: musheet_instrument_scores
+fields:
+  scoreId: int, relation(parent=musheet_score)
+  instrumentType: String
+  customInstrument: String?
+  pdfPath: String?
+  thumbnailPath: String?
+  fileSize: int?
+  createdAt: DateTime
+  updatedAt: DateTime
+```
+
+---
+
+## 5. 存储隔离与统计
+
+### 5.1 按应用存储统计
+
+```dart
+// musheet_server/lib/src/services/storage_service.dart
+
+class StorageService {
+
+  /// 获取用户在所有应用的存储使用情况
+  static Future<UserStorageSummary> getUserStorageSummary(
+    Session session,
+  ) async {
+    final userId = await session.auth.authenticatedUserId;
+    if (userId == null) throw AuthenticationException();
+
+    final appData = await UserAppData.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+
+    int totalBytes = 0;
+    final byApp = <String, int>{};
+
+    for (final data in appData) {
+      totalBytes += data.storageUsedBytes;
+      byApp[data.appId] = data.storageUsedBytes;
+    }
+
+    return UserStorageSummary(
+      totalBytes: totalBytes,
+      byApp: byApp,
+    );
+  }
+
+  /// 获取系统总存储统计 (仅管理员)
+  static Future<SystemStorageSummary> getSystemStorageSummary(
+    Session session,
+  ) async {
+    await _requireAdmin(session);
+
+    // 按应用统计
+    final apps = await Application.db.find(session);
+    final appStats = <String, AppStorageStats>{};
+
+    for (final app in apps) {
+      final data = await UserAppData.db.find(
+        session,
+        where: (t) => t.appId.equals(app.appId),
+      );
+
+      int totalBytes = 0;
+      int userCount = 0;
+      for (final d in data) {
+        if (d.storageUsedBytes > 0) {
+          totalBytes += d.storageUsedBytes;
+          userCount++;
+        }
+      }
+
+      appStats[app.appId] = AppStorageStats(
+        appId: app.appId,
+        appName: app.name,
+        totalBytes: totalBytes,
+        activeUserCount: userCount,
+      );
+    }
+
+    return SystemStorageSummary(byApp: appStats);
+  }
+}
+```
+
+### 5.2 存储路径隔离
+
+```
+文件存储目录结构：
+/data/uploads/
+├── avatars/                    # 用户头像 (共享)
+│   └── thumbs/
+├── musheet/                    # MuSheet 应用数据
+│   ├── pdfs/
+│   │   └── {userId}/
+│   │       └── {instrumentScoreId}_{fileName}
+│   └── thumbnails/
+│       └── {userId}/
+├── practice/                   # Practice App 数据
+│   └── recordings/
+│       └── {userId}/
+└── gig/                        # Gig Manager 数据
+    └── contracts/
+        └── {userId}/
+```
+
+---
+
+## 6. 未来应用扩展指南
+
+### 6.1 添加新应用步骤
+
+```
+新应用开发流程：
+
+1. 注册应用
+   └── 通过 Admin Panel 或 API 注册新应用 ID
+
+2. 创建数据模型
+   └── 在 musheet_server/lib/src/protocol/{appId}/ 目录下
+       └── 表名使用 {appId}_ 前缀
+
+3. 实现端点
+   └── 继承 AppEndpointBase
+       └── 指定 appId
+       └── 自动获得认证和存储统计
+
+4. 数据库迁移
+   └── serverpod generate
+   └── 运行迁移脚本
+
+5. 客户端集成
+   └── 使用相同的认证 Token
+       └── 调用应用专属 API
+```
+
+### 6.2 应用间数据共享
+
+虽然各应用数据隔离，但可通过定义明确接口实现选择性共享：
+
+```dart
+/// 应用间数据共享接口
+abstract class CrossAppDataProvider {
+  /// 获取可共享给其他应用的数据
+  Future<Map<String, dynamic>> getShareableData(Session session, int userId);
+}
+
+/// MuSheet 实现：共享乐谱标题列表供练习 App 使用
+class MusSheetCrossAppProvider implements CrossAppDataProvider {
+  @override
+  Future<Map<String, dynamic>> getShareableData(Session session, int userId) async {
+    final scores = await MusSheetScore.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) & t.deletedAt.equals(null),
+    );
+
+    return {
+      'scoreTitles': scores.map((s) => {
+        'id': s.id,
+        'title': s.title,
+        'composer': s.composer,
+      }).toList(),
+    };
   }
 }
 ```
@@ -2952,6 +4407,8 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
 | ✅ 首个用户 | 自动成为管理员 |
 | ✅ 登录方式 | 用户名 + 密码 |
 | ✅ 客户端配置 | 服务器地址 + 用户名 + 密码 |
+| ✅ 团队共享权限 | 所有成员对共享资源拥有完全权限 |
+| ✅ 团队批注 | 批注全团队共享，任何成员可添加/编辑/删除 |
 
 ### E. 待准备事项
 
@@ -3029,6 +4486,6 @@ docker-compose up -d --build
 
 ---
 
-*文档版本: 2.1*
+*文档版本: 3.0*
 *更新日期: 2024-12*
-*模式: 多团队管理*
+*模式: 多应用平台架构*

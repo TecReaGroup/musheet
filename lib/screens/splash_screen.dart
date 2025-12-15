@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// Splash screen shown during data initialization
 class SplashScreen extends StatelessWidget {
@@ -27,7 +26,8 @@ class SplashScreen extends StatelessWidget {
                   ).createShader(bounds),
                   child: Text(
                     'MuSheet',
-                    style: GoogleFonts.righteous(
+                    style: TextStyle(
+                      fontFamily: 'Righteous',
                       fontSize: 54,
                       color: Colors.white,
                       decoration: TextDecoration.none,

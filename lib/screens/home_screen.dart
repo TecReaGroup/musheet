@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../providers/scores_provider.dart';
 import '../providers/setlists_provider.dart';
 import '../providers/teams_provider.dart';
@@ -198,7 +197,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ).createShader(bounds),
                         child: Text(
                           'MuSheet',
-                          style: GoogleFonts.righteous(
+                          style: TextStyle(
+                            fontFamily: 'Righteous',
                             fontSize: 36,
                             color: Colors.white,
                           ),

@@ -153,6 +153,13 @@ flutter:
   assets:
     - assets/sounds/
     - assets/icons/
+    - assets/fonts/
+
+  # Custom fonts bundled for offline use
+  fonts:
+    - family: Righteous
+      fonts:
+        - asset: assets/fonts/Righteous-Regular.ttf
 
   # To add assets to your application, add an assets section, like this:
   # assets:
