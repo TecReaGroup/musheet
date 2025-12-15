@@ -153,6 +153,7 @@ flutter:
   assets:
     - assets/sounds/
     - assets/icons/
+    - assets/icons/generated_icons/
     - assets/fonts/
 
   # Custom fonts bundled for offline use

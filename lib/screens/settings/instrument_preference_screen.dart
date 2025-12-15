@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../models/instrument_score.dart';
-import '../theme/app_colors.dart';
-import '../utils/icon_mappings.dart';
-import '../router/app_router.dart';
-import 'library_screen.dart' show preferredInstrumentProvider;
+import '../../models/instrument_score.dart';
+import '../../theme/app_colors.dart';
+import '../../utils/icon_mappings.dart';
+import '../../router/app_router.dart';
+import '../library_screen.dart' show preferredInstrumentProvider;
 
 class InstrumentPreferenceScreen extends ConsumerWidget {
   const InstrumentPreferenceScreen({super.key});
@@ -14,111 +14,119 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final preferredInstrument = ref.watch(preferredInstrumentProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          // Fixed header with back button
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: AppColors.gray200)),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 16, 16),
-                child: Row(
-                  children: [
-                    // Back button
-                    IconButton(
-                      onPressed: () => context.go(AppRoutes.settings),
-                      icon: const Icon(
-                        AppIcons.chevronLeft,
-                        color: AppColors.gray600,
-                        size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    // Title
-                    const Expanded(
-                      child: Text(
-                        'Preferred Instrument',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.gray700,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          context.go(AppRoutes.settings);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Column(
+          children: [
+            // Fixed header with back button
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: AppColors.gray200)),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 8, 16, 16),
+                  child: Row(
+                    children: [
+                      // Back button
+                      IconButton(
+                        onPressed: () => context.go(AppRoutes.settings),
+                        icon: const Icon(
+                          AppIcons.chevronLeft,
+                          color: AppColors.gray600,
+                          size: 24,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          // Content
-          Expanded(
-            child: Builder(
-              builder: (context) => ListView(
-                padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
-                children: [
-                // No preference option
-                _buildInstrumentOption(
-                  context: context,
-                  ref: ref,
-                  instrumentKey: null,
-                  displayName: 'No Preference',
-                  subtitle: 'Use default order',
-                  isSelected: preferredInstrument == null,
-                  icon: AppIcons.circleSlash,
-                ),
-                const SizedBox(height: 12),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'INSTRUMENTS',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.gray500,
-                      letterSpacing: 0.5,
-                    ),
+                      const SizedBox(width: 4),
+                      // Title
+                      const Expanded(
+                        child: Text(
+                          'Preferred Instrument',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.gray700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                // Instrument options (excluding 'other')
-                ...InstrumentType.values.where((type) => type != InstrumentType.other).map((type) {
-                  final instrumentKey = type.name;
-                  final displayName = type.name[0].toUpperCase() + type.name.substring(1);
-                  final isSelected = preferredInstrument == instrumentKey;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: type == InstrumentType.bass
-                        ? _buildInstrumentOptionWithWidget(
-                            context: context,
-                            ref: ref,
-                            instrumentKey: instrumentKey,
-                            displayName: displayName,
-                            isSelected: isSelected,
-                            iconWidget: AppIcons.bassGuitar(
-                              size: 20,
-                              color: isSelected ? Colors.white : AppColors.gray600,
-                            ),
-                          )
-                        : _buildInstrumentOption(
-                            context: context,
-                            ref: ref,
-                            instrumentKey: instrumentKey,
-                            displayName: displayName,
-                            isSelected: isSelected,
-                            icon: _getInstrumentIcon(type),
-                          ),
-                  );
-                }),
-              ],
               ),
             ),
-          ),
-        ],
+            // Content
+            Expanded(
+              child: Builder(
+                builder: (context) => ListView(
+                  padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+                  children: [
+                  // No preference option
+                  _buildInstrumentOption(
+                    context: context,
+                    ref: ref,
+                    instrumentKey: null,
+                    displayName: 'No Preference',
+                    subtitle: 'Use default order',
+                    isSelected: preferredInstrument == null,
+                    icon: AppIcons.circleSlash,
+                  ),
+                  const SizedBox(height: 12),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'INSTRUMENTS',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gray500,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                  // Instrument options (excluding 'other')
+                  ...InstrumentType.values.where((type) => type != InstrumentType.other).map((type) {
+                    final instrumentKey = type.name;
+                    final displayName = type.name[0].toUpperCase() + type.name.substring(1);
+                    final isSelected = preferredInstrument == instrumentKey;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: type == InstrumentType.bass
+                          ? _buildInstrumentOptionWithWidget(
+                              context: context,
+                              ref: ref,
+                              instrumentKey: instrumentKey,
+                              displayName: displayName,
+                              isSelected: isSelected,
+                              iconWidget: AppIcons.bassGuitar(
+                                size: 20,
+                                color: isSelected ? Colors.white : AppColors.gray600,
+                              ),
+                            )
+                          : _buildInstrumentOption(
+                              context: context,
+                              ref: ref,
+                              instrumentKey: instrumentKey,
+                              displayName: displayName,
+                              isSelected: isSelected,
+                              icon: _getInstrumentIcon(type),
+                            ),
+                    );
+                  }),
+                ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

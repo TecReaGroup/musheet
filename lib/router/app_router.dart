@@ -8,7 +8,12 @@ import '../screens/settings_screen.dart';
 import '../screens/score_viewer_screen.dart';
 import '../screens/score_detail_screen.dart';
 import '../screens/setlist_detail_screen.dart';
-import '../screens/instrument_preference_screen.dart';
+import '../screens/settings/instrument_preference_screen.dart';
+import '../screens/settings/cloud_sync_screen.dart';
+import '../screens/settings/bluetooth_devices_screen.dart';
+import '../screens/settings/notifications_screen.dart';
+import '../screens/settings/help_support_screen.dart';
+import '../screens/settings/about_screen.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
 import '../app.dart';
@@ -23,6 +28,11 @@ class AppRoutes {
   static const String scoreDetail = '/score-detail';
   static const String setlistDetail = '/setlist-detail';
   static const String instrumentPreference = '/instrument-preference';
+  static const String cloudSync = '/cloud-sync';
+  static const String bluetoothDevices = '/bluetooth-devices';
+  static const String notifications = '/notifications';
+  static const String helpSupport = '/help-support';
+  static const String about = '/about';
 }
 
 // Shell route key for the main scaffold with bottom navigation
@@ -74,6 +84,36 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.instrumentPreference,
             pageBuilder: (context, state) => const MaterialPage(
               child: InstrumentPreferenceScreen(),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.cloudSync,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: CloudSyncScreen(),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.bluetoothDevices,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: BluetoothDevicesScreen(),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.notifications,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: NotificationsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.helpSupport,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: HelpSupportScreen(),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.about,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: AboutScreen(),
             ),
           ),
         ],

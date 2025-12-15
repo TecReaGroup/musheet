@@ -112,8 +112,15 @@ class AppIcons {
   // Settings & System
   static const bluetooth = LucideIcons.bluetooth;
   static const cloud = LucideIcons.cloud;
-  static const helpOutline = LucideIcons.badgeQuestionMark;
-  static const infoOutline = LucideIcons.badgeInfo;
+  static const helpOutline = LucideIcons.handHelping;
+  static const infoOutline = LucideIcons.info;
+  static const globe = LucideIcons.globe;
+  static const fileText = LucideIcons.fileText;
+  static const star = LucideIcons.star;
+  static const bookOpen = LucideIcons.bookOpen;
+  static const mail = LucideIcons.mail;
+  static const bug = LucideIcons.bug;
+  static const lightbulb = LucideIcons.lightbulb;
   
   // Special
   static const workspacePremium = LucideIcons.award;

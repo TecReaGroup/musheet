@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
@@ -183,7 +184,7 @@ class SettingsScreen extends ConsumerWidget {
               SettingsListItem(
                 icon: AppIcons.bluetooth,
                 label: 'Bluetooth Devices',
-                onTap: () {},
+                onTap: () => context.go(AppRoutes.bluetoothDevices),
                 isLast: true,
               ),
             ],
@@ -195,14 +196,14 @@ class SettingsScreen extends ConsumerWidget {
               SettingsListItem(
                 icon: AppIcons.cloud,
                 label: 'Cloud Sync',
-                onTap: () {},
+                onTap: () => context.go(AppRoutes.cloudSync),
                 showDivider: true,
                 isFirst: true,
               ),
               SettingsListItem(
                 icon: AppIcons.notifications,
                 label: 'Notifications',
-                onTap: () {},
+                onTap: () => context.go(AppRoutes.notifications),
                 isLast: true,
               ),
             ],
@@ -214,14 +215,14 @@ class SettingsScreen extends ConsumerWidget {
               SettingsListItem(
                 icon: AppIcons.helpOutline,
                 label: 'Help & Support',
-                onTap: () {},
+                onTap: () => context.go(AppRoutes.helpSupport),
                 showDivider: true,
                 isFirst: true,
               ),
               SettingsListItem(
                 icon: AppIcons.infoOutline,
                 label: 'About MuSheet',
-                onTap: () {},
+                onTap: () => context.go(AppRoutes.about),
                 isLast: true,
               ),
             ],
