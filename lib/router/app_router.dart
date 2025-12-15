@@ -70,6 +70,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               child: const SettingsScreen(),
             ),
           ),
+          GoRoute(
+            path: AppRoutes.instrumentPreference,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: InstrumentPreferenceScreen(),
+            ),
+          ),
         ],
       ),
       // Full screen routes (outside shell)
@@ -109,16 +115,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return MaterialPage(
             key: state.pageKey,
             child: SetlistDetailScreen(setlist: setlist),
-          );
-        },
-      ),
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
-        path: AppRoutes.instrumentPreference,
-        pageBuilder: (context, state) {
-          return MaterialPage(
-            key: state.pageKey,
-            child: const InstrumentPreferenceScreen(),
           );
         },
       ),
@@ -173,7 +169,7 @@ class AppNavigation {
   }
 
   static void navigateToInstrumentPreference(BuildContext context) {
-    context.push(AppRoutes.instrumentPreference);
+    context.go(AppRoutes.instrumentPreference);
   }
 
   // Get current route location

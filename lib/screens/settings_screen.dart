@@ -14,12 +14,9 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Builder(
-        builder: (context) => ListView(
-          // Remove default top padding, we handle it manually in the header container
-          // Add bottom padding for bottom navigation bar
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
-          children: [
+      body: Column(
+        children: [
+          // Fixed header
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -27,12 +24,21 @@ class SettingsScreen extends ConsumerWidget {
             ),
             // Add top safe area padding
             padding: EdgeInsets.fromLTRB(16, 16 + MediaQuery.of(context).padding.top, 16, 24),
-            child: const Text(
-              'Settings',
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: AppColors.gray700),
+            child: const Row(
+              children: [
+                Text(
+                  'Settings',
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: AppColors.gray700),
+                ),
+              ],
             ),
           ),
-          
+          // Scrollable content
+          Expanded(
+            child: ListView(
+              // Add bottom padding for bottom navigation bar
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+              children: [
           // Profile card section
           Padding(
             padding: const EdgeInsets.all(16),
@@ -235,8 +241,10 @@ class SettingsScreen extends ConsumerWidget {
               ],
             ),
           ),
+              ],
+            ),
+          ),
         ],
-        ),
       ),
     );
   }

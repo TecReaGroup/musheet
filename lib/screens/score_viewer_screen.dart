@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
@@ -393,12 +392,6 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Set status bar to dark icons for light background
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ));
-
     return Scaffold(
       // Extend body behind system UI for fullscreen effect
       extendBodyBehindAppBar: true,

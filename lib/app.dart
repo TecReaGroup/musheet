@@ -10,6 +10,7 @@ import 'theme/app_theme.dart';
 import 'theme/app_colors.dart';
 import 'screens/library_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 import 'utils/icon_mappings.dart';
 import 'router/app_router.dart';
 import 'providers/storage_providers.dart';
@@ -46,150 +47,45 @@ class MuSheetApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Watch the storage initializer to trigger initialization
     final storageInit = ref.watch(storageInitializerProvider);
-    
+
     // Watch the scores provider to trigger initial load
     final scoresAsync = ref.watch(scoresProvider);
-    
+
     // Watch the setlists provider to trigger initial load
     final setlistsAsync = ref.watch(setlistsAsyncProvider);
-    
-    return storageInit.when(
-      loading: () => MaterialApp(
+
+    // Show splash until all data is loaded
+    final isLoading = storageInit.isLoading ||
+        scoresAsync.isLoading ||
+        setlistsAsync.isLoading;
+
+    final hasError = storageInit.hasError || scoresAsync.hasError || setlistsAsync.hasError;
+
+    if (isLoading) {
+      return MaterialApp(
         title: 'MuSheet',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
-        home: const _SplashScreen(),
-      ),
-      error: (error, stack) => MaterialApp(
+        home: const SplashScreen(),
+      );
+    }
+
+    if (hasError) {
+      final error = storageInit.error ?? scoresAsync.error ?? setlistsAsync.error;
+      return MaterialApp(
         title: 'MuSheet',
         theme: AppTheme.lightTheme,
         debugShowCheckedModeBanner: false,
-        home: _ErrorScreen(error: error.toString()),
-      ),
-      data: (_) => scoresAsync.when(
-        loading: () => MaterialApp(
-          title: 'MuSheet',
-          theme: AppTheme.lightTheme,
-          debugShowCheckedModeBanner: false,
-          home: const _SplashScreen(),
-        ),
-        error: (error, stack) => MaterialApp(
-          title: 'MuSheet',
-          theme: AppTheme.lightTheme,
-          debugShowCheckedModeBanner: false,
-          home: _ErrorScreen(error: error.toString()),
-        ),
-        data: (_) => setlistsAsync.when(
-          loading: () => MaterialApp(
-            title: 'MuSheet',
-            theme: AppTheme.lightTheme,
-            debugShowCheckedModeBanner: false,
-            home: const _SplashScreen(),
-          ),
-          error: (error, stack) => MaterialApp(
-            title: 'MuSheet',
-            theme: AppTheme.lightTheme,
-            debugShowCheckedModeBanner: false,
-            home: _ErrorScreen(error: error.toString()),
-          ),
-          data: (_) {
-            final router = ref.watch(goRouterProvider);
-            return MaterialApp.router(
-              title: 'MuSheet',
-              theme: AppTheme.lightTheme,
-              debugShowCheckedModeBanner: false,
-              routerConfig: router,
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
+        home: ErrorScreen(error: error.toString()),
+      );
+    }
 
-/// Splash screen shown during storage initialization
-class _SplashScreen extends StatelessWidget {
-  const _SplashScreen();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // App logo or name
-            ShaderMask(
-              shaderCallback: (bounds) => const LinearGradient(
-                colors: [
-                  Color(0xFF3B82F6),
-                  Color(0xFF14B8A6),
-                  Color(0xFF10B981),
-                ],
-              ).createShader(bounds),
-              child: const Text(
-                'MuSheet',
-                style: TextStyle(
-                  fontSize: 48,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Error screen shown when initialization fails
-class _ErrorScreen extends StatelessWidget {
-  final String error;
-  
-  const _ErrorScreen({required this.error});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 64,
-                color: Colors.red,
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Failed to initialize',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                error,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    final router = ref.watch(goRouterProvider);
+    return MaterialApp.router(
+      title: 'MuSheet',
+      theme: AppTheme.lightTheme,
+      debugShowCheckedModeBanner: false,
+      routerConfig: router,
     );
   }
 }
@@ -353,16 +249,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         }
       });
     }
-
-    // Ensure system UI style is applied on every build
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
-      systemNavigationBarContrastEnforced: false,
-    ));
 
     return PopScope(
       canPop: false,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../models/instrument_score.dart';
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
+import '../router/app_router.dart';
 import 'library_screen.dart' show preferredInstrumentProvider;
 
 class InstrumentPreferenceScreen extends ConsumerWidget {
@@ -16,72 +18,36 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Header
+          // Fixed header with back button
           Container(
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.blue50, Colors.white],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              border: Border(bottom: BorderSide(color: AppColors.gray100)),
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: AppColors.gray200)),
             ),
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                padding: const EdgeInsets.fromLTRB(4, 8, 16, 16),
                 child: Row(
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.blue400, AppColors.blue600],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        AppIcons.piano,
-                        color: Colors.white,
+                    // Back button
+                    IconButton(
+                      onPressed: () => context.go(AppRoutes.settings),
+                      icon: const Icon(
+                        AppIcons.chevronLeft,
+                        color: AppColors.gray600,
                         size: 24,
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 4),
+                    // Title
                     const Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Preferred Instrument',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Choose your main instrument',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.gray500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      behavior: HitTestBehavior.opaque,
-                      child: const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(
-                          AppIcons.close,
-                          color: AppColors.gray400,
-                          size: 22,
+                      child: Text(
+                        'Preferred Instrument',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray700,
                         ),
                       ),
                     ),
@@ -92,9 +58,10 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
           ),
           // Content
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
+            child: Builder(
+              builder: (context) => ListView(
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+                children: [
                 // No preference option
                 _buildInstrumentOption(
                   context: context,
@@ -148,6 +115,7 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
                   );
                 }),
               ],
+              ),
             ),
           ),
         ],
@@ -170,7 +138,7 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
       child: InkWell(
         onTap: () {
           ref.read(preferredInstrumentProvider.notifier).setPreferredInstrument(instrumentKey);
-          Navigator.pop(context);
+          context.go(AppRoutes.settings);
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
@@ -252,7 +220,7 @@ class InstrumentPreferenceScreen extends ConsumerWidget {
       child: InkWell(
         onTap: () {
           ref.read(preferredInstrumentProvider.notifier).setPreferredInstrument(instrumentKey);
-          Navigator.pop(context);
+          context.go(AppRoutes.settings);
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
