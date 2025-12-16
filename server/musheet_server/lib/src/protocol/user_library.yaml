@@ -1,0 +1,21 @@
+### User Library
+### Tracks the global library version for each user (Zotero-style)
+class: UserLibrary
+table: user_libraries
+fields:
+  ### User ID (foreign key to users)
+  userId: int, relation(parent=users)
+  
+  ### Current library version (increments on any change)
+  libraryVersion: int
+  
+  ### Last sync timestamp
+  lastSyncAt: DateTime
+  
+  ### Last modification timestamp
+  lastModifiedAt: DateTime
+
+indexes:
+  user_library_user_idx:
+    fields: userId
+    unique: true

@@ -1,0 +1,24 @@
+### Sync Entity Change DTO
+### Represents a single entity change in a sync request
+class: SyncEntityChange
+fields:
+  ### Entity type (score, instrumentScore, annotation, setlist, setlistScore)
+  entityType: String
+  
+  ### Entity ID (client-side UUID)
+  entityId: String
+  
+  ### Server ID (if known, for updates)
+  serverId: int?
+  
+  ### Operation type: create, update, delete
+  operation: String
+  
+  ### Version when this change was made
+  version: int
+  
+  ### JSON-encoded entity data
+  data: String
+  
+  ### When this change was made locally
+  localUpdatedAt: DateTime

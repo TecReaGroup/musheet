@@ -27,7 +27,11 @@ class PdfDownloadState {
 /// Uses the sync service directly
 /// Returns the file path if successful, null otherwise
 Future<String?> downloadPdfForScore(Ref ref, String instrumentScoreId) async {
-  final syncService = ref.read(syncServiceProvider);
+  final syncServiceAsync = ref.read(syncServiceProvider);
+  final syncService = switch (syncServiceAsync) {
+    AsyncData(:final value) => value,
+    _ => null,
+  };
   if (syncService == null) {
     return null;
   }
@@ -41,14 +45,22 @@ Future<String?> downloadPdfForScore(Ref ref, String instrumentScoreId) async {
 
 /// Helper function to check if PDF needs download
 Future<bool> needsPdfDownload(Ref ref, String instrumentScoreId) async {
-  final syncService = ref.read(syncServiceProvider);
+  final syncServiceAsync = ref.read(syncServiceProvider);
+  final syncService = switch (syncServiceAsync) {
+    AsyncData(:final value) => value,
+    _ => null,
+  };
   if (syncService == null) return false;
-  return syncService.needsPdfDownload(instrumentScoreId);
+  return await syncService.needsPdfDownload(instrumentScoreId);
 }
 
 /// Helper function to mark PDF as pending upload
 Future<void> markPdfPendingUpload(Ref ref, String instrumentScoreId) async {
-  final syncService = ref.read(syncServiceProvider);
+  final syncServiceAsync = ref.read(syncServiceProvider);
+  final syncService = switch (syncServiceAsync) {
+    AsyncData(:final value) => value,
+    _ => null,
+  };
   if (syncService == null) return;
   await syncService.markPdfPendingUpload(instrumentScoreId);
 }

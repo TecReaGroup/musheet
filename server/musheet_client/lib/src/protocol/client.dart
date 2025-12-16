@@ -20,27 +20,32 @@ import 'package:musheet_client/src/protocol/user.dart' as _i7;
 import 'package:musheet_client/src/protocol/application.dart' as _i8;
 import 'package:musheet_client/src/protocol/dto/file_upload_result.dart' as _i9;
 import 'dart:typed_data' as _i10;
-import 'package:musheet_client/src/protocol/dto/user_profile.dart' as _i11;
-import 'package:musheet_client/src/protocol/dto/avatar_upload_result.dart'
+import 'package:musheet_client/src/protocol/dto/sync_pull_response.dart'
+    as _i11;
+import 'package:musheet_client/src/protocol/dto/sync_push_response.dart'
     as _i12;
+import 'package:musheet_client/src/protocol/dto/sync_push_request.dart' as _i13;
+import 'package:musheet_client/src/protocol/dto/user_profile.dart' as _i14;
+import 'package:musheet_client/src/protocol/dto/avatar_upload_result.dart'
+    as _i15;
 import 'package:musheet_client/src/protocol/dto/public_user_profile.dart'
-    as _i13;
+    as _i16;
 import 'package:musheet_client/src/protocol/dto/delete_user_data_result.dart'
-    as _i14;
-import 'package:musheet_client/src/protocol/score.dart' as _i15;
-import 'package:musheet_client/src/protocol/dto/score_sync_result.dart' as _i16;
-import 'package:musheet_client/src/protocol/instrument_score.dart' as _i17;
-import 'package:musheet_client/src/protocol/annotation.dart' as _i18;
-import 'package:musheet_client/src/protocol/setlist.dart' as _i19;
-import 'package:musheet_client/src/protocol/setlist_score.dart' as _i20;
-import 'package:musheet_client/src/protocol/team_annotation.dart' as _i21;
-import 'package:musheet_client/src/protocol/team.dart' as _i22;
-import 'package:musheet_client/src/protocol/team_member.dart' as _i23;
-import 'package:musheet_client/src/protocol/dto/team_member_info.dart' as _i24;
-import 'package:musheet_client/src/protocol/dto/team_with_role.dart' as _i25;
-import 'package:musheet_client/src/protocol/team_score.dart' as _i26;
-import 'package:musheet_client/src/protocol/team_setlist.dart' as _i27;
-import 'protocol.dart' as _i28;
+    as _i17;
+import 'package:musheet_client/src/protocol/score.dart' as _i18;
+import 'package:musheet_client/src/protocol/dto/score_sync_result.dart' as _i19;
+import 'package:musheet_client/src/protocol/instrument_score.dart' as _i20;
+import 'package:musheet_client/src/protocol/annotation.dart' as _i21;
+import 'package:musheet_client/src/protocol/setlist.dart' as _i22;
+import 'package:musheet_client/src/protocol/setlist_score.dart' as _i23;
+import 'package:musheet_client/src/protocol/team_annotation.dart' as _i24;
+import 'package:musheet_client/src/protocol/team.dart' as _i25;
+import 'package:musheet_client/src/protocol/team_member.dart' as _i26;
+import 'package:musheet_client/src/protocol/dto/team_member_info.dart' as _i27;
+import 'package:musheet_client/src/protocol/dto/team_with_role.dart' as _i28;
+import 'package:musheet_client/src/protocol/team_score.dart' as _i29;
+import 'package:musheet_client/src/protocol/team_setlist.dart' as _i30;
+import 'protocol.dart' as _i31;
 
 /// Admin dashboard endpoint for system administrators
 /// {@category Endpoint}
@@ -563,6 +568,58 @@ class EndpointFile extends _i1.EndpointRef {
   );
 }
 
+/// Library Sync Endpoint
+/// Implements Zotero-style Library-Wide Version synchronization
+///
+/// Key principles:
+/// 1. Single libraryVersion for entire user's data
+/// 2. Push with If-Unmodified-Since-Version for conflict detection
+/// 3. Pull returns all changes since a given version
+/// 4. Local operations win in conflict resolution
+/// {@category Endpoint}
+class EndpointLibrarySync extends _i1.EndpointRef {
+  EndpointLibrarySync(_i1.EndpointCaller caller) : super(caller);
+
+  @override
+  String get name => 'librarySync';
+
+  /// Pull changes since a given library version
+  /// GET /sync?since={version}
+  _i2.Future<_i11.SyncPullResponse> pull(
+    int userId, {
+    required int since,
+  }) => caller.callServerEndpoint<_i11.SyncPullResponse>(
+    'librarySync',
+    'pull',
+    {
+      'userId': userId,
+      'since': since,
+    },
+  );
+
+  /// Push local changes to server
+  /// POST /sync with If-Unmodified-Since-Version header
+  _i2.Future<_i12.SyncPushResponse> push(
+    int userId,
+    _i13.SyncPushRequest request,
+  ) => caller.callServerEndpoint<_i12.SyncPushResponse>(
+    'librarySync',
+    'push',
+    {
+      'userId': userId,
+      'request': request,
+    },
+  );
+
+  /// Get current library version for a user
+  _i2.Future<int> getLibraryVersion(int userId) =>
+      caller.callServerEndpoint<int>(
+        'librarySync',
+        'getLibraryVersion',
+        {'userId': userId},
+      );
+}
+
 /// Profile endpoint for user profile management
 /// {@category Endpoint}
 class EndpointProfile extends _i1.EndpointRef {
@@ -572,20 +629,20 @@ class EndpointProfile extends _i1.EndpointRef {
   String get name => 'profile';
 
   /// Get current user profile
-  _i2.Future<_i11.UserProfile> getProfile(int userId) =>
-      caller.callServerEndpoint<_i11.UserProfile>(
+  _i2.Future<_i14.UserProfile> getProfile(int userId) =>
+      caller.callServerEndpoint<_i14.UserProfile>(
         'profile',
         'getProfile',
         {'userId': userId},
       );
 
   /// Update profile
-  _i2.Future<_i11.UserProfile> updateProfile(
+  _i2.Future<_i14.UserProfile> updateProfile(
     int userId, {
     String? displayName,
     String? bio,
     String? preferredInstrument,
-  }) => caller.callServerEndpoint<_i11.UserProfile>(
+  }) => caller.callServerEndpoint<_i14.UserProfile>(
     'profile',
     'updateProfile',
     {
@@ -597,11 +654,11 @@ class EndpointProfile extends _i1.EndpointRef {
   );
 
   /// Upload avatar
-  _i2.Future<_i12.AvatarUploadResult> uploadAvatar(
+  _i2.Future<_i15.AvatarUploadResult> uploadAvatar(
     int userId,
     _i10.ByteData imageData,
     String fileName,
-  ) => caller.callServerEndpoint<_i12.AvatarUploadResult>(
+  ) => caller.callServerEndpoint<_i15.AvatarUploadResult>(
     'profile',
     'uploadAvatar',
     {
@@ -619,10 +676,10 @@ class EndpointProfile extends _i1.EndpointRef {
   );
 
   /// Get other user's public profile (visible to team members)
-  _i2.Future<_i13.PublicUserProfile> getPublicProfile(
+  _i2.Future<_i16.PublicUserProfile> getPublicProfile(
     int userId,
     int targetUserId,
-  ) => caller.callServerEndpoint<_i13.PublicUserProfile>(
+  ) => caller.callServerEndpoint<_i16.PublicUserProfile>(
     'profile',
     'getPublicProfile',
     {
@@ -633,8 +690,8 @@ class EndpointProfile extends _i1.EndpointRef {
 
   /// Delete all user data (DEBUG ONLY - use with caution!)
   /// This removes all scores, instrument scores, annotations, setlists, and user storage data
-  _i2.Future<_i14.DeleteUserDataResult> deleteAllUserData(int userId) =>
-      caller.callServerEndpoint<_i14.DeleteUserDataResult>(
+  _i2.Future<_i17.DeleteUserDataResult> deleteAllUserData(int userId) =>
+      caller.callServerEndpoint<_i17.DeleteUserDataResult>(
         'profile',
         'deleteAllUserData',
         {'userId': userId},
@@ -650,10 +707,10 @@ class EndpointScore extends _i1.EndpointRef {
   String get name => 'score';
 
   /// Get all user scores (with optional incremental sync)
-  _i2.Future<List<_i15.Score>> getScores(
+  _i2.Future<List<_i18.Score>> getScores(
     int userId, {
     DateTime? since,
-  }) => caller.callServerEndpoint<List<_i15.Score>>(
+  }) => caller.callServerEndpoint<List<_i18.Score>>(
     'score',
     'getScores',
     {
@@ -663,10 +720,10 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Get score by ID
-  _i2.Future<_i15.Score?> getScoreById(
+  _i2.Future<_i18.Score?> getScoreById(
     int userId,
     int scoreId,
-  ) => caller.callServerEndpoint<_i15.Score?>(
+  ) => caller.callServerEndpoint<_i18.Score?>(
     'score',
     'getScoreById',
     {
@@ -676,10 +733,10 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Create or update score (with conflict detection and uniqueness check)
-  _i2.Future<_i16.ScoreSyncResult> upsertScore(
+  _i2.Future<_i19.ScoreSyncResult> upsertScore(
     int userId,
-    _i15.Score score,
-  ) => caller.callServerEndpoint<_i16.ScoreSyncResult>(
+    _i18.Score score,
+  ) => caller.callServerEndpoint<_i19.ScoreSyncResult>(
     'score',
     'upsertScore',
     {
@@ -689,12 +746,12 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Create score
-  _i2.Future<_i15.Score> createScore(
+  _i2.Future<_i18.Score> createScore(
     int userId,
     String title, {
     String? composer,
     int? bpm,
-  }) => caller.callServerEndpoint<_i15.Score>(
+  }) => caller.callServerEndpoint<_i18.Score>(
     'score',
     'createScore',
     {
@@ -706,13 +763,13 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Update score metadata
-  _i2.Future<_i15.Score> updateScore(
+  _i2.Future<_i18.Score> updateScore(
     int userId,
     int scoreId, {
     String? title,
     String? composer,
     int? bpm,
-  }) => caller.callServerEndpoint<_i15.Score>(
+  }) => caller.callServerEndpoint<_i18.Score>(
     'score',
     'updateScore',
     {
@@ -751,10 +808,10 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Get instrument scores for a score
-  _i2.Future<List<_i17.InstrumentScore>> getInstrumentScores(
+  _i2.Future<List<_i20.InstrumentScore>> getInstrumentScores(
     int userId,
     int scoreId,
-  ) => caller.callServerEndpoint<List<_i17.InstrumentScore>>(
+  ) => caller.callServerEndpoint<List<_i20.InstrumentScore>>(
     'score',
     'getInstrumentScores',
     {
@@ -764,13 +821,13 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Create or update instrument score (with uniqueness check on instrumentName + scoreId)
-  _i2.Future<_i17.InstrumentScore> upsertInstrumentScore(
+  _i2.Future<_i20.InstrumentScore> upsertInstrumentScore(
     int userId,
     int scoreId,
     String instrumentName, {
     required int orderIndex,
     String? pdfPath,
-  }) => caller.callServerEndpoint<_i17.InstrumentScore>(
+  }) => caller.callServerEndpoint<_i20.InstrumentScore>(
     'score',
     'upsertInstrumentScore',
     {
@@ -783,12 +840,12 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Create instrument score (legacy - calls upsertInstrumentScore)
-  _i2.Future<_i17.InstrumentScore> createInstrumentScore(
+  _i2.Future<_i20.InstrumentScore> createInstrumentScore(
     int userId,
     int scoreId,
     String instrumentName, {
     required int orderIndex,
-  }) => caller.callServerEndpoint<_i17.InstrumentScore>(
+  }) => caller.callServerEndpoint<_i20.InstrumentScore>(
     'score',
     'createInstrumentScore',
     {
@@ -813,10 +870,10 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Get annotations for an instrument score
-  _i2.Future<List<_i18.Annotation>> getAnnotations(
+  _i2.Future<List<_i21.Annotation>> getAnnotations(
     int userId,
     int instrumentScoreId,
-  ) => caller.callServerEndpoint<List<_i18.Annotation>>(
+  ) => caller.callServerEndpoint<List<_i21.Annotation>>(
     'score',
     'getAnnotations',
     {
@@ -826,10 +883,10 @@ class EndpointScore extends _i1.EndpointRef {
   );
 
   /// Save annotation
-  _i2.Future<_i18.Annotation> saveAnnotation(
+  _i2.Future<_i21.Annotation> saveAnnotation(
     int userId,
-    _i18.Annotation annotation,
-  ) => caller.callServerEndpoint<_i18.Annotation>(
+    _i21.Annotation annotation,
+  ) => caller.callServerEndpoint<_i21.Annotation>(
     'score',
     'saveAnnotation',
     {
@@ -861,18 +918,18 @@ class EndpointSetlist extends _i1.EndpointRef {
   String get name => 'setlist';
 
   /// Get all user setlists
-  _i2.Future<List<_i19.Setlist>> getSetlists(int userId) =>
-      caller.callServerEndpoint<List<_i19.Setlist>>(
+  _i2.Future<List<_i22.Setlist>> getSetlists(int userId) =>
+      caller.callServerEndpoint<List<_i22.Setlist>>(
         'setlist',
         'getSetlists',
         {'userId': userId},
       );
 
   /// Get setlist by ID
-  _i2.Future<_i19.Setlist?> getSetlistById(
+  _i2.Future<_i22.Setlist?> getSetlistById(
     int userId,
     int setlistId,
-  ) => caller.callServerEndpoint<_i19.Setlist?>(
+  ) => caller.callServerEndpoint<_i22.Setlist?>(
     'setlist',
     'getSetlistById',
     {
@@ -882,11 +939,11 @@ class EndpointSetlist extends _i1.EndpointRef {
   );
 
   /// Create or update setlist (with uniqueness check on name + userId)
-  _i2.Future<_i19.Setlist> upsertSetlist(
+  _i2.Future<_i22.Setlist> upsertSetlist(
     int userId,
     String name, {
     String? description,
-  }) => caller.callServerEndpoint<_i19.Setlist>(
+  }) => caller.callServerEndpoint<_i22.Setlist>(
     'setlist',
     'upsertSetlist',
     {
@@ -897,11 +954,11 @@ class EndpointSetlist extends _i1.EndpointRef {
   );
 
   /// Create setlist (legacy - calls upsertSetlist)
-  _i2.Future<_i19.Setlist> createSetlist(
+  _i2.Future<_i22.Setlist> createSetlist(
     int userId,
     String name, {
     String? description,
-  }) => caller.callServerEndpoint<_i19.Setlist>(
+  }) => caller.callServerEndpoint<_i22.Setlist>(
     'setlist',
     'createSetlist',
     {
@@ -912,12 +969,12 @@ class EndpointSetlist extends _i1.EndpointRef {
   );
 
   /// Update setlist
-  _i2.Future<_i19.Setlist> updateSetlist(
+  _i2.Future<_i22.Setlist> updateSetlist(
     int userId,
     int setlistId, {
     String? name,
     String? description,
-  }) => caller.callServerEndpoint<_i19.Setlist>(
+  }) => caller.callServerEndpoint<_i22.Setlist>(
     'setlist',
     'updateSetlist',
     {
@@ -942,10 +999,10 @@ class EndpointSetlist extends _i1.EndpointRef {
   );
 
   /// Get scores in a setlist
-  _i2.Future<List<_i15.Score>> getSetlistScores(
+  _i2.Future<List<_i18.Score>> getSetlistScores(
     int userId,
     int setlistId,
-  ) => caller.callServerEndpoint<List<_i15.Score>>(
+  ) => caller.callServerEndpoint<List<_i18.Score>>(
     'setlist',
     'getSetlistScores',
     {
@@ -955,12 +1012,12 @@ class EndpointSetlist extends _i1.EndpointRef {
   );
 
   /// Add score to setlist
-  _i2.Future<_i20.SetlistScore> addScoreToSetlist(
+  _i2.Future<_i23.SetlistScore> addScoreToSetlist(
     int userId,
     int setlistId,
     int scoreId, {
     int? orderIndex,
-  }) => caller.callServerEndpoint<_i20.SetlistScore>(
+  }) => caller.callServerEndpoint<_i23.SetlistScore>(
     'setlist',
     'addScoreToSetlist',
     {
@@ -1041,10 +1098,10 @@ class EndpointSync extends _i1.EndpointRef {
   String get name => 'sync';
 
   /// Full sync - get all user data since a given timestamp
-  _i2.Future<_i16.ScoreSyncResult> syncAll(
+  _i2.Future<_i19.ScoreSyncResult> syncAll(
     int userId, {
     DateTime? lastSyncAt,
-  }) => caller.callServerEndpoint<_i16.ScoreSyncResult>(
+  }) => caller.callServerEndpoint<_i19.ScoreSyncResult>(
     'sync',
     'syncAll',
     {
@@ -1054,14 +1111,14 @@ class EndpointSync extends _i1.EndpointRef {
   );
 
   /// Push local changes to server
-  _i2.Future<_i16.ScoreSyncResult> pushChanges(
+  _i2.Future<_i19.ScoreSyncResult> pushChanges(
     int userId,
-    List<_i15.Score> scores,
-    List<_i17.InstrumentScore> instrumentScores,
-    List<_i18.Annotation> annotations,
-    List<_i19.Setlist> setlists,
-    List<_i20.SetlistScore> setlistScores,
-  ) => caller.callServerEndpoint<_i16.ScoreSyncResult>(
+    List<_i18.Score> scores,
+    List<_i20.InstrumentScore> instrumentScores,
+    List<_i21.Annotation> annotations,
+    List<_i22.Setlist> setlists,
+    List<_i23.SetlistScore> setlistScores,
+  ) => caller.callServerEndpoint<_i19.ScoreSyncResult>(
     'sync',
     'pushChanges',
     {
@@ -1092,10 +1149,10 @@ class EndpointTeamAnnotation extends _i1.EndpointRef {
   String get name => 'teamAnnotation';
 
   /// Get annotations for a team score
-  _i2.Future<List<_i21.TeamAnnotation>> getTeamAnnotations(
+  _i2.Future<List<_i24.TeamAnnotation>> getTeamAnnotations(
     int userId,
     int teamScoreId,
-  ) => caller.callServerEndpoint<List<_i21.TeamAnnotation>>(
+  ) => caller.callServerEndpoint<List<_i24.TeamAnnotation>>(
     'teamAnnotation',
     'getTeamAnnotations',
     {
@@ -1105,7 +1162,7 @@ class EndpointTeamAnnotation extends _i1.EndpointRef {
   );
 
   /// Add annotation to team score
-  _i2.Future<_i21.TeamAnnotation> addTeamAnnotation(
+  _i2.Future<_i24.TeamAnnotation> addTeamAnnotation(
     int userId,
     int teamScoreId,
     int instrumentScoreId,
@@ -1114,7 +1171,7 @@ class EndpointTeamAnnotation extends _i1.EndpointRef {
     String data,
     double positionX,
     double positionY,
-  ) => caller.callServerEndpoint<_i21.TeamAnnotation>(
+  ) => caller.callServerEndpoint<_i24.TeamAnnotation>(
     'teamAnnotation',
     'addTeamAnnotation',
     {
@@ -1130,13 +1187,13 @@ class EndpointTeamAnnotation extends _i1.EndpointRef {
   );
 
   /// Update team annotation
-  _i2.Future<_i21.TeamAnnotation> updateTeamAnnotation(
+  _i2.Future<_i24.TeamAnnotation> updateTeamAnnotation(
     int userId,
     int annotationId,
     String data,
     double positionX,
     double positionY,
-  ) => caller.callServerEndpoint<_i21.TeamAnnotation>(
+  ) => caller.callServerEndpoint<_i24.TeamAnnotation>(
     'teamAnnotation',
     'updateTeamAnnotation',
     {
@@ -1171,11 +1228,11 @@ class EndpointTeam extends _i1.EndpointRef {
   String get name => 'team';
 
   /// Create team (system admin only)
-  _i2.Future<_i22.Team> createTeam(
+  _i2.Future<_i25.Team> createTeam(
     int adminUserId,
     String name,
     String? description,
-  ) => caller.callServerEndpoint<_i22.Team>(
+  ) => caller.callServerEndpoint<_i25.Team>(
     'team',
     'createTeam',
     {
@@ -1186,20 +1243,20 @@ class EndpointTeam extends _i1.EndpointRef {
   );
 
   /// Get all teams (system admin only)
-  _i2.Future<List<_i22.Team>> getAllTeams(int adminUserId) =>
-      caller.callServerEndpoint<List<_i22.Team>>(
+  _i2.Future<List<_i25.Team>> getAllTeams(int adminUserId) =>
+      caller.callServerEndpoint<List<_i25.Team>>(
         'team',
         'getAllTeams',
         {'adminUserId': adminUserId},
       );
 
   /// Update team (system admin only)
-  _i2.Future<_i22.Team> updateTeam(
+  _i2.Future<_i25.Team> updateTeam(
     int adminUserId,
     int teamId, {
     String? name,
     String? description,
-  }) => caller.callServerEndpoint<_i22.Team>(
+  }) => caller.callServerEndpoint<_i25.Team>(
     'team',
     'updateTeam',
     {
@@ -1224,12 +1281,12 @@ class EndpointTeam extends _i1.EndpointRef {
   );
 
   /// Add member to team (system admin only)
-  _i2.Future<_i23.TeamMember> addMemberToTeam(
+  _i2.Future<_i26.TeamMember> addMemberToTeam(
     int adminUserId,
     int teamId,
     int userId,
     String role,
-  ) => caller.callServerEndpoint<_i23.TeamMember>(
+  ) => caller.callServerEndpoint<_i26.TeamMember>(
     'team',
     'addMemberToTeam',
     {
@@ -1273,10 +1330,10 @@ class EndpointTeam extends _i1.EndpointRef {
   );
 
   /// Get team members list (system admin only)
-  _i2.Future<List<_i24.TeamMemberInfo>> getTeamMembers(
+  _i2.Future<List<_i27.TeamMemberInfo>> getTeamMembers(
     int adminUserId,
     int teamId,
-  ) => caller.callServerEndpoint<List<_i24.TeamMemberInfo>>(
+  ) => caller.callServerEndpoint<List<_i27.TeamMemberInfo>>(
     'team',
     'getTeamMembers',
     {
@@ -1286,10 +1343,10 @@ class EndpointTeam extends _i1.EndpointRef {
   );
 
   /// Get user's teams (system admin only)
-  _i2.Future<List<_i22.Team>> getUserTeams(
+  _i2.Future<List<_i25.Team>> getUserTeams(
     int adminUserId,
     int userId,
-  ) => caller.callServerEndpoint<List<_i22.Team>>(
+  ) => caller.callServerEndpoint<List<_i25.Team>>(
     'team',
     'getUserTeams',
     {
@@ -1299,18 +1356,18 @@ class EndpointTeam extends _i1.EndpointRef {
   );
 
   /// Get my teams list
-  _i2.Future<List<_i25.TeamWithRole>> getMyTeams(int userId) =>
-      caller.callServerEndpoint<List<_i25.TeamWithRole>>(
+  _i2.Future<List<_i28.TeamWithRole>> getMyTeams(int userId) =>
+      caller.callServerEndpoint<List<_i28.TeamWithRole>>(
         'team',
         'getMyTeams',
         {'userId': userId},
       );
 
   /// Get team info (only if member)
-  _i2.Future<_i22.Team?> getTeamById(
+  _i2.Future<_i25.Team?> getTeamById(
     int userId,
     int teamId,
-  ) => caller.callServerEndpoint<_i22.Team?>(
+  ) => caller.callServerEndpoint<_i25.Team?>(
     'team',
     'getTeamById',
     {
@@ -1320,10 +1377,10 @@ class EndpointTeam extends _i1.EndpointRef {
   );
 
   /// Get team members (only if member)
-  _i2.Future<List<_i24.TeamMemberInfo>> getMyTeamMembers(
+  _i2.Future<List<_i27.TeamMemberInfo>> getMyTeamMembers(
     int userId,
     int teamId,
-  ) => caller.callServerEndpoint<List<_i24.TeamMemberInfo>>(
+  ) => caller.callServerEndpoint<List<_i27.TeamMemberInfo>>(
     'team',
     'getMyTeamMembers',
     {
@@ -1342,10 +1399,10 @@ class EndpointTeamScore extends _i1.EndpointRef {
   String get name => 'teamScore';
 
   /// Get team shared scores
-  _i2.Future<List<_i15.Score>> getTeamScores(
+  _i2.Future<List<_i18.Score>> getTeamScores(
     int userId,
     int teamId,
-  ) => caller.callServerEndpoint<List<_i15.Score>>(
+  ) => caller.callServerEndpoint<List<_i18.Score>>(
     'teamScore',
     'getTeamScores',
     {
@@ -1355,11 +1412,11 @@ class EndpointTeamScore extends _i1.EndpointRef {
   );
 
   /// Share score to team
-  _i2.Future<_i26.TeamScore> shareScoreToTeam(
+  _i2.Future<_i29.TeamScore> shareScoreToTeam(
     int userId,
     int teamId,
     int scoreId,
-  ) => caller.callServerEndpoint<_i26.TeamScore>(
+  ) => caller.callServerEndpoint<_i29.TeamScore>(
     'teamScore',
     'shareScoreToTeam',
     {
@@ -1394,10 +1451,10 @@ class EndpointTeamSetlist extends _i1.EndpointRef {
   String get name => 'teamSetlist';
 
   /// Get team shared setlists
-  _i2.Future<List<_i19.Setlist>> getTeamSetlists(
+  _i2.Future<List<_i22.Setlist>> getTeamSetlists(
     int userId,
     int teamId,
-  ) => caller.callServerEndpoint<List<_i19.Setlist>>(
+  ) => caller.callServerEndpoint<List<_i22.Setlist>>(
     'teamSetlist',
     'getTeamSetlists',
     {
@@ -1407,11 +1464,11 @@ class EndpointTeamSetlist extends _i1.EndpointRef {
   );
 
   /// Share setlist to team
-  _i2.Future<_i27.TeamSetlist> shareSetlistToTeam(
+  _i2.Future<_i30.TeamSetlist> shareSetlistToTeam(
     int userId,
     int teamId,
     int setlistId,
-  ) => caller.callServerEndpoint<_i27.TeamSetlist>(
+  ) => caller.callServerEndpoint<_i30.TeamSetlist>(
     'teamSetlist',
     'shareSetlistToTeam',
     {
@@ -1457,7 +1514,7 @@ class Client extends _i1.ServerpodClientShared {
     bool? disconnectStreamsOnLostInternetConnection,
   }) : super(
          host,
-         _i28.Protocol(),
+         _i31.Protocol(),
          securityContext: securityContext,
          streamingConnectionTimeout: streamingConnectionTimeout,
          connectionTimeout: connectionTimeout,
@@ -1471,6 +1528,7 @@ class Client extends _i1.ServerpodClientShared {
     application = EndpointApplication(this);
     auth = EndpointAuth(this);
     file = EndpointFile(this);
+    librarySync = EndpointLibrarySync(this);
     profile = EndpointProfile(this);
     score = EndpointScore(this);
     setlist = EndpointSetlist(this);
@@ -1491,6 +1549,8 @@ class Client extends _i1.ServerpodClientShared {
   late final EndpointAuth auth;
 
   late final EndpointFile file;
+
+  late final EndpointLibrarySync librarySync;
 
   late final EndpointProfile profile;
 
@@ -1517,6 +1577,7 @@ class Client extends _i1.ServerpodClientShared {
     'application': application,
     'auth': auth,
     'file': file,
+    'librarySync': librarySync,
     'profile': profile,
     'score': score,
     'setlist': setlist,

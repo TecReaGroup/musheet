@@ -75,7 +75,11 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
 
   /// Trigger background sync if available
   void _triggerSync() {
-    final syncService = ref.read(syncServiceProvider);
+    final syncServiceAsync = ref.read(syncServiceProvider);
+    final syncService = switch (syncServiceAsync) {
+      AsyncData(:final value) => value,
+      _ => null,
+    };
     if (syncService != null) {
       syncService.syncNow();
     }

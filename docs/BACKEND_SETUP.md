@@ -106,7 +106,6 @@ Serverpod generate completed successfully.
 ```bash
 cd server/musheet_server
 serverpod create-migration
-serverpod apply-migrations
 ```
 
 ### 步骤 5：启动服务器

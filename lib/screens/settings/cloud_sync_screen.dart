@@ -19,7 +19,11 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   String? _syncMessage;
 
   Future<void> _triggerSync() async {
-    final syncService = ref.read(syncServiceProvider);
+    final syncServiceAsync = ref.read(syncServiceProvider);
+    final syncService = switch (syncServiceAsync) {
+      AsyncData(:final value) => value,
+      _ => null,
+    };
     if (syncService == null) {
       setState(() {
         _syncMessage = 'Sync service not available';
@@ -37,7 +41,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
       setState(() {
         _isSyncing = false;
         if (result.success) {
-          _syncMessage = 'Synced: ${result.uploadedCount} uploaded, ${result.downloadedCount} downloaded';
+          _syncMessage = 'Synced: ${result.pushedCount} uploaded, ${result.pulledCount} downloaded';
         } else {
           _syncMessage = result.errorMessage ?? 'Sync failed';
         }

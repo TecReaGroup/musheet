@@ -6,7 +6,8 @@ import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../router/app_router.dart';
 import '../../services/backend_service.dart';
-import '../../services/sync_service.dart';
+import '../../sync/library_sync_service.dart';
+import '../../rpc/rpc_client.dart';
 import '../../providers/auth_provider.dart';
 
 class BackendDebugScreen extends ConsumerStatefulWidget {
@@ -76,7 +77,12 @@ class _BackendDebugScreenState extends ConsumerState<BackendDebugScreen> {
     _addLog('Fetching scores from server...');
 
     try {
-      final result = await BackendService.instance.getScores();
+      if (!RpcClient.isInitialized) {
+        _addLog('✗ RPC client not initialized', isError: true);
+        return;
+      }
+      
+      final result = await RpcClient.instance.getScores();
       
       if (result.isSuccess) {
         _addLog('✓ Got ${result.data?.length ?? 0} scores');
@@ -98,7 +104,12 @@ class _BackendDebugScreenState extends ConsumerState<BackendDebugScreen> {
     _addLog('Fetching setlists from server...');
 
     try {
-      final result = await BackendService.instance.getSetlists();
+      if (!RpcClient.isInitialized) {
+        _addLog('✗ RPC client not initialized', isError: true);
+        return;
+      }
+      
+      final result = await RpcClient.instance.getSetlists();
       
       if (result.isSuccess) {
         _addLog('✓ Got ${result.data?.length ?? 0} setlists');
@@ -120,12 +131,17 @@ class _BackendDebugScreenState extends ConsumerState<BackendDebugScreen> {
     _addLog('Triggering sync...');
 
     try {
-      final result = await SyncService.instance.syncNow();
+      if (!LibrarySyncService.isInitialized) {
+        _addLog('✗ Sync service not initialized', isError: true);
+        return;
+      }
+      
+      final result = await LibrarySyncService.instance.syncNow();
       
       if (result.success) {
         _addLog('✓ Sync completed');
-        _addLog('  Uploaded: ${result.uploadedCount}');
-        _addLog('  Downloaded: ${result.downloadedCount}');
+        _addLog('  Pushed: ${result.pushedCount}');
+        _addLog('  Pulled: ${result.pulledCount}');
         if (result.conflictCount > 0) {
           _addLog('  Conflicts: ${result.conflictCount}', isError: true);
         }

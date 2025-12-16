@@ -21,36 +21,42 @@ import 'dto/delete_user_data_result.dart' as _i8;
 import 'dto/file_upload_result.dart' as _i9;
 import 'dto/public_user_profile.dart' as _i10;
 import 'dto/score_sync_result.dart' as _i11;
-import 'dto/team_info.dart' as _i12;
-import 'dto/team_member_info.dart' as _i13;
-import 'dto/team_summary.dart' as _i14;
-import 'dto/team_with_role.dart' as _i15;
-import 'dto/user_info.dart' as _i16;
-import 'dto/user_profile.dart' as _i17;
-import 'instrument_score.dart' as _i18;
-import 'score.dart' as _i19;
-import 'setlist.dart' as _i20;
-import 'setlist_score.dart' as _i21;
-import 'team.dart' as _i22;
-import 'team_annotation.dart' as _i23;
-import 'team_member.dart' as _i24;
-import 'team_score.dart' as _i25;
-import 'team_setlist.dart' as _i26;
-import 'user.dart' as _i27;
-import 'user_app_data.dart' as _i28;
-import 'user_storage.dart' as _i29;
-import 'package:musheet_server/src/generated/dto/user_info.dart' as _i30;
-import 'package:musheet_server/src/generated/dto/team_summary.dart' as _i31;
-import 'package:musheet_server/src/generated/application.dart' as _i32;
-import 'package:musheet_server/src/generated/score.dart' as _i33;
-import 'package:musheet_server/src/generated/instrument_score.dart' as _i34;
-import 'package:musheet_server/src/generated/annotation.dart' as _i35;
-import 'package:musheet_server/src/generated/setlist.dart' as _i36;
-import 'package:musheet_server/src/generated/setlist_score.dart' as _i37;
-import 'package:musheet_server/src/generated/team_annotation.dart' as _i38;
-import 'package:musheet_server/src/generated/team.dart' as _i39;
-import 'package:musheet_server/src/generated/dto/team_member_info.dart' as _i40;
-import 'package:musheet_server/src/generated/dto/team_with_role.dart' as _i41;
+import 'dto/sync_entity_change.dart' as _i12;
+import 'dto/sync_entity_data.dart' as _i13;
+import 'dto/sync_pull_response.dart' as _i14;
+import 'dto/sync_push_request.dart' as _i15;
+import 'dto/sync_push_response.dart' as _i16;
+import 'dto/team_info.dart' as _i17;
+import 'dto/team_member_info.dart' as _i18;
+import 'dto/team_summary.dart' as _i19;
+import 'dto/team_with_role.dart' as _i20;
+import 'dto/user_info.dart' as _i21;
+import 'dto/user_profile.dart' as _i22;
+import 'instrument_score.dart' as _i23;
+import 'score.dart' as _i24;
+import 'setlist.dart' as _i25;
+import 'setlist_score.dart' as _i26;
+import 'team.dart' as _i27;
+import 'team_annotation.dart' as _i28;
+import 'team_member.dart' as _i29;
+import 'team_score.dart' as _i30;
+import 'team_setlist.dart' as _i31;
+import 'user.dart' as _i32;
+import 'user_app_data.dart' as _i33;
+import 'user_library.dart' as _i34;
+import 'user_storage.dart' as _i35;
+import 'package:musheet_server/src/generated/dto/user_info.dart' as _i36;
+import 'package:musheet_server/src/generated/dto/team_summary.dart' as _i37;
+import 'package:musheet_server/src/generated/application.dart' as _i38;
+import 'package:musheet_server/src/generated/score.dart' as _i39;
+import 'package:musheet_server/src/generated/instrument_score.dart' as _i40;
+import 'package:musheet_server/src/generated/annotation.dart' as _i41;
+import 'package:musheet_server/src/generated/setlist.dart' as _i42;
+import 'package:musheet_server/src/generated/setlist_score.dart' as _i43;
+import 'package:musheet_server/src/generated/team_annotation.dart' as _i44;
+import 'package:musheet_server/src/generated/team.dart' as _i45;
+import 'package:musheet_server/src/generated/dto/team_member_info.dart' as _i46;
+import 'package:musheet_server/src/generated/dto/team_with_role.dart' as _i47;
 export 'annotation.dart';
 export 'application.dart';
 export 'dto/auth_result.dart';
@@ -60,6 +66,11 @@ export 'dto/delete_user_data_result.dart';
 export 'dto/file_upload_result.dart';
 export 'dto/public_user_profile.dart';
 export 'dto/score_sync_result.dart';
+export 'dto/sync_entity_change.dart';
+export 'dto/sync_entity_data.dart';
+export 'dto/sync_pull_response.dart';
+export 'dto/sync_push_request.dart';
+export 'dto/sync_push_response.dart';
 export 'dto/team_info.dart';
 export 'dto/team_member_info.dart';
 export 'dto/team_summary.dart';
@@ -77,6 +88,7 @@ export 'team_score.dart';
 export 'team_setlist.dart';
 export 'user.dart';
 export 'user_app_data.dart';
+export 'user_library.dart';
 export 'user_storage.dart';
 
 class Protocol extends _i1.SerializationManagerServer {
@@ -1380,6 +1392,86 @@ class Protocol extends _i1.SerializationManagerServer {
       managed: true,
     ),
     _i2.TableDefinition(
+      name: 'user_libraries',
+      dartName: 'UserLibrary',
+      schema: 'public',
+      module: 'musheet',
+      columns: [
+        _i2.ColumnDefinition(
+          name: 'id',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int?',
+          columnDefault: 'nextval(\'user_libraries_id_seq\'::regclass)',
+        ),
+        _i2.ColumnDefinition(
+          name: 'userId',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'libraryVersion',
+          columnType: _i2.ColumnType.bigint,
+          isNullable: false,
+          dartType: 'int',
+        ),
+        _i2.ColumnDefinition(
+          name: 'lastSyncAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+        _i2.ColumnDefinition(
+          name: 'lastModifiedAt',
+          columnType: _i2.ColumnType.timestampWithoutTimeZone,
+          isNullable: false,
+          dartType: 'DateTime',
+        ),
+      ],
+      foreignKeys: [
+        _i2.ForeignKeyDefinition(
+          constraintName: 'user_libraries_fk_0',
+          columns: ['userId'],
+          referenceTable: 'users',
+          referenceTableSchema: 'public',
+          referenceColumns: ['id'],
+          onUpdate: _i2.ForeignKeyAction.noAction,
+          onDelete: _i2.ForeignKeyAction.noAction,
+          matchType: null,
+        ),
+      ],
+      indexes: [
+        _i2.IndexDefinition(
+          indexName: 'user_libraries_pkey',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'id',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: true,
+        ),
+        _i2.IndexDefinition(
+          indexName: 'user_library_user_idx',
+          tableSpace: null,
+          elements: [
+            _i2.IndexElementDefinition(
+              type: _i2.IndexElementDefinitionType.column,
+              definition: 'userId',
+            ),
+          ],
+          type: 'btree',
+          isUnique: true,
+          isPrimary: false,
+        ),
+      ],
+      managed: true,
+    ),
+    _i2.TableDefinition(
       name: 'user_storage',
       dartName: 'UserStorage',
       schema: 'public',
@@ -1633,59 +1725,77 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i11.ScoreSyncResult) {
       return _i11.ScoreSyncResult.fromJson(data) as T;
     }
-    if (t == _i12.TeamInfo) {
-      return _i12.TeamInfo.fromJson(data) as T;
+    if (t == _i12.SyncEntityChange) {
+      return _i12.SyncEntityChange.fromJson(data) as T;
     }
-    if (t == _i13.TeamMemberInfo) {
-      return _i13.TeamMemberInfo.fromJson(data) as T;
+    if (t == _i13.SyncEntityData) {
+      return _i13.SyncEntityData.fromJson(data) as T;
     }
-    if (t == _i14.TeamSummary) {
-      return _i14.TeamSummary.fromJson(data) as T;
+    if (t == _i14.SyncPullResponse) {
+      return _i14.SyncPullResponse.fromJson(data) as T;
     }
-    if (t == _i15.TeamWithRole) {
-      return _i15.TeamWithRole.fromJson(data) as T;
+    if (t == _i15.SyncPushRequest) {
+      return _i15.SyncPushRequest.fromJson(data) as T;
     }
-    if (t == _i16.UserInfo) {
-      return _i16.UserInfo.fromJson(data) as T;
+    if (t == _i16.SyncPushResponse) {
+      return _i16.SyncPushResponse.fromJson(data) as T;
     }
-    if (t == _i17.UserProfile) {
-      return _i17.UserProfile.fromJson(data) as T;
+    if (t == _i17.TeamInfo) {
+      return _i17.TeamInfo.fromJson(data) as T;
     }
-    if (t == _i18.InstrumentScore) {
-      return _i18.InstrumentScore.fromJson(data) as T;
+    if (t == _i18.TeamMemberInfo) {
+      return _i18.TeamMemberInfo.fromJson(data) as T;
     }
-    if (t == _i19.Score) {
-      return _i19.Score.fromJson(data) as T;
+    if (t == _i19.TeamSummary) {
+      return _i19.TeamSummary.fromJson(data) as T;
     }
-    if (t == _i20.Setlist) {
-      return _i20.Setlist.fromJson(data) as T;
+    if (t == _i20.TeamWithRole) {
+      return _i20.TeamWithRole.fromJson(data) as T;
     }
-    if (t == _i21.SetlistScore) {
-      return _i21.SetlistScore.fromJson(data) as T;
+    if (t == _i21.UserInfo) {
+      return _i21.UserInfo.fromJson(data) as T;
     }
-    if (t == _i22.Team) {
-      return _i22.Team.fromJson(data) as T;
+    if (t == _i22.UserProfile) {
+      return _i22.UserProfile.fromJson(data) as T;
     }
-    if (t == _i23.TeamAnnotation) {
-      return _i23.TeamAnnotation.fromJson(data) as T;
+    if (t == _i23.InstrumentScore) {
+      return _i23.InstrumentScore.fromJson(data) as T;
     }
-    if (t == _i24.TeamMember) {
-      return _i24.TeamMember.fromJson(data) as T;
+    if (t == _i24.Score) {
+      return _i24.Score.fromJson(data) as T;
     }
-    if (t == _i25.TeamScore) {
-      return _i25.TeamScore.fromJson(data) as T;
+    if (t == _i25.Setlist) {
+      return _i25.Setlist.fromJson(data) as T;
     }
-    if (t == _i26.TeamSetlist) {
-      return _i26.TeamSetlist.fromJson(data) as T;
+    if (t == _i26.SetlistScore) {
+      return _i26.SetlistScore.fromJson(data) as T;
     }
-    if (t == _i27.User) {
-      return _i27.User.fromJson(data) as T;
+    if (t == _i27.Team) {
+      return _i27.Team.fromJson(data) as T;
     }
-    if (t == _i28.UserAppData) {
-      return _i28.UserAppData.fromJson(data) as T;
+    if (t == _i28.TeamAnnotation) {
+      return _i28.TeamAnnotation.fromJson(data) as T;
     }
-    if (t == _i29.UserStorage) {
-      return _i29.UserStorage.fromJson(data) as T;
+    if (t == _i29.TeamMember) {
+      return _i29.TeamMember.fromJson(data) as T;
+    }
+    if (t == _i30.TeamScore) {
+      return _i30.TeamScore.fromJson(data) as T;
+    }
+    if (t == _i31.TeamSetlist) {
+      return _i31.TeamSetlist.fromJson(data) as T;
+    }
+    if (t == _i32.User) {
+      return _i32.User.fromJson(data) as T;
+    }
+    if (t == _i33.UserAppData) {
+      return _i33.UserAppData.fromJson(data) as T;
+    }
+    if (t == _i34.UserLibrary) {
+      return _i34.UserLibrary.fromJson(data) as T;
+    }
+    if (t == _i35.UserStorage) {
+      return _i35.UserStorage.fromJson(data) as T;
     }
     if (t == _i1.getType<_i3.Annotation?>()) {
       return (data != null ? _i3.Annotation.fromJson(data) : null) as T;
@@ -1715,110 +1825,180 @@ class Protocol extends _i1.SerializationManagerServer {
     if (t == _i1.getType<_i11.ScoreSyncResult?>()) {
       return (data != null ? _i11.ScoreSyncResult.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i12.TeamInfo?>()) {
-      return (data != null ? _i12.TeamInfo.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i12.SyncEntityChange?>()) {
+      return (data != null ? _i12.SyncEntityChange.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i13.TeamMemberInfo?>()) {
-      return (data != null ? _i13.TeamMemberInfo.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i13.SyncEntityData?>()) {
+      return (data != null ? _i13.SyncEntityData.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i14.TeamSummary?>()) {
-      return (data != null ? _i14.TeamSummary.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i14.SyncPullResponse?>()) {
+      return (data != null ? _i14.SyncPullResponse.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i15.TeamWithRole?>()) {
-      return (data != null ? _i15.TeamWithRole.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i15.SyncPushRequest?>()) {
+      return (data != null ? _i15.SyncPushRequest.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i16.UserInfo?>()) {
-      return (data != null ? _i16.UserInfo.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i16.SyncPushResponse?>()) {
+      return (data != null ? _i16.SyncPushResponse.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i17.UserProfile?>()) {
-      return (data != null ? _i17.UserProfile.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i17.TeamInfo?>()) {
+      return (data != null ? _i17.TeamInfo.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i18.InstrumentScore?>()) {
-      return (data != null ? _i18.InstrumentScore.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i18.TeamMemberInfo?>()) {
+      return (data != null ? _i18.TeamMemberInfo.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i19.Score?>()) {
-      return (data != null ? _i19.Score.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i19.TeamSummary?>()) {
+      return (data != null ? _i19.TeamSummary.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i20.Setlist?>()) {
-      return (data != null ? _i20.Setlist.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i20.TeamWithRole?>()) {
+      return (data != null ? _i20.TeamWithRole.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i21.SetlistScore?>()) {
-      return (data != null ? _i21.SetlistScore.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i21.UserInfo?>()) {
+      return (data != null ? _i21.UserInfo.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i22.Team?>()) {
-      return (data != null ? _i22.Team.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i22.UserProfile?>()) {
+      return (data != null ? _i22.UserProfile.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i23.TeamAnnotation?>()) {
-      return (data != null ? _i23.TeamAnnotation.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i23.InstrumentScore?>()) {
+      return (data != null ? _i23.InstrumentScore.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i24.TeamMember?>()) {
-      return (data != null ? _i24.TeamMember.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i24.Score?>()) {
+      return (data != null ? _i24.Score.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i25.TeamScore?>()) {
-      return (data != null ? _i25.TeamScore.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i25.Setlist?>()) {
+      return (data != null ? _i25.Setlist.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i26.TeamSetlist?>()) {
-      return (data != null ? _i26.TeamSetlist.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i26.SetlistScore?>()) {
+      return (data != null ? _i26.SetlistScore.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i27.User?>()) {
-      return (data != null ? _i27.User.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i27.Team?>()) {
+      return (data != null ? _i27.Team.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i28.UserAppData?>()) {
-      return (data != null ? _i28.UserAppData.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i28.TeamAnnotation?>()) {
+      return (data != null ? _i28.TeamAnnotation.fromJson(data) : null) as T;
     }
-    if (t == _i1.getType<_i29.UserStorage?>()) {
-      return (data != null ? _i29.UserStorage.fromJson(data) : null) as T;
+    if (t == _i1.getType<_i29.TeamMember?>()) {
+      return (data != null ? _i29.TeamMember.fromJson(data) : null) as T;
     }
-    if (t == List<_i14.TeamSummary>) {
+    if (t == _i1.getType<_i30.TeamScore?>()) {
+      return (data != null ? _i30.TeamScore.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i31.TeamSetlist?>()) {
+      return (data != null ? _i31.TeamSetlist.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i32.User?>()) {
+      return (data != null ? _i32.User.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i33.UserAppData?>()) {
+      return (data != null ? _i33.UserAppData.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i34.UserLibrary?>()) {
+      return (data != null ? _i34.UserLibrary.fromJson(data) : null) as T;
+    }
+    if (t == _i1.getType<_i35.UserStorage?>()) {
+      return (data != null ? _i35.UserStorage.fromJson(data) : null) as T;
+    }
+    if (t == List<_i19.TeamSummary>) {
       return (data as List)
-              .map((e) => deserialize<_i14.TeamSummary>(e))
+              .map((e) => deserialize<_i19.TeamSummary>(e))
               .toList()
           as T;
     }
-    if (t == List<_i12.TeamInfo>) {
-      return (data as List).map((e) => deserialize<_i12.TeamInfo>(e)).toList()
-          as T;
-    }
-    if (t == List<_i30.UserInfo>) {
-      return (data as List).map((e) => deserialize<_i30.UserInfo>(e)).toList()
-          as T;
-    }
-    if (t == List<_i31.TeamSummary>) {
+    if (t == List<_i13.SyncEntityData>) {
       return (data as List)
-              .map((e) => deserialize<_i31.TeamSummary>(e))
+              .map((e) => deserialize<_i13.SyncEntityData>(e))
               .toList()
           as T;
     }
-    if (t == List<_i32.Application>) {
+    if (t == _i1.getType<List<_i13.SyncEntityData>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_i13.SyncEntityData>(e))
+                    .toList()
+              : null)
+          as T;
+    }
+    if (t == List<String>) {
+      return (data as List).map((e) => deserialize<String>(e)).toList() as T;
+    }
+    if (t == _i1.getType<List<String>?>()) {
+      return (data != null
+              ? (data as List).map((e) => deserialize<String>(e)).toList()
+              : null)
+          as T;
+    }
+    if (t == List<_i12.SyncEntityChange>) {
       return (data as List)
-              .map((e) => deserialize<_i32.Application>(e))
+              .map((e) => deserialize<_i12.SyncEntityChange>(e))
               .toList()
           as T;
     }
-    if (t == List<_i33.Score>) {
-      return (data as List).map((e) => deserialize<_i33.Score>(e)).toList()
+    if (t == _i1.getType<List<_i12.SyncEntityChange>?>()) {
+      return (data != null
+              ? (data as List)
+                    .map((e) => deserialize<_i12.SyncEntityChange>(e))
+                    .toList()
+              : null)
           as T;
     }
-    if (t == List<_i34.InstrumentScore>) {
+    if (t == Map<String, int>) {
+      return (data as Map).map(
+            (k, v) => MapEntry(deserialize<String>(k), deserialize<int>(v)),
+          )
+          as T;
+    }
+    if (t == _i1.getType<Map<String, int>?>()) {
+      return (data != null
+              ? (data as Map).map(
+                  (k, v) =>
+                      MapEntry(deserialize<String>(k), deserialize<int>(v)),
+                )
+              : null)
+          as T;
+    }
+    if (t == List<_i17.TeamInfo>) {
+      return (data as List).map((e) => deserialize<_i17.TeamInfo>(e)).toList()
+          as T;
+    }
+    if (t == List<_i36.UserInfo>) {
+      return (data as List).map((e) => deserialize<_i36.UserInfo>(e)).toList()
+          as T;
+    }
+    if (t == List<_i37.TeamSummary>) {
       return (data as List)
-              .map((e) => deserialize<_i34.InstrumentScore>(e))
+              .map((e) => deserialize<_i37.TeamSummary>(e))
               .toList()
           as T;
     }
-    if (t == List<_i35.Annotation>) {
-      return (data as List).map((e) => deserialize<_i35.Annotation>(e)).toList()
+    if (t == List<_i38.Application>) {
+      return (data as List)
+              .map((e) => deserialize<_i38.Application>(e))
+              .toList()
           as T;
     }
-    if (t == List<_i36.Setlist>) {
-      return (data as List).map((e) => deserialize<_i36.Setlist>(e)).toList()
+    if (t == List<_i39.Score>) {
+      return (data as List).map((e) => deserialize<_i39.Score>(e)).toList()
+          as T;
+    }
+    if (t == List<_i40.InstrumentScore>) {
+      return (data as List)
+              .map((e) => deserialize<_i40.InstrumentScore>(e))
+              .toList()
+          as T;
+    }
+    if (t == List<_i41.Annotation>) {
+      return (data as List).map((e) => deserialize<_i41.Annotation>(e)).toList()
+          as T;
+    }
+    if (t == List<_i42.Setlist>) {
+      return (data as List).map((e) => deserialize<_i42.Setlist>(e)).toList()
           as T;
     }
     if (t == List<int>) {
       return (data as List).map((e) => deserialize<int>(e)).toList() as T;
     }
-    if (t == List<_i37.SetlistScore>) {
+    if (t == List<_i43.SetlistScore>) {
       return (data as List)
-              .map((e) => deserialize<_i37.SetlistScore>(e))
+              .map((e) => deserialize<_i43.SetlistScore>(e))
               .toList()
           as T;
     }
@@ -1828,24 +2008,24 @@ class Protocol extends _i1.SerializationManagerServer {
           )
           as T;
     }
-    if (t == List<_i38.TeamAnnotation>) {
+    if (t == List<_i44.TeamAnnotation>) {
       return (data as List)
-              .map((e) => deserialize<_i38.TeamAnnotation>(e))
+              .map((e) => deserialize<_i44.TeamAnnotation>(e))
               .toList()
           as T;
     }
-    if (t == List<_i39.Team>) {
-      return (data as List).map((e) => deserialize<_i39.Team>(e)).toList() as T;
+    if (t == List<_i45.Team>) {
+      return (data as List).map((e) => deserialize<_i45.Team>(e)).toList() as T;
     }
-    if (t == List<_i40.TeamMemberInfo>) {
+    if (t == List<_i46.TeamMemberInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i40.TeamMemberInfo>(e))
+              .map((e) => deserialize<_i46.TeamMemberInfo>(e))
               .toList()
           as T;
     }
-    if (t == List<_i41.TeamWithRole>) {
+    if (t == List<_i47.TeamWithRole>) {
       return (data as List)
-              .map((e) => deserialize<_i41.TeamWithRole>(e))
+              .map((e) => deserialize<_i47.TeamWithRole>(e))
               .toList()
           as T;
     }
@@ -1866,24 +2046,30 @@ class Protocol extends _i1.SerializationManagerServer {
       _i9.FileUploadResult => 'FileUploadResult',
       _i10.PublicUserProfile => 'PublicUserProfile',
       _i11.ScoreSyncResult => 'ScoreSyncResult',
-      _i12.TeamInfo => 'TeamInfo',
-      _i13.TeamMemberInfo => 'TeamMemberInfo',
-      _i14.TeamSummary => 'TeamSummary',
-      _i15.TeamWithRole => 'TeamWithRole',
-      _i16.UserInfo => 'UserInfo',
-      _i17.UserProfile => 'UserProfile',
-      _i18.InstrumentScore => 'InstrumentScore',
-      _i19.Score => 'Score',
-      _i20.Setlist => 'Setlist',
-      _i21.SetlistScore => 'SetlistScore',
-      _i22.Team => 'Team',
-      _i23.TeamAnnotation => 'TeamAnnotation',
-      _i24.TeamMember => 'TeamMember',
-      _i25.TeamScore => 'TeamScore',
-      _i26.TeamSetlist => 'TeamSetlist',
-      _i27.User => 'User',
-      _i28.UserAppData => 'UserAppData',
-      _i29.UserStorage => 'UserStorage',
+      _i12.SyncEntityChange => 'SyncEntityChange',
+      _i13.SyncEntityData => 'SyncEntityData',
+      _i14.SyncPullResponse => 'SyncPullResponse',
+      _i15.SyncPushRequest => 'SyncPushRequest',
+      _i16.SyncPushResponse => 'SyncPushResponse',
+      _i17.TeamInfo => 'TeamInfo',
+      _i18.TeamMemberInfo => 'TeamMemberInfo',
+      _i19.TeamSummary => 'TeamSummary',
+      _i20.TeamWithRole => 'TeamWithRole',
+      _i21.UserInfo => 'UserInfo',
+      _i22.UserProfile => 'UserProfile',
+      _i23.InstrumentScore => 'InstrumentScore',
+      _i24.Score => 'Score',
+      _i25.Setlist => 'Setlist',
+      _i26.SetlistScore => 'SetlistScore',
+      _i27.Team => 'Team',
+      _i28.TeamAnnotation => 'TeamAnnotation',
+      _i29.TeamMember => 'TeamMember',
+      _i30.TeamScore => 'TeamScore',
+      _i31.TeamSetlist => 'TeamSetlist',
+      _i32.User => 'User',
+      _i33.UserAppData => 'UserAppData',
+      _i34.UserLibrary => 'UserLibrary',
+      _i35.UserStorage => 'UserStorage',
       _ => null,
     };
   }
@@ -1916,41 +2102,53 @@ class Protocol extends _i1.SerializationManagerServer {
         return 'PublicUserProfile';
       case _i11.ScoreSyncResult():
         return 'ScoreSyncResult';
-      case _i12.TeamInfo():
+      case _i12.SyncEntityChange():
+        return 'SyncEntityChange';
+      case _i13.SyncEntityData():
+        return 'SyncEntityData';
+      case _i14.SyncPullResponse():
+        return 'SyncPullResponse';
+      case _i15.SyncPushRequest():
+        return 'SyncPushRequest';
+      case _i16.SyncPushResponse():
+        return 'SyncPushResponse';
+      case _i17.TeamInfo():
         return 'TeamInfo';
-      case _i13.TeamMemberInfo():
+      case _i18.TeamMemberInfo():
         return 'TeamMemberInfo';
-      case _i14.TeamSummary():
+      case _i19.TeamSummary():
         return 'TeamSummary';
-      case _i15.TeamWithRole():
+      case _i20.TeamWithRole():
         return 'TeamWithRole';
-      case _i16.UserInfo():
+      case _i21.UserInfo():
         return 'UserInfo';
-      case _i17.UserProfile():
+      case _i22.UserProfile():
         return 'UserProfile';
-      case _i18.InstrumentScore():
+      case _i23.InstrumentScore():
         return 'InstrumentScore';
-      case _i19.Score():
+      case _i24.Score():
         return 'Score';
-      case _i20.Setlist():
+      case _i25.Setlist():
         return 'Setlist';
-      case _i21.SetlistScore():
+      case _i26.SetlistScore():
         return 'SetlistScore';
-      case _i22.Team():
+      case _i27.Team():
         return 'Team';
-      case _i23.TeamAnnotation():
+      case _i28.TeamAnnotation():
         return 'TeamAnnotation';
-      case _i24.TeamMember():
+      case _i29.TeamMember():
         return 'TeamMember';
-      case _i25.TeamScore():
+      case _i30.TeamScore():
         return 'TeamScore';
-      case _i26.TeamSetlist():
+      case _i31.TeamSetlist():
         return 'TeamSetlist';
-      case _i27.User():
+      case _i32.User():
         return 'User';
-      case _i28.UserAppData():
+      case _i33.UserAppData():
         return 'UserAppData';
-      case _i29.UserStorage():
+      case _i34.UserLibrary():
+        return 'UserLibrary';
+      case _i35.UserStorage():
         return 'UserStorage';
     }
     className = _i2.Protocol().getClassNameForObject(data);
@@ -1993,59 +2191,77 @@ class Protocol extends _i1.SerializationManagerServer {
     if (dataClassName == 'ScoreSyncResult') {
       return deserialize<_i11.ScoreSyncResult>(data['data']);
     }
+    if (dataClassName == 'SyncEntityChange') {
+      return deserialize<_i12.SyncEntityChange>(data['data']);
+    }
+    if (dataClassName == 'SyncEntityData') {
+      return deserialize<_i13.SyncEntityData>(data['data']);
+    }
+    if (dataClassName == 'SyncPullResponse') {
+      return deserialize<_i14.SyncPullResponse>(data['data']);
+    }
+    if (dataClassName == 'SyncPushRequest') {
+      return deserialize<_i15.SyncPushRequest>(data['data']);
+    }
+    if (dataClassName == 'SyncPushResponse') {
+      return deserialize<_i16.SyncPushResponse>(data['data']);
+    }
     if (dataClassName == 'TeamInfo') {
-      return deserialize<_i12.TeamInfo>(data['data']);
+      return deserialize<_i17.TeamInfo>(data['data']);
     }
     if (dataClassName == 'TeamMemberInfo') {
-      return deserialize<_i13.TeamMemberInfo>(data['data']);
+      return deserialize<_i18.TeamMemberInfo>(data['data']);
     }
     if (dataClassName == 'TeamSummary') {
-      return deserialize<_i14.TeamSummary>(data['data']);
+      return deserialize<_i19.TeamSummary>(data['data']);
     }
     if (dataClassName == 'TeamWithRole') {
-      return deserialize<_i15.TeamWithRole>(data['data']);
+      return deserialize<_i20.TeamWithRole>(data['data']);
     }
     if (dataClassName == 'UserInfo') {
-      return deserialize<_i16.UserInfo>(data['data']);
+      return deserialize<_i21.UserInfo>(data['data']);
     }
     if (dataClassName == 'UserProfile') {
-      return deserialize<_i17.UserProfile>(data['data']);
+      return deserialize<_i22.UserProfile>(data['data']);
     }
     if (dataClassName == 'InstrumentScore') {
-      return deserialize<_i18.InstrumentScore>(data['data']);
+      return deserialize<_i23.InstrumentScore>(data['data']);
     }
     if (dataClassName == 'Score') {
-      return deserialize<_i19.Score>(data['data']);
+      return deserialize<_i24.Score>(data['data']);
     }
     if (dataClassName == 'Setlist') {
-      return deserialize<_i20.Setlist>(data['data']);
+      return deserialize<_i25.Setlist>(data['data']);
     }
     if (dataClassName == 'SetlistScore') {
-      return deserialize<_i21.SetlistScore>(data['data']);
+      return deserialize<_i26.SetlistScore>(data['data']);
     }
     if (dataClassName == 'Team') {
-      return deserialize<_i22.Team>(data['data']);
+      return deserialize<_i27.Team>(data['data']);
     }
     if (dataClassName == 'TeamAnnotation') {
-      return deserialize<_i23.TeamAnnotation>(data['data']);
+      return deserialize<_i28.TeamAnnotation>(data['data']);
     }
     if (dataClassName == 'TeamMember') {
-      return deserialize<_i24.TeamMember>(data['data']);
+      return deserialize<_i29.TeamMember>(data['data']);
     }
     if (dataClassName == 'TeamScore') {
-      return deserialize<_i25.TeamScore>(data['data']);
+      return deserialize<_i30.TeamScore>(data['data']);
     }
     if (dataClassName == 'TeamSetlist') {
-      return deserialize<_i26.TeamSetlist>(data['data']);
+      return deserialize<_i31.TeamSetlist>(data['data']);
     }
     if (dataClassName == 'User') {
-      return deserialize<_i27.User>(data['data']);
+      return deserialize<_i32.User>(data['data']);
     }
     if (dataClassName == 'UserAppData') {
-      return deserialize<_i28.UserAppData>(data['data']);
+      return deserialize<_i33.UserAppData>(data['data']);
+    }
+    if (dataClassName == 'UserLibrary') {
+      return deserialize<_i34.UserLibrary>(data['data']);
     }
     if (dataClassName == 'UserStorage') {
-      return deserialize<_i29.UserStorage>(data['data']);
+      return deserialize<_i35.UserStorage>(data['data']);
     }
     if (dataClassName.startsWith('serverpod.')) {
       data['className'] = dataClassName.substring(10);
@@ -2067,30 +2283,32 @@ class Protocol extends _i1.SerializationManagerServer {
         return _i3.Annotation.t;
       case _i4.Application:
         return _i4.Application.t;
-      case _i18.InstrumentScore:
-        return _i18.InstrumentScore.t;
-      case _i19.Score:
-        return _i19.Score.t;
-      case _i20.Setlist:
-        return _i20.Setlist.t;
-      case _i21.SetlistScore:
-        return _i21.SetlistScore.t;
-      case _i22.Team:
-        return _i22.Team.t;
-      case _i23.TeamAnnotation:
-        return _i23.TeamAnnotation.t;
-      case _i24.TeamMember:
-        return _i24.TeamMember.t;
-      case _i25.TeamScore:
-        return _i25.TeamScore.t;
-      case _i26.TeamSetlist:
-        return _i26.TeamSetlist.t;
-      case _i27.User:
-        return _i27.User.t;
-      case _i28.UserAppData:
-        return _i28.UserAppData.t;
-      case _i29.UserStorage:
-        return _i29.UserStorage.t;
+      case _i23.InstrumentScore:
+        return _i23.InstrumentScore.t;
+      case _i24.Score:
+        return _i24.Score.t;
+      case _i25.Setlist:
+        return _i25.Setlist.t;
+      case _i26.SetlistScore:
+        return _i26.SetlistScore.t;
+      case _i27.Team:
+        return _i27.Team.t;
+      case _i28.TeamAnnotation:
+        return _i28.TeamAnnotation.t;
+      case _i29.TeamMember:
+        return _i29.TeamMember.t;
+      case _i30.TeamScore:
+        return _i30.TeamScore.t;
+      case _i31.TeamSetlist:
+        return _i31.TeamSetlist.t;
+      case _i32.User:
+        return _i32.User.t;
+      case _i33.UserAppData:
+        return _i33.UserAppData.t;
+      case _i34.UserLibrary:
+        return _i34.UserLibrary.t;
+      case _i35.UserStorage:
+        return _i35.UserStorage.t;
     }
     return null;
   }

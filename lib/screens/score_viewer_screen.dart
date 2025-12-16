@@ -171,7 +171,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       final file = File(pdfPath);
       if (!await file.exists()) {
         // Try to download from server
-        final syncService = ref.read(syncServiceProvider);
+        final syncServiceAsync = ref.read(syncServiceProvider);
+        final syncService = switch (syncServiceAsync) {
+          AsyncData(:final value) => value,
+          _ => null,
+        };
         if (syncService != null) {
           setState(() {
             _pdfError = null;  // Clear error while downloading

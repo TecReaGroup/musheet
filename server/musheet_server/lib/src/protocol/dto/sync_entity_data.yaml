@@ -1,0 +1,21 @@
+### Sync Entity Data DTO
+### Represents entity data in a pull response
+class: SyncEntityData
+fields:
+  ### Entity type
+  entityType: String
+  
+  ### Server ID
+  serverId: int
+  
+  ### Version when this entity was modified (= libraryVersion at modification time)
+  version: int
+  
+  ### JSON-encoded entity data
+  data: String
+  
+  ### When this was last updated on server
+  updatedAt: DateTime
+  
+  ### If this entity is deleted (soft delete)
+  isDeleted: bool

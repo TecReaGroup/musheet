@@ -40,6 +40,10 @@ file:
   - downloadPdf:
   - getFileUrl:
   - deletePdf:
+librarySync:
+  - pull:
+  - push:
+  - getLibraryVersion:
 profile:
   - getProfile:
   - updateProfile:

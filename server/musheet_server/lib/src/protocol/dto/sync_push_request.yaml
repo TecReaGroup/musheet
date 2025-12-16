@@ -1,0 +1,24 @@
+### Sync Push Request DTO
+### Unified push request for all entity changes
+class: SyncPushRequest
+fields:
+  ### Client's current library version (for conflict detection)
+  clientLibraryVersion: int
+  
+  ### List of score changes
+  scores: List<SyncEntityChange>?
+  
+  ### List of instrument score changes  
+  instrumentScores: List<SyncEntityChange>?
+  
+  ### List of annotation changes
+  annotations: List<SyncEntityChange>?
+  
+  ### List of setlist changes
+  setlists: List<SyncEntityChange>?
+  
+  ### List of setlist score changes
+  setlistScores: List<SyncEntityChange>?
+  
+  ### List of entity IDs to delete (format: "type:id")
+  deletes: List<String>?

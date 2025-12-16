@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
 import 'package:serverpod_client/serverpod_client.dart' show ClientAuthKeyProvider, wrapAsBearerAuthHeaderValue;
@@ -635,10 +636,10 @@ class RpcClient {
   }
 
   // ============================================================================
-  // Sync Operations
+  // Sync Operations (Legacy - will be replaced by Library Sync)
   // ============================================================================
 
-  /// Full sync
+  /// Full sync (Legacy)
   Future<RpcResponse<server.ScoreSyncResult>> syncAll({DateTime? lastSyncAt}) async {
     if (_userId == null) {
       return RpcResponse.failure(
@@ -655,7 +656,7 @@ class RpcClient {
     );
   }
 
-  /// Get sync status
+  /// Get sync status (Legacy)
   Future<RpcResponse<Map<String, dynamic>>> getSyncStatus() async {
     if (_userId == null) {
       return RpcResponse.failure(
@@ -668,6 +669,92 @@ class RpcClient {
       endpoint: 'sync',
       method: 'getSyncStatus',
       call: () => _client.sync.getSyncStatus(_userId!),
+      transform: (result) => result,
+    );
+  }
+
+  // ============================================================================
+  // Library Sync Operations (New Zotero-style sync)
+  // ============================================================================
+
+  /// Pull changes since a given library version
+  /// This implements the Zotero-style pull where client specifies the last known version
+  Future<RpcResponse<LibrarySyncPullResult>> libraryPull({int since = 0}) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'libraryPull',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'librarySync',
+      method: 'pull',
+      call: () => _client.librarySync.pull(_userId!, since: since),
+      transform: (result) => LibrarySyncPullResult.fromServerpod(result),
+    );
+  }
+
+  /// Push local changes to server
+  /// Returns conflict=true if client's version is behind server (needs pull first)
+  Future<RpcResponse<LibrarySyncPushResult>> libraryPush({
+    required int clientLibraryVersion,
+    required List<Map<String, dynamic>> scores,
+    required List<Map<String, dynamic>> setlists,
+    required List<String> deletes,
+  }) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'libraryPush',
+      );
+    }
+
+    // Build push request
+    final request = server.SyncPushRequest(
+      clientLibraryVersion: clientLibraryVersion,
+      scores: scores.map((s) => server.SyncEntityChange(
+        entityType: s['entityType'] as String,
+        entityId: s['entityId'] as String,
+        serverId: s['serverId'] as int?,
+        operation: s['operation'] as String,
+        version: s['version'] as int,
+        data: s['data'] as String,
+        localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+      )).toList(),
+      setlists: setlists.map((s) => server.SyncEntityChange(
+        entityType: s['entityType'] as String,
+        entityId: s['entityId'] as String,
+        serverId: s['serverId'] as int?,
+        operation: s['operation'] as String,
+        version: s['version'] as int,
+        data: s['data'] as String,
+        localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+      )).toList(),
+      deletes: deletes,
+    );
+
+    return _executeCall(
+      endpoint: 'librarySync',
+      method: 'push',
+      call: () => _client.librarySync.push(_userId!, request),
+      transform: (result) => LibrarySyncPushResult.fromServerpod(result),
+    );
+  }
+
+  /// Get current library version for a user
+  Future<RpcResponse<int>> getLibraryVersion() async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'getLibraryVersion',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'librarySync',
+      method: 'getLibraryVersion',
+      call: () => _client.librarySync.getLibraryVersion(_userId!),
       transform: (result) => result,
     );
   }
@@ -818,5 +905,124 @@ class AuthResultData {
       user: userProfile,
       mustChangePassword: result.mustChangePassword,
     );
+  }
+}
+
+// ============================================================================
+// Library Sync Result Types
+// ============================================================================
+
+/// Result from library pull operation
+class LibrarySyncPullResult {
+  final int libraryVersion;
+  final List<SyncEntityData> scores;
+  final List<SyncEntityData> instrumentScores;
+  final List<SyncEntityData> annotations;
+  final List<SyncEntityData> setlists;
+  final List<SyncEntityData> setlistScores;
+  final List<String> deleted;
+  final bool isFullSync;
+
+  LibrarySyncPullResult({
+    required this.libraryVersion,
+    this.scores = const [],
+    this.instrumentScores = const [],
+    this.annotations = const [],
+    this.setlists = const [],
+    this.setlistScores = const [],
+    this.deleted = const [],
+    this.isFullSync = false,
+  });
+
+  factory LibrarySyncPullResult.fromServerpod(dynamic result) {
+    return LibrarySyncPullResult(
+      libraryVersion: (result.libraryVersion as int?) ?? 0,
+      scores: _parseEntityList(result.scores),
+      instrumentScores: _parseEntityList(result.instrumentScores),
+      annotations: _parseEntityList(result.annotations),
+      setlists: _parseEntityList(result.setlists),
+      setlistScores: _parseEntityList(result.setlistScores),
+      deleted: (result.deleted as List?)?.cast<String>() ?? [],
+      isFullSync: (result.isFullSync as bool?) ?? false,
+    );
+  }
+
+  static List<SyncEntityData> _parseEntityList(dynamic list) {
+    if (list == null) return [];
+    return (list as List).map((s) => SyncEntityData.fromServerpod(s)).toList();
+  }
+}
+
+/// Result from library push operation
+class LibrarySyncPushResult {
+  final bool success;
+  final bool conflict;
+  final int? newLibraryVersion;
+  final int? serverLibraryVersion;
+  final List<String> accepted;
+  final Map<String, int> serverIdMapping;
+  final String? errorMessage;
+
+  LibrarySyncPushResult({
+    required this.success,
+    this.conflict = false,
+    this.newLibraryVersion,
+    this.serverLibraryVersion,
+    this.accepted = const [],
+    this.serverIdMapping = const {},
+    this.errorMessage,
+  });
+
+  factory LibrarySyncPushResult.fromServerpod(dynamic result) {
+    return LibrarySyncPushResult(
+      success: (result.success as bool?) ?? false,
+      conflict: (result.conflict as bool?) ?? false,
+      newLibraryVersion: result.newLibraryVersion as int?,
+      serverLibraryVersion: result.serverLibraryVersion as int?,
+      accepted: (result.accepted as List?)?.cast<String>() ?? [],
+      serverIdMapping: (result.serverIdMapping as Map?)?.cast<String, int>() ?? {},
+      errorMessage: result.errorMessage as String?,
+    );
+  }
+}
+
+/// Entity data from sync pull
+class SyncEntityData {
+  final String entityType;
+  final int serverId;
+  final int version;
+  final String data;
+  final DateTime? updatedAt;
+  final bool isDeleted;
+
+  SyncEntityData({
+    required this.entityType,
+    required this.serverId,
+    required this.version,
+    required this.data,
+    this.updatedAt,
+    this.isDeleted = false,
+  });
+
+  factory SyncEntityData.fromServerpod(dynamic entity) {
+    return SyncEntityData(
+      entityType: entity.entityType as String,
+      serverId: entity.serverId as int,
+      version: entity.version as int,
+      data: entity.data as String,
+      updatedAt: entity.updatedAt as DateTime?,
+      isDeleted: (entity.isDeleted as bool?) ?? false,
+    );
+  }
+
+  /// Parse the JSON data
+  Map<String, dynamic> get parsedData {
+    try {
+      return Map<String, dynamic>.from(
+        jsonDecode(data) as Map,
+      );
+    } catch (_) {
+      return {};
+    }
   }
 }

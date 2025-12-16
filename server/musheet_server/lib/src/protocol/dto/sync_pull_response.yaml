@@ -1,0 +1,27 @@
+### Sync Pull Response DTO
+### Response from pull operation containing all changes since requested version
+class: SyncPullResponse
+fields:
+  ### Current library version on server
+  libraryVersion: int
+  
+  ### Score changes since requested version
+  scores: List<SyncEntityData>?
+  
+  ### Instrument score changes since requested version
+  instrumentScores: List<SyncEntityData>?
+  
+  ### Annotation changes since requested version
+  annotations: List<SyncEntityData>?
+  
+  ### Setlist changes since requested version
+  setlists: List<SyncEntityData>?
+  
+  ### Setlist score changes since requested version
+  setlistScores: List<SyncEntityData>?
+  
+  ### List of deleted entity IDs (format: "type:serverId")
+  deleted: List<String>?
+  
+  ### Whether this is a full sync (client was at version 0)
+  isFullSync: bool

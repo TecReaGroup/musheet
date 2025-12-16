@@ -1,0 +1,24 @@
+### Sync Push Response DTO
+### Response from push operation
+class: SyncPushResponse
+fields:
+  ### Whether the push was successful
+  success: bool
+  
+  ### New library version after push (if successful)
+  newLibraryVersion: int?
+  
+  ### List of accepted entity IDs
+  accepted: List<String>?
+  
+  ### Map of local entity ID to server ID for newly created entities
+  serverIdMapping: Map<String, int>?
+  
+  ### Whether a conflict occurred (HTTP 412 equivalent)
+  conflict: bool
+  
+  ### Current server library version (if conflict)
+  serverLibraryVersion: int?
+  
+  ### Error message if any
+  errorMessage: String?

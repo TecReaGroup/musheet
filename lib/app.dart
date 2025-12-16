@@ -105,9 +105,13 @@ class MuSheetApp extends ConsumerWidget {
       // Then restore session with network validation
       await ref.read(authProvider.notifier).restoreSession();
       // Start background sync if logged in
-      final syncService = ref.read(syncServiceProvider);
+      final syncServiceAsync = ref.read(syncServiceProvider);
+      final syncService = switch (syncServiceAsync) {
+        AsyncData(:final value) => value,
+        _ => null,
+      };
       if (syncService != null) {
-        syncService.startBackgroundSync();
+        await syncService.startBackgroundSync();
       }
     });
 

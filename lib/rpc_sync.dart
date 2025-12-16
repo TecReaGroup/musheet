@@ -6,8 +6,5 @@ export 'rpc/rpc_protocol.dart';
 export 'rpc/rpc_interceptors.dart';
 export 'rpc/rpc_client.dart';
 
-// Sync
-export 'sync/sync_state_machine.dart';
-export 'sync/operation_queue.dart';
-export 'sync/conflict_resolver.dart';
-export 'sync/sync_service_v2.dart';
+// Sync - New Library-Wide Version synchronization (Zotero-style)
+export 'sync/library_sync_service.dart';
