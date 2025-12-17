@@ -8,7 +8,16 @@ fields:
   orderIndex: int
   createdAt: DateTime
   updatedAt: DateTime
+  deletedAt: DateTime?
+  version: int
+  syncStatus: String?
 indexes:
   instrument_score_idx:
     fields: scoreId
+    type: btree
+  instrument_score_unique:
+    fields: scoreId, instrumentName
+    unique: true
+  instrument_score_version_idx:
+    fields: scoreId, version
     type: btree

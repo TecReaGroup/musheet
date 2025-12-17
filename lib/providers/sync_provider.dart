@@ -58,24 +58,24 @@ final syncServiceProvider = FutureProvider<LibrarySyncService?>((ref) async {
 });
 
 /// Provider for sync status stream
-final syncStatusStreamProvider = StreamProvider<LibrarySyncStatus>((ref) {
+final syncStatusStreamProvider = StreamProvider<SyncStatus>((ref) {
   final syncServiceAsync = ref.watch(syncServiceProvider);
   return syncServiceAsync.when(
     data: (syncService) {
       if (syncService == null) {
-        return Stream.value(const LibrarySyncStatus(
-          state: LibrarySyncState.waitingForNetwork,
+        return Stream.value(const SyncStatus(
+          state: SyncState.waitingForNetwork,
           localLibraryVersion: 0,
         ));
       }
       return syncService.statusStream;
     },
-    loading: () => Stream.value(const LibrarySyncStatus(
-      state: LibrarySyncState.idle,
+    loading: () => Stream.value(const SyncStatus(
+      state: SyncState.idle,
       localLibraryVersion: 0,
     )),
-    error: (e, s) => Stream.value(const LibrarySyncStatus(
-      state: LibrarySyncState.error,
+    error: (e, s) => Stream.value(const SyncStatus(
+      state: SyncState.error,
       localLibraryVersion: 0,
       errorMessage: 'Failed to initialize sync',
     )),
@@ -83,24 +83,24 @@ final syncStatusStreamProvider = StreamProvider<LibrarySyncStatus>((ref) {
 });
 
 /// Provider for current sync status
-final syncStatusProvider = Provider<LibrarySyncStatus>((ref) {
+final syncStatusProvider = Provider<SyncStatus>((ref) {
   final syncServiceAsync = ref.watch(syncServiceProvider);
   return syncServiceAsync.when(
     data: (syncService) {
       if (syncService == null) {
-        return const LibrarySyncStatus(
-          state: LibrarySyncState.waitingForNetwork,
+        return const SyncStatus(
+          state: SyncState.waitingForNetwork,
           localLibraryVersion: 0,
         );
       }
       return syncService.status;
     },
-    loading: () => const LibrarySyncStatus(
-      state: LibrarySyncState.idle,
+    loading: () => const SyncStatus(
+      state: SyncState.idle,
       localLibraryVersion: 0,
     ),
-    error: (e, s) => const LibrarySyncStatus(
-      state: LibrarySyncState.error,
+    error: (e, s) => const SyncStatus(
+      state: SyncState.error,
       localLibraryVersion: 0,
       errorMessage: 'Failed to initialize sync',
     ),
@@ -152,15 +152,15 @@ final backgroundSyncProvider = Provider<void>((ref) {
 /// Helper to check if sync is in progress
 final isSyncingProvider = Provider<bool>((ref) {
   final status = ref.watch(syncStatusProvider);
-  return status.state == LibrarySyncState.pushing ||
-         status.state == LibrarySyncState.pulling ||
-         status.state == LibrarySyncState.merging;
+  return status.state == SyncState.pushing ||
+         status.state == SyncState.pulling ||
+         status.state == SyncState.merging;
 });
 
 /// Helper to get pending changes count
 final pendingChangesProvider = Provider<int>((ref) {
   final status = ref.watch(syncStatusProvider);
-  return status.pendingChangesCount;
+  return status.pendingChanges;
 });
 
 /// Helper to get last sync time

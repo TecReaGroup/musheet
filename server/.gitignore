@@ -1,0 +1,56 @@
+# Serverpod Generated Code
+musheet_server/lib/src/generated/
+musheet_client/lib/src/protocol/
+musheet_flutter/.dart_tool/
+
+# Build Outputs
+musheet_server/.dart_tool/
+musheet_server/build/
+musheet_client/.dart_tool/
+musheet_client/build/
+musheet_flutter/build/
+
+# Dependency Lock Files
+musheet_server/pubspec.lock
+musheet_client/pubspec.lock
+musheet_flutter/pubspec.lock
+
+# User Uploads (runtime generated content)
+musheet_server/uploads/
+
+# Docker Volumes
+postgres_data/
+redis_data/
+backup_data/
+
+# Environment Files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# IDE Files
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# SSL Certificates
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt
+
+# Temporary Files
+*.tmp
+*.temp
+.cache/

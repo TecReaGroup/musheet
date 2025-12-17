@@ -14,6 +14,14 @@ class Annotations extends Table {
   RealColumn get posY => real().nullable()();
   IntColumn get pageNumber => integer().withDefault(const Constant(1))();
 
+  // Sync fields (aligned with sync_logic.md)
+  // Note: Annotations use physical delete, not soft delete (no deletedAt field)
+  // Note: userId is NOT stored on frontend - backend extracts it from session
+  IntColumn get version => integer().withDefault(const Constant(1))();
+  TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
+  IntColumn get serverId => integer().nullable()();
+  DateTimeColumn get updatedAt => dateTime().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

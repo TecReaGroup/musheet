@@ -59,6 +59,8 @@ class SetlistEndpoint extends Endpoint {
       userId: validatedUserId,
       name: name,
       description: description,
+      version: 1,
+      syncStatus: 'synced',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -180,6 +182,10 @@ class SetlistEndpoint extends Endpoint {
       setlistId: setlistId,
       scoreId: scoreId,
       orderIndex: pos,
+      version: 1,
+      syncStatus: 'synced',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
 
     return await SetlistScore.db.insertRow(session, setlistScore);

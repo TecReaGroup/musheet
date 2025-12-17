@@ -17,3 +17,9 @@ indexes:
   score_user_updated_idx:
     fields: userId, updatedAt
     type: btree
+  score_user_title_composer_unique:
+    fields: userId, title, composer
+    unique: true
+  score_user_version_idx:
+    fields: userId, version
+    type: btree

@@ -527,6 +527,23 @@ class RpcClient {
     );
   }
 
+  /// Check if PDF with given hash exists on server (for instant upload/秒传)
+  Future<RpcResponse<bool>> checkPdfHash(String hash) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'checkPdfHash',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'file',
+      method: 'checkPdfHash',
+      call: () => _client.file.checkPdfHash(_userId!, hash),
+      transform: (result) => result,
+    );
+  }
+
   // ============================================================================
   // Library Sync Operations (Zotero-style batch sync)
   // NOTE: Legacy syncAll/getSyncStatus methods have been removed.
@@ -572,7 +589,9 @@ class RpcClient {
     required int clientLibraryVersion,
     required List<Map<String, dynamic>> scores,
     List<Map<String, dynamic>> instrumentScores = const [],
+    List<Map<String, dynamic>> annotations = const [],
     required List<Map<String, dynamic>> setlists,
+    List<Map<String, dynamic>> setlistScores = const [],
     required List<String> deletes,
   }) async {
     if (_userId == null) {
@@ -584,7 +603,7 @@ class RpcClient {
 
     // Build push request with null-safe type conversions
     if (kDebugMode) {
-      debugPrint('[RpcClient] Building SyncPushRequest: scores=${scores.length}, instrumentScores=${instrumentScores.length}, setlists=${setlists.length}, deletes=${deletes.length}');
+      debugPrint('[RpcClient] Building SyncPushRequest: scores=${scores.length}, instrumentScores=${instrumentScores.length}, annotations=${annotations.length}, setlists=${setlists.length}, setlistScores=${setlistScores.length}, deletes=${deletes.length}');
     }
     
     try {
@@ -608,7 +627,25 @@ class RpcClient {
           data: s['data'] as String,
           localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
         )).toList(),
+        annotations: annotations.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,  // Default to 1 if null
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
         setlists: setlists.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,  // Default to 1 if null
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        setlistScores: setlistScores.map((s) => server.SyncEntityChange(
           entityType: s['entityType'] as String,
           entityId: s['entityId'] as String,
           serverId: s['serverId'] as int?,

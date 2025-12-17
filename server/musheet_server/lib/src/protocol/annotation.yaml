@@ -14,7 +14,12 @@ fields:
   vectorClock: String?
   createdAt: DateTime
   updatedAt: DateTime
+  version: int
+  syncStatus: String?
 indexes:
   annotation_inst_score_idx:
     fields: instrumentScoreId
+    type: btree
+  annotation_user_version_idx:
+    fields: userId, version
     type: btree

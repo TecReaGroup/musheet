@@ -8,7 +8,8 @@ class Scores extends Table {
   IntColumn get bpm => integer().withDefault(const Constant(120))();
   DateTimeColumn get dateAdded => dateTime()();
 
-  // Sync fields
+  // Sync fields (aligned with sync_logic.md)
+  // Note: userId is NOT stored on frontend - backend extracts it from session
   IntColumn get version => integer().withDefault(const Constant(1))();
   TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
   IntColumn get serverId => integer().nullable()();

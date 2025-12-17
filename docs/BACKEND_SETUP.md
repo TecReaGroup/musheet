@@ -462,6 +462,9 @@ cd musheet_server
 # 重新生成代码
 serverpod generate
 
+# 先删除 migrations 目录下的所有旧迁移文件
+serverpod create-migration
+
 # 应用迁移（创建数据库和表）
 dart run bin/main.dart --apply-migrations
 ```

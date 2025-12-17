@@ -4,7 +4,15 @@ fields:
   setlistId: int, relation(parent=setlists)
   scoreId: int, relation(parent=scores)
   orderIndex: int
+  createdAt: DateTime
+  updatedAt: DateTime
+  deletedAt: DateTime?
+  version: int
+  syncStatus: String?
 indexes:
   setlist_score_idx:
     fields: setlistId
     type: btree
+  setlist_score_unique:
+    fields: setlistId, scoreId
+    unique: true

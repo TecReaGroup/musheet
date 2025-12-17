@@ -17,11 +17,14 @@ CREATE TABLE "annotations" (
     "color" text,
     "vectorClock" text,
     "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
+    "updatedAt" timestamp without time zone NOT NULL,
+    "version" bigint NOT NULL,
+    "syncStatus" text
 );
 
 -- Indexes
 CREATE INDEX "annotation_inst_score_idx" ON "annotations" USING btree ("instrumentScoreId");
+CREATE INDEX "annotation_user_version_idx" ON "annotations" USING btree ("userId", "version");
 
 --
 -- Class Application as table applications
@@ -51,11 +54,16 @@ CREATE TABLE "instrument_scores" (
     "pdfHash" text,
     "orderIndex" bigint NOT NULL,
     "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL
+    "updatedAt" timestamp without time zone NOT NULL,
+    "deletedAt" timestamp without time zone,
+    "version" bigint NOT NULL,
+    "syncStatus" text
 );
 
 -- Indexes
 CREATE INDEX "instrument_score_idx" ON "instrument_scores" USING btree ("scoreId");
+CREATE UNIQUE INDEX "instrument_score_unique" ON "instrument_scores" USING btree ("scoreId", "instrumentName");
+CREATE INDEX "instrument_score_version_idx" ON "instrument_scores" USING btree ("scoreId", "version");
 
 --
 -- Class Score as table scores
@@ -76,6 +84,8 @@ CREATE TABLE "scores" (
 -- Indexes
 CREATE INDEX "score_user_idx" ON "scores" USING btree ("userId");
 CREATE INDEX "score_user_updated_idx" ON "scores" USING btree ("userId", "updatedAt");
+CREATE UNIQUE INDEX "score_user_title_composer_unique" ON "scores" USING btree ("userId", "title", "composer");
+CREATE INDEX "score_user_version_idx" ON "scores" USING btree ("userId", "version");
 
 --
 -- Class SetlistScore as table setlist_scores
@@ -84,11 +94,17 @@ CREATE TABLE "setlist_scores" (
     "id" bigserial PRIMARY KEY,
     "setlistId" bigint NOT NULL,
     "scoreId" bigint NOT NULL,
-    "orderIndex" bigint NOT NULL
+    "orderIndex" bigint NOT NULL,
+    "createdAt" timestamp without time zone NOT NULL,
+    "updatedAt" timestamp without time zone NOT NULL,
+    "deletedAt" timestamp without time zone,
+    "version" bigint NOT NULL,
+    "syncStatus" text
 );
 
 -- Indexes
 CREATE INDEX "setlist_score_idx" ON "setlist_scores" USING btree ("setlistId");
+CREATE UNIQUE INDEX "setlist_score_unique" ON "setlist_scores" USING btree ("setlistId", "scoreId");
 
 --
 -- Class Setlist as table setlists
@@ -100,11 +116,15 @@ CREATE TABLE "setlists" (
     "description" text,
     "createdAt" timestamp without time zone NOT NULL,
     "updatedAt" timestamp without time zone NOT NULL,
-    "deletedAt" timestamp without time zone
+    "deletedAt" timestamp without time zone,
+    "version" bigint NOT NULL,
+    "syncStatus" text
 );
 
 -- Indexes
 CREATE INDEX "setlist_user_idx" ON "setlists" USING btree ("userId");
+CREATE UNIQUE INDEX "setlist_user_name_unique" ON "setlists" USING btree ("userId", "name");
+CREATE INDEX "setlist_version_idx" ON "setlists" USING btree ("userId", "version");
 
 --
 -- Class TeamAnnotation as table team_annotations
@@ -205,6 +225,20 @@ CREATE TABLE "user_app_data" (
 
 -- Indexes
 CREATE UNIQUE INDEX "user_app_data_user_app_idx" ON "user_app_data" USING btree ("userId", "applicationId");
+
+--
+-- Class UserLibrary as table user_libraries
+--
+CREATE TABLE "user_libraries" (
+    "id" bigserial PRIMARY KEY,
+    "userId" bigint NOT NULL,
+    "libraryVersion" bigint NOT NULL,
+    "lastSyncAt" timestamp without time zone NOT NULL,
+    "lastModifiedAt" timestamp without time zone NOT NULL
+);
+
+-- Indexes
+CREATE UNIQUE INDEX "user_library_user_idx" ON "user_libraries" USING btree ("userId");
 
 --
 -- Class UserStorage as table user_storage
@@ -596,6 +630,16 @@ ALTER TABLE ONLY "user_app_data"
     ON UPDATE NO ACTION;
 
 --
+-- Foreign relations for "user_libraries" table
+--
+ALTER TABLE ONLY "user_libraries"
+    ADD CONSTRAINT "user_libraries_fk_0"
+    FOREIGN KEY("userId")
+    REFERENCES "users"("id")
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION;
+
+--
 -- Foreign relations for "user_storage" table
 --
 ALTER TABLE ONLY "user_storage"
@@ -640,9 +684,9 @@ ALTER TABLE ONLY "serverpod_query_log"
 -- MIGRATION VERSION FOR musheet
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('musheet', '20251215122620413', now())
+    VALUES ('musheet', '20251217163930570', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20251215122620413', "timestamp" = now();
+    DO UPDATE SET "version" = '20251217163930570', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

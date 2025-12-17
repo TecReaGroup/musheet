@@ -37,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase._internal() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -60,6 +60,7 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(instrumentScores, instrumentScores.pdfSyncStatus);
             await m.addColumn(instrumentScores, instrumentScores.pdfHash);
             await m.addColumn(instrumentScores, instrumentScores.updatedAt);
+            await m.addColumn(instrumentScores, instrumentScores.deletedAt);
 
             // Add sync fields to setlists
             await m.addColumn(setlists, setlists.version);
@@ -76,6 +77,24 @@ class AppDatabase extends _$AppDatabase {
             await customStatement("UPDATE instrument_scores SET version = 1, sync_status = 'pending', pdf_sync_status = 'pending' WHERE version IS NULL OR sync_status IS NULL");
             await customStatement("UPDATE setlists SET version = 1, sync_status = 'pending' WHERE version IS NULL OR sync_status IS NULL");
           }
+          if (from < 3) {
+            // Add deletedAt to instrument_scores if missing (users upgrading from v2)
+            await customStatement("ALTER TABLE instrument_scores ADD COLUMN deleted_at INTEGER");
+            
+            // Add sync fields to annotations using SQL
+            await customStatement("ALTER TABLE annotations ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
+            await customStatement("ALTER TABLE annotations ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'");
+            await customStatement("ALTER TABLE annotations ADD COLUMN server_id INTEGER");
+            await customStatement("ALTER TABLE annotations ADD COLUMN updated_at INTEGER");
+            await customStatement("ALTER TABLE annotations ADD COLUMN deleted_at INTEGER");
+
+            // Add sync fields to setlist_scores using SQL
+            await customStatement("ALTER TABLE setlist_scores ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
+            await customStatement("ALTER TABLE setlist_scores ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'");
+            await customStatement("ALTER TABLE setlist_scores ADD COLUMN server_id INTEGER");
+            await customStatement("ALTER TABLE setlist_scores ADD COLUMN updated_at INTEGER");
+            await customStatement("ALTER TABLE setlist_scores ADD COLUMN deleted_at INTEGER");
+          }
         },
         beforeOpen: (details) async {
           // Fix NULL sync fields for existing records (handles case where migration already ran)
@@ -84,8 +103,12 @@ class AppDatabase extends _$AppDatabase {
           await customStatement("UPDATE instrument_scores SET version = 1 WHERE version IS NULL");
           await customStatement("UPDATE instrument_scores SET sync_status = 'pending' WHERE sync_status IS NULL");
           await customStatement("UPDATE instrument_scores SET pdf_sync_status = 'pending' WHERE pdf_sync_status IS NULL");
+          await customStatement("UPDATE annotations SET version = 1 WHERE version IS NULL");
+          await customStatement("UPDATE annotations SET sync_status = 'pending' WHERE sync_status IS NULL");
           await customStatement("UPDATE setlists SET version = 1 WHERE version IS NULL");
           await customStatement("UPDATE setlists SET sync_status = 'pending' WHERE sync_status IS NULL");
+          await customStatement("UPDATE setlist_scores SET version = 1 WHERE version IS NULL");
+          await customStatement("UPDATE setlist_scores SET sync_status = 'pending' WHERE sync_status IS NULL");
         },
       );
 }

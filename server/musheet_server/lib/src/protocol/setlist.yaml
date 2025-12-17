@@ -7,7 +7,15 @@ fields:
   createdAt: DateTime
   updatedAt: DateTime
   deletedAt: DateTime?
+  version: int
+  syncStatus: String?
 indexes:
   setlist_user_idx:
     fields: userId
+    type: btree
+  setlist_user_name_unique:
+    fields: userId, name
+    unique: true
+  setlist_version_idx:
+    fields: userId, version
     type: btree

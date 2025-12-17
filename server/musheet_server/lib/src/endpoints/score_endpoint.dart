@@ -312,6 +312,8 @@ class ScoreEndpoint extends Endpoint {
       instrumentName: instrumentName,
       orderIndex: orderIndex,
       pdfPath: pdfPath,
+      version: 1,
+      syncStatus: 'synced',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );

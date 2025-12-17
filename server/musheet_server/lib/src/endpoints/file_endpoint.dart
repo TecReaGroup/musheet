@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart';
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
@@ -63,6 +64,28 @@ class FileEndpoint extends Endpoint {
     }
 
     return await _readFile(instrumentScore.pdfPath!);
+  }
+
+  /// Check if PDF with given hash exists on server (for instant upload/秒传)
+  /// Returns true if a file with this hash already exists in user's library
+  Future<bool> checkPdfHash(Session session, int userId, String hash) async {
+    // Query all instrument scores for this user to find matching hash
+    final scores = await Score.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) & t.deletedAt.equals(null),
+    );
+
+    for (final score in scores) {
+      final instrumentScores = await InstrumentScore.db.find(
+        session,
+        where: (t) => t.scoreId.equals(score.id!) & t.pdfHash.equals(hash),
+      );
+      if (instrumentScores.isNotEmpty) {
+        return true; // Hash found - file already exists
+      }
+    }
+
+    return false; // Hash not found - file needs to be uploaded
   }
 
   /// Get file URL
@@ -169,13 +192,10 @@ class FileEndpoint extends Endpoint {
   }
 
   String _computeHash(ByteData data) {
-    // Simple hash for file integrity check
-    int hash = 0;
+    // Use MD5 hash for file deduplication (秒传)
     final bytes = data.buffer.asUint8List();
-    for (int i = 0; i < bytes.length; i++) {
-      hash = (hash * 31 + bytes[i]) & 0xFFFFFFFF;
-    }
-    return hash.toRadixString(16);
+    final digest = md5.convert(bytes);
+    return digest.toString();
   }
 
   Future<void> _updateStorageStats(Session session, int userId, int addedBytes) async {

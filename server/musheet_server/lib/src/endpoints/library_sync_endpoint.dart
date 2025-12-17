@@ -154,13 +154,16 @@ class LibrarySyncEndpoint extends Endpoint {
         }
       }
       
-      // Process deletes
+      // Process deletes (version is managed inside _processDelete for cascaded deletes)
       if (request.deletes != null) {
+        session.log('[LIBSYNC] Processing ${request.deletes!.length} deletions', level: LogLevel.debug);
         for (final deleteKey in request.deletes!) {
-          newVersion++;
-          await _processDelete(session, validatedUserId, deleteKey, newVersion);
+          session.log('[LIBSYNC]   Delete: $deleteKey', level: LogLevel.debug);
+          newVersion++; // Version for the primary delete
+          newVersion = await _processDelete(session, validatedUserId, deleteKey, newVersion);
           acceptedIds.add(deleteKey);
         }
+        session.log('[LIBSYNC] Deletions processed, final version=$newVersion, acceptedIds: ${acceptedIds.length}', level: LogLevel.debug);
       }
       
       // Update library version
@@ -250,23 +253,20 @@ class LibrarySyncEndpoint extends Endpoint {
       session,
       where: (t) => t.userId.equals(userId),
     );
-    final scoreIds = userScores.map((s) => s.id!).toList();
+    final scoreIds = userScores.map((s) => s.id!).toSet();
     
     if (scoreIds.isEmpty) return [];
     
-    final instrumentScores = <InstrumentScore>[];
-    for (final scoreId in scoreIds) {
-      final instScores = await InstrumentScore.db.find(
-        session,
-        where: (t) => t.scoreId.equals(scoreId),
-      );
-      instrumentScores.addAll(instScores);
-    }
+    // Optimized: Use single query with IN clause instead of loop
+    final instrumentScores = await InstrumentScore.db.find(
+      session,
+      where: (t) => t.scoreId.inSet(scoreIds) & (t.version > sinceVersion),
+    );
     
     return instrumentScores.map((is_) => SyncEntityData(
       entityType: 'instrumentScore',
       serverId: is_.id!,
-      version: 1, // InstrumentScores don't have version field yet
+      version: is_.version,
       data: jsonEncode({
         'scoreId': is_.scoreId,
         'instrumentName': is_.instrumentName,
@@ -276,20 +276,20 @@ class LibrarySyncEndpoint extends Endpoint {
         'createdAt': is_.createdAt.toIso8601String(),
       }),
       updatedAt: is_.updatedAt,
-      isDeleted: false,
+      isDeleted: is_.deletedAt != null,  // Check deletedAt field
     )).toList();
   }
   
   Future<List<SyncEntityData>> _getAnnotationsSince(Session session, int userId, int sinceVersion) async {
     final annotations = await Annotation.db.find(
       session,
-      where: (t) => t.userId.equals(userId),
+      where: (t) => t.userId.equals(userId) & (t.version > sinceVersion),
     );
     
     return annotations.map((a) => SyncEntityData(
       entityType: 'annotation',
       serverId: a.id!,
-      version: 1,
+      version: a.version,
       data: jsonEncode({
         'instrumentScoreId': a.instrumentScoreId,
         'pageNumber': a.pageNumber,
@@ -304,20 +304,20 @@ class LibrarySyncEndpoint extends Endpoint {
         'createdAt': a.createdAt.toIso8601String(),
       }),
       updatedAt: a.updatedAt,
-      isDeleted: false,
+      isDeleted: false,  // Annotations use physical delete, never soft deleted
     )).toList();
   }
   
   Future<List<SyncEntityData>> _getSetlistsSince(Session session, int userId, int sinceVersion) async {
     final setlists = await Setlist.db.find(
       session,
-      where: (t) => t.userId.equals(userId),
+      where: (t) => t.userId.equals(userId) & (t.version > sinceVersion),
     );
     
     return setlists.map((s) => SyncEntityData(
       entityType: 'setlist',
       serverId: s.id!,
-      version: 1,
+      version: s.version,
       data: jsonEncode({
         'name': s.name,
         'description': s.description,
@@ -334,30 +334,27 @@ class LibrarySyncEndpoint extends Endpoint {
       session,
       where: (t) => t.userId.equals(userId),
     );
-    final setlistIds = userSetlists.map((s) => s.id!).toList();
+    final setlistIds = userSetlists.map((s) => s.id!).toSet();
     
     if (setlistIds.isEmpty) return [];
     
-    final setlistScores = <SetlistScore>[];
-    for (final setlistId in setlistIds) {
-      final scores = await SetlistScore.db.find(
-        session,
-        where: (t) => t.setlistId.equals(setlistId),
-      );
-      setlistScores.addAll(scores);
-    }
+    // Optimized: Use single query with IN clause instead of loop
+    final setlistScores = await SetlistScore.db.find(
+      session,
+      where: (t) => t.setlistId.inSet(setlistIds) & (t.version > sinceVersion),
+    );
     
     return setlistScores.map((ss) => SyncEntityData(
       entityType: 'setlistScore',
       serverId: ss.id!,
-      version: 1,
+      version: ss.version,  // Use actual version from database
       data: jsonEncode({
         'setlistId': ss.setlistId,
         'scoreId': ss.scoreId,
         'orderIndex': ss.orderIndex,
       }),
-      updatedAt: DateTime.now(),
-      isDeleted: false,
+      updatedAt: ss.updatedAt,
+      isDeleted: ss.deletedAt != null,
     )).toList();
   }
   
@@ -375,15 +372,59 @@ class LibrarySyncEndpoint extends Endpoint {
       deleted.add('score:${s.id}');
     }
     
+    // Get deleted instrument scores
+    // Need to verify ownership through parent score
+    final userScores = await Score.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+    final scoreIds = userScores.map((s) => s.id!).toSet();
+    
+    if (scoreIds.isNotEmpty) {
+      final deletedInstrumentScores = await InstrumentScore.db.find(
+        session,
+        where: (t) => t.scoreId.inSet(scoreIds) &
+                      t.deletedAt.notEquals(null) &
+                      (t.version > sinceVersion),
+      );
+      for (final is_ in deletedInstrumentScores) {
+        deleted.add('instrumentScore:${is_.id}');
+      }
+    }
+    
     // Get deleted setlists
     final deletedSetlists = await Setlist.db.find(
       session,
-      where: (t) => t.userId.equals(userId) & 
-                    t.deletedAt.notEquals(null),
+      where: (t) => t.userId.equals(userId) &
+                    t.deletedAt.notEquals(null) &
+                    (t.version > sinceVersion),
     );
     for (final s in deletedSetlists) {
       deleted.add('setlist:${s.id}');
     }
+    
+    // Get deleted setlist scores
+    // Need to verify ownership through parent setlist
+    final userSetlists = await Setlist.db.find(
+      session,
+      where: (t) => t.userId.equals(userId),
+    );
+    final setlistIds = userSetlists.map((s) => s.id!).toSet();
+    
+    if (setlistIds.isNotEmpty) {
+      final deletedSetlistScores = await SetlistScore.db.find(
+        session,
+        where: (t) => t.setlistId.inSet(setlistIds) &
+                      t.deletedAt.notEquals(null) &
+                      (t.version > sinceVersion),
+      );
+      for (final ss in deletedSetlistScores) {
+        deleted.add('setlistScore:${ss.id}');
+      }
+    }
+    
+    // Note: Annotations are physically deleted, not soft deleted
+    // So they don't appear in the deleted list
     
     return deleted;
   }
@@ -393,8 +434,8 @@ class LibrarySyncEndpoint extends Endpoint {
   // ============================================================================
   
   Future<int?> _processScoreChange(
-    Session session, 
-    int userId, 
+    Session session,
+    int userId,
     SyncEntityChange change,
     int newVersion,
   ) async {
@@ -422,16 +463,50 @@ class LibrarySyncEndpoint extends Endpoint {
         existing.bpm = data['bpm'] as int?;
         existing.version = newVersion;
         existing.updatedAt = DateTime.now();
+        existing.deletedAt = null; // Restore if it was deleted
         await Score.db.updateRow(session, existing);
         return existing.id;
       }
     }
     
-    // Create new
+    // Check for deleted score with same title and composer (restore instead of creating new)
+    final title = data['title'] as String;
+    final composer = data['composer'] as String?;
+    final deletedScores = await Score.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) &
+                    t.title.equals(title) &
+                    t.deletedAt.notEquals(null),
+    );
+    
+    // Find exact match by composer (null-safe comparison)
+    Score? scoreToRestore;
+    for (final s in deletedScores) {
+      // Handle null composer comparison properly
+      if ((s.composer == null && composer == null) ||
+          (s.composer != null && s.composer == composer)) {
+        scoreToRestore = s;
+        break;
+      }
+    }
+    
+    // If found a deleted score with same title and composer, restore it
+    if (scoreToRestore != null) {
+      scoreToRestore.composer = composer;
+      scoreToRestore.bpm = data['bpm'] as int?;
+      scoreToRestore.version = newVersion;
+      scoreToRestore.updatedAt = DateTime.now();
+      scoreToRestore.deletedAt = null; // Restore
+      scoreToRestore.syncStatus = 'synced';
+      await Score.db.updateRow(session, scoreToRestore);
+      return scoreToRestore.id;
+    }
+    
+    // Create new only if no deleted score found
     final score = Score(
       userId: userId,
-      title: data['title'] as String,
-      composer: data['composer'] as String?,
+      title: title,
+      composer: composer,
       bpm: data['bpm'] as int?,
       version: newVersion,
       syncStatus: 'synced',
@@ -457,7 +532,26 @@ class LibrarySyncEndpoint extends Endpoint {
           // Verify ownership through score
           final score = await Score.db.findById(session, existing.scoreId);
           if (score != null && score.userId == userId) {
-            await InstrumentScore.db.deleteRow(session, existing);
+            // Physically delete annotations for this instrument score
+            // Per sync_logic.md, annotations don't use soft delete
+            final annotations = await Annotation.db.find(
+              session,
+              where: (t) => t.instrumentScoreId.equals(existing.id!),
+            );
+            for (final ann in annotations) {
+              await Annotation.db.deleteRow(session, ann);
+            }
+            
+            // Delete physical PDF file
+            if (existing.pdfPath != null) {
+              await _deleteFile(existing.pdfPath!);
+            }
+            
+            // Soft delete the instrument score
+            existing.deletedAt = DateTime.now();
+            existing.version = newVersion;
+            existing.updatedAt = DateTime.now();
+            await InstrumentScore.db.updateRow(session, existing);
           }
         }
       }
@@ -465,6 +559,7 @@ class LibrarySyncEndpoint extends Endpoint {
     }
     
     final scoreId = data['scoreId'] as int;
+    final instrumentName = data['instrumentName'] as String;
     
     // Verify ownership
     final score = await Score.db.findById(session, scoreId);
@@ -476,23 +571,47 @@ class LibrarySyncEndpoint extends Endpoint {
       // Update existing
       final existing = await InstrumentScore.db.findById(session, change.serverId!);
       if (existing != null) {
-        existing.instrumentName = data['instrumentName'] as String? ?? existing.instrumentName;
+        existing.instrumentName = instrumentName;
         existing.pdfPath = data['pdfPath'] as String?;
         existing.pdfHash = data['pdfHash'] as String?;
         existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
+        existing.version = newVersion;
+        existing.syncStatus = 'synced';
         existing.updatedAt = DateTime.now();
         await InstrumentScore.db.updateRow(session, existing);
         return existing.id;
       }
     }
     
-    // Create new
+    // Check for existing InstrumentScore with same (scoreId, instrumentName), including deleted ones
+    final existingInstruments = await InstrumentScore.db.find(
+      session,
+      where: (t) => t.scoreId.equals(scoreId) & t.instrumentName.equals(instrumentName),
+    );
+    
+    // If found, update it instead of creating new (restore if deleted)
+    if (existingInstruments.isNotEmpty) {
+      final existing = existingInstruments.first;
+      existing.pdfPath = data['pdfPath'] as String?;
+      existing.pdfHash = data['pdfHash'] as String?;
+      existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
+      existing.version = newVersion;
+      existing.syncStatus = 'synced';
+      existing.updatedAt = DateTime.now();
+      existing.deletedAt = null; // Restore if it was deleted
+      await InstrumentScore.db.updateRow(session, existing);
+      return existing.id;
+    }
+    
+    // Create new only if no existing found
     final instrumentScore = InstrumentScore(
       scoreId: scoreId,
-      instrumentName: data['instrumentName'] as String,
+      instrumentName: instrumentName,
       pdfPath: data['pdfPath'] as String?,
       pdfHash: data['pdfHash'] as String?,
       orderIndex: data['orderIndex'] as int? ?? 0,
+      version: newVersion,
+      syncStatus: 'synced',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -512,6 +631,8 @@ class LibrarySyncEndpoint extends Endpoint {
       if (change.serverId != null) {
         final existing = await Annotation.db.findById(session, change.serverId!);
         if (existing != null && existing.userId == userId) {
+          // Physically delete annotation
+          // Per sync_logic.md, annotations don't use soft delete
           await Annotation.db.deleteRow(session, existing);
         }
       }
@@ -530,6 +651,8 @@ class LibrarySyncEndpoint extends Endpoint {
         existing.height = (data['height'] as num?)?.toDouble();
         existing.color = data['color'] as String?;
         existing.vectorClock = data['vectorClock'] as String?;
+        existing.version = newVersion;
+        existing.syncStatus = 'synced';
         existing.updatedAt = DateTime.now();
         await Annotation.db.updateRow(session, existing);
         return existing.id;
@@ -549,6 +672,8 @@ class LibrarySyncEndpoint extends Endpoint {
       height: (data['height'] as num?)?.toDouble(),
       color: data['color'] as String?,
       vectorClock: data['vectorClock'] as String?,
+      version: newVersion,
+      syncStatus: 'synced',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -569,30 +694,71 @@ class LibrarySyncEndpoint extends Endpoint {
         final existing = await Setlist.db.findById(session, change.serverId!);
         if (existing != null && existing.userId == userId) {
           existing.deletedAt = DateTime.now();
+          existing.version = newVersion;
+          existing.syncStatus = 'synced';
           existing.updatedAt = DateTime.now();
           await Setlist.db.updateRow(session, existing);
+          
+          // Cascade soft delete setlist scores
+          final setlistScores = await SetlistScore.db.find(
+            session,
+            where: (t) => t.setlistId.equals(change.serverId!),
+          );
+          for (final ss in setlistScores) {
+            ss.deletedAt = DateTime.now();
+            ss.version = newVersion;
+            ss.updatedAt = DateTime.now();
+            await SetlistScore.db.updateRow(session, ss);
+          }
         }
       }
       return null;
     }
     
+    final name = data['name'] as String;
+    
     if (change.serverId != null) {
       // Update existing
       final existing = await Setlist.db.findById(session, change.serverId!);
       if (existing != null && existing.userId == userId) {
-        existing.name = data['name'] as String? ?? existing.name;
+        existing.name = name;
         existing.description = data['description'] as String?;
+        existing.version = newVersion;
+        existing.syncStatus = 'synced';
         existing.updatedAt = DateTime.now();
+        existing.deletedAt = null; // Restore if it was deleted
         await Setlist.db.updateRow(session, existing);
         return existing.id;
       }
     }
     
-    // Create new
+    // Check for deleted setlist with same (userId, name) - restore instead of creating new
+    final deletedSetlists = await Setlist.db.find(
+      session,
+      where: (t) => t.userId.equals(userId) &
+                    t.name.equals(name) &
+                    t.deletedAt.notEquals(null),
+    );
+    
+    // If found a deleted setlist with same name, restore it
+    if (deletedSetlists.isNotEmpty) {
+      final setlistToRestore = deletedSetlists.first;
+      setlistToRestore.description = data['description'] as String?;
+      setlistToRestore.version = newVersion;
+      setlistToRestore.syncStatus = 'synced';
+      setlistToRestore.updatedAt = DateTime.now();
+      setlistToRestore.deletedAt = null; // Restore
+      await Setlist.db.updateRow(session, setlistToRestore);
+      return setlistToRestore.id;
+    }
+    
+    // Create new only if no deleted setlist found
     final setlist = Setlist(
       userId: userId,
-      name: data['name'] as String,
+      name: name,
       description: data['description'] as String?,
+      version: newVersion,
+      syncStatus: 'synced',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -615,7 +781,11 @@ class LibrarySyncEndpoint extends Endpoint {
           // Verify ownership through setlist
           final setlist = await Setlist.db.findById(session, existing.setlistId);
           if (setlist != null && setlist.userId == userId) {
-            await SetlistScore.db.deleteRow(session, existing);
+            // Soft delete setlist score
+            existing.deletedAt = DateTime.now();
+            existing.version = newVersion;
+            existing.updatedAt = DateTime.now();
+            await SetlistScore.db.updateRow(session, existing);
           }
         }
       }
@@ -623,6 +793,7 @@ class LibrarySyncEndpoint extends Endpoint {
     }
     
     final setlistId = data['setlistId'] as int;
+    final scoreId = data['scoreId'] as int;
     
     // Verify ownership
     final setlist = await Setlist.db.findById(session, setlistId);
@@ -635,33 +806,72 @@ class LibrarySyncEndpoint extends Endpoint {
       final existing = await SetlistScore.db.findById(session, change.serverId!);
       if (existing != null) {
         existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
+        existing.version = newVersion;
+        existing.syncStatus = 'synced';
+        existing.updatedAt = DateTime.now();
+        existing.deletedAt = null;  // Restore if it was deleted
         await SetlistScore.db.updateRow(session, existing);
         return existing.id;
       }
     }
     
-    // Create new
+    // Check for deleted SetlistScore with same (setlistId, scoreId) - restore instead of creating new
+    final deletedSetlistScores = await SetlistScore.db.find(
+      session,
+      where: (t) => t.setlistId.equals(setlistId) &
+                    t.scoreId.equals(scoreId) &
+                    t.deletedAt.notEquals(null),
+    );
+    
+    // If found a deleted SetlistScore with same keys, restore it
+    if (deletedSetlistScores.isNotEmpty) {
+      final setlistScoreToRestore = deletedSetlistScores.first;
+      setlistScoreToRestore.orderIndex = data['orderIndex'] as int? ?? 0;
+      setlistScoreToRestore.version = newVersion;
+      setlistScoreToRestore.syncStatus = 'synced';
+      setlistScoreToRestore.updatedAt = DateTime.now();
+      setlistScoreToRestore.deletedAt = null;  // Restore
+      await SetlistScore.db.updateRow(session, setlistScoreToRestore);
+      return setlistScoreToRestore.id;
+    }
+    
+    // Create new only if no deleted SetlistScore found
     final setlistScore = SetlistScore(
       setlistId: setlistId,
-      scoreId: data['scoreId'] as int,
+      scoreId: scoreId,
       orderIndex: data['orderIndex'] as int? ?? 0,
+      version: newVersion,
+      syncStatus: 'synced',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
     final inserted = await SetlistScore.db.insertRow(session, setlistScore);
     return inserted.id;
   }
   
-  Future<void> _processDelete(
+  /// Process delete operation with proper version management for cascaded deletes
+  /// Returns the final version number after all cascaded operations
+  Future<int> _processDelete(
     Session session,
     int userId,
     String deleteKey,
-    int newVersion,
+    int currentVersion,
   ) async {
+    session.log('[LIBSYNC] _processDelete: $deleteKey, currentVersion=$currentVersion', level: LogLevel.debug);
     final parts = deleteKey.split(':');
-    if (parts.length != 2) return;
+    if (parts.length != 2) {
+      session.log('[LIBSYNC] Invalid deleteKey format: $deleteKey', level: LogLevel.warning);
+      return currentVersion;
+    }
     
     final entityType = parts[0];
     final serverId = int.tryParse(parts[1]);
-    if (serverId == null) return;
+    if (serverId == null) {
+      session.log('[LIBSYNC] Invalid serverId in deleteKey: $deleteKey', level: LogLevel.warning);
+      return currentVersion;
+    }
+    
+    var newVersion = currentVersion;
     
     switch (entityType) {
       case 'score':
@@ -672,32 +882,47 @@ class LibrarySyncEndpoint extends Endpoint {
           score.updatedAt = DateTime.now();
           await Score.db.updateRow(session, score);
           
-          // Cascade delete: InstrumentScores, PDF files, and Annotations
+          // Cascade soft delete: InstrumentScores and Annotations
           final instrumentScores = await InstrumentScore.db.find(
             session,
             where: (t) => t.scoreId.equals(serverId),
           );
           for (final is_ in instrumentScores) {
-            // Delete annotations for this instrument score
-            await Annotation.db.deleteWhere(
+            // Physically delete annotations for this instrument score
+            // Per sync_logic.md, annotations don't use soft delete
+            final annotations = await Annotation.db.find(
               session,
               where: (t) => t.instrumentScoreId.equals(is_.id!),
             );
+            for (final ann in annotations) {
+              await Annotation.db.deleteRow(session, ann);
+            }
             
-            // Delete physical PDF file
+            // Delete physical PDF file (file deletion is immediate)
             if (is_.pdfPath != null) {
               await _deleteFile(is_.pdfPath!);
             }
             
-            // Delete InstrumentScore record
-            await InstrumentScore.db.deleteRow(session, is_);
+            // Soft delete InstrumentScore record with properly incremented version
+            newVersion++; // Each cascaded entity gets its own version increment
+            is_.deletedAt = DateTime.now();
+            is_.version = newVersion;
+            is_.updatedAt = DateTime.now();
+            await InstrumentScore.db.updateRow(session, is_);
           }
           
-          // Delete setlist score associations
-          await SetlistScore.db.deleteWhere(
+          // Soft delete setlist score associations with properly incremented versions
+          final setlistScores = await SetlistScore.db.find(
             session,
             where: (t) => t.scoreId.equals(serverId),
           );
+          for (final ss in setlistScores) {
+            newVersion++; // Each cascaded entity gets its own version increment
+            ss.deletedAt = DateTime.now();
+            ss.version = newVersion;
+            ss.updatedAt = DateTime.now();
+            await SetlistScore.db.updateRow(session, ss);
+          }
         }
         break;
         
@@ -705,14 +930,22 @@ class LibrarySyncEndpoint extends Endpoint {
         final setlist = await Setlist.db.findById(session, serverId);
         if (setlist != null && setlist.userId == userId) {
           setlist.deletedAt = DateTime.now();
+          setlist.version = newVersion;
           setlist.updatedAt = DateTime.now();
           await Setlist.db.updateRow(session, setlist);
           
-          // Delete setlist score associations
-          await SetlistScore.db.deleteWhere(
+          // Soft delete setlist score associations with properly incremented versions
+          final setlistScores = await SetlistScore.db.find(
             session,
             where: (t) => t.setlistId.equals(serverId),
           );
+          for (final ss in setlistScores) {
+            newVersion++; // Each cascaded entity gets its own version increment
+            ss.deletedAt = DateTime.now();
+            ss.version = newVersion;
+            ss.updatedAt = DateTime.now();
+            await SetlistScore.db.updateRow(session, ss);
+          }
         }
         break;
         
@@ -721,13 +954,26 @@ class LibrarySyncEndpoint extends Endpoint {
         if (instrumentScore != null) {
           final score = await Score.db.findById(session, instrumentScore.scoreId);
           if (score != null && score.userId == userId) {
-            // Delete annotations
-            await Annotation.db.deleteWhere(
+            // Physically delete annotations
+            // Per sync_logic.md, annotations don't use soft delete
+            final annotations = await Annotation.db.find(
               session,
               where: (t) => t.instrumentScoreId.equals(serverId),
             );
-            // Delete instrument score
-            await InstrumentScore.db.deleteRow(session, instrumentScore);
+            for (final ann in annotations) {
+              await Annotation.db.deleteRow(session, ann);
+            }
+            
+            // Delete physical PDF file
+            if (instrumentScore.pdfPath != null) {
+              await _deleteFile(instrumentScore.pdfPath!);
+            }
+            
+            // Soft delete instrument score
+            instrumentScore.deletedAt = DateTime.now();
+            instrumentScore.version = newVersion;
+            instrumentScore.updatedAt = DateTime.now();
+            await InstrumentScore.db.updateRow(session, instrumentScore);
           }
         }
         break;
@@ -735,10 +981,29 @@ class LibrarySyncEndpoint extends Endpoint {
       case 'annotation':
         final annotation = await Annotation.db.findById(session, serverId);
         if (annotation != null && annotation.userId == userId) {
+          // Physically delete annotation
+          // Per sync_logic.md, annotations don't use soft delete
           await Annotation.db.deleteRow(session, annotation);
         }
         break;
+        
+      case 'setlistScore':
+        final setlistScore = await SetlistScore.db.findById(session, serverId);
+        if (setlistScore != null) {
+          // Verify ownership through setlist
+          final setlist = await Setlist.db.findById(session, setlistScore.setlistId);
+          if (setlist != null && setlist.userId == userId) {
+            // Soft delete setlist score
+            setlistScore.deletedAt = DateTime.now();
+            setlistScore.version = newVersion;
+            setlistScore.updatedAt = DateTime.now();
+            await SetlistScore.db.updateRow(session, setlistScore);
+          }
+        }
+        break;
     }
+    
+    return newVersion; // Return final version after all cascades
   }
   
   /// Delete physical file from disk

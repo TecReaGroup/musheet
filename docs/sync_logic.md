@@ -23,6 +23,13 @@
 
 5. **本地操作优先**：尽量同步所有版本，实在无法合并则本地操作覆盖云端。
 
+6. **唯一性约束** 必须遵守，前端忽略userId（前端完全不存储 userId），后端需要校验：
+实体	唯一键	当前问题
+Score	(title, composer, userId)
+InstrumentScore	(instrumentName, scoreId)
+Setlist	(name, userId)	createSetlist()
+注意：如果用户删除了某个实体，再次创建同样唯一键的实体，会被视为更新该实体，移除删除状态，而不是创建新实体。
+
 ---
 
 ## 设计灵感：Zotero 的双通道同步
@@ -101,6 +108,7 @@ Zotero 是开源界的神级同步方案，其核心智慧：
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │  libraryVersion = 105                                   │ │
 │  │  每次任何数据变更，libraryVersion++                      │ │
+│  │  注意：Push 操作中的每个实体变更都会增加版本号           │ │
 │  └─────────────────────────────────────────────────────────┘ │
 │                                                             │
 │  客户端请求：                                                │
@@ -120,6 +128,33 @@ Zotero 是开源界的神级同步方案，其核心智慧：
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+#### 版本号增量策略
+
+**当前实现**：每个实体变更（create/update/delete）都会使 `libraryVersion++`
+
+**示例**：
+```
+客户端推送: 3 个 Score + 2 个 InstrumentScore + 1 个删除
+服务器处理:
+  - Score 1: version 101
+  - Score 2: version 102
+  - Score 3: version 103
+  - InstrumentScore 1: version 104
+  - InstrumentScore 2: version 105
+  - Delete: version 106
+最终 libraryVersion = 106
+```
+
+**设计理由**：
+- 细粒度版本控制：每个实体变更都有独立的版本号
+- 便于调试：可以精确追踪每个变更的顺序
+- 支持部分失败恢复：如果中途失败，已成功的变更不会丢失版本号
+
+**注意事项**：
+- 批量操作会导致版本号快速增长，这是正常的
+- 版本号是单调递增的整数，不会回退
+- 客户端只需要知道最终的 libraryVersion，不需要关心中间的增量方式
 
 ### 每个实体的版本字段
 
@@ -328,9 +363,9 @@ libraryVersion = 101（删除操作也算一次变更）
    ```
    - 标记 Score.deletedAt = DateTime.now()
    - 标记 Score.syncStatus = pending_delete
-   - 级联标记所有关联的 InstrumentScore.deletedAt
-   - 级联标记所有关联的 Annotation.deletedAt
-   - 级联标记所有关联的 SetlistScore.deletedAt
+   - 级联软删除所有关联的 InstrumentScore (标记 deletedAt)
+   - 级联物理删除所有关联的 Annotation (直接从数据库删除)
+   - 级联软删除所有关联的 SetlistScore (标记 deletedAt)
    ```
 
 3. **UI 响应：**
@@ -345,7 +380,7 @@ libraryVersion = 101（删除操作也算一次变更）
 #### 删除记录保留策略
 
 **服务器端：**
-- 软删除的元数据记录**永久保留**（直到用户删除账号）
+- 软删除的元数据记录**永久保留**（直到用户删除账号，或者又重新创建同样的记录）
 - 这确保任何时间点离线的设备都能正确同步删除信息
 - 关联的 PDF 文件**立即删除**（因为已被删除的分谱不会再被任何设备请求）
 - 元数据记录体积小，永久保留成本可接受
@@ -378,14 +413,23 @@ libraryVersion = 101（删除操作也算一次变更）
 └─────────────────────────────────────────────────────────────┘
 ```
 
+注意软删除，如果之后又次创建同样的score，setlist，会被视为更新记录，更新version，移除删除状态。
+
 ### 3. 级联删除规则
 
-| 删除的实体 | 级联影响 | 处理方式 |
-|-----------|---------|---------|
-| **Score** | InstrumentScores, Annotations, SetlistScores | 全部标记 deletedAt |
-| **InstrumentScore** | Annotations (该分谱的), PDF 文件 | Annotations 标记删除，PDF 本地删除 |
-| **Setlist** | SetlistScores | 关联记录标记删除 |
-| **Annotation** | 无 | 仅删除自身 |
+本地和服务器都遵循以下级联删除规则：
+
+| 删除的实体 | 级联影响 | 处理方式 | 说明 |
+|-----------|---------|---------|------|
+| **Score** | InstrumentScores, Annotations, SetlistScores | InstrumentScore/SetlistScore 软删除，Annotation 物理删除 | Score 软删除后，InstrumentScore 标记 deletedAt，Annotation 直接删除，SetlistScore 标记 deletedAt |
+| **InstrumentScore** | Annotations, PDF 文件 | Annotation 物理删除，PDF 文件立即删除 | InstrumentScore 软删除后，所有关联的 Annotation 直接物理删除，PDF 文件从存储中删除 |
+| **Setlist** | SetlistScores | SetlistScore 软删除 | Setlist 软删除后，所有关联的 SetlistScore 标记 deletedAt |
+| **Annotation** | 无 | **不支持单独删除** | Annotation 只能通过级联删除（删除 Score 或 InstrumentScore 时），使用物理删除而非软删除 |
+
+**重要说明**：
+- **Annotation 采用物理删除**：因为 MuSheet 不提供单独删除 Annotation 的功能，Annotation 只会在删除父实体（Score 或 InstrumentScore）时被级联删除。由于父实体已经软删除并记录了版本信息，Annotation 无需软删除即可确保同步一致性。
+- **级联删除顺序**：先物理删除 Annotations，再软删除或删除其他实体
+- **PDF 文件删除**：服务器端立即删除，客户端同步成功后删除
 
 ### 4. PDF 文件上传
 
@@ -466,7 +510,7 @@ libraryVersion = 101（删除操作也算一次变更）
 
 ### 1. 首次登录 / 新设备同步
 
-当用户在新设备登录时，`libraryVersion = 0`，需要全量拉取数据。
+当用户在新设备登录时，`libraryVersion = 0`，需要全量拉取数据，注意是新设备登录账号就直接开始同步。
 
 **分优先级同步策略：**
 
@@ -784,17 +828,12 @@ Response:
 | 用户登出 | **不清理本地数据** |
 | 用户删除账号 | **不清理本地数据** |
 | 多账号切换 | **不清理本地数据** |
+不清理本地数据，但是清空push 和 pull 队列，停止同步。
 
 **设计理由：**
 - 本地数据保留，可直接迁移到新服务器
 - 用户可手动清理 App 缓存释放空间
 - 简化实现复杂度
-
-### 不支持的功能
-
-- ❌ 数据恢复/回滚
-- ❌ 同步历史查看
-- ❌ 撤销删除操作
 
 ---
 
