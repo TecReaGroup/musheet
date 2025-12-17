@@ -70,9 +70,15 @@ class DatabaseService {
     );
   }
 
-  /// Delete a score (cascade deletes instrument scores and annotations)
+  /// Delete a score (soft delete for sync)
   Future<void> deleteScore(String scoreId) async {
-    await (_db.delete(_db.scores)..where((s) => s.id.equals(scoreId))).go();
+    // Use soft delete: mark as deleted and pending sync
+    await (_db.update(_db.scores)..where((s) => s.id.equals(scoreId))).write(
+      ScoresCompanion(
+        deletedAt: Value(DateTime.now()),
+        syncStatus: const Value('pending'),
+      ),
+    );
   }
 
   // ============== Instrument Score Operations ==============
@@ -251,9 +257,15 @@ class DatabaseService {
     });
   }
 
-  /// Delete a setlist
+  /// Delete a setlist (soft delete for sync)
   Future<void> deleteSetlist(String setlistId) async {
-    await (_db.delete(_db.setlists)..where((s) => s.id.equals(setlistId))).go();
+    // Use soft delete: mark as deleted and pending sync
+    await (_db.update(_db.setlists)..where((s) => s.id.equals(setlistId))).write(
+      SetlistsCompanion(
+        deletedAt: Value(DateTime.now()),
+        syncStatus: const Value('pending'),
+      ),
+    );
   }
 
   // ============== App State Operations ==============

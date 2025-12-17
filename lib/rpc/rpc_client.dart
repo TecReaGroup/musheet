@@ -571,6 +571,7 @@ class RpcClient {
   Future<RpcResponse<LibrarySyncPushResult>> libraryPush({
     required int clientLibraryVersion,
     required List<Map<String, dynamic>> scores,
+    List<Map<String, dynamic>> instrumentScores = const [],
     required List<Map<String, dynamic>> setlists,
     required List<String> deletes,
   }) async {
@@ -583,13 +584,22 @@ class RpcClient {
 
     // Build push request with null-safe type conversions
     if (kDebugMode) {
-      debugPrint('[RpcClient] Building SyncPushRequest: scores=${scores.length}, setlists=${setlists.length}, deletes=${deletes.length}');
+      debugPrint('[RpcClient] Building SyncPushRequest: scores=${scores.length}, instrumentScores=${instrumentScores.length}, setlists=${setlists.length}, deletes=${deletes.length}');
     }
     
     try {
       final request = server.SyncPushRequest(
         clientLibraryVersion: clientLibraryVersion,
         scores: scores.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,  // Default to 1 if null
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        instrumentScores: instrumentScores.map((s) => server.SyncEntityChange(
           entityType: s['entityType'] as String,
           entityId: s['entityId'] as String,
           serverId: s['serverId'] as int?,

@@ -8,7 +8,7 @@ apiServer:
   publicScheme: http
 
 # Max request size - at root level for Serverpod to recognize
-maxRequestSize: 52428800  # 50 MB - needed for PDF uploads
+maxRequestSize: 104857600  # 100 MB
 
 # Insights Server (Admin Panel)
 insightsServer:

@@ -391,6 +391,11 @@ class LibrarySyncService {
       ..where((s) => s.deletedAt.isNull())).get();
   }
 
+  Future<List<InstrumentScoreEntity>> _getPendingInstrumentScores() async {
+    return await (_db.select(_db.instrumentScores)
+      ..where((s) => s.syncStatus.equals('pending'))).get();
+  }
+
   Future<List<SetlistEntity>> _getPendingSetlists() async {
     return await (_db.select(_db.setlists)
       ..where((s) => s.syncStatus.equals('pending'))
@@ -401,6 +406,12 @@ class LibrarySyncService {
     return await (_db.select(_db.scores)
       ..where((s) => s.deletedAt.isNotNull())
       ..where((s) => s.syncStatus.equals('pending'))).get();
+  }
+
+  Future<List<InstrumentScoreEntity>> _getDeletedInstrumentScores() async {
+    // InstrumentScores don't have deletedAt field - they are deleted directly
+    // Deletion is handled through parent Score deletion
+    return [];
   }
 
   Future<List<SetlistEntity>> _getDeletedSetlists() async {
@@ -493,16 +504,19 @@ class LibrarySyncService {
 
   Future<_PushResult> _pushLocalChanges() async {
     final pendingScores = await _getPendingScores();
+    final pendingInstrumentScores = await _getPendingInstrumentScores();
     final pendingSetlists = await _getPendingSetlists();
     final deletedScores = await _getDeletedScores();
+    final deletedInstrumentScores = await _getDeletedInstrumentScores();
     final deletedSetlists = await _getDeletedSetlists();
     
-    if (pendingScores.isEmpty && pendingSetlists.isEmpty && 
-        deletedScores.isEmpty && deletedSetlists.isEmpty) {
+    if (pendingScores.isEmpty && pendingInstrumentScores.isEmpty && pendingSetlists.isEmpty &&
+        deletedScores.isEmpty && deletedInstrumentScores.isEmpty && deletedSetlists.isEmpty) {
       return _PushResult(pushed: 0, conflict: false);
     }
     
     final scoreChanges = <Map<String, dynamic>>[];
+    final instrumentScoreChanges = <Map<String, dynamic>>[];
     final setlistChanges = <Map<String, dynamic>>[];
     final deletes = <String>[];
     
@@ -515,6 +529,36 @@ class LibrarySyncService {
         'version': score.version,
         'data': jsonEncode({'title': score.title, 'composer': score.composer, 'bpm': score.bpm}),
         'localUpdatedAt': (score.updatedAt ?? DateTime.now()).toIso8601String(),
+      });
+    }
+    
+    for (final instrumentScore in pendingInstrumentScores) {
+      // Get parent score's serverId
+      final scores = await (_db.select(_db.scores)
+        ..where((s) => s.id.equals(instrumentScore.scoreId))).get();
+      if (scores.isEmpty) continue;
+      
+      final parentScore = scores.first;
+      final parentServerId = parentScore.serverId;
+      if (parentServerId == null) continue; // Parent score must be synced first
+      
+      // Map client fields to server fields
+      final instrumentName = instrumentScore.customInstrument ?? instrumentScore.instrumentType;
+      
+      instrumentScoreChanges.add({
+        'entityType': 'instrumentScore',
+        'entityId': instrumentScore.id,
+        'serverId': instrumentScore.serverId,
+        'operation': instrumentScore.serverId == null ? 'create' : 'update',
+        'version': instrumentScore.version,
+        'data': jsonEncode({
+          'scoreId': parentServerId,
+          'instrumentName': instrumentName,
+          'pdfPath': instrumentScore.pdfPath,
+          'pdfHash': instrumentScore.pdfHash,
+          'orderIndex': 0, // Client doesn't have orderIndex, default to 0
+        }),
+        'localUpdatedAt': (instrumentScore.updatedAt ?? DateTime.now()).toIso8601String(),
       });
     }
     
@@ -533,6 +577,9 @@ class LibrarySyncService {
     for (final score in deletedScores) {
       if (score.serverId != null) deletes.add('score:${score.serverId}');
     }
+    for (final instrumentScore in deletedInstrumentScores) {
+      if (instrumentScore.serverId != null) deletes.add('instrumentScore:${instrumentScore.serverId}');
+    }
     for (final setlist in deletedSetlists) {
       if (setlist.serverId != null) deletes.add('setlist:${setlist.serverId}');
     }
@@ -540,6 +587,7 @@ class LibrarySyncService {
     final response = await _callSyncPush(
       clientLibraryVersion: _status.localLibraryVersion,
       scores: scoreChanges,
+      instrumentScores: instrumentScoreChanges,
       setlists: setlistChanges,
       deletes: deletes,
     );
@@ -554,12 +602,24 @@ class LibrarySyncService {
         final localId = entry.key;
         final serverId = entry.value as int;
         
-        await (_db.update(_db.scores)..where((s) => s.id.equals(localId))).write(
+        // Update scores
+        final scoreUpdated = await (_db.update(_db.scores)..where((s) => s.id.equals(localId))).write(
           ScoresCompanion(serverId: Value(serverId), syncStatus: const Value('synced')),
         );
-        await (_db.update(_db.setlists)..where((s) => s.id.equals(localId))).write(
+        
+        // Update instrument scores
+        final instScoreUpdated = await (_db.update(_db.instrumentScores)..where((s) => s.id.equals(localId))).write(
+          InstrumentScoresCompanion(serverId: Value(serverId), syncStatus: const Value('synced')),
+        );
+        
+        // Update setlists
+        final setlistUpdated = await (_db.update(_db.setlists)..where((s) => s.id.equals(localId))).write(
           SetlistsCompanion(serverId: Value(serverId), syncStatus: const Value('synced')),
         );
+        
+        if (kDebugMode) {
+          debugPrint('[LibrarySyncService] Updated serverId mapping: $localId → $serverId (score:$scoreUpdated, instScore:$instScoreUpdated, setlist:$setlistUpdated)');
+        }
       }
     }
     
@@ -569,9 +629,26 @@ class LibrarySyncService {
       await (_db.update(_db.scores)..where((s) => s.id.equals(id))).write(
         const ScoresCompanion(syncStatus: Value('synced')),
       );
+      await (_db.update(_db.instrumentScores)..where((s) => s.id.equals(id))).write(
+        const InstrumentScoresCompanion(syncStatus: Value('synced')),
+      );
       await (_db.update(_db.setlists)..where((s) => s.id.equals(id))).write(
         const SetlistsCompanion(syncStatus: Value('synced')),
       );
+    }
+    
+    // Clean up synced deletions: physically remove soft-deleted records that were successfully pushed
+    for (final score in deletedScores) {
+      if (acceptedIds.contains(score.id)) {
+        await (_db.delete(_db.scores)..where((s) => s.id.equals(score.id))).go();
+        if (kDebugMode) debugPrint('[LibrarySyncService] Cleaned up deleted score: ${score.id}');
+      }
+    }
+    for (final setlist in deletedSetlists) {
+      if (acceptedIds.contains(setlist.id)) {
+        await (_db.delete(_db.setlists)..where((s) => s.id.equals(setlist.id))).go();
+        if (kDebugMode) debugPrint('[LibrarySyncService] Cleaned up deleted setlist: ${setlist.id}');
+      }
     }
     
     // Update library version
@@ -587,15 +664,17 @@ class LibrarySyncService {
   Future<Map<String, dynamic>?> _callSyncPush({
     required int clientLibraryVersion,
     required List<Map<String, dynamic>> scores,
+    required List<Map<String, dynamic>> instrumentScores,
     required List<Map<String, dynamic>> setlists,
     required List<String> deletes,
   }) async {
     if (kDebugMode) {
-      debugPrint('[LibrarySyncService] RPC libraryPush: version=$clientLibraryVersion, scores=${scores.length}, setlists=${setlists.length}, deletes=${deletes.length}');
+      debugPrint('[LibrarySyncService] RPC libraryPush: version=$clientLibraryVersion, scores=${scores.length}, instrumentScores=${instrumentScores.length}, setlists=${setlists.length}, deletes=${deletes.length}');
     }
     final response = await _rpc.libraryPush(
       clientLibraryVersion: clientLibraryVersion,
       scores: scores,
+      instrumentScores: instrumentScores,
       setlists: setlists,
       deletes: deletes,
     );
@@ -910,24 +989,42 @@ class LibrarySyncService {
       return;
     }
     
+    // Check if instrument score has server ID
+    final serverId = instrumentScore.serverId;
+    if (serverId == null) {
+      if (kDebugMode) debugPrint('[LibrarySyncService] No serverId for instrument score, cannot upload PDF');
+      await (_db.update(_db.instrumentScores)
+        ..where((s) => s.id.equals(instrumentScore.id)))
+        .write(const InstrumentScoresCompanion(pdfSyncStatus: Value('pending')));
+      return;
+    }
+    
     // Calculate MD5 hash
     final bytes = await file.readAsBytes();
     final hash = md5.convert(bytes).toString();
     
     // Check if hash changed (skip upload if same)
-    if (instrumentScore.pdfHash == hash) {
-      await (_db.update(_db.instrumentScores)
-        ..where((s) => s.id.equals(instrumentScore.id)))
-        .write(const InstrumentScoresCompanion(pdfSyncStatus: Value('synced')));
+    if (instrumentScore.pdfHash == hash && instrumentScore.pdfSyncStatus == 'synced') {
+      if (kDebugMode) debugPrint('[LibrarySyncService] PDF hash unchanged, skipping upload');
       return;
     }
     
-    // Upload to server (using existing backend service pattern)
-    // In production, this would use the actual file upload endpoint
+    // Upload to server
     try {
-      // Placeholder for actual upload implementation
-      // await _rpc.uploadPdf(instrumentScore.serverId, bytes);
+      if (kDebugMode) debugPrint('[LibrarySyncService] Uploading PDF for instrumentScore ${instrumentScore.id} (serverId: $serverId)');
       
+      final fileName = p.basename(localPath);
+      final response = await _rpc.uploadPdf(
+        instrumentScoreId: serverId,
+        fileBytes: bytes,
+        fileName: fileName,
+      );
+      
+      if (!response.isSuccess || response.data == null || !response.data!.success) {
+        throw Exception('PDF upload failed: ${response.data?.errorMessage ?? response.error?.message ?? "Unknown error"}');
+      }
+      
+      // Update local record
       await (_db.update(_db.instrumentScores)
         ..where((s) => s.id.equals(instrumentScore.id)))
         .write(InstrumentScoresCompanion(
@@ -935,9 +1032,13 @@ class LibrarySyncService {
           pdfHash: Value(hash),
         ));
         
-      if (kDebugMode) debugPrint('[LibrarySyncService] PDF uploaded: ${instrumentScore.id}');
+      if (kDebugMode) debugPrint('[LibrarySyncService] PDF uploaded successfully: ${instrumentScore.id}');
     } catch (e) {
       if (kDebugMode) debugPrint('[LibrarySyncService] PDF upload error: $e');
+      // Mark as failed so it will retry later
+      await (_db.update(_db.instrumentScores)
+        ..where((s) => s.id.equals(instrumentScore.id)))
+        .write(const InstrumentScoresCompanion(pdfSyncStatus: Value('pending')));
       rethrow;
     }
   }

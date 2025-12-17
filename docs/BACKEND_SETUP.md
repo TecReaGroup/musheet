@@ -362,20 +362,145 @@ docker-compose down -v
 
 ---
 
-## 下一步
+## 数据库管理
 
-- 查看 [server/README.md](../server/README.md) 了解完整的 API 文档
-- 查看 [backend_architecture.md](./backend_architecture.md) 了解后端架构设计
+### 使用 DBeaver 查看数据库
 
-重构数据库：
+#### 1. 安装 DBeaver
+
+下载并安装 [DBeaver Community Edition](https://dbeaver.io/download/)
+
+#### 2. 创建数据库连接
+
+在 DBeaver 中：
+
+1. **创建新连接:**
+   - 点击菜单 `数据库` → `新建数据库连接`
+   - 或点击工具栏的插头图标 ⚡
+   - 快捷键：`Ctrl+Shift+N` (Windows)
+
+2. **选择数据库类型:**
+   - 选择 **PostgreSQL**
+   - 点击 `下一步`
+
+3. **配置连接参数:**
+   - **主机:** `localhost`
+   - **端口:** `5432`
+   - **数据库:** `musheet` （重要：不是 postgres！）
+   - **用户名:** `musheet`
+   - **密码:** `musheet_password` （默认开发密码）
+
+4. **SSL 设置:**
+   - **SSL 模式:** `disable`
+
+5. **测试连接:**
+   - 点击 `测试连接`
+   - 首次使用会提示下载 PostgreSQL JDBC 驱动 - 点击 `下载`
+   - 看到"已连接"消息后点击 `完成`
+
+#### 3. 查看数据库表
+
+连接成功后，在左侧数据库导航器中：
+
+```
+musheet (连接)
+└── Databases
+    └── musheet (应用数据库)
+        └── Schemas
+            └── public
+                └── Tables
+                    ├── annotations (注释表)
+                    ├── instrument_scores (乐器乐谱表)
+                    ├── scores (乐谱表)
+                    ├── setlists (曲集表)
+                    ├── setlist_scores (曲集-乐谱关联表)
+                    ├── teams (团队表)
+                    ├── team_members (团队成员表)
+                    ├── users (用户表)
+                    └── serverpod_* (Serverpod 系统表)
+```
+
+**常见问题：**
+- 如果看不到 `musheet` 数据库，说明数据库尚未创建，参考下面的"完全重置数据库"步骤
+- 如果只看到 `postgres` 数据库，不要在 DBeaver 中展开它 - 那是 PostgreSQL 系统数据库，不包含应用数据
+
+#### 4. 查询数据
+
+- **查看表内容:** 右键点击表 → `查看数据`
+- **运行 SQL:** `SQL 编辑器` → `新建 SQL 编辑器` (快捷键 `Ctrl+]`)
+
+---
+
+## 完全重置数据库（不保留任何数据）
+
+如果需要从头开始，删除所有现有数据并重建数据库：
+
+### 方法 1：使用 Docker Compose（推荐）
+
+```bash
 # 进入 server 目录
 cd server
 
-# 停止服务
+# 停止所有服务
 docker-compose down
 
 # 删除所有数据卷（包括数据库数据）
 docker-compose down -v
 
-# 重新启动（会重新初始化数据库）
-docker-compose up -d
+# 重新启动数据库
+docker-compose up -d postgres redis
+
+# 等待数据库就绪（约 5 秒）
+# Windows PowerShell:
+Start-Sleep -Seconds 5
+# macOS/Linux:
+sleep 5
+
+# 进入 musheet_server 目录
+cd musheet_server
+
+# 重新生成代码
+serverpod generate
+
+# 应用迁移（创建数据库和表）
+dart run bin/main.dart --apply-migrations
+```
+
+### 方法 2：手动重置
+
+如果您不使用 Docker，而是直接运行 `dart run bin/main.dart`：
+
+1. **在 DBeaver 中删除数据库:**
+   ```sql
+   DROP DATABASE IF EXISTS musheet;
+   CREATE DATABASE musheet;
+   ```
+
+2. **重新生成代码并应用迁移:**
+   ```bash
+   cd server/musheet_server
+   serverpod generate
+   dart run bin/main.dart --apply-migrations
+   ```
+
+### 验证重置成功
+
+1. **检查服务器日志**，应该看到：
+   ```
+   Applying migrations...
+   Migration 20251215122620413 applied successfully
+   Migration 20251216161146631 applied successfully
+   Database initialized successfully
+   ```
+
+2. **在 DBeaver 中刷新连接**:
+   - 右键点击 `musheet` 连接 → `刷新`
+   - 展开 `Databases` → `musheet` → `Schemas` → `public` → `Tables`
+   - 应该看到所有应用表
+
+---
+
+## 下一步
+
+- 查看 [server/README.md](../server/README.md) 了解完整的 API 文档
+- 查看 [backend_architecture.md](./backend_architecture.md) 了解后端架构设计

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
@@ -671,7 +672,7 @@ class LibrarySyncEndpoint extends Endpoint {
           score.updatedAt = DateTime.now();
           await Score.db.updateRow(session, score);
           
-          // Cascade to instrument scores - mark for deletion
+          // Cascade delete: InstrumentScores, PDF files, and Annotations
           final instrumentScores = await InstrumentScore.db.find(
             session,
             where: (t) => t.scoreId.equals(serverId),
@@ -682,6 +683,14 @@ class LibrarySyncEndpoint extends Endpoint {
               session,
               where: (t) => t.instrumentScoreId.equals(is_.id!),
             );
+            
+            // Delete physical PDF file
+            if (is_.pdfPath != null) {
+              await _deleteFile(is_.pdfPath!);
+            }
+            
+            // Delete InstrumentScore record
+            await InstrumentScore.db.deleteRow(session, is_);
           }
           
           // Delete setlist score associations
@@ -729,6 +738,14 @@ class LibrarySyncEndpoint extends Endpoint {
           await Annotation.db.deleteRow(session, annotation);
         }
         break;
+    }
+  }
+  
+  /// Delete physical file from disk
+  Future<void> _deleteFile(String path) async {
+    final file = File('uploads/$path');
+    if (await file.exists()) {
+      await file.delete();
     }
   }
 }
