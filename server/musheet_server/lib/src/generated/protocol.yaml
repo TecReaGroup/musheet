@@ -81,10 +81,6 @@ status:
   - health:
   - info:
   - ping:
-sync:
-  - syncAll:
-  - pushChanges:
-  - getSyncStatus:
 teamAnnotation:
   - getTeamAnnotations:
   - addTeamAnnotation:

@@ -42,6 +42,9 @@ class SharedFilePathNotifier extends Notifier<String?> {
 
 final sharedFilePathProvider = NotifierProvider<SharedFilePathNotifier, String?>(SharedFilePathNotifier.new);
 
+// Flag to prevent multiple auth initialization attempts
+bool _authInitialized = false;
+
 class MuSheetApp extends ConsumerWidget {
   const MuSheetApp({super.key});
 
@@ -99,21 +102,39 @@ class MuSheetApp extends ConsumerWidget {
 
     // Trigger background session restoration (non-blocking)
     // This will validate the auth token with the server in the background
-    Future.microtask(() async {
-      // First initialize auth from preferences (requires preferences to be loaded)
-      await ref.read(authProvider.notifier).initializeFromPreferences();
-      // Then restore session with network validation
-      await ref.read(authProvider.notifier).restoreSession();
-      // Start background sync if logged in
-      final syncServiceAsync = ref.read(syncServiceProvider);
-      final syncService = switch (syncServiceAsync) {
-        AsyncData(:final value) => value,
-        _ => null,
-      };
-      if (syncService != null) {
-        await syncService.startBackgroundSync();
-      }
-    });
+    // Use a flag to prevent multiple initialization attempts from widget rebuilds
+    if (!_authInitialized) {
+      _authInitialized = true;
+      Future.microtask(() async {
+        debugPrint('[App] Starting auth initialization microtask (one-time)...');
+        try {
+          // First initialize auth from preferences (requires preferences to be loaded)
+          debugPrint('[App] Calling initializeFromPreferences...');
+          await ref.read(authProvider.notifier).initializeFromPreferences();
+          debugPrint('[App] initializeFromPreferences completed');
+          // Then restore session with network validation
+          debugPrint('[App] Calling restoreSession...');
+          await ref.read(authProvider.notifier).restoreSession();
+          debugPrint('[App] restoreSession completed');
+          // Start background sync if logged in - await the FutureProvider
+          debugPrint('[App] Awaiting syncServiceProvider.future...');
+          final syncService = await ref.read(syncServiceProvider.future);
+          debugPrint('[App] syncServiceProvider resolved: ${syncService != null ? "service available" : "null"}');
+          if (syncService != null) {
+            debugPrint('[App] Calling startBackgroundSync...');
+            await syncService.startBackgroundSync();
+            debugPrint('[App] startBackgroundSync completed');
+          } else {
+            debugPrint('[App] Sync service is null, skipping background sync');
+          }
+        } catch (e, stack) {
+          debugPrint('[App] Auth initialization failed: $e');
+          debugPrint('[App] Stack trace: $stack');
+          // Reset flag to allow retry on next build
+          _authInitialized = false;
+        }
+      });
+    }
 
     final router = ref.watch(goRouterProvider);
     return AnnotatedRegion<SystemUiOverlayStyle>(

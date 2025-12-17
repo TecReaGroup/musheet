@@ -248,8 +248,11 @@ class LibrarySyncService {
   // ============================================================================
 
   Future<void> startBackgroundSync({Duration interval = const Duration(minutes: 5)}) async {
+    if (kDebugMode) debugPrint('[LibrarySyncService] startBackgroundSync called');
     stopBackgroundSync();
+    if (kDebugMode) debugPrint('[LibrarySyncService] Calling initial syncNow...');
     await syncNow();
+    if (kDebugMode) debugPrint('[LibrarySyncService] Initial sync completed, starting periodic timer');
     _periodicSyncTimer = Timer.periodic(interval, (_) => syncNow());
   }
 
@@ -261,15 +264,24 @@ class LibrarySyncService {
   }
 
   Future<SyncResult> syncNow() async {
-    if (_isSyncing) return SyncResult.failure('Sync already in progress');
-    if (!_rpc.isLoggedIn) return SyncResult.failure('Not logged in');
+    if (kDebugMode) debugPrint('[LibrarySyncService] syncNow called - isSyncing: $_isSyncing, isLoggedIn: ${_rpc.isLoggedIn}, isOnline: $_isOnline');
+    if (_isSyncing) {
+      if (kDebugMode) debugPrint('[LibrarySyncService] Sync already in progress, skipping');
+      return SyncResult.failure('Sync already in progress');
+    }
+    if (!_rpc.isLoggedIn) {
+      if (kDebugMode) debugPrint('[LibrarySyncService] Not logged in, skipping sync');
+      return SyncResult.failure('Not logged in');
+    }
     if (!_isOnline) {
+      if (kDebugMode) debugPrint('[LibrarySyncService] No network, waiting');
       _updateStatus(_status.copyWith(state: LibrarySyncState.waitingForNetwork));
       return SyncResult.failure('No network connection');
     }
     
     _isSyncing = true;
     try {
+      if (kDebugMode) debugPrint('[LibrarySyncService] Starting _performSync...');
       return await _performSync();
     } finally {
       _isSyncing = false;
@@ -402,6 +414,7 @@ class LibrarySyncService {
   // ============================================================================
 
   Future<SyncResult> _performSync() async {
+    if (kDebugMode) debugPrint('[LibrarySyncService] _performSync started');
     final startTime = DateTime.now();
     var pushedCount = 0;
     var pulledCount = 0;
@@ -409,9 +422,11 @@ class LibrarySyncService {
     
     try {
       // STEP 1: Push local changes first
+      if (kDebugMode) debugPrint('[LibrarySyncService] STEP 1: Pushing local changes...');
       _updateStatus(_status.copyWith(state: LibrarySyncState.pushing));
       final pushResult = await _pushLocalChanges();
       pushedCount = pushResult.pushed;
+      if (kDebugMode) debugPrint('[LibrarySyncService] Push result: pushed=${pushResult.pushed}, conflict=${pushResult.conflict}');
       
       if (pushResult.conflict) {
         _updateStatus(_status.copyWith(state: LibrarySyncState.pulling));
@@ -428,10 +443,12 @@ class LibrarySyncService {
       
       // STEP 2: Pull remote changes
       if (!pushResult.conflict) {
+        if (kDebugMode) debugPrint('[LibrarySyncService] STEP 2: Pulling remote changes...');
         _updateStatus(_status.copyWith(state: LibrarySyncState.pulling));
         final pullResult = await _pullRemoteChanges();
         pulledCount = pullResult.pulled;
         conflictCount = pullResult.conflicts;
+        if (kDebugMode) debugPrint('[LibrarySyncService] Pull result: pulled=${pullResult.pulled}, conflicts=${pullResult.conflicts}');
       }
       
       // STEP 3: Sync pending PDFs
@@ -452,7 +469,11 @@ class LibrarySyncService {
         duration: DateTime.now().difference(startTime),
       );
       
-    } catch (e) {
+    } catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('[LibrarySyncService] ✗ Sync error: $e');
+        debugPrint('[LibrarySyncService] Stack trace: $stack');
+      }
       _updateStatus(_status.copyWith(state: LibrarySyncState.error, errorMessage: e.toString()));
       _scheduleRetry();
       
@@ -569,12 +590,19 @@ class LibrarySyncService {
     required List<Map<String, dynamic>> setlists,
     required List<String> deletes,
   }) async {
+    if (kDebugMode) {
+      debugPrint('[LibrarySyncService] RPC libraryPush: version=$clientLibraryVersion, scores=${scores.length}, setlists=${setlists.length}, deletes=${deletes.length}');
+    }
     final response = await _rpc.libraryPush(
       clientLibraryVersion: clientLibraryVersion,
       scores: scores,
       setlists: setlists,
       deletes: deletes,
     );
+    
+    if (kDebugMode) {
+      debugPrint('[LibrarySyncService] RPC libraryPush response: isSuccess=${response.isSuccess}, error=${response.error?.message}');
+    }
     
     if (response.isSuccess && response.data != null) {
       final result = response.data!;
@@ -596,8 +624,13 @@ class LibrarySyncService {
   // ============================================================================
 
   Future<_PullResult> _pullRemoteChanges() async {
+    if (kDebugMode) debugPrint('[LibrarySyncService] _pullRemoteChanges: localVersion=${_status.localLibraryVersion}');
     final response = await _callSyncPull(since: _status.localLibraryVersion);
-    if (response == null) throw Exception('Pull failed - no response');
+    if (response == null) {
+      if (kDebugMode) debugPrint('[LibrarySyncService] Pull failed - no response from server');
+      throw Exception('Pull failed - no response');
+    }
+    if (kDebugMode) debugPrint('[LibrarySyncService] Pull response received: libraryVersion=${response['libraryVersion']}');
     
     final serverVersion = response['libraryVersion'] as int? ?? _status.localLibraryVersion;
     var pulled = 0;
@@ -636,7 +669,11 @@ class LibrarySyncService {
   }
 
   Future<Map<String, dynamic>?> _callSyncPull({required int since}) async {
+    if (kDebugMode) debugPrint('[LibrarySyncService] RPC libraryPull: since=$since');
     final response = await _rpc.libraryPull(since: since);
+    if (kDebugMode) {
+      debugPrint('[LibrarySyncService] RPC libraryPull response: isSuccess=${response.isSuccess}, error=${response.error?.message}');
+    }
     if (response.isSuccess && response.data != null) {
       final result = response.data!;
       return {

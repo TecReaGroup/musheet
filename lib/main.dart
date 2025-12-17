@@ -7,6 +7,7 @@ import 'package:pdfrx/pdfrx.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app.dart';
 import 'services/backend_service.dart';
+import 'rpc/rpc_client.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
@@ -47,7 +48,7 @@ void main() async {
   );
 }
 
-/// Initialize the backend service with saved URL
+/// Initialize the backend service and RPC client with saved URL
 Future<void> _initializeBackend() async {
   try {
     final prefs = await SharedPreferences.getInstance();
@@ -55,19 +56,23 @@ Future<void> _initializeBackend() async {
     
     // Only initialize if user has configured a server URL
     if (savedUrl != null && savedUrl.isNotEmpty) {
+      // Initialize BackendService for auth operations
       BackendService.initialize(baseUrl: savedUrl);
       
+      // Initialize RpcClient for sync operations
+      RpcClient.initialize(RpcClientConfig(baseUrl: savedUrl));
+      
       if (kDebugMode) {
-        debugPrint('Backend initialized with saved URL: $savedUrl');
+        debugPrint('[Main] Backend and RpcClient initialized with saved URL: $savedUrl');
       }
     } else {
       if (kDebugMode) {
-        debugPrint('No server URL configured. User must set it in Settings.');
+        debugPrint('[Main] No server URL configured. User must set it in Settings.');
       }
     }
   } catch (e) {
     if (kDebugMode) {
-      debugPrint('Failed to initialize backend: $e');
+      debugPrint('[Main] Failed to initialize backend: $e');
     }
   }
 }

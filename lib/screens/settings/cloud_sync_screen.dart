@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../../utils/icon_mappings.dart';
 import '../../router/app_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/sync_provider.dart';
+import '../../rpc/rpc_client.dart';
 
 class CloudSyncScreen extends ConsumerStatefulWidget {
   const CloudSyncScreen({super.key});
@@ -19,14 +21,37 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   String? _syncMessage;
 
   Future<void> _triggerSync() async {
+    // Debug: Log the current state
+    if (kDebugMode) {
+      debugPrint('[CloudSync] RpcClient.isInitialized: ${RpcClient.isInitialized}');
+      if (RpcClient.isInitialized) {
+        debugPrint('[CloudSync] RpcClient.isLoggedIn: ${RpcClient.instance.isLoggedIn}');
+        debugPrint('[CloudSync] RpcClient.userId: ${RpcClient.instance.userId}');
+      }
+    }
+    
     final syncServiceAsync = ref.read(syncServiceProvider);
+    if (kDebugMode) {
+      debugPrint('[CloudSync] syncServiceAsync: $syncServiceAsync');
+    }
+    
     final syncService = switch (syncServiceAsync) {
       AsyncData(:final value) => value,
-      _ => null,
+      AsyncLoading() => null,
+      AsyncError(:final error) => () {
+        if (kDebugMode) debugPrint('[CloudSync] Sync provider error: $error');
+        return null;
+      }(),
     };
     if (syncService == null) {
+      final reason = switch (syncServiceAsync) {
+        AsyncLoading() => 'Still loading...',
+        AsyncError(:final error) => 'Error: $error',
+        AsyncData(:final value) when value == null => 'Not initialized (check RpcClient)',
+        AsyncData() => 'Unknown state',
+      };
       setState(() {
-        _syncMessage = 'Sync service not available';
+        _syncMessage = 'Sync service not available: $reason';
       });
       return;
     }

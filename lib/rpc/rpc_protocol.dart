@@ -181,7 +181,7 @@ class RpcError implements Exception {
 class RpcRequest<T> {
   final String endpoint;
   final String method;
-  final T payload;
+  final T? payload;  // Made nullable - payload is optional for RPC calls
   final String requestId;
   final DateTime timestamp;
   final Map<String, String> headers;
@@ -192,7 +192,7 @@ class RpcRequest<T> {
   RpcRequest({
     required this.endpoint,
     required this.method,
-    required this.payload,
+    this.payload,  // Now optional
     String? requestId,
     DateTime? timestamp,
     Map<String, String>? headers,

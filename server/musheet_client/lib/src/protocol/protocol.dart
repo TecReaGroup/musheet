@@ -51,11 +51,10 @@ import 'package:musheet_client/src/protocol/score.dart' as _i38;
 import 'package:musheet_client/src/protocol/instrument_score.dart' as _i39;
 import 'package:musheet_client/src/protocol/annotation.dart' as _i40;
 import 'package:musheet_client/src/protocol/setlist.dart' as _i41;
-import 'package:musheet_client/src/protocol/setlist_score.dart' as _i42;
-import 'package:musheet_client/src/protocol/team_annotation.dart' as _i43;
-import 'package:musheet_client/src/protocol/team.dart' as _i44;
-import 'package:musheet_client/src/protocol/dto/team_member_info.dart' as _i45;
-import 'package:musheet_client/src/protocol/dto/team_with_role.dart' as _i46;
+import 'package:musheet_client/src/protocol/team_annotation.dart' as _i42;
+import 'package:musheet_client/src/protocol/team.dart' as _i43;
+import 'package:musheet_client/src/protocol/dto/team_member_info.dart' as _i44;
+import 'package:musheet_client/src/protocol/dto/team_with_role.dart' as _i45;
 export 'annotation.dart';
 export 'application.dart';
 export 'dto/auth_result.dart';
@@ -423,36 +422,24 @@ class Protocol extends _i1.SerializationManager {
     if (t == List<int>) {
       return (data as List).map((e) => deserialize<int>(e)).toList() as T;
     }
-    if (t == List<_i42.SetlistScore>) {
+    if (t == List<_i42.TeamAnnotation>) {
       return (data as List)
-              .map((e) => deserialize<_i42.SetlistScore>(e))
+              .map((e) => deserialize<_i42.TeamAnnotation>(e))
               .toList()
           as T;
     }
-    if (t == Map<String, dynamic>) {
-      return (data as Map).map(
-            (k, v) => MapEntry(deserialize<String>(k), deserialize<dynamic>(v)),
-          )
-          as T;
+    if (t == List<_i43.Team>) {
+      return (data as List).map((e) => deserialize<_i43.Team>(e)).toList() as T;
     }
-    if (t == List<_i43.TeamAnnotation>) {
+    if (t == List<_i44.TeamMemberInfo>) {
       return (data as List)
-              .map((e) => deserialize<_i43.TeamAnnotation>(e))
+              .map((e) => deserialize<_i44.TeamMemberInfo>(e))
               .toList()
           as T;
     }
-    if (t == List<_i44.Team>) {
-      return (data as List).map((e) => deserialize<_i44.Team>(e)).toList() as T;
-    }
-    if (t == List<_i45.TeamMemberInfo>) {
+    if (t == List<_i45.TeamWithRole>) {
       return (data as List)
-              .map((e) => deserialize<_i45.TeamMemberInfo>(e))
-              .toList()
-          as T;
-    }
-    if (t == List<_i46.TeamWithRole>) {
-      return (data as List)
-              .map((e) => deserialize<_i46.TeamWithRole>(e))
+              .map((e) => deserialize<_i45.TeamWithRole>(e))
               .toList()
           as T;
     }

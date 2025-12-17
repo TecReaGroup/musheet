@@ -21,19 +21,15 @@ import '../endpoints/profile_endpoint.dart' as _i8;
 import '../endpoints/score_endpoint.dart' as _i9;
 import '../endpoints/setlist_endpoint.dart' as _i10;
 import '../endpoints/status_endpoint.dart' as _i11;
-import '../endpoints/sync_endpoint.dart' as _i12;
-import '../endpoints/team_annotation_endpoint.dart' as _i13;
-import '../endpoints/team_endpoint.dart' as _i14;
-import '../endpoints/team_score_endpoint.dart' as _i15;
-import '../endpoints/team_setlist_endpoint.dart' as _i16;
-import 'dart:typed_data' as _i17;
+import '../endpoints/team_annotation_endpoint.dart' as _i12;
+import '../endpoints/team_endpoint.dart' as _i13;
+import '../endpoints/team_score_endpoint.dart' as _i14;
+import '../endpoints/team_setlist_endpoint.dart' as _i15;
+import 'dart:typed_data' as _i16;
 import 'package:musheet_server/src/generated/dto/sync_push_request.dart'
-    as _i18;
-import 'package:musheet_server/src/generated/score.dart' as _i19;
-import 'package:musheet_server/src/generated/annotation.dart' as _i20;
-import 'package:musheet_server/src/generated/instrument_score.dart' as _i21;
-import 'package:musheet_server/src/generated/setlist.dart' as _i22;
-import 'package:musheet_server/src/generated/setlist_score.dart' as _i23;
+    as _i17;
+import 'package:musheet_server/src/generated/score.dart' as _i18;
+import 'package:musheet_server/src/generated/annotation.dart' as _i19;
 
 class Endpoints extends _i1.EndpointDispatch {
   @override
@@ -99,31 +95,25 @@ class Endpoints extends _i1.EndpointDispatch {
           'status',
           null,
         ),
-      'sync': _i12.SyncEndpoint()
-        ..initialize(
-          server,
-          'sync',
-          null,
-        ),
-      'teamAnnotation': _i13.TeamAnnotationEndpoint()
+      'teamAnnotation': _i12.TeamAnnotationEndpoint()
         ..initialize(
           server,
           'teamAnnotation',
           null,
         ),
-      'team': _i14.TeamEndpoint()
+      'team': _i13.TeamEndpoint()
         ..initialize(
           server,
           'team',
           null,
         ),
-      'teamScore': _i15.TeamScoreEndpoint()
+      'teamScore': _i14.TeamScoreEndpoint()
         ..initialize(
           server,
           'teamScore',
           null,
         ),
-      'teamSetlist': _i16.TeamSetlistEndpoint()
+      'teamSetlist': _i15.TeamSetlistEndpoint()
         ..initialize(
           server,
           'teamSetlist',
@@ -1019,7 +1009,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'fileData': _i1.ParameterDescription(
               name: 'fileData',
-              type: _i1.getType<_i17.ByteData>(),
+              type: _i1.getType<_i16.ByteData>(),
               nullable: false,
             ),
             'fileName': _i1.ParameterDescription(
@@ -1153,7 +1143,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'request': _i1.ParameterDescription(
               name: 'request',
-              type: _i1.getType<_i18.SyncPushRequest>(),
+              type: _i1.getType<_i17.SyncPushRequest>(),
               nullable: false,
             ),
           },
@@ -1259,7 +1249,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'imageData': _i1.ParameterDescription(
               name: 'imageData',
-              type: _i1.getType<_i17.ByteData>(),
+              type: _i1.getType<_i16.ByteData>(),
               nullable: false,
             ),
             'fileName': _i1.ParameterDescription(
@@ -1407,7 +1397,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'score': _i1.ParameterDescription(
               name: 'score',
-              type: _i1.getType<_i19.Score>(),
+              type: _i1.getType<_i18.Score>(),
               nullable: false,
             ),
           },
@@ -1713,7 +1703,7 @@ class Endpoints extends _i1.EndpointDispatch {
             ),
             'annotation': _i1.ParameterDescription(
               name: 'annotation',
-              type: _i1.getType<_i20.Annotation>(),
+              type: _i1.getType<_i19.Annotation>(),
               nullable: false,
             ),
           },
@@ -2089,102 +2079,6 @@ class Endpoints extends _i1.EndpointDispatch {
         ),
       },
     );
-    connectors['sync'] = _i1.EndpointConnector(
-      name: 'sync',
-      endpoint: endpoints['sync']!,
-      methodConnectors: {
-        'syncAll': _i1.MethodConnector(
-          name: 'syncAll',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-            'lastSyncAt': _i1.ParameterDescription(
-              name: 'lastSyncAt',
-              type: _i1.getType<DateTime?>(),
-              nullable: true,
-            ),
-          },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['sync'] as _i12.SyncEndpoint).syncAll(
-                session,
-                params['userId'],
-                lastSyncAt: params['lastSyncAt'],
-              ),
-        ),
-        'pushChanges': _i1.MethodConnector(
-          name: 'pushChanges',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-            'scores': _i1.ParameterDescription(
-              name: 'scores',
-              type: _i1.getType<List<_i19.Score>>(),
-              nullable: false,
-            ),
-            'instrumentScores': _i1.ParameterDescription(
-              name: 'instrumentScores',
-              type: _i1.getType<List<_i21.InstrumentScore>>(),
-              nullable: false,
-            ),
-            'annotations': _i1.ParameterDescription(
-              name: 'annotations',
-              type: _i1.getType<List<_i20.Annotation>>(),
-              nullable: false,
-            ),
-            'setlists': _i1.ParameterDescription(
-              name: 'setlists',
-              type: _i1.getType<List<_i22.Setlist>>(),
-              nullable: false,
-            ),
-            'setlistScores': _i1.ParameterDescription(
-              name: 'setlistScores',
-              type: _i1.getType<List<_i23.SetlistScore>>(),
-              nullable: false,
-            ),
-          },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['sync'] as _i12.SyncEndpoint).pushChanges(
-                session,
-                params['userId'],
-                params['scores'],
-                params['instrumentScores'],
-                params['annotations'],
-                params['setlists'],
-                params['setlistScores'],
-              ),
-        ),
-        'getSyncStatus': _i1.MethodConnector(
-          name: 'getSyncStatus',
-          params: {
-            'userId': _i1.ParameterDescription(
-              name: 'userId',
-              type: _i1.getType<int>(),
-              nullable: false,
-            ),
-          },
-          call:
-              (
-                _i1.Session session,
-                Map<String, dynamic> params,
-              ) async => (endpoints['sync'] as _i12.SyncEndpoint).getSyncStatus(
-                session,
-                params['userId'],
-              ),
-        ),
-      },
-    );
     connectors['teamAnnotation'] = _i1.EndpointConnector(
       name: 'teamAnnotation',
       endpoint: endpoints['teamAnnotation']!,
@@ -2208,7 +2102,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['teamAnnotation'] as _i13.TeamAnnotationEndpoint)
+                  (endpoints['teamAnnotation'] as _i12.TeamAnnotationEndpoint)
                       .getTeamAnnotations(
                         session,
                         params['userId'],
@@ -2264,7 +2158,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['teamAnnotation'] as _i13.TeamAnnotationEndpoint)
+                  (endpoints['teamAnnotation'] as _i12.TeamAnnotationEndpoint)
                       .addTeamAnnotation(
                         session,
                         params['userId'],
@@ -2311,7 +2205,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['teamAnnotation'] as _i13.TeamAnnotationEndpoint)
+                  (endpoints['teamAnnotation'] as _i12.TeamAnnotationEndpoint)
                       .updateTeamAnnotation(
                         session,
                         params['userId'],
@@ -2340,7 +2234,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['teamAnnotation'] as _i13.TeamAnnotationEndpoint)
+                  (endpoints['teamAnnotation'] as _i12.TeamAnnotationEndpoint)
                       .deleteTeamAnnotation(
                         session,
                         params['userId'],
@@ -2376,7 +2270,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['team'] as _i14.TeamEndpoint).createTeam(
+              ) async => (endpoints['team'] as _i13.TeamEndpoint).createTeam(
                 session,
                 params['adminUserId'],
                 params['name'],
@@ -2396,7 +2290,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['team'] as _i14.TeamEndpoint).getAllTeams(
+              ) async => (endpoints['team'] as _i13.TeamEndpoint).getAllTeams(
                 session,
                 params['adminUserId'],
               ),
@@ -2429,7 +2323,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['team'] as _i14.TeamEndpoint).updateTeam(
+              ) async => (endpoints['team'] as _i13.TeamEndpoint).updateTeam(
                 session,
                 params['adminUserId'],
                 params['teamId'],
@@ -2455,7 +2349,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['team'] as _i14.TeamEndpoint).deleteTeam(
+              ) async => (endpoints['team'] as _i13.TeamEndpoint).deleteTeam(
                 session,
                 params['adminUserId'],
                 params['teamId'],
@@ -2490,7 +2384,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['team'] as _i14.TeamEndpoint).addMemberToTeam(
+                  (endpoints['team'] as _i13.TeamEndpoint).addMemberToTeam(
                     session,
                     params['adminUserId'],
                     params['teamId'],
@@ -2522,7 +2416,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['team'] as _i14.TeamEndpoint).removeMemberFromTeam(
+                  (endpoints['team'] as _i13.TeamEndpoint).removeMemberFromTeam(
                     session,
                     params['adminUserId'],
                     params['teamId'],
@@ -2558,7 +2452,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['team'] as _i14.TeamEndpoint).updateMemberRole(
+                  (endpoints['team'] as _i13.TeamEndpoint).updateMemberRole(
                     session,
                     params['adminUserId'],
                     params['teamId'],
@@ -2585,7 +2479,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['team'] as _i14.TeamEndpoint).getTeamMembers(
+                  (endpoints['team'] as _i13.TeamEndpoint).getTeamMembers(
                     session,
                     params['adminUserId'],
                     params['teamId'],
@@ -2609,7 +2503,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['team'] as _i14.TeamEndpoint).getUserTeams(
+              ) async => (endpoints['team'] as _i13.TeamEndpoint).getUserTeams(
                 session,
                 params['adminUserId'],
                 params['userId'],
@@ -2628,7 +2522,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['team'] as _i14.TeamEndpoint).getMyTeams(
+              ) async => (endpoints['team'] as _i13.TeamEndpoint).getMyTeams(
                 session,
                 params['userId'],
               ),
@@ -2651,7 +2545,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['team'] as _i14.TeamEndpoint).getTeamById(
+              ) async => (endpoints['team'] as _i13.TeamEndpoint).getTeamById(
                 session,
                 params['userId'],
                 params['teamId'],
@@ -2676,7 +2570,7 @@ class Endpoints extends _i1.EndpointDispatch {
                 _i1.Session session,
                 Map<String, dynamic> params,
               ) async =>
-                  (endpoints['team'] as _i14.TeamEndpoint).getMyTeamMembers(
+                  (endpoints['team'] as _i13.TeamEndpoint).getMyTeamMembers(
                     session,
                     params['userId'],
                     params['teamId'],
@@ -2706,7 +2600,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['teamScore'] as _i15.TeamScoreEndpoint)
+              ) async => (endpoints['teamScore'] as _i14.TeamScoreEndpoint)
                   .getTeamScores(
                     session,
                     params['userId'],
@@ -2736,7 +2630,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['teamScore'] as _i15.TeamScoreEndpoint)
+              ) async => (endpoints['teamScore'] as _i14.TeamScoreEndpoint)
                   .shareScoreToTeam(
                     session,
                     params['userId'],
@@ -2767,7 +2661,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['teamScore'] as _i15.TeamScoreEndpoint)
+              ) async => (endpoints['teamScore'] as _i14.TeamScoreEndpoint)
                   .unshareScoreFromTeam(
                     session,
                     params['userId'],
@@ -2799,7 +2693,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['teamSetlist'] as _i16.TeamSetlistEndpoint)
+              ) async => (endpoints['teamSetlist'] as _i15.TeamSetlistEndpoint)
                   .getTeamSetlists(
                     session,
                     params['userId'],
@@ -2829,7 +2723,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['teamSetlist'] as _i16.TeamSetlistEndpoint)
+              ) async => (endpoints['teamSetlist'] as _i15.TeamSetlistEndpoint)
                   .shareSetlistToTeam(
                     session,
                     params['userId'],
@@ -2860,7 +2754,7 @@ class Endpoints extends _i1.EndpointDispatch {
               (
                 _i1.Session session,
                 Map<String, dynamic> params,
-              ) async => (endpoints['teamSetlist'] as _i16.TeamSetlistEndpoint)
+              ) async => (endpoints['teamSetlist'] as _i15.TeamSetlistEndpoint)
                   .unshareSetlistFromTeam(
                     session,
                     params['userId'],

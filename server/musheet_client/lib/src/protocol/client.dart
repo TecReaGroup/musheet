@@ -1089,57 +1089,6 @@ class EndpointStatus extends _i1.EndpointRef {
   );
 }
 
-/// Sync endpoint for offline-first synchronization
-/// {@category Endpoint}
-class EndpointSync extends _i1.EndpointRef {
-  EndpointSync(_i1.EndpointCaller caller) : super(caller);
-
-  @override
-  String get name => 'sync';
-
-  /// Full sync - get all user data since a given timestamp
-  _i2.Future<_i19.ScoreSyncResult> syncAll(
-    int userId, {
-    DateTime? lastSyncAt,
-  }) => caller.callServerEndpoint<_i19.ScoreSyncResult>(
-    'sync',
-    'syncAll',
-    {
-      'userId': userId,
-      'lastSyncAt': lastSyncAt,
-    },
-  );
-
-  /// Push local changes to server
-  _i2.Future<_i19.ScoreSyncResult> pushChanges(
-    int userId,
-    List<_i18.Score> scores,
-    List<_i20.InstrumentScore> instrumentScores,
-    List<_i21.Annotation> annotations,
-    List<_i22.Setlist> setlists,
-    List<_i23.SetlistScore> setlistScores,
-  ) => caller.callServerEndpoint<_i19.ScoreSyncResult>(
-    'sync',
-    'pushChanges',
-    {
-      'userId': userId,
-      'scores': scores,
-      'instrumentScores': instrumentScores,
-      'annotations': annotations,
-      'setlists': setlists,
-      'setlistScores': setlistScores,
-    },
-  );
-
-  /// Get sync status
-  _i2.Future<Map<String, dynamic>> getSyncStatus(int userId) =>
-      caller.callServerEndpoint<Map<String, dynamic>>(
-        'sync',
-        'getSyncStatus',
-        {'userId': userId},
-      );
-}
-
 /// Team annotation endpoint for team shared annotation management
 /// {@category Endpoint}
 class EndpointTeamAnnotation extends _i1.EndpointRef {
@@ -1533,7 +1482,6 @@ class Client extends _i1.ServerpodClientShared {
     score = EndpointScore(this);
     setlist = EndpointSetlist(this);
     status = EndpointStatus(this);
-    sync = EndpointSync(this);
     teamAnnotation = EndpointTeamAnnotation(this);
     team = EndpointTeam(this);
     teamScore = EndpointTeamScore(this);
@@ -1560,8 +1508,6 @@ class Client extends _i1.ServerpodClientShared {
 
   late final EndpointStatus status;
 
-  late final EndpointSync sync;
-
   late final EndpointTeamAnnotation teamAnnotation;
 
   late final EndpointTeam team;
@@ -1582,7 +1528,6 @@ class Client extends _i1.ServerpodClientShared {
     'score': score,
     'setlist': setlist,
     'status': status,
-    'sync': sync,
     'teamAnnotation': teamAnnotation,
     'team': team,
     'teamScore': teamScore,

@@ -448,107 +448,16 @@ class RpcClient {
     );
   }
 
-  /// Upsert score
-  Future<RpcResponse<server.ScoreSyncResult>> upsertScore(server.Score score) async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'upsertScore',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'score',
-      method: 'upsertScore',
-      call: () => _client.score.upsertScore(_userId!, score),
-      transform: (result) => result,
-    );
-  }
-
-  /// Delete score
-  Future<RpcResponse<bool>> deleteScore(int scoreId) async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'deleteScore',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'score',
-      method: 'deleteScore',
-      call: () => _client.score.deleteScore(_userId!, scoreId),
-      transform: (result) => result,
-    );
-  }
-
-  /// Get instrument scores
-  Future<RpcResponse<List<server.InstrumentScore>>> getInstrumentScores(int scoreId) async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'getInstrumentScores',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'score',
-      method: 'getInstrumentScores',
-      call: () => _client.score.getInstrumentScores(_userId!, scoreId),
-      transform: (result) => result,
-    );
-  }
-
-  /// Upsert instrument score
-  Future<RpcResponse<server.InstrumentScore>> upsertInstrumentScore({
-    required int scoreId,
-    required String instrumentName,
-    int orderIndex = 0,
-    String? pdfPath,
-  }) async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'upsertInstrumentScore',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'score',
-      method: 'upsertInstrumentScore',
-      call: () => _client.score.upsertInstrumentScore(
-        _userId!,
-        scoreId,
-        instrumentName,
-        orderIndex: orderIndex,
-        pdfPath: pdfPath,
-      ),
-      transform: (result) => result,
-    );
-  }
-
-  /// Delete instrument score
-  Future<RpcResponse<bool>> deleteInstrumentScore(int instrumentScoreId) async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'deleteInstrumentScore',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'score',
-      method: 'deleteInstrumentScore',
-      call: () => _client.score.deleteInstrumentScore(_userId!, instrumentScoreId),
-      transform: (result) => result,
-    );
-  }
+  // NOTE: Individual score/instrument mutations (upsertScore, deleteScore,
+  // getInstrumentScores, upsertInstrumentScore, deleteInstrumentScore) have been
+  // removed. These operations are now handled by LibrarySyncService via batch
+  // sync (libraryPush/libraryPull).
 
   // ============================================================================
-  // Setlist Operations
+  // Setlist Operations (getSetlists kept for debug purposes)
   // ============================================================================
 
-  /// Get all setlists
+  /// Get all setlists (for debug purposes)
   Future<RpcResponse<List<server.Setlist>>> getSetlists() async {
     if (_userId == null) {
       return RpcResponse.failure(
@@ -565,25 +474,8 @@ class RpcClient {
     );
   }
 
-  /// Upsert setlist
-  Future<RpcResponse<server.Setlist>> upsertSetlist({
-    required String name,
-    String? description,
-  }) async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'upsertSetlist',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'setlist',
-      method: 'upsertSetlist',
-      call: () => _client.setlist.upsertSetlist(_userId!, name, description: description),
-      transform: (result) => result,
-    );
-  }
+  // NOTE: upsertSetlist has been removed. Setlist mutations are now handled
+  // by LibrarySyncService via batch sync (libraryPush/libraryPull).
 
   // ============================================================================
   // File Operations
@@ -636,45 +528,9 @@ class RpcClient {
   }
 
   // ============================================================================
-  // Sync Operations (Legacy - will be replaced by Library Sync)
-  // ============================================================================
-
-  /// Full sync (Legacy)
-  Future<RpcResponse<server.ScoreSyncResult>> syncAll({DateTime? lastSyncAt}) async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'syncAll',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'sync',
-      method: 'syncAll',
-      call: () => _client.sync.syncAll(_userId!, lastSyncAt: lastSyncAt),
-      transform: (result) => result,
-    );
-  }
-
-  /// Get sync status (Legacy)
-  Future<RpcResponse<Map<String, dynamic>>> getSyncStatus() async {
-    if (_userId == null) {
-      return RpcResponse.failure(
-        RpcError(code: RpcErrorCode.authenticationRequired),
-        requestId: 'getSyncStatus',
-      );
-    }
-
-    return _executeCall(
-      endpoint: 'sync',
-      method: 'getSyncStatus',
-      call: () => _client.sync.getSyncStatus(_userId!),
-      transform: (result) => result,
-    );
-  }
-
-  // ============================================================================
-  // Library Sync Operations (New Zotero-style sync)
+  // Library Sync Operations (Zotero-style batch sync)
+  // NOTE: Legacy syncAll/getSyncStatus methods have been removed.
+  // All sync operations now use libraryPush/libraryPull.
   // ============================================================================
 
   /// Pull changes since a given library version
@@ -687,11 +543,26 @@ class RpcClient {
       );
     }
 
-    return _executeCall(
+    if (kDebugMode) {
+      debugPrint('[RpcClient] libraryPull: userId=$_userId, since=$since');
+    }
+
+    return _executeCallNullable(
       endpoint: 'librarySync',
       method: 'pull',
       call: () => _client.librarySync.pull(_userId!, since: since),
-      transform: (result) => LibrarySyncPullResult.fromServerpod(result),
+      transform: (result) {
+        if (result == null) {
+          if (kDebugMode) {
+            debugPrint('[RpcClient] libraryPull: server returned null, using empty result');
+          }
+          return LibrarySyncPullResult(libraryVersion: since);
+        }
+        if (kDebugMode) {
+          debugPrint('[RpcClient] libraryPull: received response with libraryVersion=${result.libraryVersion}');
+        }
+        return LibrarySyncPullResult.fromServerpod(result);
+      },
     );
   }
 
@@ -710,36 +581,57 @@ class RpcClient {
       );
     }
 
-    // Build push request
-    final request = server.SyncPushRequest(
-      clientLibraryVersion: clientLibraryVersion,
-      scores: scores.map((s) => server.SyncEntityChange(
-        entityType: s['entityType'] as String,
-        entityId: s['entityId'] as String,
-        serverId: s['serverId'] as int?,
-        operation: s['operation'] as String,
-        version: s['version'] as int,
-        data: s['data'] as String,
-        localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
-      )).toList(),
-      setlists: setlists.map((s) => server.SyncEntityChange(
-        entityType: s['entityType'] as String,
-        entityId: s['entityId'] as String,
-        serverId: s['serverId'] as int?,
-        operation: s['operation'] as String,
-        version: s['version'] as int,
-        data: s['data'] as String,
-        localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
-      )).toList(),
-      deletes: deletes,
-    );
+    // Build push request with null-safe type conversions
+    if (kDebugMode) {
+      debugPrint('[RpcClient] Building SyncPushRequest: scores=${scores.length}, setlists=${setlists.length}, deletes=${deletes.length}');
+    }
+    
+    try {
+      final request = server.SyncPushRequest(
+        clientLibraryVersion: clientLibraryVersion,
+        scores: scores.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,  // Default to 1 if null
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        setlists: setlists.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,  // Default to 1 if null
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        deletes: deletes,
+      );
+      
+      if (kDebugMode) {
+        debugPrint('[RpcClient] SyncPushRequest built successfully');
+      }
 
-    return _executeCall(
-      endpoint: 'librarySync',
-      method: 'push',
-      call: () => _client.librarySync.push(_userId!, request),
-      transform: (result) => LibrarySyncPushResult.fromServerpod(result),
-    );
+      return _executeCall(
+        endpoint: 'librarySync',
+        method: 'push',
+        call: () => _client.librarySync.push(_userId!, request),
+        transform: (result) {
+          return LibrarySyncPushResult.fromServerpod(result);
+        },
+      );
+    } catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('[RpcClient] Error building SyncPushRequest: $e');
+        debugPrint('[RpcClient] Stack: $stack');
+      }
+      return RpcResponse.failure(
+        RpcError.fromException(e, stack),
+        requestId: 'libraryPush',
+      );
+    }
   }
 
   /// Get current library version for a user
@@ -763,6 +655,57 @@ class RpcClient {
   // Internal Execution
   // ============================================================================
 
+  /// Execute RPC call with interceptor chain (for nullable results)
+  Future<RpcResponse<R>> _executeCallNullable<T, R>({
+    required String endpoint,
+    required String method,
+    required Future<T?> Function() call,
+    required R Function(T?) transform,
+    bool requiresAuth = true,
+  }) async {
+    final request = RpcRequest<R>(
+      endpoint: endpoint,
+      method: method,
+      // payload is now optional, no need to cast null
+      requiresAuth: requiresAuth,
+    );
+
+    try {
+      // Process request through interceptors
+      final processedRequest = await _interceptorChain.processRequest(request);
+
+      // Execute actual call
+      final startTime = DateTime.now();
+      final result = await call().timeout(
+        processedRequest.timeout ?? config.requestTimeout,
+        onTimeout: () => throw RpcError(code: RpcErrorCode.connectionTimeout),
+      );
+      final latency = DateTime.now().difference(startTime);
+
+      // Transform and wrap response (null is allowed)
+      final response = RpcResponse.success(
+        transform(result),
+        requestId: request.requestId,
+        latency: latency,
+      );
+
+      // Process response through interceptors
+      return await _interceptorChain.processResponse(response);
+    } catch (e, stack) {
+      final error = e is RpcError ? e : RpcError.fromException(e, stack);
+
+      try {
+        // Try to recover through interceptors
+        return await _interceptorChain.processError(error, request);
+      } catch (finalError) {
+        return RpcResponse.failure(
+          finalError is RpcError ? finalError : RpcError.fromException(finalError),
+          requestId: request.requestId,
+        );
+      }
+    }
+  }
+
   /// Execute RPC call with interceptor chain
   Future<RpcResponse<R>> _executeCall<T, R>({
     required String endpoint,
@@ -774,7 +717,7 @@ class RpcClient {
     final request = RpcRequest<R>(
       endpoint: endpoint,
       method: method,
-      payload: null as R,
+      // payload is now optional, no need to cast null
       requiresAuth: requiresAuth,
     );
 

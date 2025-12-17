@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/backend_service.dart';
+import '../rpc/rpc_client.dart' hide LocalUserProfile, AuthResultData;
 import 'storage_providers.dart';
 
 /// Authentication state
@@ -99,10 +100,15 @@ class AuthNotifier extends Notifier<AuthData> {
     final prefs = ref.read(preferencesProvider);
     if (prefs == null) return;
 
-    // Initialize backend service if URL is saved
+    // Initialize backend service and RpcClient if URL is saved
     final savedUrl = prefs.getServerUrl();
-    if (savedUrl != null && savedUrl.isNotEmpty && !BackendService.isInitialized) {
-      BackendService.initialize(baseUrl: savedUrl);
+    if (savedUrl != null && savedUrl.isNotEmpty) {
+      if (!BackendService.isInitialized) {
+        BackendService.initialize(baseUrl: savedUrl);
+      }
+      if (!RpcClient.isInitialized) {
+        RpcClient.initialize(RpcClientConfig(baseUrl: savedUrl));
+      }
     }
 
     // Check for saved auth token
@@ -110,8 +116,12 @@ class AuthNotifier extends Notifier<AuthData> {
     if (token != null && token.isNotEmpty) {
       // IMPORTANT: Set credentials BEFORE changing state
       // This ensures sync service has access to credentials when it starts
+      final userId = _extractUserIdFromToken(token);
       if (BackendService.isInitialized) {
-        BackendService.instance.setAuthCredentials(token, _extractUserIdFromToken(token));
+        BackendService.instance.setAuthCredentials(token, userId);
+      }
+      if (RpcClient.isInitialized) {
+        RpcClient.instance.setAuthCredentials(token, userId);
       }
 
       // Now change state (which might trigger sync providers)
@@ -136,14 +146,16 @@ class AuthNotifier extends Notifier<AuthData> {
     }
 
     // Check if backend service is initialized
-    if (!BackendService.isInitialized) {
+    if (!BackendService.isInitialized || !RpcClient.isInitialized) {
       // Backend not configured, stay in offline auth mode
       return;
     }
 
     // Don't show loading state - run validation in background
     try {
-      BackendService.instance.setAuthCredentials(token, _extractUserIdFromToken(token));
+      final userId = _extractUserIdFromToken(token);
+      BackendService.instance.setAuthCredentials(token, userId);
+      RpcClient.instance.setAuthCredentials(token, userId);
       
       // Check backend connection in background
       final statusResult = await BackendService.instance.checkStatus();
@@ -228,8 +240,9 @@ class AuthNotifier extends Notifier<AuthData> {
 
   /// Update server URL
   Future<void> setServerUrl(String url) async {
-    // Re-initialize backend with new URL
+    // Re-initialize backend and RpcClient with new URL
     BackendService.initialize(baseUrl: url);
+    RpcClient.initialize(RpcClientConfig(baseUrl: url));
     
     // Check connection
     await checkConnection();
@@ -289,6 +302,19 @@ class AuthNotifier extends Notifier<AuthData> {
         final prefs = ref.read(preferencesProvider);
         await prefs?.setAuthToken(result.data!.token);
         
+        // Ensure RpcClient is initialized (use same URL as BackendService)
+        if (!RpcClient.isInitialized) {
+          final url = prefs?.getServerUrl();
+          if (url != null && url.isNotEmpty) {
+            RpcClient.initialize(RpcClientConfig(baseUrl: url));
+          }
+        }
+        
+        // Also set RpcClient credentials
+        if (RpcClient.isInitialized && result.data!.token != null && result.data!.userId != null) {
+          RpcClient.instance.setAuthCredentials(result.data!.token!, result.data!.userId!);
+        }
+        
         state = state.copyWith(
           state: AuthState.authenticated,
           user: result.data!.user,
@@ -336,6 +362,19 @@ class AuthNotifier extends Notifier<AuthData> {
         final prefs = ref.read(preferencesProvider);
         await prefs?.setAuthToken(result.data!.token);
         
+        // Ensure RpcClient is initialized (use same URL as BackendService)
+        if (!RpcClient.isInitialized) {
+          final url = prefs?.getServerUrl();
+          if (url != null && url.isNotEmpty) {
+            RpcClient.initialize(RpcClientConfig(baseUrl: url));
+          }
+        }
+        
+        // Also set RpcClient credentials
+        if (RpcClient.isInitialized && result.data!.token != null && result.data!.userId != null) {
+          RpcClient.instance.setAuthCredentials(result.data!.token!, result.data!.userId!);
+        }
+        
         state = state.copyWith(
           state: AuthState.authenticated,
           user: result.data!.user,
@@ -365,6 +404,11 @@ class AuthNotifier extends Notifier<AuthData> {
       await BackendService.instance.logout();
     } catch (_) {
       // Ignore logout errors
+    }
+    
+    // Clear RpcClient auth
+    if (RpcClient.isInitialized) {
+      RpcClient.instance.clearAuth();
     }
 
     // Clear stored auth
