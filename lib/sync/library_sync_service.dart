@@ -707,17 +707,63 @@ class LibrarySyncService {
       }
     }
     
-    // Mark accepted as synced
-    for (final id in result.accepted) {
+    // Mark accepted as synced - categorize by entity type to avoid blind updates
+    // Build sets of accepted IDs by entity type from the original changes
+    final acceptedScoreIds = <String>{};
+    final acceptedInstrumentScoreIds = <String>{};
+    final acceptedAnnotationIds = <String>{};
+    final acceptedSetlistIds = <String>{};
+    final acceptedSetlistScoreIds = <String>{};
+    
+    for (final change in scoreChanges) {
+      if (result.accepted.contains(change['entityId'])) {
+        acceptedScoreIds.add(change['entityId'] as String);
+      }
+    }
+    for (final change in instrumentScoreChanges) {
+      if (result.accepted.contains(change['entityId'])) {
+        acceptedInstrumentScoreIds.add(change['entityId'] as String);
+      }
+    }
+    for (final change in annotationChanges) {
+      if (result.accepted.contains(change['entityId'])) {
+        acceptedAnnotationIds.add(change['entityId'] as String);
+      }
+    }
+    for (final change in setlistChanges) {
+      if (result.accepted.contains(change['entityId'])) {
+        acceptedSetlistIds.add(change['entityId'] as String);
+      }
+    }
+    for (final change in setlistScoreChanges) {
+      if (result.accepted.contains(change['entityId'])) {
+        acceptedSetlistScoreIds.add(change['entityId'] as String);
+      }
+    }
+    
+    // Now update each entity type separately to ensure correct syncStatus updates
+    for (final id in acceptedScoreIds) {
       await (_db.update(_db.scores)..where((s) => s.id.equals(id)))
         .write(const ScoresCompanion(syncStatus: Value('synced')));
+    }
+    
+    for (final id in acceptedInstrumentScoreIds) {
       await (_db.update(_db.instrumentScores)..where((s) => s.id.equals(id)))
         .write(const InstrumentScoresCompanion(syncStatus: Value('synced')));
+    }
+    
+    for (final id in acceptedAnnotationIds) {
       await (_db.update(_db.annotations)..where((s) => s.id.equals(id)))
         .write(const AnnotationsCompanion(syncStatus: Value('synced')));
+    }
+    
+    for (final id in acceptedSetlistIds) {
       await (_db.update(_db.setlists)..where((s) => s.id.equals(id)))
         .write(const SetlistsCompanion(syncStatus: Value('synced')));
-      // Handle SetlistScore composite key with ::: separator
+    }
+    
+    for (final id in acceptedSetlistScoreIds) {
+      // SetlistScore uses composite key with ::: separator
       if (id.contains(':::')) {
         final parts = id.split(':::');
         if (parts.length == 2) {

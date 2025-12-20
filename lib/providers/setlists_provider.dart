@@ -33,12 +33,13 @@ class SetlistsNotifier extends AsyncNotifier<List<Setlist>> {
       dateCreated: DateTime.now(),
     );
     
-    // Insert into database
+    // Insert into database (may restore an existing soft-deleted record with different ID)
     await dbService.insertSetlist(newSetlist);
     
-    // Update state
-    final currentSetlists = _getSetlistsValue(state);
-    state = AsyncData([...currentSetlists, newSetlist]);
+    // Refresh from database to get the actual record
+    // This handles the case where insertSetlist restored an existing record with different ID
+    // Without this refresh, UI would hold the wrong ID, causing delete operations to fail
+    await refresh();
   }
 
   Future<void> deleteSetlist(String setlistId) async {

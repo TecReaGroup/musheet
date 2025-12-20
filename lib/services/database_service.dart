@@ -60,7 +60,7 @@ class DatabaseService {
         // Restore the deleted score instead of creating new
         final existingScore = deletedScores.first;
         if (kDebugMode) {
-          debugPrint('[DatabaseService] Restoring soft-deleted Score: id=${existingScore.id}, title="${score.title}", composer="${score.composer}"');
+          debugPrint('[DatabaseService] Restoring soft-deleted Score: id=${existingScore.id}, title="${score.title}", composer="${score.composer}", serverId=${existingScore.serverId}');
         }
         
         await (_db.update(_db.scores)
@@ -68,17 +68,14 @@ class DatabaseService {
             .write(ScoresCompanion(
           bpm: Value(score.bpm),
           deletedAt: const Value(null), // Clear deletion
-          serverId: const Value(null), // Clear serverId so server assigns new one
+          // Keep serverId - per sync_logic.md, restoration is an UPDATE operation, not CREATE
           syncStatus: const Value('pending'),
           updatedAt: Value(DateTime.now()),
           // Note: version will be set by server on push
         ));
 
-        // Delete old instrument scores and insert new ones
-        await (_db.delete(_db.instrumentScores)
-              ..where((is_) => is_.scoreId.equals(existingScore.id)))
-            .go();
-
+        // Restore associated InstrumentScores - they should already exist as soft-deleted
+        // Just clear their deletedAt flags instead of deleting and recreating
         for (final instrumentScore in score.instrumentScores) {
           await _insertInstrumentScore(existingScore.id, instrumentScore);
         }
@@ -221,7 +218,7 @@ class DatabaseService {
       // Restore the deleted instrument score instead of creating new
       final existingInstrumentScore = deletedInstrumentScores.first;
       if (kDebugMode) {
-        debugPrint('[DatabaseService] Restoring soft-deleted InstrumentScore: id=${existingInstrumentScore.id}, scoreId=$scoreId, instrumentName="$instrumentName"');
+        debugPrint('[DatabaseService] Restoring soft-deleted InstrumentScore: id=${existingInstrumentScore.id}, scoreId=$scoreId, instrumentName="$instrumentName", serverId=${existingInstrumentScore.serverId}');
       }
       
       await (_db.update(_db.instrumentScores)
@@ -230,8 +227,13 @@ class DatabaseService {
         pdfPath: Value(instrumentScore.pdfUrl),
         thumbnail: Value(instrumentScore.thumbnail),
         deletedAt: const Value(null), // Clear deletion
-        serverId: const Value(null), // Clear serverId so server assigns new one
+        // Keep serverId - per sync_logic.md, restoration is an UPDATE operation, not CREATE
         syncStatus: const Value('pending'),
+        // CRITICAL: Reset pdfSyncStatus to 'pending' so the new PDF will be uploaded
+        // The restored record may have pdfSyncStatus='synced' from before deletion,
+        // but we have a new PDF file that needs to be uploaded
+        pdfSyncStatus: const Value('pending'),
+        pdfHash: const Value(null), // Clear old hash since we have a new PDF
         updatedAt: Value(DateTime.now()),
         // Note: version will be set by server on push
       ));
@@ -258,6 +260,10 @@ class DatabaseService {
           pdfPath: instrumentScore.pdfUrl,
           thumbnail: Value(instrumentScore.thumbnail),
           dateAdded: instrumentScore.dateAdded,
+          // CRITICAL: Set sync status so the instrument score will be synced
+          syncStatus: const Value('pending'),
+          // CRITICAL: Set PDF sync status so the PDF will be uploaded
+          pdfSyncStatus: const Value('pending'),
         ));
 
     // Insert annotations
@@ -274,12 +280,28 @@ class DatabaseService {
     await _insertInstrumentScore(scoreId, instrumentScore);
   }
 
-  /// Delete an instrument score
-  /// Cascade deletes associated annotations (physical delete per sync_logic.md)
+  /// Delete an instrument score (soft delete for sync)
+  /// Cascade deletes associated annotations (physical delete - annotations don't sync deletions)
   Future<void> deleteInstrumentScore(String instrumentScoreId) async {
     await _db.transaction(() async {
+      final now = DateTime.now();
+      
+      // Get the instrument score to check if it has a serverId
+      final instrumentScores = await (_db.select(_db.instrumentScores)
+            ..where((is_) => is_.id.equals(instrumentScoreId)))
+          .get();
+      
+      if (instrumentScores.isEmpty) {
+        if (kDebugMode) {
+          debugPrint('[DatabaseService] InstrumentScore not found: $instrumentScoreId');
+        }
+        return;
+      }
+      
+      final instrumentScore = instrumentScores.first;
+      
       // Cascade: Physically delete annotations for this InstrumentScore
-      // Per sync_logic.md line 398-400, annotations should be physically deleted
+      // Per sync_logic.md, annotations don't use soft delete and deletions are not synced
       await (_db.delete(_db.annotations)
             ..where((a) => a.instrumentScoreId.equals(instrumentScoreId)))
           .go();
@@ -288,13 +310,29 @@ class DatabaseService {
         debugPrint('[DatabaseService] ✓ Cascade physically deleted Annotations for InstrumentScore: $instrumentScoreId');
       }
       
-      // Delete the InstrumentScore itself
-      await (_db.delete(_db.instrumentScores)
-            ..where((is_) => is_.id.equals(instrumentScoreId)))
-          .go();
-      
-      if (kDebugMode) {
-        debugPrint('[DatabaseService] ✓ Deleted InstrumentScore: $instrumentScoreId');
+      // Check if this InstrumentScore has been synced to server
+      if (instrumentScore.serverId != null) {
+        // Soft delete: mark as deleted and pending sync so server deletion is triggered
+        await (_db.update(_db.instrumentScores)
+              ..where((is_) => is_.id.equals(instrumentScoreId)))
+            .write(InstrumentScoresCompanion(
+              deletedAt: Value(now),
+              syncStatus: const Value('pending_delete'),
+              updatedAt: Value(now),
+            ));
+        
+        if (kDebugMode) {
+          debugPrint('[DatabaseService] ✓ Soft-deleted InstrumentScore: $instrumentScoreId (serverId=${instrumentScore.serverId}, marked for sync)');
+        }
+      } else {
+        // Physical delete: this was never synced, so just remove it locally
+        await (_db.delete(_db.instrumentScores)
+              ..where((is_) => is_.id.equals(instrumentScoreId)))
+            .go();
+        
+        if (kDebugMode) {
+          debugPrint('[DatabaseService] ✓ Physically deleted InstrumentScore: $instrumentScoreId (never synced)');
+        }
       }
     });
   }
@@ -403,7 +441,7 @@ class DatabaseService {
         setlistIdToUse = existingSetlist.id;
         
         if (kDebugMode) {
-          debugPrint('[DatabaseService] Restoring soft-deleted Setlist: id=${existingSetlist.id}, name="${setlist.name}"');
+          debugPrint('[DatabaseService] Restoring soft-deleted Setlist: id=${existingSetlist.id}, name="${setlist.name}", serverId=${existingSetlist.serverId}');
         }
 
         await (_db.update(_db.setlists)
@@ -411,16 +449,14 @@ class DatabaseService {
             .write(SetlistsCompanion(
           description: Value(setlist.description),
           deletedAt: const Value(null), // Clear deletion
-          serverId: const Value(null), // Clear serverId so server assigns new one
+          // Keep serverId - per sync_logic.md, restoration is an UPDATE operation, not CREATE
           syncStatus: const Value('pending'),
           updatedAt: Value(DateTime.now()),
           // Note: version will be set by server on push
         ));
 
-        // Delete old setlist-score relationships
-        await (_db.delete(_db.setlistScores)
-              ..where((ss) => ss.setlistId.equals(existingSetlist.id)))
-            .go();
+        // Restore associated SetlistScores - they should already exist as soft-deleted
+        // Just clear their deletedAt flags in _insertSetlistScore logic below
       } else {
         // No deleted setlist found, insert new
         setlistIdToUse = setlist.id;

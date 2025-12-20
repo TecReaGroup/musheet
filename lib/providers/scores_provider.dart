@@ -62,12 +62,13 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
   Future<void> addScore(Score score) async {
     final dbService = ref.read(databaseServiceProvider);
 
-    // Insert into database
+    // Insert into database (may restore an existing soft-deleted record with different ID)
     await dbService.insertScore(score);
 
-    // Update state
-    final currentScores = _getScoresValue(state);
-    state = AsyncData([...currentScores, score]);
+    // Refresh from database to get the actual record
+    // This handles the case where insertScore restored an existing record with different ID
+    // Without this refresh, UI would hold the wrong ID, causing delete operations to fail
+    await refresh();
 
     // Trigger background sync
     _triggerSync();
