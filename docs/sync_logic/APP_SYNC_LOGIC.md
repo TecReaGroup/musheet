@@ -27,10 +27,11 @@
 │   ├──────────────┤         ├──────────────┤                         │
 │   │ Score        │         │              │                         │
 │   │ InstrumentScore ───────┼─→ pdfHash ───┼─→ PDF 文件               │
-│   │ Annotation   │         │              │                         │
-│   │ Setlist      │         │ 引用计数管理   │                         │
-│   │ SetlistScore │         │              │                         │
+│   │ Setlist      │         │              │                         │
+│   │ SetlistScore │         │ 引用计数管理   │                         │
 │   └──────────────┘         └──────────────┘                         │
+│                                                                      │
+│   注: Annotation 不作为独立同步实体，嵌入 InstrumentScore.annotationsJson │
 │         │                         │                                  │
 │         ▼                         ▼                                  │
 │   libraryVersion            pdfHash (MD5)                           │
@@ -95,12 +96,12 @@ syncing
 |---------|------|------|
 | **本地数据变更** | 防抖 5s 后同步 | 避免频繁操作时过多请求 |
 | **App 启动** | 立即同步 | 获取最新数据 |
-| **App 从后台恢复** | 立即 Pull | 可能有其他设备的变更 |
+| **App 从后台恢复** | 立即同步（Push → Pull） | 可能有其他设备的变更，同时推送本地变更 |
 | **网络恢复** | 立即同步 | 处理离线期间的变更 |
 | **定时同步** | 每 5 分钟 | 后台保活时的增量同步 |
 | **用户手动刷新** | 立即同步 | 下拉刷新等操作 |
-| **用户登录** | 全量同步 | libraryVersion = 0 |
-| **用户切换账号** | 清空本地 + 全量同步 | 切换到新账号的数据 |
+| **用户登录** | 全量同步（Push → Pull） | 先推送未登录时的本地数据，再拉取服务器数据 |
+| **用户登出** | 停止同步 + 清空本地 | 不支持切换账号，必须先登出再登录 |
 
 ### 1.4 完整同步流程图
 
@@ -123,8 +124,7 @@ syncing
 │  ║     ┌────────────────────────────────────────────────┐         ║ │
 │  ║     │ 第1批: Scores, Setlists (无依赖)                │         ║ │
 │  ║     │ 第2批: InstrumentScores (依赖 Score)           │         ║ │
-│  ║     │ 第3批: Annotations (依赖 InstrumentScore)      │         ║ │
-│  ║     │ 第4批: SetlistScores (依赖 Setlist + Score)    │         ║ │
+│  ║     │ 第3批: SetlistScores (依赖 Setlist + Score)    │         ║ │
 │  ║     └────────────────────────────────────────────────┘         ║ │
 │  ║                                                                 ║ │
 │  ║  3. 发送请求: POST /library/push                                ║ │
@@ -154,7 +154,7 @@ syncing
 │  ║                                                                 ║ │
 │  ║  2. 响应包含:                                                    ║ │
 │  ║     • libraryVersion (最新版本号)                               ║ │
-│  ║     • 各实体数组 (scores, instrumentScores 含 pdfHash, etc.)    ║ │
+│  ║     • 各实体数组 (scores, instrumentScores 含 pdfHash+annotationsJson, etc.) ║ │
 │  ║     • deleted 数组 (已删除实体的标识)                            ║ │
 │  ║                                                                 ║ │
 │  ║  3. 合并策略 (详见 §2.4):                                        ║ │
@@ -170,9 +170,11 @@ syncing
 │  ║  阶段 3: PDF 文件同步 (独立队列)                                  ║ │
 │  ╠════════════════════════════════════════════════════════════════╣ │
 │  ║                                                                 ║ │
-│  ║  此阶段完全独立于元数据同步，详见 §3                              ║ │
+│  ║  在元数据 Push 成功后立即开始 PDF 上传                           ║ │
+│  ║  详见 §3                                                        ║ │
 │  ║                                                                 ║ │
-│  ║  1. 上传队列: pdfSyncStatus = 'pending'                         ║ │
+│  ║  1. 上传队列: pdfSyncStatus = 'pending' AND pdfHash IS NOT NULL ║ │
+│  ║     (PDF 通过 hash 上传，不依赖元数据的 serverId)                ║ │
 │  ║  2. 下载队列: pdfSyncStatus = 'needsDownload'                   ║ │
 │  ║  3. 引用计数: 基于 pdfHash 管理文件生命周期                       ║ │
 │  ║                                                                 ║ │
@@ -193,28 +195,31 @@ syncing
 │  1. 用户登录成功                                                      │
 │     │                                                                │
 │     ▼                                                                │
-│  2. 初始化本地数据库                                                  │
+│  2. 初始化本地数据库（如有离线数据则保留）                             │
 │     libraryVersion = 0                                               │
 │     │                                                                │
 │     ▼                                                                │
-│  3. Pull 全量元数据 (since = 0)                                      │
+│  3. Push 本地 pending 数据（遵循 Push 先于 Pull 铁律）                │
 │     ┌─────────────────────────────────────────────┐                 │
-│     │ 服务器返回所有: Scores, InstrumentScores,    │                 │
-│     │ Setlists, SetlistScores                     │                 │
-│     │ (不包含 Annotations，按需加载)               │                 │
+│     │ 场景: 用户未登录时创建的本地数据              │                 │
+│     │ 如果没有 pending 数据则跳过此步               │                 │
 │     └─────────────────────────────────────────────┘                 │
 │     │                                                                │
 │     ▼                                                                │
-│  4. UI 立即可用                                                       │
+│  4. Pull 全量元数据 (since = 0)                                      │
+│     ┌─────────────────────────────────────────────┐                 │
+│     │ 服务器返回所有: Scores, InstrumentScores,    │                 │
+│     │ Setlists, SetlistScores                     │                 │
+│     │ (不包含独立 Annotations，标注嵌入 InstrumentScore) │                 │
+│     └─────────────────────────────────────────────┘                 │
+│     │                                                                │
+│     ▼                                                                │
+│  5. UI 立即可用                                                       │
 │     用户可以看到曲库列表、曲单列表                                     │
 │     │                                                                │
 │     ▼                                                                │
-│  5. PDF 按需下载                                                      │
+│  6. PDF 按需下载                                                      │
 │     用户打开某个分谱时才下载对应 PDF                                   │
-│     │                                                                │
-│     ▼                                                                │
-│  6. Annotations 按需加载                                              │
-│     打开分谱时加载该分谱的标注                                         │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -253,11 +258,11 @@ syncing
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 1.5.3 用户切换账号
+#### 1.5.3 用户登出
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  账号切换流程                                                         │
+│  用户登出流程                                                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  1. 用户点击登出                                                      │
@@ -279,15 +284,40 @@ syncing
 │     • libraryVersion = 0                                             │
 │     │                                                                │
 │     ▼                                                                │
-│  5. 新账号登录                                                        │
-│     │                                                                │
-│     ▼                                                                │
-│  6. 全量同步（同 1.5.1）                                              │
+│  5. 返回登录页面                                                      │
+│                                                                      │
+│  注: 不支持切换账号，必须先登出再登录                                  │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 1.5.4 App 退出
+#### 1.5.4 未登录状态使用
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  未登录状态使用流程                                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  用户可以在未登录状态下使用 App:                                       │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ • 创建/编辑/删除 Score、InstrumentScore、Setlist 等          │    │
+│  │ • 所有操作写入本地数据库，syncStatus = 'pending'             │    │
+│  │ • PDF 文件保存到本地，pdfSyncStatus = 'pending'              │    │
+│  │ • 无网络请求，完全离线使用                                   │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+│  首次登录时:                                                          │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │ • 遵循 Push 先于 Pull 铁律                                   │    │
+│  │ • 先 Push 本地 pending 数据到服务器                          │    │
+│  │ • 再 Pull 服务器数据（如果该账号之前有数据）                  │    │
+│  │ • 合并后完成同步                                             │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### 1.5.5 App 退出
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -330,7 +360,7 @@ syncing
 │  ┌─────────────────────────────────────────────────────────────┐    │
 │  │ 本地 syncStatus = 'pending' → 本地优先，保留本地修改          │    │
 │  │ 本地 syncStatus = 'synced'  → 服务器优先，覆盖本地            │    │
-│  │ 删除 vs 修改 → 删除优先 (用户明确意图)                        │    │
+│  │ (无论是修改还是删除，都遵循上述 pending/synced 规则)          │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 │  PDF 冲突:                                                            │
@@ -399,18 +429,20 @@ T1: 服务器版本 = 10
 │  ├── pdfHash (MD5, nullable) ─────────────────┐                     │
 │  ├── pdfPath (本地路径)                        │                     │
 │  ├── pdfSyncStatus ('pending'|'synced'|'needsDownload')             │
+│  ├── annotationsJson (TEXT) ← 嵌入的标注数据    │                     │
 │  ├── serverId, syncStatus, version, deletedAt, updatedAt            │
-│       │                                        │                     │
-│       │ 1:N                                    │ 指向                 │
-│       ▼                                        ▼                     │
-│  Annotation (标注)                        PdfFile (概念)             │
-│  ├── id (UUID)                            存储路径: {hash}.pdf       │
-│  ├── instrumentScoreId (FK)               引用计数: N个InstrumentScore│
-│  ├── pageNumber                                                      │
-│  ├── annotationType                                                  │
-│  ├── color, strokeWidth                                              │
-│  ├── posX, posY                                                      │
-│  └── serverId, syncStatus, version, updatedAt                       │
+│                                                │                     │
+│                                                │ 指向                 │
+│                                                ▼                     │
+│                                           PdfFile (概念)             │
+│                                           存储路径: {hash}.pdf       │
+│                                           引用计数: N个InstrumentScore│
+│                                                                      │
+│  Annotation (标注) - 仅本地缓存表，不参与同步                         │
+│  ├── id (UUID)                                                       │
+│  ├── instrumentScoreId (FK)                                          │
+│  ├── pageNumber, annotationType, color, strokeWidth, posX, posY     │
+│  └── 无同步字段 (无 serverId, syncStatus, version)                   │
 │                                                                      │
 │  Setlist (曲单)                                                      │
 │  ├── id (UUID)                                                       │
@@ -470,7 +502,8 @@ T1: 服务器版本 = 10
 | InstrumentScore | (instrumentName, scoreId) | 同左 |
 | Setlist | (name, userId) | (name) |
 | SetlistScore | (setlistId, scoreId) | 同左 |
-| Annotation | 无业务约束 | 通过 UUID 标识 |
+
+**注意：** Annotation 不参与同步，无唯一性约束要求。
 
 **恢复规则：** 如果创建的实体与已删除实体的唯一键相同，视为"恢复"该实体（清除 deletedAt，不创建新记录）。
 
@@ -493,11 +526,9 @@ T1: 服务器版本 = 10
 │  ┌─────────────────────────────────────────────────────────────┐    │
 │  │ 批次 1: Scores, Setlists                                     │    │
 │  │         ↓ (需要先获得 serverId)                              │    │
-│  │ 批次 2: InstrumentScores                                     │    │
+│  │ 批次 2: InstrumentScores (含 annotationsJson)               │    │
 │  │         ↓ (需要父 Score 的 serverId)                         │    │
-│  │ 批次 3: Annotations                                          │    │
-│  │         ↓ (需要父 InstrumentScore 的 serverId)               │    │
-│  │ 批次 4: SetlistScores                                        │    │
+│  │ 批次 3: SetlistScores                                        │    │
 │  │         (需要 Setlist 和 Score 的 serverId)                  │    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
@@ -512,7 +543,41 @@ T1: 服务器版本 = 10
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-#### 2.2.2 Push 请求格式
+#### 2.2.2 Push 数据收集
+
+Push 时通过查询数据库中所有 `syncStatus='pending'` 的记录来收集待同步数据。
+
+**收集步骤：**
+
+1. 查询待同步的新建/修改记录：
+   - Scores: `WHERE syncStatus='pending' AND deletedAt IS NULL`
+   - InstrumentScores: `WHERE syncStatus='pending' AND deletedAt IS NULL`
+   - Setlists: `WHERE syncStatus='pending' AND deletedAt IS NULL`
+   - SetlistScores: `WHERE syncStatus='pending' AND deletedAt IS NULL`
+   - 注：Annotation 数据嵌入 InstrumentScore.annotationsJson，不单独查询
+
+2. 查询待同步的删除记录：
+   - Scores: `WHERE syncStatus='pending' AND deletedAt IS NOT NULL`
+   - InstrumentScores: `WHERE syncStatus='pending' AND deletedAt IS NOT NULL`
+   - Setlists: `WHERE syncStatus='pending' AND deletedAt IS NOT NULL`
+   - SetlistScores: `WHERE syncStatus='pending' AND deletedAt IS NOT NULL`
+
+3. 如果所有查询结果都为空，则无需 Push
+
+**依赖顺序处理：**
+
+子实体依赖父实体的 serverId，因此 Push 时需要处理依赖关系：
+
+| 实体 | 依赖的父实体 | 处理方式 |
+|------|-------------|---------|
+| Score | 无 | 直接 Push |
+| Setlist | 无 | 直接 Push |
+| InstrumentScore | Score | 如果父 Score 无 serverId，跳过本次，等待下次同步 |
+| SetlistScore | Setlist, Score | 如果父实体无 serverId，跳过本次 |
+
+当存在跳过的子实体时，系统会在下一次同步周期中重试（父实体获得 serverId 后）。
+
+#### 2.2.3 Push 请求格式
 
 **请求端点：** `POST /library/push`
 
@@ -522,8 +587,7 @@ T1: 服务器版本 = 10
 |------|------|------|
 | clientLibraryVersion | int | 客户端当前版本号 |
 | scores | array | Score 实体数组 |
-| instrumentScores | array | InstrumentScore 实体数组（只含 pdfHash，不含文件） |
-| annotations | array | Annotation 实体数组 |
+| instrumentScores | array | InstrumentScore 实体数组（含 pdfHash 和 annotationsJson） |
 | setlists | array | Setlist 实体数组 |
 | setlistScores | array | SetlistScore 实体数组 |
 | deletes | array | 待删除的实体标识，格式: `["score:456", "instrumentScore:789"]` |
@@ -540,7 +604,7 @@ T1: 服务器版本 = 10
 | data | JSON 格式的业务数据 |
 | localUpdatedAt | 本地更新时间 |
 
-#### 2.2.3 Push 响应处理
+#### 2.2.4 Push 响应处理
 
 **200 OK 响应字段：**
 
@@ -577,8 +641,7 @@ SyncPullResponse {
   isFullSync: bool,               // 是否全量同步
 
   scores: List<SyncEntityData>?,        // 包含已删除的（isDeleted=true）
-  instrumentScores: List<SyncEntityData>?,
-  annotations: List<SyncEntityData>?,
+  instrumentScores: List<SyncEntityData>?,  // 含 annotationsJson
   setlists: List<SyncEntityData>?,
   setlistScores: List<SyncEntityData>?,
 
@@ -589,7 +652,7 @@ SyncEntityData {
   entityType: String,      // "score", "instrumentScore", etc.
   serverId: int,
   version: int,
-  data: String,            // JSON 业务数据
+  data: String,            // JSON 业务数据（InstrumentScore 含 annotationsJson）
   updatedAt: DateTime,
   isDeleted: bool,         // 标记该实体是否已被删除
 }
@@ -603,8 +666,7 @@ SyncEntityData {
 |------|------|
 | libraryVersion | 最新版本号 |
 | scores | Score 实体数组（包含 isDeleted=true 的已删除记录） |
-| instrumentScores | InstrumentScore 实体数组（含 pdfHash） |
-| annotations | Annotation 实体数组 |
+| instrumentScores | InstrumentScore 实体数组（含 pdfHash 和 annotationsJson） |
 | setlists | Setlist 实体数组 |
 | setlistScores | SetlistScore 实体数组 |
 | deleted | 已删除实体标识数组（冗余字段），格式: `["score:123", ...]` |
@@ -687,7 +749,39 @@ pending 包括修改操作和删除操作，通过 `deletedAt` 字段区分：
 
 ### 2.5 本地操作处理
 
-#### 2.5.1 创建实体
+#### 2.5.1 多次修改合并
+
+本地多次修改同一实体不会产生冲突，所有修改会合并为一次 Push：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  本地多次修改场景                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  T1: 用户修改 Score A 的 title = "曲目1"                         │
+│      → 本地更新记录，syncStatus = 'pending'                      │
+│                                                                  │
+│  T2: 用户再次修改 Score A 的 title = "曲目2"                     │
+│      → 同一条记录被覆盖，仍然是 syncStatus = 'pending'           │
+│                                                                  │
+│  T3: 用户第三次修改 Score A 的 bpm = 120                         │
+│      → 同一条记录被更新，仍然是 syncStatus = 'pending'           │
+│                                                                  │
+│  T4: 触发 Push（防抖 5s 后）                                     │
+│      → 只发送一条记录：title="曲目2", bpm=120                    │
+│      → 服务器 libraryVersion: 100 → 101（只 +1）                 │
+│      → Score A 的 version = 101                                  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**关键点：**
+- 本地数据库中，同一实体只有一条记录
+- 多次修改 = 多次 UPDATE 同一条记录
+- Push 时只看最终状态，中间过程不保留
+- 服务器只收到一次变更，版本号只增加 1
+
+#### 2.5.2 创建实体
 
 **创建 Score 的处理逻辑：**
 
@@ -696,11 +790,11 @@ pending 包括修改操作和删除操作，通过 `deletedAt` 字段区分：
 3. 否则 → 插入新记录：生成 UUID，syncStatus = 'pending'，serverId = null
 4. 触发同步（防抖 5s）
 
-#### 2.5.2 删除实体
+#### 2.5.3 删除实体
 
 删除操作需要正确处理级联关系，确保本地用户删除和 Pull 同步删除使用统一的逻辑。
 
-##### 2.5.2.1 级联删除规则
+##### 2.5.3.1 级联删除规则
 
 | 删除的实体 | 级联删除的子实体 | 说明 |
 |-----------|-----------------|------|
@@ -710,7 +804,7 @@ pending 包括修改操作和删除操作，通过 `deletedAt` 字段区分：
 | Annotation | 无 | 无子实体 |
 | SetlistScore | 无 | 无子实体 |
 
-##### 2.5.2.2 删除方式
+##### 2.5.3.2 删除方式
 
 根据触发来源和实体状态，采用不同的删除方式：
 
@@ -719,9 +813,9 @@ pending 包括修改操作和删除操作，通过 `deletedAt` 字段区分：
 | 本地用户删除 + 有 serverId | 软删除 | 设置 deletedAt + syncStatus='pending'，等待 Push 同步到服务器 |
 | 本地用户删除 + 无 serverId | 物理删除 | 从未同步过，直接从数据库删除 |
 | Pull 同步删除 + 本地 synced | 物理删除 | 服务器已删除，本地直接删除 |
-| Pull 同步删除 + 本地 pending | 保留本地 | 本地有未同步修改，保留本地数据并断开 serverId |
+| Pull 同步删除 + 本地 pending | 保留本地 | 本地有未同步修改，保留本地数据和 serverId，下次 Push 时服务器自动恢复 |
 
-##### 2.5.2.3 统一级联删除函数
+##### 2.5.3.3 统一级联删除函数
 
 为避免级联删除逻辑分散在多处导致遗漏，应实现统一的级联删除函数：
 
@@ -731,78 +825,111 @@ pending 包括修改操作和删除操作，通过 `deletedAt` 字段区分：
 3. 软删除或物理删除所有 InstrumentScores（根据删除方式）
 4. 软删除或物理删除所有关联的 SetlistScores
 5. 软删除或物理删除 Score 本身
-6. 清理本地 PDF 文件（检查引用计数）
+6. 清理本地 PDF 文件：
+   - 对每个 InstrumentScore 的 pdfHash，减少引用计数
+   - 如果引用计数减为 0，删除本地 PDF 文件
 
 **删除 InstrumentScore 的完整流程：**
 1. 物理删除其关联的 Annotations
 2. 判断是否有 serverId：
    - 有 serverId → 软删除 InstrumentScore
    - 无 serverId → 物理删除 InstrumentScore
-3. 清理本地 PDF 文件（检查引用计数）
+3. 清理本地 PDF 文件：
+   - 获取该 InstrumentScore 的 pdfHash
+   - 减少该 pdfHash 的引用计数
+   - 如果引用计数减为 0，删除本地 PDF 文件
 
 **删除 Setlist 的完整流程：**
 1. 软删除或物理删除所有关联的 SetlistScores
 2. 软删除或物理删除 Setlist 本身
 
-##### 2.5.2.4 Pull 同步删除的级联处理
+##### 2.5.3.4 Pull 同步删除的级联处理
 
 **重要：** Pull 时处理服务器删除（isDeleted=true）必须触发级联删除，而不是只删除单个实体。
 
 当收到 Score 的 isDeleted=true 时：
 1. 检查本地 syncStatus
 2. 如果是 synced → 调用级联物理删除函数，删除 Score 及其所有子实体
-3. 如果是 pending → 保留本地数据，断开 serverId 关联
+3. 如果是 pending → 忽略服务器删除，保留本地数据和 serverId，下次 Push 时服务器自动恢复
 
 当收到 InstrumentScore 的 isDeleted=true 时：
 1. 检查本地 syncStatus
 2. 如果是 synced → 物理删除 Annotations，然后物理删除 InstrumentScore
-3. 如果是 pending → 保留本地数据，断开 serverId 关联
+3. 如果是 pending → 忽略服务器删除，保留本地数据和 serverId，下次 Push 时服务器自动恢复
 
-##### 2.5.2.5 Annotation 特殊处理
+##### 2.5.3.5 Annotation 处理
 
-- Annotation 使用物理删除，不使用软删除
-- 删除 InstrumentScore 时，服务器端会级联物理删除关联的 Annotation
-- Pull 时不会收到 Annotation 的删除通知（因为已物理删除）
-- 客户端在处理 InstrumentScore 删除时，应同时删除本地关联的 Annotation
-- Annotation 的同步采用 Last-Write-Wins 策略（详见 §2.6）
+Annotation 采用嵌入方案，作为 InstrumentScore.annotationsJson 字段存储，不作为独立同步实体：
 
-### 2.6 Annotation 同步策略
+- 删除 InstrumentScore 时，annotationsJson 随之删除，无需额外处理
+- 本地 Annotation 表仅作为缓存，可选保留用于快速查询
+- 服务器端不存储独立的 Annotation 记录
 
-Annotation（标注）的同步采用 **整体覆盖 + Last-Write-Wins** 策略。
+### 2.6 Annotation 嵌入同步策略
+
+Annotation（标注）采用 **嵌入 InstrumentScore** 方案，不作为独立同步实体。
 
 #### 2.6.1 设计原则
 
 | 原则 | 说明 |
 |------|------|
-| 整体覆盖 | 每个 Annotation 作为原子单位，不支持细粒度合并 |
-| Last-Write-Wins | 冲突时，updatedAt 更新的一方胜出 |
-| 物理删除 | Annotation 不使用软删除，删除后不可恢复 |
-| 按需加载 | Annotation 在打开分谱时按需加载，不随全量同步下发 |
+| 嵌入存储 | Annotation 作为 InstrumentScore.annotationsJson 字段存储 |
+| 随父同步 | Annotation 变更触发 InstrumentScore 同步，不独立同步 |
+| Last-Write-Wins | 冲突在 InstrumentScore 级别处理，整个 annotationsJson 一起覆盖 |
+| 本地缓存 | 本地 Annotation 表仅作为缓存，用于快速查询和编辑 |
 
-#### 2.6.2 同步行为
+#### 2.6.2 数据流
 
-| 操作 | 本地处理 | 同步处理 |
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Annotation 嵌入同步流程                                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌──────────────┐      保存时序列化       ┌──────────────────┐   │
+│  │ Annotation   │  ──────────────────►  │ InstrumentScore  │   │
+│  │ 本地缓存表    │                        │ .annotationsJson │   │
+│  │ (无同步字段)  │  ◄──────────────────  │ (TEXT 字段)       │   │
+│  └──────────────┘      打开时反序列化      └──────────────────┘   │
+│                                                                  │
+│  用户编辑 → 更新本地缓存 → 防抖5秒 → 序列化到IS → IS标记pending    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### 2.6.3 annotationsJson 格式
+
+```json
+{
+  "version": 1,
+  "annotations": [
+    {
+      "id": "uuid",
+      "type": "stroke|text|highlight",
+      "color": "#FF0000",
+      "strokeWidth": 2.0,
+      "points": [0.1, 0.2, 0.15, 0.25],
+      "textContent": null,
+      "posX": null,
+      "posY": null,
+      "pageNumber": 1
+    }
+  ]
+}
+```
+
+#### 2.6.4 同步行为
+
+| 操作 | 本地处理 | 同步效果 |
 |------|---------|---------|
-| 创建标注 | syncStatus='pending', serverId=null | Push 时 create，获取 serverId |
-| 修改标注 | syncStatus='pending', updatedAt=now | Push 时 update |
-| 删除标注 | 物理删除本地记录 | Push 时发送 delete 请求 |
-| Pull 收到新标注 | 本地不存在 → 创建 | - |
-| Pull 收到更新 | synced → 覆盖；pending → 比较 updatedAt | 更新的胜出 |
-| Pull 收到删除 | synced → 删除；pending → 保留本地 | 用户刚修改的优先 |
+| 创建/修改/删除标注 | 更新本地缓存表 → 序列化到 IS.annotationsJson | IS 标记 pending，随 IS 一起同步 |
+| Pull 收到 IS 更新 | 反序列化 annotationsJson → 覆盖本地缓存表 | Last-Write-Wins 在 IS 级别 |
+| 删除 IS | 本地缓存表关联删除（外键 CASCADE） | 服务器端 annotationsJson 随 IS 删除 |
 
-#### 2.6.3 冲突场景处理
+#### 2.6.5 优化措施
 
-| 场景 | 条件 | 处理方式 |
-|------|------|---------|
-| 双方都修改 | 本地 pending，服务器有更新 | 比较 updatedAt，更新的覆盖旧的 |
-| 本地修改 + 服务器删除 | 本地 pending，服务器 isDeleted=true | 保留本地修改，断开 serverId |
-| 本地删除 + 服务器修改 | 本地已物理删除 | 本地无记录，Pull 时会重新创建 |
-
-#### 2.6.4 优化措施
-
-1. **防抖**：用户绘画期间不触发同步，手指抬起后等待 5 秒再同步
-2. **批量 Push**：一次 Push 发送多个 Annotation 变更
-3. **按需 Pull**：只在打开分谱时 Pull 该分谱的 Annotation，不随全量同步下发
+1. **防抖**：用户绘画期间不触发序列化，手指抬起后等待 5 秒再序列化到 IS
+2. **版本号稳定**：用户画 10 笔只触发 1 次 IS 更新，而非 10 次 Annotation 更新
+3. **批量保存**：多个标注变更合并为一次 IS 更新
 
 ---
 
@@ -900,8 +1027,10 @@ InstrumentScore 表中的 `pdfSyncStatus` 字段：
 
 **队列来源查询条件：**
 - pdfSyncStatus = 'pending'
-- serverId IS NOT NULL（元数据已同步）
+- pdfHash IS NOT NULL（已计算 hash）
 - pdfPath IS NOT NULL（有本地文件）
+
+**说明：** PDF 通过 hash 上传到全局存储，不依赖 InstrumentScore 的 serverId。元数据和 PDF 可以独立上传，服务器通过 pdfHash 字段关联。
 
 **处理顺序：** 串行处理，避免占用过多带宽
 
@@ -1171,25 +1300,179 @@ InstrumentScore 表中的 `pdfSyncStatus` 字段：
 
 ## 附录
 
-### A. 版本号机制详解
+### A. 同步服务函数架构
 
-#### A.1 版本号递增时机
+#### A.1 整体调用结构
+
+```
+_performSync()
+    │
+    ├──► _pushLocalChanges()
+    │        │
+    │        ├──► 收集待同步数据
+    │        │        ├──► _getPendingScores()
+    │        │        ├──► _getPendingInstrumentScores()  // 含 annotationsJson
+    │        │        ├──► _getPendingSetlists()
+    │        │        └──► _getPendingSetlistScores()
+    │        │
+    │        ├──► 收集待删除数据
+    │        │        ├──► _getDeletedScores()
+    │        │        ├──► _getDeletedInstrumentScores()
+    │        │        ├──► _getDeletedSetlists()
+    │        │        └──► _getDeletedSetlistScores()
+    │        │
+    │        ├──► 构建请求体（按依赖顺序）
+    │        │
+    │        ├──► 发送 Push 请求
+    │        │
+    │        └──► 处理响应
+    │                 ├──► 更新 serverId 映射
+    │                 ├──► 标记 syncStatus='synced'
+    │                 └──► 物理删除已同步的删除记录
+    │
+    ├──► _pullRemoteChanges()
+    │        │
+    │        ├──► 获取远程变更
+    │        │
+    │        ├──► 按 version 排序
+    │        │
+    │        ├──► 合并变更（按依赖顺序）
+    │        │        ├──► _mergeScore()
+    │        │        ├──► _mergeInstrumentScore()  // 含 annotationsJson 反序列化
+    │        │        ├──► _mergeSetlist()
+    │        │        └──► _mergeSetlistScore()
+    │        │
+    │        ├──► 处理删除列表
+    │        │        └──► _processRemoteDelete()
+    │        │
+    │        └──► 更新本地 libraryVersion
+    │
+    └──► _syncPendingPdfs()
+             ├──► 上传待上传的 PDF
+             └──► 下载待下载的 PDF
+```
+
+#### A.2 Merge 函数通用逻辑
+
+每个 `_merge{Entity}()` 函数遵循相同的处理模式：
+
+```
+_mergeEntity(serverData)
+    │
+    ├──► 查找本地记录（通过 serverId）
+    │
+    ├──► if serverData.isDeleted == true
+    │        │
+    │        ├──► if 本地存在 && syncStatus == 'pending'
+    │        │        └──► 保留本地，保留 serverId（本地优先，下次 Push 时服务器恢复）
+    │        │
+    │        └──► if 本地存在 && syncStatus == 'synced'
+    │                 └──► 调用级联删除函数（物理删除）
+    │
+    ├──► if 本地不存在
+    │        └──► 创建新记录，syncStatus = 'synced'
+    │
+    └──► if 本地存在
+             │
+             ├──► if syncStatus == 'pending'
+             │        └──► 保留本地修改（本地优先）
+             │
+             └──► if syncStatus == 'synced'
+                      └──► 用服务器数据覆盖本地
+```
+
+#### A.3 级联删除函数调用关系
+
+级联删除函数被多处调用，需要统一实现以避免遗漏：
+
+```
+调用来源
+    │
+    ├──► DatabaseService.deleteScore()           （用户本地删除）
+    │        └──► cascadeDeleteScore(id, soft: true)
+    │
+    ├──► DatabaseService.deleteInstrumentScore() （用户本地删除）
+    │        └──► cascadeDeleteInstrumentScore(id, soft: true)
+    │
+    ├──► DatabaseService.deleteSetlist()         （用户本地删除）
+    │        └──► cascadeDeleteSetlist(id, soft: true)
+    │
+    ├──► LibrarySyncService._mergeScore()        （Pull 同步删除）
+    │        └──► cascadeDeleteScore(id, soft: false)
+    │
+    ├──► LibrarySyncService._mergeInstrumentScore()
+    │        └──► cascadeDeleteInstrumentScore(id, soft: false)
+    │
+    └──► LibrarySyncService._processRemoteDelete()
+             └──► cascadeDelete{Entity}(id, soft: false)
+```
+
+**级联删除函数内部逻辑：**
+
+```
+cascadeDeleteScore(scoreId, soft)
+    │
+    ├──► 获取所有关联的 InstrumentScores
+    │
+    ├──► for each InstrumentScore:
+    │        ├──► 物理删除关联的 Annotations
+    │        └──► soft ? 软删除 : 物理删除 InstrumentScore
+    │
+    ├──► soft ? 软删除 : 物理删除 关联的 SetlistScores
+    │
+    └──► soft ? 软删除 : 物理删除 Score 本身
+
+
+cascadeDeleteInstrumentScore(instrumentScoreId, soft)
+    │
+    ├──► 物理删除关联的 Annotations
+    │
+    └──► soft ? 软删除 : 物理删除 InstrumentScore
+
+
+cascadeDeleteSetlist(setlistId, soft)
+    │
+    ├──► soft ? 软删除 : 物理删除 关联的 SetlistScores
+    │
+    └──► soft ? 软删除 : 物理删除 Setlist 本身
+```
+
+#### A.4 函数参数说明
+
+| 参数 | 说明 |
+|------|------|
+| `soft: true` | 软删除：设置 deletedAt + syncStatus='pending'，用于用户本地删除已同步实体 |
+| `soft: false` | 物理删除：从数据库中删除记录，用于 Pull 同步删除或删除从未同步的实体 |
+
+### B. 版本号机制详解
+
+#### B.1 版本号递增时机
 
 版本号采用 **Per-Entity Version** 策略：每个实体变更都会递增 libraryVersion。
 
-**Push 5 个实体时的版本变化示例：**
+**Push 4 个实体时的版本变化示例：**
 ```
-libraryVersion: 100 → 105
+libraryVersion: 100 → 104
 score1.version = 101
 score2.version = 102
-instrumentScore1.version = 103
+instrumentScore1.version = 103  // 含 annotationsJson
 instrumentScore2.version = 104
-annotation1.version = 105
 ```
 
 **Pull(since=100) 时：** 返回所有 version > 100 的实体。
 
-#### A.2 版本号类型
+**Annotation 对版本号的影响（嵌入方案）：**
+
+Annotation 采用嵌入方案后，标注变更不再独立递增 `libraryVersion`，而是随 InstrumentScore 一起递增：
+- 用户画 10 笔标注 → 触发 1 次 InstrumentScore 更新 → `libraryVersion` 只增加 1
+- 大幅减少版本号增长速度，避免因频繁标注导致的版本膨胀
+
+优化措施：
+- **防抖 5 秒**：用户绘画期间不触发序列化，手指抬起后等待 5 秒
+- **批量保存**：多个标注变更合并为一次 InstrumentScore 更新
+- **64 位整数**：即使每秒递增 1000 次，也需要约 2.9 亿年才会溢出
+
+#### B.2 版本号类型
 
 | 层            | 类型    | 范围                      | 说明        |
 |---------------|---------|---------------------------|-------------|
@@ -1198,13 +1481,13 @@ annotation1.version = 105
 | SQLite        | INTEGER | 64 位有符号               | 够用       |
 | PostgreSQL    | bigint  | 64 位                     | 够用       |
 
-#### A.3 版本号语义
+#### B.3 版本号语义
 
 - `libraryVersion`: 全局版本号，表示用户库的整体状态
 - `entity.version`: 该实体最后一次变更时的库版本号
 - Pull 时通过比较实体的 version 与本地的 libraryVersion 来判断是否需要同步该实体
 
-### B. 错误处理策略
+### C. 错误处理策略
 
 | 错误类型 | 处理方式 |
 |---------|---------|
@@ -1216,7 +1499,7 @@ annotation1.version = 105
 | PDF 下载失败 | 保持 needsDownload 状态，下次重试 |
 | PDF Hash 不匹配 | 重新下载 |
 
-### C. 性能优化
+### D. 性能优化
 
 1. **批量操作**: Push/Pull 使用批量 API，减少请求次数
 2. **防抖**: 本地操作后 5 秒内的变更合并为一次同步
@@ -1224,7 +1507,7 @@ annotation1.version = 105
 4. **按需加载**: Annotations 和 PDF 按需加载，首次同步快
 5. **Hash 去重**: 相同内容只存一份，节省存储和带宽
 
-### D. 日志记录
+### E. 日志记录
 
 关键操作日志格式：
 

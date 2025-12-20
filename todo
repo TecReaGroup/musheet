@@ -67,3 +67,12 @@ Serverpod backend:
 reuse UI/UX:
 
 English comments and texts:
+
+control webui:
+  support: 
+    history back forward
+    team manager
+    user manager
+    settings manager
+    storage manager
+    data monitor
