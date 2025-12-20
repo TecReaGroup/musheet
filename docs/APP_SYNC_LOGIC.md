@@ -116,7 +116,7 @@ syncing
 │  ║  1. 收集待同步数据:                                              ║ │
 │  ║     ┌─────────────────────────────────────────────────┐        ║ │
 │  ║     │ syncStatus = 'pending'       → 新建/修改的记录   │        ║ │
-│  ║     │ syncStatus = 'pending_delete' → 待删除的记录     │        ║ │
+│  ║     │ syncStatus = 'pending' + deletedAt → 待删除的记录│        ║ │
 │  ║     └─────────────────────────────────────────────────┘        ║ │
 │  ║                                                                 ║ │
 │  ║  2. 按依赖顺序排序:                                              ║ │
@@ -137,7 +137,7 @@ syncing
 │  ║     │   • 保存 serverId 映射                               │    ║ │
 │  ║     │   • 更新 syncStatus = 'synced'                      │    ║ │
 │  ║     │   • 更新本地 libraryVersion                          │    ║ │
-│  ║     │   • 物理删除 pending_delete 记录                     │    ║ │
+│  ║     │   • 物理删除已同步的删除记录                        │    ║ │
 │  ║     ├─────────────────────────────────────────────────────┤    ║ │
 │  ║     │ 412 Conflict:                                        │    ║ │
 │  ║     │   • 跳到阶段 2 拉取数据                              │    ║ │
@@ -384,7 +384,7 @@ T1: 服务器版本 = 10
 │  ├── composer                                                        │
 │  ├── bpm                                                             │
 │  ├── serverId (int, nullable)                                        │
-│  ├── syncStatus ('pending' | 'synced' | 'pending_delete')           │
+│  ├── syncStatus ('pending' | 'synced')                                 │
 │  ├── version (int)                                                   │
 │  ├── deletedAt (datetime, nullable)                                  │
 │  └── updatedAt                                                       │
@@ -486,7 +486,7 @@ T1: 服务器版本 = 10
 │  队列来源 (自动收集):                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐    │
 │  │ 新建/修改:  WHERE syncStatus = 'pending' AND deletedAt IS NULL│    │
-│  │ 删除:      WHERE syncStatus = 'pending_delete'              │    │
+│  │ 删除:      WHERE syncStatus = 'pending' AND deletedAt IS NOT NULL│    │
 │  └─────────────────────────────────────────────────────────────┘    │
 │                                                                      │
 │  依赖排序:                                                            │
@@ -555,7 +555,7 @@ T1: 服务器版本 = 10
 1. 保存 serverId 映射到本地实体
 2. 更新 syncStatus = 'synced'
 3. 更新本地 libraryVersion
-4. 物理删除 pending_delete 记录
+4. 物理删除已同步的删除记录（syncStatus='synced' 且 deletedAt 不为空的记录）
 
 **412 Conflict 响应处理：**
 1. 跳转到 Pull 阶段
@@ -569,17 +569,45 @@ T1: 服务器版本 = 10
 
 **请求端点：** `GET /library/pull?since={version}`
 
+**响应结构：**
+
+```dart
+SyncPullResponse {
+  libraryVersion: int,            // 最新版本号
+  isFullSync: bool,               // 是否全量同步
+
+  scores: List<SyncEntityData>?,        // 包含已删除的（isDeleted=true）
+  instrumentScores: List<SyncEntityData>?,
+  annotations: List<SyncEntityData>?,
+  setlists: List<SyncEntityData>?,
+  setlistScores: List<SyncEntityData>?,
+
+  deleted: List<String>?,               // ["score:123", "instrumentScore:456", ...]
+}
+
+SyncEntityData {
+  entityType: String,      // "score", "instrumentScore", etc.
+  serverId: int,
+  version: int,
+  data: String,            // JSON 业务数据
+  updatedAt: DateTime,
+  isDeleted: bool,         // 标记该实体是否已被删除
+}
+```
+
+**说明：** 删除信息通过 `SyncEntityData.isDeleted` 字段表示。`deleted` 列表作为冗余字段提供向后兼容，客户端应优先使用 `isDeleted` 字段判断。
+
 **响应字段：**
 
 | 字段 | 说明 |
 |------|------|
 | libraryVersion | 最新版本号 |
-| scores | Score 实体数组 |
+| scores | Score 实体数组（包含 isDeleted=true 的已删除记录） |
 | instrumentScores | InstrumentScore 实体数组（含 pdfHash） |
 | annotations | Annotation 实体数组 |
 | setlists | Setlist 实体数组 |
 | setlistScores | SetlistScore 实体数组 |
-| deleted | 已删除实体标识数组，格式: `["score:123", ...]` |
+| deleted | 已删除实体标识数组（冗余字段），格式: `["score:123", ...]` |
 
 #### 2.3.2 Pull 处理流程
 
@@ -587,29 +615,26 @@ T1: 服务器版本 = 10
 
 1. 按 version 排序所有实体（确保删除→重建场景的正确顺序）
 
-2. 遍历每个实体：
-   - 如果实体已删除 → 同步远程的删除到本地
-   - 如果本地不存在 → 创建新记录
-   - 如果本地存在 → 调用合并逻辑
+2. 遍历每个实体（通过 isDeleted 字段判断状态）：
+   - 如果 `isDeleted=true` → 同步远程的删除到本地（详见 §2.4.2）
+   - 如果本地不存在 → 创建新记录，syncStatus='synced'
+   - 如果本地存在 → 调用合并逻辑（详见 §2.4.1）
 
-3. 处理删除列表：
-   - 解析 deleteKey 获取 entityType 和 serverId
-   - 查找本地对应记录
-   - 如果本地 syncStatus = 'pending' → 断开 serverId 关联，保留本地修改
-   - 否则 → 物理删除本地记录
-
-4. 更新本地 libraryVersion
+3. 更新本地 libraryVersion
 
 ### 2.4 冲突解决详解
 
-pending 包括 'pending' 和 'pending_delete'
-只要本地有未同步的变更，就会覆盖服务器上其他设备的修改
+pending 包括修改操作和删除操作，通过 `deletedAt` 字段区分：
+- `pending` + `deletedAt IS NULL` = 新建或修改
+- `pending` + `deletedAt IS NOT NULL` = 待同步的删除操作
+
+只要本地有未同步的变更（`syncStatus='pending'`），就会覆盖服务器上其他设备的修改。
   
 两种表现形式
   | 变体         | 本地状态       | 服务器状态     | 结果               |
   |--------------|----------------|----------------|--------------------|
-  | 修改 vs 修改 | pending (修改) | 其他设备的修改 | 本地修改覆盖服务器 |
-  | 删除 vs 修改 | pending_delete | 其他设备的修改 | 本地删除覆盖服务器 |
+  | 修改 vs 修改 | pending (deletedAt IS NULL) | 其他设备的修改 | 本地修改覆盖服务器 |
+  | 删除 vs 修改 | pending (deletedAt IS NOT NULL) | 其他设备的修改 | 本地删除覆盖服务器 |
 
 #### 2.4.1 Merge 逻辑
 
@@ -654,9 +679,11 @@ pending 包括 'pending' 和 'pending_delete'
 
 | 场景 | 条件 | 处理方式 |
 |------|------|---------|
-| 服务器删除 + 本地已同步 | 服务器 deleted 列表包含实体，本地 syncStatus='synced' | 物理删除本地记录 |
-| 服务器删除 + 本地有修改 | 服务器 deleted 列表包含实体，本地 syncStatus='pending' | 保留本地修改，serverId = null（断开关联），下次 Push 作为新记录创建 |
-| 本地删除 + 服务器有更新 | 本地 syncStatus='pending_delete' | 删除优先，Push 时发送删除请求 |
+| 服务器删除 + 本地已同步 | 服务器返回 isDeleted=true，本地 syncStatus='synced' | 物理删除本地记录 |
+| 服务器删除 + 本地有修改 | 服务器返回 isDeleted=true，本地 syncStatus='pending' | **保留 serverId，直接 Push update**。服务器是软删除，会自动恢复（清除 deletedAt） |
+| 本地删除 + 服务器有更新 | 本地 deletedAt 不为空且 syncStatus='pending' | 删除优先，Push 时发送删除请求 |
+
+**说明：** 服务器采用软删除机制（设置 deletedAt），记录并未物理删除。当客户端发送 update 请求时，服务器会自动将 deletedAt 设为 null，实现记录恢复。因此不需要断开 serverId 关联重新创建。
 
 ### 2.5 本地操作处理
 
@@ -671,14 +698,111 @@ pending 包括 'pending' 和 'pending_delete'
 
 #### 2.5.2 删除实体
 
-**删除 InstrumentScore 的处理逻辑：**
+删除操作需要正确处理级联关系，确保本地用户删除和 Pull 同步删除使用统一的逻辑。
 
-1. 级联删除关联的 Annotations（物理删除，不同步）
-2. 判断删除方式：
-   - 如果有 serverId（已同步到服务器）→ 软删除：设置 deletedAt 和 syncStatus = 'pending_delete'
-   - 如果无 serverId（从未同步）→ 直接物理删除
-3. 检查 PDF 引用计数，必要时删除本地 PDF 文件（详见 §3.5）
-4. 触发同步
+##### 2.5.2.1 级联删除规则
+
+| 删除的实体 | 级联删除的子实体 | 说明 |
+|-----------|-----------------|------|
+| Score | InstrumentScores → Annotations, SetlistScores | 删除乐谱时，其所有分谱、标注、曲单关联都要删除 |
+| InstrumentScore | Annotations | 删除分谱时，其所有标注都要删除 |
+| Setlist | SetlistScores | 删除曲单时，其所有曲目关联都要删除 |
+| Annotation | 无 | 无子实体 |
+| SetlistScore | 无 | 无子实体 |
+
+##### 2.5.2.2 删除方式
+
+根据触发来源和实体状态，采用不同的删除方式：
+
+| 场景 | 删除方式 | 说明 |
+|------|---------|------|
+| 本地用户删除 + 有 serverId | 软删除 | 设置 deletedAt + syncStatus='pending'，等待 Push 同步到服务器 |
+| 本地用户删除 + 无 serverId | 物理删除 | 从未同步过，直接从数据库删除 |
+| Pull 同步删除 + 本地 synced | 物理删除 | 服务器已删除，本地直接删除 |
+| Pull 同步删除 + 本地 pending | 保留本地 | 本地有未同步修改，保留本地数据并断开 serverId |
+
+##### 2.5.2.3 统一级联删除函数
+
+为避免级联删除逻辑分散在多处导致遗漏，应实现统一的级联删除函数：
+
+**删除 Score 的完整流程：**
+1. 获取该 Score 下所有 InstrumentScores
+2. 对每个 InstrumentScore：物理删除其关联的 Annotations
+3. 软删除或物理删除所有 InstrumentScores（根据删除方式）
+4. 软删除或物理删除所有关联的 SetlistScores
+5. 软删除或物理删除 Score 本身
+6. 清理本地 PDF 文件（检查引用计数）
+
+**删除 InstrumentScore 的完整流程：**
+1. 物理删除其关联的 Annotations
+2. 判断是否有 serverId：
+   - 有 serverId → 软删除 InstrumentScore
+   - 无 serverId → 物理删除 InstrumentScore
+3. 清理本地 PDF 文件（检查引用计数）
+
+**删除 Setlist 的完整流程：**
+1. 软删除或物理删除所有关联的 SetlistScores
+2. 软删除或物理删除 Setlist 本身
+
+##### 2.5.2.4 Pull 同步删除的级联处理
+
+**重要：** Pull 时处理服务器删除（isDeleted=true）必须触发级联删除，而不是只删除单个实体。
+
+当收到 Score 的 isDeleted=true 时：
+1. 检查本地 syncStatus
+2. 如果是 synced → 调用级联物理删除函数，删除 Score 及其所有子实体
+3. 如果是 pending → 保留本地数据，断开 serverId 关联
+
+当收到 InstrumentScore 的 isDeleted=true 时：
+1. 检查本地 syncStatus
+2. 如果是 synced → 物理删除 Annotations，然后物理删除 InstrumentScore
+3. 如果是 pending → 保留本地数据，断开 serverId 关联
+
+##### 2.5.2.5 Annotation 特殊处理
+
+- Annotation 使用物理删除，不使用软删除
+- 删除 InstrumentScore 时，服务器端会级联物理删除关联的 Annotation
+- Pull 时不会收到 Annotation 的删除通知（因为已物理删除）
+- 客户端在处理 InstrumentScore 删除时，应同时删除本地关联的 Annotation
+- Annotation 的同步采用 Last-Write-Wins 策略（详见 §2.6）
+
+### 2.6 Annotation 同步策略
+
+Annotation（标注）的同步采用 **整体覆盖 + Last-Write-Wins** 策略。
+
+#### 2.6.1 设计原则
+
+| 原则 | 说明 |
+|------|------|
+| 整体覆盖 | 每个 Annotation 作为原子单位，不支持细粒度合并 |
+| Last-Write-Wins | 冲突时，updatedAt 更新的一方胜出 |
+| 物理删除 | Annotation 不使用软删除，删除后不可恢复 |
+| 按需加载 | Annotation 在打开分谱时按需加载，不随全量同步下发 |
+
+#### 2.6.2 同步行为
+
+| 操作 | 本地处理 | 同步处理 |
+|------|---------|---------|
+| 创建标注 | syncStatus='pending', serverId=null | Push 时 create，获取 serverId |
+| 修改标注 | syncStatus='pending', updatedAt=now | Push 时 update |
+| 删除标注 | 物理删除本地记录 | Push 时发送 delete 请求 |
+| Pull 收到新标注 | 本地不存在 → 创建 | - |
+| Pull 收到更新 | synced → 覆盖；pending → 比较 updatedAt | 更新的胜出 |
+| Pull 收到删除 | synced → 删除；pending → 保留本地 | 用户刚修改的优先 |
+
+#### 2.6.3 冲突场景处理
+
+| 场景 | 条件 | 处理方式 |
+|------|------|---------|
+| 双方都修改 | 本地 pending，服务器有更新 | 比较 updatedAt，更新的覆盖旧的 |
+| 本地修改 + 服务器删除 | 本地 pending，服务器 isDeleted=true | 保留本地修改，断开 serverId |
+| 本地删除 + 服务器修改 | 本地已物理删除 | 本地无记录，Pull 时会重新创建 |
+
+#### 2.6.4 优化措施
+
+1. **防抖**：用户绘画期间不触发同步，手指抬起后等待 5 秒再同步
+2. **批量 Push**：一次 Push 发送多个 Annotation 变更
+3. **按需 Pull**：只在打开分谱时 Pull 该分谱的 Annotation，不随全量同步下发
 
 ---
 
@@ -1047,7 +1171,40 @@ InstrumentScore 表中的 `pdfSyncStatus` 字段：
 
 ## 附录
 
-### A. 错误处理策略
+### A. 版本号机制详解
+
+#### A.1 版本号递增时机
+
+版本号采用 **Per-Entity Version** 策略：每个实体变更都会递增 libraryVersion。
+
+**Push 5 个实体时的版本变化示例：**
+```
+libraryVersion: 100 → 105
+score1.version = 101
+score2.version = 102
+instrumentScore1.version = 103
+instrumentScore2.version = 104
+annotation1.version = 105
+```
+
+**Pull(since=100) 时：** 返回所有 version > 100 的实体。
+
+#### A.2 版本号类型
+
+| 层            | 类型    | 范围                      | 说明        |
+|---------------|---------|---------------------------|-------------|
+| Dart (移动端) | int     | 64 位有符号 ≈ ±9.2 × 10¹⁸ | 永远够用   |
+| Dart (Web)    | int     | 53 位精度 ≈ ±9 × 10¹⁵     | 够用       |
+| SQLite        | INTEGER | 64 位有符号               | 够用       |
+| PostgreSQL    | bigint  | 64 位                     | 够用       |
+
+#### A.3 版本号语义
+
+- `libraryVersion`: 全局版本号，表示用户库的整体状态
+- `entity.version`: 该实体最后一次变更时的库版本号
+- Pull 时通过比较实体的 version 与本地的 libraryVersion 来判断是否需要同步该实体
+
+### B. 错误处理策略
 
 | 错误类型 | 处理方式 |
 |---------|---------|
@@ -1059,7 +1216,7 @@ InstrumentScore 表中的 `pdfSyncStatus` 字段：
 | PDF 下载失败 | 保持 needsDownload 状态，下次重试 |
 | PDF Hash 不匹配 | 重新下载 |
 
-### B. 性能优化
+### C. 性能优化
 
 1. **批量操作**: Push/Pull 使用批量 API，减少请求次数
 2. **防抖**: 本地操作后 5 秒内的变更合并为一次同步
@@ -1067,7 +1224,7 @@ InstrumentScore 表中的 `pdfSyncStatus` 字段：
 4. **按需加载**: Annotations 和 PDF 按需加载，首次同步快
 5. **Hash 去重**: 相同内容只存一份，节省存储和带宽
 
-### C. 日志记录
+### D. 日志记录
 
 关键操作日志格式：
 
