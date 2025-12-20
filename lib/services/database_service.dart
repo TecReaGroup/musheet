@@ -257,7 +257,7 @@ class DatabaseService {
           scoreId: scoreId,
           instrumentType: instrumentName,
           customInstrument: Value(instrumentScore.customInstrument),
-          pdfPath: instrumentScore.pdfUrl,
+          pdfPath: Value(instrumentScore.pdfUrl),
           thumbnail: Value(instrumentScore.thumbnail),
           dateAdded: instrumentScore.dateAdded,
           // CRITICAL: Set sync status so the instrument score will be synced
@@ -593,7 +593,7 @@ class DatabaseService {
       InstrumentScoreEntity entity, List<models.Annotation> annotations) {
     return models.InstrumentScore(
       id: entity.id,
-      pdfUrl: entity.pdfPath,
+      pdfUrl: entity.pdfPath ?? '',
       thumbnail: entity.thumbnail,
       instrumentType: models.InstrumentType.values.firstWhere(
         (t) => t.name == entity.instrumentType,

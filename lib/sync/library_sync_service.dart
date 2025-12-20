@@ -339,19 +339,19 @@ class LibrarySyncService {
       ..where((s) => s.id.equals(instrumentScoreId))).get();
     if (records.isEmpty) return false;
     final record = records.first;
-    
+
     // Check if explicitly marked as needing download
     if (record.pdfSyncStatus == 'needsDownload') return true;
-    
+
     // Check if has server ID (meaning it's synced)
     if (record.serverId != null) {
-      // No local file
-      if (record.pdfPath.isEmpty) return true;
-      
+      // No local file path
+      if (record.pdfPath == null || record.pdfPath!.isEmpty) return true;
+
       // Local file doesn't exist
-      final file = File(record.pdfPath);
+      final file = File(record.pdfPath!);
       if (!file.existsSync()) return true;
-      
+
       // Hash mismatch - need to download updated version
       // Per sync_logic.md line 254: "比较本地 pdfHash 和服务器记录的 Hash"
       if (record.pdfHash != null) {
@@ -478,45 +478,61 @@ class LibrarySyncService {
   Future<_PushResult> _pushLocalChanges() async {
     // Get all pending changes
     // IMPORTANT: Push in dependency order to ensure parents get serverIds first
-    // Order: Scores -> InstrumentScores -> Annotations
+    // Order: Scores -> InstrumentScores (with embedded annotations)
     //        Setlists -> SetlistScores
+    // NOTE: Per sync_logic.md §2.6, Annotations are embedded in InstrumentScore, not synced independently
     final pendingScores = await _getPendingScores();
     final pendingInstrumentScores = await _getPendingInstrumentScores();
-    final pendingAnnotations = await _getPendingAnnotations();
     final pendingSetlists = await _getPendingSetlists();
     final pendingSetlistScores = await _getPendingSetlistScores();
     final deletedScores = await _getDeletedScores();
     final deletedInstrumentScores = await _getDeletedInstrumentScores();
     final deletedSetlists = await _getDeletedSetlists();
     final deletedSetlistScores = await _getDeletedSetlistScores();
-    // Note: Annotations use physical delete, not soft delete tracking
-    
-    if (pendingScores.isEmpty && pendingInstrumentScores.isEmpty &&
-        pendingAnnotations.isEmpty && pendingSetlists.isEmpty &&
-        pendingSetlistScores.isEmpty && deletedScores.isEmpty &&
-        deletedInstrumentScores.isEmpty &&
+
+    // Also check if any InstrumentScore needs sync because its annotations changed
+    final instrumentScoresWithPendingAnnotations = await _getInstrumentScoresWithPendingAnnotations();
+
+    // Merge InstrumentScores that need sync due to annotation changes
+    final allPendingInstrumentScores = <InstrumentScoreEntity>[];
+    final seenIds = <String>{};
+    for (final is_ in pendingInstrumentScores) {
+      if (!seenIds.contains(is_.id)) {
+        allPendingInstrumentScores.add(is_);
+        seenIds.add(is_.id);
+      }
+    }
+    for (final is_ in instrumentScoresWithPendingAnnotations) {
+      if (!seenIds.contains(is_.id)) {
+        allPendingInstrumentScores.add(is_);
+        seenIds.add(is_.id);
+      }
+    }
+
+    if (pendingScores.isEmpty && allPendingInstrumentScores.isEmpty &&
+        pendingSetlists.isEmpty && pendingSetlistScores.isEmpty &&
+        deletedScores.isEmpty && deletedInstrumentScores.isEmpty &&
         deletedSetlists.isEmpty && deletedSetlistScores.isEmpty) {
       return _PushResult(pushed: 0, conflict: false);
     }
-    
+
     // Check if we need multi-pass sync (when parent entities lack serverIds)
     final needsMultiPass = await _checkNeedsMultiPassSync(
-      pendingInstrumentScores,
-      pendingAnnotations,
+      allPendingInstrumentScores,
+      [], // No longer passing annotations - they are embedded
       pendingSetlistScores,
     );
-    
+
     if (needsMultiPass) {
       _log('Multi-pass sync needed: some child entities waiting for parent serverIds');
     }
-    
+
     final scoreChanges = <Map<String, dynamic>>[];
     final instrumentScoreChanges = <Map<String, dynamic>>[];
-    final annotationChanges = <Map<String, dynamic>>[];
     final setlistChanges = <Map<String, dynamic>>[];
     final setlistScoreChanges = <Map<String, dynamic>>[];
     final deletes = <String>[];
-    
+
     for (final score in pendingScores) {
       scoreChanges.add({
         'entityType': 'score',
@@ -528,8 +544,8 @@ class LibrarySyncService {
         'localUpdatedAt': (score.updatedAt ?? DateTime.now()).toIso8601String(),
       });
     }
-    
-    for (final instrumentScore in pendingInstrumentScores) {
+
+    for (final instrumentScore in allPendingInstrumentScores) {
       final parentScores = await (_db.select(_db.scores)
         ..where((s) => s.id.equals(instrumentScore.scoreId))).get();
       if (parentScores.isEmpty) {
@@ -539,12 +555,41 @@ class LibrarySyncService {
       final parentServerId = parentScores.first.serverId;
       if (parentServerId == null) {
         // Parent Score hasn't been synced yet - skip for now
-        // It will be synced in the next sync cycle after the parent Score gets a serverId
         _log('Skipping InstrumentScore ${instrumentScore.id}: parent Score ${instrumentScore.scoreId} has no serverId yet');
         continue;
       }
-      
+
       final instrumentName = instrumentScore.customInstrument ?? instrumentScore.instrumentType;
+
+      // Per sync_logic.md §2.6: Get all annotations for this InstrumentScore and embed them
+      final annotations = await (_db.select(_db.annotations)
+        ..where((a) => a.instrumentScoreId.equals(instrumentScore.id))).get();
+
+      // Note: ann.points is stored as JSON string in database, need to decode it
+      // before embedding in the annotationsJsonList to avoid double encoding
+      final annotationsJsonList = annotations.map((ann) {
+        // Decode points from JSON string to List<double> for proper serialization
+        Object? decodedPoints;
+        if (ann.points != null && ann.points!.isNotEmpty) {
+          try {
+            decodedPoints = jsonDecode(ann.points!);
+          } catch (_) {
+            decodedPoints = null;
+          }
+        }
+        return {
+          'id': ann.id,
+          'pageNumber': ann.pageNumber,
+          'type': ann.annotationType,
+          'color': ann.color,
+          'strokeWidth': ann.strokeWidth,
+          'points': decodedPoints, // Now properly decoded, will be encoded once by outer jsonEncode
+          'textContent': ann.textContent,
+          'posX': ann.posX,
+          'posY': ann.posY,
+        };
+      }).toList();
+
       instrumentScoreChanges.add({
         'entityType': 'instrumentScore',
         'entityId': instrumentScore.id,
@@ -552,52 +597,14 @@ class LibrarySyncService {
         'operation': instrumentScore.serverId == null ? 'create' : 'update',
         'version': instrumentScore.version,
         'data': jsonEncode({
-          'scoreId': parentServerId, // This is int - server expects int
+          'scoreId': parentServerId,
           'instrumentName': instrumentName,
           'pdfPath': instrumentScore.pdfPath,
           'pdfHash': instrumentScore.pdfHash,
-          'orderIndex': 0,
+          'orderIndex': instrumentScore.orderIndex,
+          'annotationsJson': jsonEncode(annotationsJsonList), // Embedded annotations
         }),
         'localUpdatedAt': (instrumentScore.updatedAt ?? DateTime.now()).toIso8601String(),
-      });
-    }
-    
-    for (final annotation in pendingAnnotations) {
-      // Get InstrumentScore serverId for this annotation
-      final instrumentScores = await (_db.select(_db.instrumentScores)
-        ..where((is_) => is_.id.equals(annotation.instrumentScoreId))).get();
-      
-      if (instrumentScores.isEmpty) {
-        _log('Skipping Annotation ${annotation.id}: InstrumentScore not found');
-        continue;
-      }
-      
-      final instrumentScoreServerId = instrumentScores.first.serverId;
-      if (instrumentScoreServerId == null) {
-        // Parent InstrumentScore hasn't been synced yet - skip for now
-        _log('Skipping Annotation ${annotation.id}: InstrumentScore has no serverId yet');
-        continue;
-      }
-      
-      annotationChanges.add({
-        'entityType': 'annotation',
-        'entityId': annotation.id,
-        'serverId': annotation.serverId,
-        'operation': annotation.serverId == null ? 'create' : 'update',
-        'version': annotation.version,
-        'data': jsonEncode({
-          'instrumentScoreId': instrumentScoreServerId,  // Use serverId (int), not local UUID
-          'pageNumber': annotation.pageNumber,
-          'type': annotation.annotationType,
-          'data': annotation.textContent ?? '',
-          'positionX': annotation.posX ?? 0.0,
-          'positionY': annotation.posY ?? 0.0,
-          'width': annotation.strokeWidth,  // Map strokeWidth to width for now
-          'height': null,  // Not tracked on client currently
-          'color': annotation.color,
-          'vectorClock': null,  // Not implemented yet
-        }),
-        'localUpdatedAt': (annotation.updatedAt ?? DateTime.now()).toIso8601String(),
       });
     }
     
@@ -664,14 +671,13 @@ class LibrarySyncService {
     }
     
     _log('Pushing: scores=${scoreChanges.length}, instrumentScores=${instrumentScoreChanges.length}, '
-        'annotations=${annotationChanges.length}, setlists=${setlistChanges.length}, '
-        'setlistScores=${setlistScoreChanges.length}, deletes=${deletes.length}');
-    
+        'setlists=${setlistChanges.length}, setlistScores=${setlistScoreChanges.length}, deletes=${deletes.length}');
+
     final response = await _rpc.libraryPush(
       clientLibraryVersion: _status.localLibraryVersion,
       scores: scoreChanges,
       instrumentScores: instrumentScoreChanges,
-      annotations: annotationChanges,
+      annotations: const [], // Per sync_logic.md §2.6: Annotations are embedded, not synced independently
       setlists: setlistChanges,
       setlistScores: setlistScoreChanges,
       deletes: deletes,
@@ -692,8 +698,7 @@ class LibrarySyncService {
         .write(ScoresCompanion(serverId: Value(serverId), syncStatus: const Value('synced')));
       await (_db.update(_db.instrumentScores)..where((s) => s.id.equals(localId)))
         .write(InstrumentScoresCompanion(serverId: Value(serverId), syncStatus: const Value('synced')));
-      await (_db.update(_db.annotations)..where((s) => s.id.equals(localId)))
-        .write(AnnotationsCompanion(serverId: Value(serverId), syncStatus: const Value('synced')));
+      // Note: Annotations no longer have serverIds - they are embedded in InstrumentScore
       await (_db.update(_db.setlists)..where((s) => s.id.equals(localId)))
         .write(SetlistsCompanion(serverId: Value(serverId), syncStatus: const Value('synced')));
       // SetlistScore uses composite key with ::: separator
@@ -709,9 +714,9 @@ class LibrarySyncService {
     
     // Mark accepted as synced - categorize by entity type to avoid blind updates
     // Build sets of accepted IDs by entity type from the original changes
+    // Note: Annotations no longer have individual accepted IDs - they are embedded in InstrumentScore
     final acceptedScoreIds = <String>{};
     final acceptedInstrumentScoreIds = <String>{};
-    final acceptedAnnotationIds = <String>{};
     final acceptedSetlistIds = <String>{};
     final acceptedSetlistScoreIds = <String>{};
     
@@ -725,11 +730,7 @@ class LibrarySyncService {
         acceptedInstrumentScoreIds.add(change['entityId'] as String);
       }
     }
-    for (final change in annotationChanges) {
-      if (result.accepted.contains(change['entityId'])) {
-        acceptedAnnotationIds.add(change['entityId'] as String);
-      }
-    }
+    // Note: Annotations are embedded in InstrumentScore, not tracked separately
     for (final change in setlistChanges) {
       if (result.accepted.contains(change['entityId'])) {
         acceptedSetlistIds.add(change['entityId'] as String);
@@ -740,28 +741,26 @@ class LibrarySyncService {
         acceptedSetlistScoreIds.add(change['entityId'] as String);
       }
     }
-    
+
     // Now update each entity type separately to ensure correct syncStatus updates
     for (final id in acceptedScoreIds) {
       await (_db.update(_db.scores)..where((s) => s.id.equals(id)))
         .write(const ScoresCompanion(syncStatus: Value('synced')));
     }
-    
+
     for (final id in acceptedInstrumentScoreIds) {
       await (_db.update(_db.instrumentScores)..where((s) => s.id.equals(id)))
         .write(const InstrumentScoresCompanion(syncStatus: Value('synced')));
-    }
-    
-    for (final id in acceptedAnnotationIds) {
-      await (_db.update(_db.annotations)..where((s) => s.id.equals(id)))
+      // Also mark all annotations for this InstrumentScore as synced
+      await (_db.update(_db.annotations)..where((a) => a.instrumentScoreId.equals(id)))
         .write(const AnnotationsCompanion(syncStatus: Value('synced')));
     }
-    
+
     for (final id in acceptedSetlistIds) {
       await (_db.update(_db.setlists)..where((s) => s.id.equals(id)))
         .write(const SetlistsCompanion(syncStatus: Value('synced')));
     }
-    
+
     for (final id in acceptedSetlistScoreIds) {
       // SetlistScore uses composite key with ::: separator
       if (id.contains(':::')) {
@@ -773,28 +772,31 @@ class LibrarySyncService {
         }
       }
     }
-    
-    // Clean up deletions
+
+    // Clean up deletions - check against deleteKey format (entityType:serverId)
+    // Per SERVER_SYNC_LOGIC.md: server returns deleteKey strings like 'score:123' in accepted list
     for (final score in deletedScores) {
-      if (result.accepted.contains(score.id)) {
+      final deleteKey = 'score:${score.serverId}';
+      if (score.serverId != null && result.accepted.contains(deleteKey)) {
         await (_db.delete(_db.scores)..where((s) => s.id.equals(score.id))).go();
       }
     }
     for (final instrumentScore in deletedInstrumentScores) {
-      if (result.accepted.contains(instrumentScore.id)) {
+      final deleteKey = 'instrumentScore:${instrumentScore.serverId}';
+      if (instrumentScore.serverId != null && result.accepted.contains(deleteKey)) {
         await (_db.delete(_db.instrumentScores)..where((s) => s.id.equals(instrumentScore.id))).go();
       }
     }
     // Note: Annotations are physically deleted immediately, no cleanup needed
     for (final setlist in deletedSetlists) {
-      if (result.accepted.contains(setlist.id)) {
+      final deleteKey = 'setlist:${setlist.serverId}';
+      if (setlist.serverId != null && result.accepted.contains(deleteKey)) {
         await (_db.delete(_db.setlists)..where((s) => s.id.equals(setlist.id))).go();
       }
     }
     for (final setlistScore in deletedSetlistScores) {
-      // SetlistScore uses composite key with ::: separator
-      final compositeId = '${setlistScore.setlistId}:::${setlistScore.scoreId}';
-      if (result.accepted.contains(compositeId)) {
+      final deleteKey = 'setlistScore:${setlistScore.serverId}';
+      if (setlistScore.serverId != null && result.accepted.contains(deleteKey)) {
         await (_db.delete(_db.setlistScores)
           ..where((ss) => ss.setlistId.equals(setlistScore.setlistId) & ss.scoreId.equals(setlistScore.scoreId))).go();
       }
@@ -814,60 +816,56 @@ class LibrarySyncService {
 
   Future<_PullResult> _pullRemoteChanges() async {
     final response = await _rpc.libraryPull(since: _status.localLibraryVersion);
-    
+
     if (!response.isSuccess || response.data == null) {
       throw Exception('Pull failed: ${response.error?.message}');
     }
-    
+
     final result = response.data!;
     final serverVersion = result.libraryVersion;
     var pulled = 0;
     var conflicts = 0;
-    
+
     // Sort all changes by version to ensure correct order of application
     // This is critical when an entity is deleted then recreated
     final sortedScores = List<SyncEntityData>.from(result.scores)..sort((a, b) => a.version.compareTo(b.version));
     final sortedInstrumentScores = List<SyncEntityData>.from(result.instrumentScores)..sort((a, b) => a.version.compareTo(b.version));
-    final sortedAnnotations = List<SyncEntityData>.from(result.annotations)..sort((a, b) => a.version.compareTo(b.version));
+    // Note: Per sync_logic.md §2.6, Annotations are embedded in InstrumentScore, server no longer sends them separately
     final sortedSetlists = List<SyncEntityData>.from(result.setlists)..sort((a, b) => a.version.compareTo(b.version));
     final sortedSetlistScores = List<SyncEntityData>.from(result.setlistScores)..sort((a, b) => a.version.compareTo(b.version));
-    
+
     for (final scoreData in sortedScores) {
       final mergeResult = await _mergeScore(scoreData);
       if (mergeResult.merged) pulled++;
       if (mergeResult.hadConflict) conflicts++;
     }
-    
+
     for (final instrumentScoreData in sortedInstrumentScores) {
+      // This now also handles embedded annotations
       final mergeResult = await _mergeInstrumentScore(instrumentScoreData);
       if (mergeResult.merged) pulled++;
       if (mergeResult.hadConflict) conflicts++;
     }
-    
-    for (final annotationData in sortedAnnotations) {
-      final mergeResult = await _mergeAnnotation(annotationData);
-      if (mergeResult.merged) pulled++;
-      if (mergeResult.hadConflict) conflicts++;
-    }
-    
+
+    // Note: Annotations are no longer synced independently - they are embedded in InstrumentScore
+
     for (final setlistData in sortedSetlists) {
       final mergeResult = await _mergeSetlist(setlistData);
       if (mergeResult.merged) pulled++;
       if (mergeResult.hadConflict) conflicts++;
     }
-    
+
     for (final setlistScoreData in sortedSetlistScores) {
       final mergeResult = await _mergeSetlistScore(setlistScoreData);
       if (mergeResult.merged) pulled++;
       if (mergeResult.hadConflict) conflicts++;
     }
-    
-    // Process deletes (these are already sorted by the deleted list order from server)
-    for (final deleteKey in result.deleted) {
-      await _processRemoteDelete(deleteKey);
-      pulled++;
-    }
-    
+
+    // NOTE: Per APP_SYNC_LOGIC.md §2.3.2, deleted list processing is removed.
+    // All deletes are already handled via isDeleted flag in the merge functions above.
+    // The server still sends result.deleted for backwards compatibility, but we no longer
+    // need to process it separately as it would duplicate the work done in merge functions.
+
     await _saveSyncState(libraryVersion: serverVersion);
     _updateStatus(_status.copyWith(localLibraryVersion: serverVersion));
     
@@ -882,26 +880,28 @@ class LibrarySyncService {
     final serverId = serverData.serverId;
     final data = serverData.parsedData;
     final isDeleted = serverData.isDeleted;
-    
+
     final localRecords = await (_db.select(_db.scores)
       ..where((s) => s.serverId.equals(serverId))).get();
-    
+
     if (isDeleted) {
       if (localRecords.isNotEmpty) {
         final local = localRecords.first;
         if (local.syncStatus == 'pending') {
-          // Local wins
-          await (_db.update(_db.scores)..where((s) => s.id.equals(local.id)))
-            .write(const ScoresCompanion(serverId: Value(null)));
+          // Per APP_SYNC_LOGIC.md §2.4.2: Local pending wins
+          // KEEP serverId - server will auto-restore on next Push update
+          // DO NOT disconnect serverId
+          _log('Merge conflict: local pending Score ${local.id} vs server delete - keeping local with serverId');
           return _MergeResult(merged: true, hadConflict: true);
         } else {
-          await (_db.delete(_db.scores)..where((s) => s.id.equals(local.id))).go();
+          // Server wins - cascade delete local record and children
+          await _cascadeDeleteScore(local.id, soft: false);
           return _MergeResult(merged: true, hadConflict: false);
         }
       }
       return _MergeResult(merged: false, hadConflict: false);
     }
-    
+
     if (localRecords.isEmpty) {
       await _db.into(_db.scores).insert(ScoresCompanion.insert(
         id: 'server_$serverId',
@@ -915,13 +915,14 @@ class LibrarySyncService {
       ));
       return _MergeResult(merged: true, hadConflict: false);
     }
-    
+
     final local = localRecords.first;
     if (local.syncStatus == 'pending') {
-      // Local wins
+      // Local wins - keep serverId, server will get our changes on next Push
+      _log('Merge conflict: local pending Score ${local.id} vs server update - keeping local');
       return _MergeResult(merged: false, hadConflict: true);
     }
-    
+
     await (_db.update(_db.scores)..where((s) => s.id.equals(local.id)))
       .write(ScoresCompanion(
         title: Value(data['title'] as String),
@@ -930,7 +931,7 @@ class LibrarySyncService {
         syncStatus: const Value('synced'),
         version: Value(serverData.version),
       ));
-    
+
     return _MergeResult(merged: true, hadConflict: false);
   }
 
@@ -938,25 +939,27 @@ class LibrarySyncService {
     final serverId = serverData.serverId;
     final data = serverData.parsedData;
     final isDeleted = serverData.isDeleted;
-    
+
     final localRecords = await (_db.select(_db.setlists)
       ..where((s) => s.serverId.equals(serverId))).get();
-    
+
     if (isDeleted) {
       if (localRecords.isNotEmpty) {
         final local = localRecords.first;
         if (local.syncStatus == 'pending') {
-          await (_db.update(_db.setlists)..where((s) => s.id.equals(local.id)))
-            .write(const SetlistsCompanion(serverId: Value(null)));
+          // Per APP_SYNC_LOGIC.md §2.4.2: Local pending wins
+          // KEEP serverId - server will auto-restore on next Push update
+          _log('Merge conflict: local pending Setlist ${local.id} vs server delete - keeping local with serverId');
           return _MergeResult(merged: true, hadConflict: true);
         } else {
-          await (_db.delete(_db.setlists)..where((s) => s.id.equals(local.id))).go();
+          // Server wins - cascade delete setlist and its scores
+          await _cascadeDeleteSetlist(local.id, soft: false);
           return _MergeResult(merged: true, hadConflict: false);
         }
       }
       return _MergeResult(merged: false, hadConflict: false);
     }
-    
+
     if (localRecords.isEmpty) {
       await _db.into(_db.setlists).insert(SetlistsCompanion.insert(
         id: 'server_$serverId',
@@ -969,12 +972,14 @@ class LibrarySyncService {
       ));
       return _MergeResult(merged: true, hadConflict: false);
     }
-    
+
     final local = localRecords.first;
     if (local.syncStatus == 'pending') {
+      // Local wins - keep serverId
+      _log('Merge conflict: local pending Setlist ${local.id} vs server update - keeping local');
       return _MergeResult(merged: false, hadConflict: true);
     }
-    
+
     await (_db.update(_db.setlists)..where((s) => s.id.equals(local.id)))
       .write(SetlistsCompanion(
         name: Value(data['name'] as String),
@@ -982,7 +987,7 @@ class LibrarySyncService {
         syncStatus: const Value('synced'),
         version: Value(serverData.version),
       ));
-    
+
     return _MergeResult(merged: true, hadConflict: false);
   }
 
@@ -990,29 +995,34 @@ class LibrarySyncService {
     final serverId = serverData.serverId;
     final data = serverData.parsedData;
     final isDeleted = serverData.isDeleted;
-    
+
     final localRecords = await (_db.select(_db.instrumentScores)
       ..where((is_) => is_.serverId.equals(serverId))).get();
-    
+
     if (isDeleted) {
       if (localRecords.isNotEmpty) {
         final local = localRecords.first;
         if (local.syncStatus == 'pending') {
-          await (_db.update(_db.instrumentScores)..where((is_) => is_.id.equals(local.id)))
-            .write(const InstrumentScoresCompanion(serverId: Value(null)));
+          // Per APP_SYNC_LOGIC.md §2.4.2: Local pending wins
+          // KEEP serverId - server will auto-restore on next Push update
+          _log('Merge conflict: local pending InstrumentScore ${local.id} vs server delete - keeping local with serverId');
           return _MergeResult(merged: true, hadConflict: true);
         } else {
-          await (_db.delete(_db.instrumentScores)..where((is_) => is_.id.equals(local.id))).go();
+          // Server wins - cascade delete with annotations and PDF cleanup
+          await _cascadeDeleteInstrumentScore(local.id, soft: false);
           return _MergeResult(merged: true, hadConflict: false);
         }
       }
       return _MergeResult(merged: false, hadConflict: false);
     }
-    
+
+    // Extract annotationsJson from server data (per APP_SYNC_LOGIC.md §2.6)
+    final annotationsJsonStr = data['annotationsJson'] as String?;
+
     if (localRecords.isEmpty) {
       final serverScoreId = data['scoreId'] as int?;
       if (serverScoreId == null) return _MergeResult(merged: false, hadConflict: false);
-      
+
       // Find local score by serverId
       final localScores = await (_db.select(_db.scores)
         ..where((s) => s.serverId.equals(serverScoreId))).get();
@@ -1021,147 +1031,80 @@ class LibrarySyncService {
         return _MergeResult(merged: false, hadConflict: false);
       }
       final localScoreId = localScores.first.id;
-      
+      final newLocalId = 'server_$serverId';
+
       await _db.into(_db.instrumentScores).insert(InstrumentScoresCompanion.insert(
-        id: 'server_$serverId',
-        scoreId: localScoreId, // Use local Score ID
+        id: newLocalId,
+        scoreId: localScoreId,
         instrumentType: data['instrumentName'] as String,
-        pdfPath: data['pdfPath'] as String? ?? '',
+        pdfPath: Value(data['pdfPath'] as String?),
         dateAdded: serverData.updatedAt ?? DateTime.now(),
+        orderIndex: Value(data['orderIndex'] as int? ?? 0),
         serverId: Value(serverId),
         syncStatus: const Value('synced'),
         version: Value(serverData.version),
         pdfHash: Value(data['pdfHash'] as String?),
         pdfSyncStatus: Value(data['pdfHash'] != null ? 'needsDownload' : 'pending'),
+        annotationsJson: Value(annotationsJsonStr ?? '[]'),
       ));
+
+      // Also create local annotations from embedded JSON
+      await _syncEmbeddedAnnotations(newLocalId, annotationsJsonStr);
+
       return _MergeResult(merged: true, hadConflict: false);
     }
-    
+
     final local = localRecords.first;
     if (local.syncStatus == 'pending') {
+      // Local wins - keep serverId
+      _log('Merge conflict: local pending InstrumentScore ${local.id} vs server update - keeping local');
       return _MergeResult(merged: false, hadConflict: true);
     }
-    
+
     final serverHash = data['pdfHash'] as String?;
     final needsDownload = serverHash != null && serverHash != local.pdfHash;
-    
+
     await (_db.update(_db.instrumentScores)..where((is_) => is_.id.equals(local.id)))
       .write(InstrumentScoresCompanion(
         instrumentType: Value(data['instrumentName'] as String),
+        orderIndex: Value(data['orderIndex'] as int? ?? local.orderIndex),
         syncStatus: const Value('synced'),
         version: Value(serverData.version),
         pdfHash: Value(serverHash),
         pdfSyncStatus: Value(needsDownload ? 'needsDownload' : local.pdfSyncStatus),
+        annotationsJson: Value(annotationsJsonStr ?? local.annotationsJson),
       ));
-    
+
+    // Sync embedded annotations to local Annotations table
+    await _syncEmbeddedAnnotations(local.id, annotationsJsonStr);
+
     return _MergeResult(merged: true, hadConflict: false);
   }
 
-  Future<_MergeResult> _mergeAnnotation(SyncEntityData serverData) async {
-    final serverId = serverData.serverId;
-    final data = serverData.parsedData;
-    final isDeleted = serverData.isDeleted;
-    
-    final localRecords = await (_db.select(_db.annotations)
-      ..where((a) => a.serverId.equals(serverId))).get();
-    
-    if (isDeleted) {
-      if (localRecords.isNotEmpty) {
-        final local = localRecords.first;
-        if (local.syncStatus == 'pending') {
-          // Local wins - detach from server
-          await (_db.update(_db.annotations)..where((a) => a.id.equals(local.id)))
-            .write(const AnnotationsCompanion(serverId: Value(null)));
-          return _MergeResult(merged: true, hadConflict: true);
-        } else {
-          // Server wins - delete local
-          await (_db.delete(_db.annotations)..where((a) => a.id.equals(local.id))).go();
-          return _MergeResult(merged: true, hadConflict: false);
-        }
-      }
-      return _MergeResult(merged: false, hadConflict: false);
-    }
-    
-    if (localRecords.isEmpty) {
-      // New annotation from server - need to find local InstrumentScore ID
-      final serverInstrumentScoreId = data['instrumentScoreId'] as int;
-      
-      // Find local InstrumentScore by serverId
-      final localInstrumentScores = await (_db.select(_db.instrumentScores)
-        ..where((is_) => is_.serverId.equals(serverInstrumentScoreId))).get();
-      
-      if (localInstrumentScores.isEmpty) {
-        _log('Cannot merge Annotation: InstrumentScore with serverId=$serverInstrumentScoreId not found locally');
-        return _MergeResult(merged: false, hadConflict: false);
-      }
-      
-      final localInstrumentScoreId = localInstrumentScores.first.id;
-      
-      // Create annotation with local InstrumentScore ID
-      await _db.into(_db.annotations).insert(AnnotationsCompanion.insert(
-        id: 'server_$serverId',
-        instrumentScoreId: localInstrumentScoreId,  // Use local UUID, not server int
-        annotationType: data['type'] as String,
-        color: data['color'] as String? ?? '#000000',
-        strokeWidth: (data['width'] as num?)?.toDouble() ?? 2.0,  // Map width to strokeWidth
-        points: Value(null),  // Server doesn't send points
-        textContent: Value(data['data'] as String?),
-        posX: Value((data['positionX'] as num?)?.toDouble()),
-        posY: Value((data['positionY'] as num?)?.toDouble()),
-        pageNumber: Value(data['pageNumber'] as int? ?? 1),
-        serverId: Value(serverId),
-        syncStatus: const Value('synced'),
-        version: Value(serverData.version),
-      ));
-      return _MergeResult(merged: true, hadConflict: false);
-    }
-    
-    final local = localRecords.first;
-    if (local.syncStatus == 'pending') {
-      // Local wins
-      return _MergeResult(merged: false, hadConflict: true);
-    }
-    
-    // Server wins - update local
-    await (_db.update(_db.annotations)..where((a) => a.id.equals(local.id)))
-      .write(AnnotationsCompanion(
-        annotationType: Value(data['type'] as String),
-        color: Value(data['color'] as String? ?? '#000000'),
-        strokeWidth: Value((data['width'] as num?)?.toDouble() ?? 2.0),  // Map width to strokeWidth
-        points: Value(null),  // Server doesn't send points
-        textContent: Value(data['data'] as String?),
-        posX: Value((data['positionX'] as num?)?.toDouble()),
-        posY: Value((data['positionY'] as num?)?.toDouble()),
-        pageNumber: Value(data['pageNumber'] as int? ?? 1),
-        syncStatus: const Value('synced'),
-        version: Value(serverData.version),
-      ));
-    
-    return _MergeResult(merged: true, hadConflict: false);
-  }
+  // NOTE: _mergeAnnotation() has been removed per sync_logic.md §2.6
+  // Annotations are now embedded in InstrumentScore and synced via _syncEmbeddedAnnotations()
 
   Future<_MergeResult> _mergeSetlistScore(SyncEntityData serverData) async {
     final serverId = serverData.serverId;
     final data = serverData.parsedData;
     final isDeleted = serverData.isDeleted;
-    
+
     final serverSetlistId = data['setlistId'] as int;
     final serverScoreId = data['scoreId'] as int;
-    
+
     final localRecords = await (_db.select(_db.setlistScores)
       ..where((ss) => ss.serverId.equals(serverId))).get();
-    
+
     if (isDeleted) {
       if (localRecords.isNotEmpty) {
         final local = localRecords.first;
         if (local.syncStatus == 'pending') {
-          // Local wins - detach from server
-          await (_db.update(_db.setlistScores)
-            ..where((ss) => ss.setlistId.equals(local.setlistId) & ss.scoreId.equals(local.scoreId)))
-            .write(const SetlistScoresCompanion(serverId: Value(null)));
+          // Per APP_SYNC_LOGIC.md §2.4.2: Local pending wins
+          // KEEP serverId - server will auto-restore on next Push update
+          _log('Merge conflict: local pending SetlistScore vs server delete - keeping local with serverId');
           return _MergeResult(merged: true, hadConflict: true);
         } else {
-          // Server wins - delete local
+          // Server wins - delete local (physical delete for SetlistScore as it's a join table)
           await (_db.delete(_db.setlistScores)
             ..where((ss) => ss.setlistId.equals(local.setlistId) & ss.scoreId.equals(local.scoreId))).go();
           return _MergeResult(merged: true, hadConflict: false);
@@ -1169,26 +1112,26 @@ class LibrarySyncService {
       }
       return _MergeResult(merged: false, hadConflict: false);
     }
-    
+
     if (localRecords.isEmpty) {
       // Find local IDs by serverIds
       final localSetlists = await (_db.select(_db.setlists)
         ..where((s) => s.serverId.equals(serverSetlistId))).get();
       final localScores = await (_db.select(_db.scores)
         ..where((s) => s.serverId.equals(serverScoreId))).get();
-      
+
       if (localSetlists.isEmpty || localScores.isEmpty) {
         _log('Cannot merge SetlistScore: parent entities not found locally');
         return _MergeResult(merged: false, hadConflict: false);
       }
-      
+
       final localSetlistId = localSetlists.first.id;
       final localScoreId = localScores.first.id;
-      
+
       // New setlist-score from server - create it
       await _db.into(_db.setlistScores).insert(SetlistScoresCompanion.insert(
-        setlistId: localSetlistId, // Use local IDs
-        scoreId: localScoreId, // Use local IDs
+        setlistId: localSetlistId,
+        scoreId: localScoreId,
         orderIndex: data['orderIndex'] as int,
         serverId: Value(serverId),
         syncStatus: const Value('synced'),
@@ -1196,13 +1139,14 @@ class LibrarySyncService {
       ));
       return _MergeResult(merged: true, hadConflict: false);
     }
-    
+
     final local = localRecords.first;
     if (local.syncStatus == 'pending') {
-      // Local wins
+      // Local wins - keep serverId
+      _log('Merge conflict: local pending SetlistScore vs server update - keeping local');
       return _MergeResult(merged: false, hadConflict: true);
     }
-    
+
     // Server wins - update local
     await (_db.update(_db.setlistScores)
       ..where((ss) => ss.setlistId.equals(local.setlistId) & ss.scoreId.equals(local.scoreId)))
@@ -1211,77 +1155,13 @@ class LibrarySyncService {
         syncStatus: const Value('synced'),
         version: Value(serverData.version),
       ));
-    
+
     return _MergeResult(merged: true, hadConflict: false);
   }
 
-  Future<void> _processRemoteDelete(String deleteKey) async {
-    final parts = deleteKey.split(':');
-    if (parts.length != 2) return;
-    
-    final entityType = parts[0];
-    final serverId = int.tryParse(parts[1]);
-    if (serverId == null) return;
-    
-    if (entityType == 'score') {
-      final localRecords = await (_db.select(_db.scores)
-        ..where((s) => s.serverId.equals(serverId))).get();
-      for (final record in localRecords) {
-        if (record.syncStatus == 'pending') {
-          await (_db.update(_db.scores)..where((s) => s.id.equals(record.id)))
-            .write(const ScoresCompanion(serverId: Value(null)));
-        } else {
-          await (_db.delete(_db.scores)..where((s) => s.id.equals(record.id))).go();
-        }
-      }
-    } else if (entityType == 'instrumentScore') {
-      final localRecords = await (_db.select(_db.instrumentScores)
-        ..where((is_) => is_.serverId.equals(serverId))).get();
-      for (final record in localRecords) {
-        if (record.syncStatus == 'pending') {
-          await (_db.update(_db.instrumentScores)..where((is_) => is_.id.equals(record.id)))
-            .write(const InstrumentScoresCompanion(serverId: Value(null)));
-        } else {
-          await (_db.delete(_db.instrumentScores)..where((is_) => is_.id.equals(record.id))).go();
-        }
-      }
-    } else if (entityType == 'annotation') {
-      final localRecords = await (_db.select(_db.annotations)
-        ..where((a) => a.serverId.equals(serverId))).get();
-      for (final record in localRecords) {
-        if (record.syncStatus == 'pending') {
-          await (_db.update(_db.annotations)..where((a) => a.id.equals(record.id)))
-            .write(const AnnotationsCompanion(serverId: Value(null)));
-        } else {
-          await (_db.delete(_db.annotations)..where((a) => a.id.equals(record.id))).go();
-        }
-      }
-    } else if (entityType == 'setlist') {
-      final localRecords = await (_db.select(_db.setlists)
-        ..where((s) => s.serverId.equals(serverId))).get();
-      for (final record in localRecords) {
-        if (record.syncStatus == 'pending') {
-          await (_db.update(_db.setlists)..where((s) => s.id.equals(record.id)))
-            .write(const SetlistsCompanion(serverId: Value(null)));
-        } else {
-          await (_db.delete(_db.setlists)..where((s) => s.id.equals(record.id))).go();
-        }
-      }
-    } else if (entityType == 'setlistScore') {
-      final localRecords = await (_db.select(_db.setlistScores)
-        ..where((ss) => ss.serverId.equals(serverId))).get();
-      for (final record in localRecords) {
-        if (record.syncStatus == 'pending') {
-          await (_db.update(_db.setlistScores)
-            ..where((ss) => ss.setlistId.equals(record.setlistId) & ss.scoreId.equals(record.scoreId)))
-            .write(const SetlistScoresCompanion(serverId: Value(null)));
-        } else {
-          await (_db.delete(_db.setlistScores)
-            ..where((ss) => ss.setlistId.equals(record.setlistId) & ss.scoreId.equals(record.scoreId))).go();
-        }
-      }
-    }
-  }
+  // NOTE: _processRemoteDelete has been removed.
+  // Per APP_SYNC_LOGIC.md §2.3.2: All deletes are now handled via isDeleted flag in merge functions.
+  // The server's deleted list is kept for backwards compatibility but no longer processed separately.
 
   // ============================================================================
   // PDF SYNC
@@ -1312,20 +1192,21 @@ class LibrarySyncService {
     }
   }
 
+  /// Upload PDF for an InstrumentScore
+  /// Per APP_SYNC_LOGIC.md §3.3: PDF uploads don't require serverId - use hash-based upload
   Future<void> _uploadPdf(InstrumentScoreEntity instrumentScore) async {
-    final file = File(instrumentScore.pdfPath);
+    if (instrumentScore.pdfPath == null || instrumentScore.pdfPath!.isEmpty) return;
+
+    final file = File(instrumentScore.pdfPath!);
     if (!file.existsSync()) return;
-    
-    final serverId = instrumentScore.serverId;
-    if (serverId == null) return;
-    
+
     final bytes = await file.readAsBytes();
     final hash = md5.convert(bytes).toString();
-    
+
     if (instrumentScore.pdfHash == hash && instrumentScore.pdfSyncStatus == 'synced') {
       return;
     }
-    
+
     // Check if server already has a file with this hash (秒传 / instant upload)
     // Per sync_logic.md line 445: "上传前先问服务器：'有没有 Hash 为 xxx 的文件？'"
     try {
@@ -1333,7 +1214,7 @@ class LibrarySyncService {
       if (checkResponse.isSuccess && checkResponse.data == true) {
         // Server already has this file - skip upload and just link it
         _log('PDF with hash $hash already exists on server - skipping upload (秒传)');
-        
+
         await (_db.update(_db.instrumentScores)
           ..where((s) => s.id.equals(instrumentScore.id)))
           .write(InstrumentScoresCompanion(
@@ -1346,19 +1227,19 @@ class LibrarySyncService {
       // If check fails, proceed with normal upload
       _log('Hash check failed, proceeding with upload: $e');
     }
-    
-    // Normal upload flow
-    final fileName = p.basename(instrumentScore.pdfPath);
-    final response = await _rpc.uploadPdf(
-      instrumentScoreId: serverId,
+
+    // Per APP_SYNC_LOGIC.md §3.3.1: Upload by hash directly, not by serverId
+    // This allows uploading PDFs even before metadata sync completes
+    final fileName = p.basename(instrumentScore.pdfPath!);
+    final response = await _rpc.uploadPdfByHash(
       fileBytes: bytes,
       fileName: fileName,
     );
-    
+
     if (!response.isSuccess || response.data == null || !response.data!.success) {
       throw Exception('PDF upload failed');
     }
-    
+
     await (_db.update(_db.instrumentScores)
       ..where((s) => s.id.equals(instrumentScore.id)))
       .write(InstrumentScoresCompanion(
@@ -1367,64 +1248,79 @@ class LibrarySyncService {
       ));
   }
 
+  /// Download PDF for an InstrumentScore
+  /// Per APP_SYNC_LOGIC.md §3.4: Download by hash, not by serverId
   Future<String?> _downloadPdfForInstrumentScore(String instrumentScoreId) async {
     final records = await (_db.select(_db.instrumentScores)
       ..where((s) => s.id.equals(instrumentScoreId))).get();
     if (records.isEmpty) return null;
-    
+
     final instrumentScore = records.first;
-    final serverId = instrumentScore.serverId;
-    if (serverId == null) return null;
-    
+    final pdfHash = instrumentScore.pdfHash;
+
+    // Per APP_SYNC_LOGIC.md §3.4: Download by hash, not serverId
+    if (pdfHash == null || pdfHash.isEmpty) {
+      _log('Cannot download PDF for $instrumentScoreId: no pdfHash');
+      return null;
+    }
+
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final pdfDir = Directory(p.join(appDir.path, 'pdfs'));
       if (!pdfDir.existsSync()) {
         await pdfDir.create(recursive: true);
       }
-      
+
       final localPath = p.join(pdfDir.path, '${instrumentScore.id}.pdf');
-      
+
       // Check if file exists and hash matches
       if (File(localPath).existsSync()) {
         final bytes = await File(localPath).readAsBytes();
-        final hash = md5.convert(bytes).toString();
-        
+        final localHash = md5.convert(bytes).toString();
+
         // If hash matches, no need to download
-        if (instrumentScore.pdfHash == hash) {
+        if (pdfHash == localHash) {
+          _log('PDF already exists and hash matches: $instrumentScoreId');
           await (_db.update(_db.instrumentScores)
             ..where((s) => s.id.equals(instrumentScoreId)))
             .write(InstrumentScoresCompanion(
               pdfPath: Value(localPath),
               pdfSyncStatus: const Value('synced'),
-              pdfHash: Value(hash),
             ));
           return localPath;
         }
-        // Hash mismatch - need to re-download
+        _log('PDF hash mismatch, re-downloading: local=$localHash, server=$pdfHash');
       }
-      
-      // Download PDF from server
-      final downloadResponse = await _rpc.downloadPdf(serverId);
+
+      // Download PDF from server by hash
+      // Per APP_SYNC_LOGIC.md §3.4: GET /file/download/{hash}
+      final downloadResponse = await _rpc.downloadPdfByHash(pdfHash);
       if (!downloadResponse.isSuccess || downloadResponse.data == null) {
         throw Exception('PDF download failed: ${downloadResponse.error?.message}');
       }
-      
+
       final pdfBytes = downloadResponse.data!;
-      final hash = md5.convert(pdfBytes).toString();
-      
+      final downloadedHash = md5.convert(pdfBytes).toString();
+
+      // Verify downloaded file hash matches expected
+      if (downloadedHash != pdfHash) {
+        _logError('Downloaded PDF hash mismatch', 'expected=$pdfHash, got=$downloadedHash');
+        throw Exception('Downloaded PDF hash mismatch');
+      }
+
       // Save to file
       await File(localPath).writeAsBytes(pdfBytes);
-      
+      _log('PDF downloaded successfully: $instrumentScoreId -> $localPath');
+
       // Update database
       await (_db.update(_db.instrumentScores)
         ..where((s) => s.id.equals(instrumentScoreId)))
         .write(InstrumentScoresCompanion(
           pdfPath: Value(localPath),
           pdfSyncStatus: const Value('synced'),
-          pdfHash: Value(hash),
+          pdfHash: Value(downloadedHash),
         ));
-      
+
       return localPath;
     } catch (e, stack) {
       _logError('PDF download failed', e, stack);
@@ -1444,14 +1340,23 @@ class LibrarySyncService {
       ..where((s) => s.syncStatus.equals('pending'))).get();
     final pendingInstrumentScores = await (_db.select(_db.instrumentScores)
       ..where((s) => s.syncStatus.equals('pending'))).get();
-    final pendingAnnotations = await (_db.select(_db.annotations)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
+    // Note: Per sync_logic.md §2.6, Annotations are embedded in InstrumentScore
+    // They are synced as part of InstrumentScore, so we count InstrumentScores
+    // that have pending annotations instead of counting annotations directly
+    final instrumentScoresWithPendingAnnotations = await _getInstrumentScoresWithPendingAnnotations();
     final pendingSetlists = await (_db.select(_db.setlists)
       ..where((s) => s.syncStatus.equals('pending'))).get();
     final pendingSetlistScores = await (_db.select(_db.setlistScores)
       ..where((s) => s.syncStatus.equals('pending'))).get();
+
+    // Count unique InstrumentScores (avoid double counting those already pending)
+    final pendingInstrumentScoreIds = pendingInstrumentScores.map((is_) => is_.id).toSet();
+    final additionalFromAnnotations = instrumentScoresWithPendingAnnotations
+        .where((is_) => !pendingInstrumentScoreIds.contains(is_.id))
+        .length;
+
     return pendingScores.length + pendingInstrumentScores.length +
-           pendingAnnotations.length + pendingSetlists.length +
+           additionalFromAnnotations + pendingSetlists.length +
            pendingSetlistScores.length;
   }
 
@@ -1507,26 +1412,24 @@ class LibrarySyncService {
   }
 
   Future<List<ScoreEntity>> _getDeletedScores() async {
+    // Per sync_logic.md: use pending + deletedAt for delete tracking (no pending_delete state)
     return await (_db.select(_db.scores)
       ..where((s) => s.deletedAt.isNotNull())
-      ..where((s) => s.syncStatus.equals('pending_delete'))).get();
+      ..where((s) => s.syncStatus.equals('pending'))).get();
   }
 
   Future<List<InstrumentScoreEntity>> _getDeletedInstrumentScores() async {
+    // Per sync_logic.md: use pending + deletedAt for delete tracking (no pending_delete state)
     return await (_db.select(_db.instrumentScores)
       ..where((s) => s.deletedAt.isNotNull())
-      ..where((s) => s.syncStatus.equals('pending_delete'))).get();
-  }
-  
-  Future<List<AnnotationEntity>> _getPendingAnnotations() async {
-    return await (_db.select(_db.annotations)
       ..where((s) => s.syncStatus.equals('pending'))).get();
   }
 
   Future<List<SetlistEntity>> _getDeletedSetlists() async {
+    // Per sync_logic.md: use pending + deletedAt for delete tracking (no pending_delete state)
     return await (_db.select(_db.setlists)
       ..where((s) => s.deletedAt.isNotNull())
-      ..where((s) => s.syncStatus.equals('pending_delete'))).get();
+      ..where((s) => s.syncStatus.equals('pending'))).get();
   }
 
   // Note: Annotations use physical delete, not soft delete
@@ -1539,15 +1442,127 @@ class LibrarySyncService {
   }
 
   Future<List<SetlistScoreEntity>> _getDeletedSetlistScores() async {
+    // Per sync_logic.md: use pending + deletedAt for delete tracking (no pending_delete state)
     return await (_db.select(_db.setlistScores)
       ..where((s) => s.deletedAt.isNotNull())
-      ..where((s) => s.syncStatus.equals('pending_delete'))).get();
+      ..where((s) => s.syncStatus.equals('pending'))).get();
   }
-  
+
+  /// Get InstrumentScores that have pending annotations (need to sync due to annotation changes)
+  /// Per sync_logic.md §2.6: Annotations are embedded in InstrumentScore
+  Future<List<InstrumentScoreEntity>> _getInstrumentScoresWithPendingAnnotations() async {
+    // Find all annotations with syncStatus = 'pending'
+    final pendingAnnotations = await (_db.select(_db.annotations)
+      ..where((a) => a.syncStatus.equals('pending'))).get();
+
+    if (pendingAnnotations.isEmpty) return [];
+
+    // Get unique InstrumentScore IDs
+    final instrumentScoreIds = pendingAnnotations
+        .map((a) => a.instrumentScoreId)
+        .toSet();
+
+    // Fetch those InstrumentScores
+    final instrumentScores = <InstrumentScoreEntity>[];
+    for (final id in instrumentScoreIds) {
+      final records = await (_db.select(_db.instrumentScores)
+        ..where((is_) => is_.id.equals(id))
+        ..where((is_) => is_.deletedAt.isNull())).get();
+      instrumentScores.addAll(records);
+    }
+
+    return instrumentScores;
+  }
+
+  /// Sync embedded annotations from server JSON to local Annotations table
+  /// Per sync_logic.md §2.6: Annotations are synced as part of InstrumentScore
+  Future<void> _syncEmbeddedAnnotations(String instrumentScoreId, String? annotationsJsonStr) async {
+    if (annotationsJsonStr == null || annotationsJsonStr.isEmpty || annotationsJsonStr == '[]') {
+      // No annotations from server - clear local ones if they are synced (not pending)
+      await (_db.delete(_db.annotations)
+        ..where((a) => a.instrumentScoreId.equals(instrumentScoreId))
+        ..where((a) => a.syncStatus.equals('synced'))).go();
+      return;
+    }
+
+    try {
+      final List<dynamic> annotationsList = jsonDecode(annotationsJsonStr) as List<dynamic>;
+
+      // Get current local annotations for this InstrumentScore
+      final localAnnotations = await (_db.select(_db.annotations)
+        ..where((a) => a.instrumentScoreId.equals(instrumentScoreId))).get();
+      final localAnnotationIds = localAnnotations.map((a) => a.id).toSet();
+
+      final serverAnnotationIds = <String>{};
+
+      for (final annMap in annotationsList) {
+        final annData = annMap as Map<String, dynamic>;
+        final annId = annData['id'] as String;
+        serverAnnotationIds.add(annId);
+
+        // Convert points to JSON string for database storage
+        // Server may send points as List<double> (decoded JSON array)
+        String? pointsJsonStr;
+        final pointsData = annData['points'];
+        if (pointsData != null) {
+          if (pointsData is String) {
+            pointsJsonStr = pointsData; // Already a JSON string
+          } else if (pointsData is List) {
+            pointsJsonStr = jsonEncode(pointsData); // Encode List to JSON string
+          }
+        }
+
+        if (localAnnotationIds.contains(annId)) {
+          // Update existing annotation (only if not pending)
+          final localAnn = localAnnotations.firstWhere((a) => a.id == annId);
+          if (localAnn.syncStatus != 'pending') {
+            await (_db.update(_db.annotations)..where((a) => a.id.equals(annId)))
+              .write(AnnotationsCompanion(
+                pageNumber: Value(annData['pageNumber'] as int? ?? 1),
+                annotationType: Value(annData['type'] as String? ?? 'draw'),
+                color: Value(annData['color'] as String? ?? '#000000'),
+                strokeWidth: Value((annData['strokeWidth'] as num?)?.toDouble() ?? 2.0),
+                points: Value(pointsJsonStr),
+                textContent: Value(annData['textContent'] as String?),
+                posX: Value((annData['posX'] as num?)?.toDouble()),
+                posY: Value((annData['posY'] as num?)?.toDouble()),
+                syncStatus: const Value('synced'),
+              ));
+          }
+        } else {
+          // Insert new annotation from server
+          await _db.into(_db.annotations).insert(AnnotationsCompanion.insert(
+            id: annId,
+            instrumentScoreId: instrumentScoreId,
+            annotationType: annData['type'] as String? ?? 'draw',
+            color: annData['color'] as String? ?? '#000000',
+            strokeWidth: (annData['strokeWidth'] as num?)?.toDouble() ?? 2.0,
+            points: Value(pointsJsonStr),
+            textContent: Value(annData['textContent'] as String?),
+            posX: Value((annData['posX'] as num?)?.toDouble()),
+            posY: Value((annData['posY'] as num?)?.toDouble()),
+            pageNumber: Value(annData['pageNumber'] as int? ?? 1),
+            syncStatus: const Value('synced'),
+          ));
+        }
+      }
+
+      // Delete annotations that are on server but no longer exist (only synced ones)
+      for (final localAnn in localAnnotations) {
+        if (!serverAnnotationIds.contains(localAnn.id) && localAnn.syncStatus == 'synced') {
+          await (_db.delete(_db.annotations)..where((a) => a.id.equals(localAnn.id))).go();
+        }
+      }
+    } catch (e) {
+      _log('Error syncing embedded annotations: $e');
+    }
+  }
+
   /// Check if multi-pass sync is needed (child entities waiting for parent serverIds)
+  /// Note: Annotations are no longer checked here - they are embedded in InstrumentScore
   Future<bool> _checkNeedsMultiPassSync(
     List<InstrumentScoreEntity> pendingInstrumentScores,
-    List<AnnotationEntity> pendingAnnotations,
+    List<dynamic> _, // Kept for API compatibility, no longer used
     List<SetlistScoreEntity> pendingSetlistScores,
   ) async {
     // Check InstrumentScores waiting for Score serverIds
@@ -1558,16 +1573,7 @@ class LibrarySyncService {
         return true; // Parent Score needs serverId first
       }
     }
-    
-    // Check Annotations waiting for InstrumentScore serverIds
-    for (final ann in pendingAnnotations) {
-      final parentInstrumentScores = await (_db.select(_db.instrumentScores)
-        ..where((is_) => is_.id.equals(ann.instrumentScoreId))).get();
-      if (parentInstrumentScores.isNotEmpty && parentInstrumentScores.first.serverId == null) {
-        return true; // Parent InstrumentScore needs serverId first
-      }
-    }
-    
+
     // Check SetlistScores waiting for Setlist or Score serverIds
     for (final ss in pendingSetlistScores) {
       final parentSetlists = await (_db.select(_db.setlists)
@@ -1579,8 +1585,164 @@ class LibrarySyncService {
         return true; // Parent entities need serverIds first
       }
     }
-    
+
     return false;
+  }
+
+  // ============================================================================
+  // CASCADE DELETE FUNCTIONS (Per APP_SYNC_LOGIC.md §2.5)
+  // ============================================================================
+
+  /// Cascade delete Score with all children (InstrumentScores, Annotations, SetlistScores)
+  /// Per APP_SYNC_LOGIC.md §2.5.3: Unified cascade delete function
+  ///
+  /// [soft]: if true, use soft delete (set deletedAt); if false, physical delete
+  Future<void> _cascadeDeleteScore(String scoreId, {required bool soft}) async {
+    _log('Cascade delete Score: $scoreId (soft=$soft)');
+
+    // 1. Get all InstrumentScores for this Score
+    final instrumentScores = await (_db.select(_db.instrumentScores)
+      ..where((is_) => is_.scoreId.equals(scoreId))).get();
+
+    // 2. Delete each InstrumentScore (with its annotations and PDF cleanup)
+    for (final is_ in instrumentScores) {
+      await _cascadeDeleteInstrumentScore(is_.id, soft: soft);
+    }
+
+    // 3. Delete SetlistScore associations
+    final setlistScores = await (_db.select(_db.setlistScores)
+      ..where((ss) => ss.scoreId.equals(scoreId))).get();
+    for (final ss in setlistScores) {
+      if (soft) {
+        await (_db.update(_db.setlistScores)
+          ..where((t) => t.setlistId.equals(ss.setlistId) & t.scoreId.equals(ss.scoreId)))
+          .write(SetlistScoresCompanion(
+            deletedAt: Value(DateTime.now()),
+            syncStatus: const Value('pending'),
+          ));
+      } else {
+        await (_db.delete(_db.setlistScores)
+          ..where((t) => t.setlistId.equals(ss.setlistId) & t.scoreId.equals(ss.scoreId))).go();
+      }
+    }
+
+    // 4. Delete the Score itself
+    if (soft) {
+      await (_db.update(_db.scores)..where((s) => s.id.equals(scoreId)))
+        .write(ScoresCompanion(
+          deletedAt: Value(DateTime.now()),
+          syncStatus: const Value('pending'),
+        ));
+    } else {
+      await (_db.delete(_db.scores)..where((s) => s.id.equals(scoreId))).go();
+    }
+
+    _log('Cascade delete Score complete: $scoreId');
+  }
+
+  /// Cascade delete InstrumentScore with annotations
+  /// Per APP_SYNC_LOGIC.md §2.5.3: Also handles PDF reference cleanup
+  Future<void> _cascadeDeleteInstrumentScore(String instrumentScoreId, {required bool soft}) async {
+    _log('Cascade delete InstrumentScore: $instrumentScoreId (soft=$soft)');
+
+    final records = await (_db.select(_db.instrumentScores)
+      ..where((is_) => is_.id.equals(instrumentScoreId))).get();
+    if (records.isEmpty) return;
+
+    final instrumentScore = records.first;
+
+    // 1. Delete all annotations for this InstrumentScore (always physical delete)
+    // Per APP_SYNC_LOGIC.md §2.5: Annotations use physical delete
+    await (_db.delete(_db.annotations)
+      ..where((a) => a.instrumentScoreId.equals(instrumentScoreId))).go();
+
+    // 2. Cleanup local PDF file if exists (with reference counting)
+    // Per APP_SYNC_LOGIC.md §3.5.2: Only delete if no other local references exist
+    if (instrumentScore.pdfPath != null && instrumentScore.pdfPath!.isNotEmpty && instrumentScore.pdfHash != null) {
+      await _cleanupLocalPdfIfUnreferenced(
+        instrumentScoreId,
+        instrumentScore.pdfPath!,
+        instrumentScore.pdfHash!,
+      );
+    }
+
+    // 3. Delete the InstrumentScore itself
+    if (soft) {
+      await (_db.update(_db.instrumentScores)..where((is_) => is_.id.equals(instrumentScoreId)))
+        .write(InstrumentScoresCompanion(
+          deletedAt: Value(DateTime.now()),
+          syncStatus: const Value('pending'),
+        ));
+    } else {
+      await (_db.delete(_db.instrumentScores)..where((is_) => is_.id.equals(instrumentScoreId))).go();
+    }
+
+    _log('Cascade delete InstrumentScore complete: $instrumentScoreId');
+  }
+
+  /// Cleanup local PDF file if no other InstrumentScores reference it
+  /// Per APP_SYNC_LOGIC.md §3.5.2: Local reference counting before physical delete
+  Future<void> _cleanupLocalPdfIfUnreferenced(
+    String excludeInstrumentScoreId,
+    String pdfPath,
+    String pdfHash,
+  ) async {
+    // Count other InstrumentScores that reference the same pdfHash (excluding the one being deleted)
+    final otherReferences = await (_db.select(_db.instrumentScores)
+      ..where((is_) => is_.pdfHash.equals(pdfHash))
+      ..where((is_) => is_.id.isNotValue(excludeInstrumentScoreId))
+      ..where((is_) => is_.deletedAt.isNull())).get();
+
+    if (otherReferences.isEmpty) {
+      // No other local references - safe to delete the physical file
+      try {
+        final file = File(pdfPath);
+        if (await file.exists()) {
+          await file.delete();
+          _log('Deleted local PDF (no other references): $pdfPath');
+        }
+      } catch (e) {
+        _logError('Failed to delete local PDF', e);
+      }
+    } else {
+      _log('Keeping local PDF (${otherReferences.length} other references): $pdfPath');
+    }
+  }
+
+  /// Cascade delete Setlist with all SetlistScores
+  /// Per APP_SYNC_LOGIC.md §2.5.3: Setlist deletion cascades to SetlistScore associations
+  Future<void> _cascadeDeleteSetlist(String setlistId, {required bool soft}) async {
+    _log('Cascade delete Setlist: $setlistId (soft=$soft)');
+
+    // 1. Delete all SetlistScore associations
+    final setlistScores = await (_db.select(_db.setlistScores)
+      ..where((ss) => ss.setlistId.equals(setlistId))).get();
+    for (final ss in setlistScores) {
+      if (soft) {
+        await (_db.update(_db.setlistScores)
+          ..where((t) => t.setlistId.equals(ss.setlistId) & t.scoreId.equals(ss.scoreId)))
+          .write(SetlistScoresCompanion(
+            deletedAt: Value(DateTime.now()),
+            syncStatus: const Value('pending'),
+          ));
+      } else {
+        await (_db.delete(_db.setlistScores)
+          ..where((t) => t.setlistId.equals(ss.setlistId) & t.scoreId.equals(ss.scoreId))).go();
+      }
+    }
+
+    // 2. Delete the Setlist itself
+    if (soft) {
+      await (_db.update(_db.setlists)..where((s) => s.id.equals(setlistId)))
+        .write(SetlistsCompanion(
+          deletedAt: Value(DateTime.now()),
+          syncStatus: const Value('pending'),
+        ));
+    } else {
+      await (_db.delete(_db.setlists)..where((s) => s.id.equals(setlistId))).go();
+    }
+
+    _log('Cascade delete Setlist complete: $setlistId');
   }
 
   // ============================================================================

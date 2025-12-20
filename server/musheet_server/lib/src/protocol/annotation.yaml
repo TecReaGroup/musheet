@@ -12,6 +12,11 @@ fields:
   height: double?
   color: String?
   vectorClock: String?
+  # Per sync_logic.md §2.6: Store drawing points as JSON string
+  # Format: "[x1, y1, x2, y2, ...]" - flattened list of point coordinates
+  points: String?
+  # Stroke width for drawing annotations
+  strokeWidth: double?
   createdAt: DateTime
   updatedAt: DateTime
   version: int

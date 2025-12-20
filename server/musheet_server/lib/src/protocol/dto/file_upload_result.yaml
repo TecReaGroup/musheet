@@ -2,4 +2,5 @@ class: FileUploadResult
 fields:
   success: bool
   path: String?
+  hash: String?  # Per sync_logic.md §3.1: Return hash for global deduplication
   errorMessage: String?

@@ -7,12 +7,18 @@ import '../helpers/auth_helper.dart';
 
 /// Library Sync Endpoint
 /// Implements Zotero-style Library-Wide Version synchronization
-/// 
+///
+/// Per APP_SYNC_LOGIC.md and SERVER_SYNC_LOGIC.md:
+///
 /// Key principles:
-/// 1. Single libraryVersion for entire user's data
-/// 2. Push with If-Unmodified-Since-Version for conflict detection
-/// 3. Pull returns all changes since a given version
-/// 4. Local operations win in conflict resolution
+/// 1. Single libraryVersion for entire user's data (Library-Wide Version)
+/// 2. Push with clientLibraryVersion for conflict detection (412 Conflict)
+/// 3. Pull returns all changes since a given version (including deleted with isDeleted=true)
+/// 4. Local operations win in conflict resolution (pending > synced)
+/// 5. Soft delete mechanism with deletedAt field
+/// 6. Per-Entity Version: each entity change increments libraryVersion
+/// 7. Annotations are embedded in InstrumentScore.annotationsJson (not synced independently)
+/// 8. PDF files use global deduplication with content-addressable storage (hash-based)
 class LibrarySyncEndpoint extends Endpoint {
   
   /// Pull changes since a given library version
@@ -23,36 +29,37 @@ class LibrarySyncEndpoint extends Endpoint {
     int since = 0,
   }) async {
     session.log('[LIBSYNC] pull called - userId: $userId, since: $since', level: LogLevel.info);
-    
+
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
-    
+
     // Get or create user library
     final library = await _getOrCreateUserLibrary(session, validatedUserId);
     final currentVersion = library.libraryVersion;
-    
+
     session.log('[LIBSYNC] Current library version: $currentVersion', level: LogLevel.debug);
-    
+
     final isFullSync = since == 0;
-    
+
     // Get all entities modified since the given version
+    // NOTE: Per sync_logic.md §2.6, Annotations are embedded in InstrumentScore
     final scores = await _getScoresSince(session, validatedUserId, since);
     final instrumentScores = await _getInstrumentScoresSince(session, validatedUserId, since);
-    final annotations = await _getAnnotationsSince(session, validatedUserId, since);
+    // Annotations are no longer synced independently - they are embedded in InstrumentScore.annotationsJson
     final setlists = await _getSetlistsSince(session, validatedUserId, since);
     final setlistScores = await _getSetlistScoresSince(session, validatedUserId, since);
-    
+
     // Get deleted entities (those with deletedAt set and version > since)
     final deleted = await _getDeletedEntitiesSince(session, validatedUserId, since);
-    
+
     session.log('[LIBSYNC] Pull complete: ${scores.length} scores, ${instrumentScores.length} instScores, '
-        '${annotations.length} annotations, ${setlists.length} setlists, ${deleted.length} deleted', 
+        '${setlists.length} setlists, ${deleted.length} deleted',
         level: LogLevel.info);
-    
+
     return SyncPullResponse(
       libraryVersion: currentVersion,
       scores: scores.isEmpty ? null : scores,
       instrumentScores: instrumentScores.isEmpty ? null : instrumentScores,
-      annotations: annotations.isEmpty ? null : annotations,
+      annotations: null, // Per sync_logic.md §2.6: Annotations are embedded in InstrumentScore
       setlists: setlists.isEmpty ? null : setlists,
       setlistScores: setlistScores.isEmpty ? null : setlistScores,
       deleted: deleted.isEmpty ? null : deleted,
@@ -106,7 +113,7 @@ class LibrarySyncEndpoint extends Endpoint {
         }
       }
       
-      // Process instrument scores
+      // Process instrument scores (now includes embedded annotations)
       if (request.instrumentScores != null) {
         for (final change in request.instrumentScores!) {
           newVersion++;
@@ -117,27 +124,19 @@ class LibrarySyncEndpoint extends Endpoint {
           }
         }
       }
-      
-      // Process annotations
-      if (request.annotations != null) {
-        for (final change in request.annotations!) {
-          newVersion++;
-          final result = await _processAnnotationChange(session, validatedUserId, change, newVersion);
-          acceptedIds.add(change.entityId);
-          if (result != null) {
-            serverIdMapping[change.entityId] = result;
-          }
-        }
-      }
-      
+
+      // NOTE: Per sync_logic.md §2.6, Annotations are embedded in InstrumentScore
+      // The annotations field in SyncPushRequest is kept for API compatibility but ignored
+
       // Process setlists
       if (request.setlists != null) {
         for (final change in request.setlists!) {
           newVersion++;
           final result = await _processSetlistChange(session, validatedUserId, change, newVersion);
+          newVersion = result.finalVersion; // Update version after any cascaded operations
           acceptedIds.add(change.entityId);
-          if (result != null) {
-            serverIdMapping[change.entityId] = result;
+          if (result.serverId != null) {
+            serverIdMapping[change.entityId] = result.serverId!;
           }
         }
       }
@@ -254,60 +253,57 @@ class LibrarySyncEndpoint extends Endpoint {
       where: (t) => t.userId.equals(userId),
     );
     final scoreIds = userScores.map((s) => s.id!).toSet();
-    
+
     if (scoreIds.isEmpty) return [];
-    
+
     // Optimized: Use single query with IN clause instead of loop
     final instrumentScores = await InstrumentScore.db.find(
       session,
       where: (t) => t.scoreId.inSet(scoreIds) & (t.version > sinceVersion),
     );
-    
-    return instrumentScores.map((is_) => SyncEntityData(
-      entityType: 'instrumentScore',
-      serverId: is_.id!,
-      version: is_.version,
-      data: jsonEncode({
-        'scoreId': is_.scoreId,
-        'instrumentName': is_.instrumentName,
-        'pdfPath': is_.pdfPath,
-        'pdfHash': is_.pdfHash,
-        'orderIndex': is_.orderIndex,
-        'createdAt': is_.createdAt.toIso8601String(),
-      }),
-      updatedAt: is_.updatedAt,
-      isDeleted: is_.deletedAt != null,  // Check deletedAt field
-    )).toList();
+
+    final result = <SyncEntityData>[];
+    for (final is_ in instrumentScores) {
+      // Per sync_logic.md §2.6: Embed annotations in InstrumentScore
+      final annotations = await Annotation.db.find(
+        session,
+        where: (t) => t.instrumentScoreId.equals(is_.id!),
+      );
+
+      // Build embedded annotations JSON
+      final annotationsList = annotations.map((ann) => {
+        'id': 'server_${ann.id}', // Use server-prefixed ID for client
+        'pageNumber': ann.pageNumber,
+        'type': ann.type,
+        'color': ann.color,
+        'strokeWidth': ann.strokeWidth ?? ann.width ?? 2.0,
+        'points': ann.points, // Return stored points data
+        'textContent': ann.data,
+        'posX': ann.positionX,
+        'posY': ann.positionY,
+      }).toList();
+
+      result.add(SyncEntityData(
+        entityType: 'instrumentScore',
+        serverId: is_.id!,
+        version: is_.version,
+        data: jsonEncode({
+          'scoreId': is_.scoreId,
+          'instrumentName': is_.instrumentName,
+          'pdfPath': is_.pdfPath,
+          'pdfHash': is_.pdfHash,
+          'orderIndex': is_.orderIndex,
+          'createdAt': is_.createdAt.toIso8601String(),
+          'annotationsJson': jsonEncode(annotationsList), // Embedded annotations
+        }),
+        updatedAt: is_.updatedAt,
+        isDeleted: is_.deletedAt != null,
+      ));
+    }
+
+    return result;
   }
-  
-  Future<List<SyncEntityData>> _getAnnotationsSince(Session session, int userId, int sinceVersion) async {
-    final annotations = await Annotation.db.find(
-      session,
-      where: (t) => t.userId.equals(userId) & (t.version > sinceVersion),
-    );
-    
-    return annotations.map((a) => SyncEntityData(
-      entityType: 'annotation',
-      serverId: a.id!,
-      version: a.version,
-      data: jsonEncode({
-        'instrumentScoreId': a.instrumentScoreId,
-        'pageNumber': a.pageNumber,
-        'type': a.type,
-        'data': a.data,
-        'positionX': a.positionX,
-        'positionY': a.positionY,
-        'width': a.width,
-        'height': a.height,
-        'color': a.color,
-        'vectorClock': a.vectorClock,
-        'createdAt': a.createdAt.toIso8601String(),
-      }),
-      updatedAt: a.updatedAt,
-      isDeleted: false,  // Annotations use physical delete, never soft deleted
-    )).toList();
-  }
-  
+
   Future<List<SyncEntityData>> _getSetlistsSince(Session session, int userId, int sinceVersion) async {
     final setlists = await Setlist.db.find(
       session,
@@ -524,7 +520,7 @@ class LibrarySyncEndpoint extends Endpoint {
     int newVersion,
   ) async {
     final data = jsonDecode(change.data) as Map<String, dynamic>;
-    
+
     if (change.operation == 'delete') {
       if (change.serverId != null) {
         final existing = await InstrumentScore.db.findById(session, change.serverId!);
@@ -541,32 +537,41 @@ class LibrarySyncEndpoint extends Endpoint {
             for (final ann in annotations) {
               await Annotation.db.deleteRow(session, ann);
             }
-            
-            // Delete physical PDF file
-            if (existing.pdfPath != null) {
-              await _deleteFile(existing.pdfPath!);
-            }
-            
+
+            // Per APP_SYNC_LOGIC.md §3.5: Use global reference counting for PDF cleanup
+            // Don't delete directly - mark for cleanup after soft delete
+            final pdfHash = existing.pdfHash;
+
             // Soft delete the instrument score
             existing.deletedAt = DateTime.now();
             existing.version = newVersion;
             existing.updatedAt = DateTime.now();
             await InstrumentScore.db.updateRow(session, existing);
+
+            // Now check if PDF should be deleted (after soft delete, reference count should exclude this record)
+            if (pdfHash != null) {
+              await _cleanupPdfIfUnreferenced(session, pdfHash);
+            }
           }
         }
       }
       return null;
     }
-    
+
     final scoreId = data['scoreId'] as int;
     final instrumentName = data['instrumentName'] as String;
-    
+
     // Verify ownership
     final score = await Score.db.findById(session, scoreId);
     if (score == null || score.userId != userId) {
       throw Exception('Score not found or not owned by user');
     }
-    
+
+    // Extract embedded annotations from client data (per sync_logic.md §2.6)
+    final annotationsJsonStr = data['annotationsJson'] as String?;
+
+    int? instrumentScoreId;
+
     if (change.serverId != null) {
       // Update existing
       final existing = await InstrumentScore.db.findById(session, change.serverId!);
@@ -575,163 +580,187 @@ class LibrarySyncEndpoint extends Endpoint {
         existing.pdfPath = data['pdfPath'] as String?;
         existing.pdfHash = data['pdfHash'] as String?;
         existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
+        existing.annotationsJson = annotationsJsonStr;
         existing.version = newVersion;
         existing.syncStatus = 'synced';
         existing.updatedAt = DateTime.now();
         await InstrumentScore.db.updateRow(session, existing);
-        return existing.id;
+        instrumentScoreId = existing.id;
       }
     }
-    
-    // Check for existing InstrumentScore with same (scoreId, instrumentName), including deleted ones
-    final existingInstruments = await InstrumentScore.db.find(
-      session,
-      where: (t) => t.scoreId.equals(scoreId) & t.instrumentName.equals(instrumentName),
-    );
-    
-    // If found, update it instead of creating new (restore if deleted)
-    if (existingInstruments.isNotEmpty) {
-      final existing = existingInstruments.first;
-      existing.pdfPath = data['pdfPath'] as String?;
-      existing.pdfHash = data['pdfHash'] as String?;
-      existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
-      existing.version = newVersion;
-      existing.syncStatus = 'synced';
-      existing.updatedAt = DateTime.now();
-      existing.deletedAt = null; // Restore if it was deleted
-      await InstrumentScore.db.updateRow(session, existing);
-      return existing.id;
-    }
-    
-    // Create new only if no existing found
-    final instrumentScore = InstrumentScore(
-      scoreId: scoreId,
-      instrumentName: instrumentName,
-      pdfPath: data['pdfPath'] as String?,
-      pdfHash: data['pdfHash'] as String?,
-      orderIndex: data['orderIndex'] as int? ?? 0,
-      version: newVersion,
-      syncStatus: 'synced',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    final inserted = await InstrumentScore.db.insertRow(session, instrumentScore);
-    return inserted.id;
-  }
-  
-  Future<int?> _processAnnotationChange(
-    Session session,
-    int userId,
-    SyncEntityChange change,
-    int newVersion,
-  ) async {
-    final data = jsonDecode(change.data) as Map<String, dynamic>;
-    
-    if (change.operation == 'delete') {
-      if (change.serverId != null) {
-        final existing = await Annotation.db.findById(session, change.serverId!);
-        if (existing != null && existing.userId == userId) {
-          // Physically delete annotation
-          // Per sync_logic.md, annotations don't use soft delete
-          await Annotation.db.deleteRow(session, existing);
-        }
-      }
-      return null;
-    }
-    
-    if (change.serverId != null) {
-      // Update existing
-      final existing = await Annotation.db.findById(session, change.serverId!);
-      if (existing != null && existing.userId == userId) {
-        existing.type = data['type'] as String? ?? existing.type;
-        existing.data = data['data'] as String? ?? existing.data;
-        existing.positionX = (data['positionX'] as num?)?.toDouble() ?? existing.positionX;
-        existing.positionY = (data['positionY'] as num?)?.toDouble() ?? existing.positionY;
-        existing.width = (data['width'] as num?)?.toDouble();
-        existing.height = (data['height'] as num?)?.toDouble();
-        existing.color = data['color'] as String?;
-        existing.vectorClock = data['vectorClock'] as String?;
+
+    if (instrumentScoreId == null) {
+      // Check for existing InstrumentScore with same (scoreId, instrumentName), including deleted ones
+      final existingInstruments = await InstrumentScore.db.find(
+        session,
+        where: (t) => t.scoreId.equals(scoreId) & t.instrumentName.equals(instrumentName),
+      );
+
+      // If found, update it instead of creating new (restore if deleted)
+      if (existingInstruments.isNotEmpty) {
+        final existing = existingInstruments.first;
+        existing.pdfPath = data['pdfPath'] as String?;
+        existing.pdfHash = data['pdfHash'] as String?;
+        existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
+        existing.annotationsJson = annotationsJsonStr;
         existing.version = newVersion;
         existing.syncStatus = 'synced';
         existing.updatedAt = DateTime.now();
-        await Annotation.db.updateRow(session, existing);
-        return existing.id;
+        existing.deletedAt = null; // Restore if it was deleted
+        await InstrumentScore.db.updateRow(session, existing);
+        instrumentScoreId = existing.id;
+      } else {
+        // Create new only if no existing found
+        final instrumentScore = InstrumentScore(
+          scoreId: scoreId,
+          instrumentName: instrumentName,
+          pdfPath: data['pdfPath'] as String?,
+          pdfHash: data['pdfHash'] as String?,
+          orderIndex: data['orderIndex'] as int? ?? 0,
+          annotationsJson: annotationsJsonStr,
+          version: newVersion,
+          syncStatus: 'synced',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        final inserted = await InstrumentScore.db.insertRow(session, instrumentScore);
+        instrumentScoreId = inserted.id;
       }
     }
-    
-    // Create new
-    final annotation = Annotation(
-      instrumentScoreId: data['instrumentScoreId'] as int,
-      userId: userId,
-      pageNumber: data['pageNumber'] as int,
-      type: data['type'] as String,
-      data: data['data'] as String,
-      positionX: (data['positionX'] as num).toDouble(),
-      positionY: (data['positionY'] as num).toDouble(),
-      width: (data['width'] as num?)?.toDouble(),
-      height: (data['height'] as num?)?.toDouble(),
-      color: data['color'] as String?,
-      vectorClock: data['vectorClock'] as String?,
-      version: newVersion,
-      syncStatus: 'synced',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-    final inserted = await Annotation.db.insertRow(session, annotation);
-    return inserted.id;
+
+    // Sync embedded annotations to Annotation table (per sync_logic.md §2.6)
+    if (instrumentScoreId != null) {
+      await _syncEmbeddedAnnotations(session, userId, instrumentScoreId, annotationsJsonStr);
+    }
+
+    return instrumentScoreId;
   }
-  
-  Future<int?> _processSetlistChange(
+
+  /// Sync embedded annotations from InstrumentScore to Annotation table
+  /// Per sync_logic.md §2.6: Full replacement strategy - each sync completely replaces
+  /// all annotations for this InstrumentScore with client-provided data
+  Future<void> _syncEmbeddedAnnotations(
+    Session session,
+    int userId,
+    int instrumentScoreId,
+    String? annotationsJsonStr,
+  ) async {
+    // Step 1: Delete ALL existing annotations for this InstrumentScore
+    final existingAnnotations = await Annotation.db.find(
+      session,
+      where: (t) => t.instrumentScoreId.equals(instrumentScoreId),
+    );
+    for (final ann in existingAnnotations) {
+      await Annotation.db.deleteRow(session, ann);
+    }
+
+    // Step 2: If no new annotations, we're done
+    if (annotationsJsonStr == null || annotationsJsonStr.isEmpty || annotationsJsonStr == '[]') {
+      return;
+    }
+
+    // Step 3: Insert all annotations from client
+    try {
+      final List<dynamic> annotationsList = jsonDecode(annotationsJsonStr) as List<dynamic>;
+
+      for (final annMap in annotationsList) {
+        final annData = annMap as Map<String, dynamic>;
+
+        // Convert points to JSON string if it's a List
+        String? pointsStr;
+        final pointsData = annData['points'];
+        if (pointsData != null) {
+          if (pointsData is String) {
+            pointsStr = pointsData;
+          } else if (pointsData is List) {
+            pointsStr = jsonEncode(pointsData);
+          }
+        }
+
+        // Create new annotation
+        final annotation = Annotation(
+          instrumentScoreId: instrumentScoreId,
+          userId: userId,
+          pageNumber: annData['pageNumber'] as int? ?? 1,
+          type: annData['type'] as String? ?? 'draw',
+          data: annData['textContent'] as String? ?? '',
+          positionX: (annData['posX'] as num?)?.toDouble() ?? 0.0,
+          positionY: (annData['posY'] as num?)?.toDouble() ?? 0.0,
+          width: (annData['strokeWidth'] as num?)?.toDouble(),
+          strokeWidth: (annData['strokeWidth'] as num?)?.toDouble(),
+          height: null,
+          color: annData['color'] as String?,
+          points: pointsStr,
+          vectorClock: null,
+          version: 1,
+          syncStatus: 'synced',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        );
+        await Annotation.db.insertRow(session, annotation);
+      }
+    } catch (e) {
+      session.log('[LIBSYNC] Error syncing embedded annotations: $e', level: LogLevel.error);
+    }
+  }
+
+  /// Process setlist change and return (serverId, finalVersion)
+  /// Returns (serverId for new entities, finalVersion after any cascaded operations)
+  Future<({int? serverId, int finalVersion})> _processSetlistChange(
     Session session,
     int userId,
     SyncEntityChange change,
     int newVersion,
   ) async {
     final data = jsonDecode(change.data) as Map<String, dynamic>;
-    
+    var currentVersion = newVersion;
+
     if (change.operation == 'delete') {
       if (change.serverId != null) {
         final existing = await Setlist.db.findById(session, change.serverId!);
         if (existing != null && existing.userId == userId) {
           existing.deletedAt = DateTime.now();
-          existing.version = newVersion;
+          existing.version = currentVersion;
           existing.syncStatus = 'synced';
           existing.updatedAt = DateTime.now();
           await Setlist.db.updateRow(session, existing);
-          
-          // Cascade soft delete setlist scores
+
+          // Cascade soft delete setlist scores with properly incremented versions
+          // Per SERVER_SYNC_LOGIC.md §7.3: Each cascaded entity gets its own version
           final setlistScores = await SetlistScore.db.find(
             session,
             where: (t) => t.setlistId.equals(change.serverId!),
           );
+
           for (final ss in setlistScores) {
+            currentVersion++; // Each cascaded entity gets its own version increment
             ss.deletedAt = DateTime.now();
-            ss.version = newVersion;
+            ss.version = currentVersion;
             ss.updatedAt = DateTime.now();
             await SetlistScore.db.updateRow(session, ss);
           }
         }
       }
-      return null;
+      return (serverId: null, finalVersion: currentVersion);
     }
-    
+
     final name = data['name'] as String;
-    
+
     if (change.serverId != null) {
       // Update existing
       final existing = await Setlist.db.findById(session, change.serverId!);
       if (existing != null && existing.userId == userId) {
         existing.name = name;
         existing.description = data['description'] as String?;
-        existing.version = newVersion;
+        existing.version = currentVersion;
         existing.syncStatus = 'synced';
         existing.updatedAt = DateTime.now();
         existing.deletedAt = null; // Restore if it was deleted
         await Setlist.db.updateRow(session, existing);
-        return existing.id;
+        return (serverId: existing.id, finalVersion: currentVersion);
       }
     }
-    
+
     // Check for deleted setlist with same (userId, name) - restore instead of creating new
     final deletedSetlists = await Setlist.db.find(
       session,
@@ -739,31 +768,31 @@ class LibrarySyncEndpoint extends Endpoint {
                     t.name.equals(name) &
                     t.deletedAt.notEquals(null),
     );
-    
+
     // If found a deleted setlist with same name, restore it
     if (deletedSetlists.isNotEmpty) {
       final setlistToRestore = deletedSetlists.first;
       setlistToRestore.description = data['description'] as String?;
-      setlistToRestore.version = newVersion;
+      setlistToRestore.version = currentVersion;
       setlistToRestore.syncStatus = 'synced';
       setlistToRestore.updatedAt = DateTime.now();
       setlistToRestore.deletedAt = null; // Restore
       await Setlist.db.updateRow(session, setlistToRestore);
-      return setlistToRestore.id;
+      return (serverId: setlistToRestore.id, finalVersion: currentVersion);
     }
-    
+
     // Create new only if no deleted setlist found
     final setlist = Setlist(
       userId: userId,
       name: name,
       description: data['description'] as String?,
-      version: newVersion,
+      version: currentVersion,
       syncStatus: 'synced',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
     final inserted = await Setlist.db.insertRow(session, setlist);
-    return inserted.id;
+    return (serverId: inserted.id, finalVersion: currentVersion);
   }
   
   Future<int?> _processSetlistScoreChange(
@@ -881,12 +910,16 @@ class LibrarySyncEndpoint extends Endpoint {
           score.version = newVersion;
           score.updatedAt = DateTime.now();
           await Score.db.updateRow(session, score);
-          
+
           // Cascade soft delete: InstrumentScores and Annotations
           final instrumentScores = await InstrumentScore.db.find(
             session,
             where: (t) => t.scoreId.equals(serverId),
           );
+
+          // Collect PDF hashes for cleanup after soft delete
+          final pdfHashesToCleanup = <String>[];
+
           for (final is_ in instrumentScores) {
             // Physically delete annotations for this instrument score
             // Per sync_logic.md, annotations don't use soft delete
@@ -897,12 +930,12 @@ class LibrarySyncEndpoint extends Endpoint {
             for (final ann in annotations) {
               await Annotation.db.deleteRow(session, ann);
             }
-            
-            // Delete physical PDF file (file deletion is immediate)
-            if (is_.pdfPath != null) {
-              await _deleteFile(is_.pdfPath!);
+
+            // Collect PDF hash for later cleanup (per APP_SYNC_LOGIC.md §3.5)
+            if (is_.pdfHash != null) {
+              pdfHashesToCleanup.add(is_.pdfHash!);
             }
-            
+
             // Soft delete InstrumentScore record with properly incremented version
             newVersion++; // Each cascaded entity gets its own version increment
             is_.deletedAt = DateTime.now();
@@ -910,7 +943,12 @@ class LibrarySyncEndpoint extends Endpoint {
             is_.updatedAt = DateTime.now();
             await InstrumentScore.db.updateRow(session, is_);
           }
-          
+
+          // Cleanup PDFs after soft deletes (per APP_SYNC_LOGIC.md §3.5: global reference counting)
+          for (final hash in pdfHashesToCleanup) {
+            await _cleanupPdfIfUnreferenced(session, hash);
+          }
+
           // Soft delete setlist score associations with properly incremented versions
           final setlistScores = await SetlistScore.db.find(
             session,
@@ -963,17 +1001,20 @@ class LibrarySyncEndpoint extends Endpoint {
             for (final ann in annotations) {
               await Annotation.db.deleteRow(session, ann);
             }
-            
-            // Delete physical PDF file
-            if (instrumentScore.pdfPath != null) {
-              await _deleteFile(instrumentScore.pdfPath!);
-            }
-            
+
+            // Collect PDF hash for cleanup after soft delete (per APP_SYNC_LOGIC.md §3.5)
+            final pdfHash = instrumentScore.pdfHash;
+
             // Soft delete instrument score
             instrumentScore.deletedAt = DateTime.now();
             instrumentScore.version = newVersion;
             instrumentScore.updatedAt = DateTime.now();
             await InstrumentScore.db.updateRow(session, instrumentScore);
+
+            // Cleanup PDF using global reference counting
+            if (pdfHash != null) {
+              await _cleanupPdfIfUnreferenced(session, pdfHash);
+            }
           }
         }
         break;
@@ -1011,6 +1052,25 @@ class LibrarySyncEndpoint extends Endpoint {
     final file = File('uploads/$path');
     if (await file.exists()) {
       await file.delete();
+    }
+  }
+
+  /// Cleanup PDF if no global references exist
+  /// Per APP_SYNC_LOGIC.md §3.5: Global reference count = all InstrumentScores with this hash
+  Future<void> _cleanupPdfIfUnreferenced(Session session, String hash) async {
+    // Count ALL InstrumentScores with this hash (across all users, excluding soft-deleted)
+    final references = await InstrumentScore.db.find(
+      session,
+      where: (t) => t.pdfHash.equals(hash) & t.deletedAt.equals(null),
+    );
+
+    if (references.isEmpty) {
+      // No references left - physically delete the file
+      final globalPath = 'global/pdfs/$hash.pdf';
+      await _deleteFile(globalPath);
+      session.log('[LIBSYNC] Deleted unreferenced PDF: $hash', level: LogLevel.info);
+    } else {
+      session.log('[LIBSYNC] PDF $hash still has ${references.length} references, keeping file', level: LogLevel.debug);
     }
   }
 }

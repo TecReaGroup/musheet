@@ -1,7 +1,7 @@
 BEGIN;
 
 --
--- Class Annotation as table annotations
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "annotations" (
     "id" bigserial PRIMARY KEY,
@@ -16,6 +16,8 @@ CREATE TABLE "annotations" (
     "height" double precision,
     "color" text,
     "vectorClock" text,
+    "points" text,
+    "strokeWidth" double precision,
     "createdAt" timestamp without time zone NOT NULL,
     "updatedAt" timestamp without time zone NOT NULL,
     "version" bigint NOT NULL,
@@ -27,7 +29,7 @@ CREATE INDEX "annotation_inst_score_idx" ON "annotations" USING btree ("instrume
 CREATE INDEX "annotation_user_version_idx" ON "annotations" USING btree ("userId", "version");
 
 --
--- Class Application as table applications
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "applications" (
     "id" bigserial PRIMARY KEY,
@@ -44,7 +46,7 @@ CREATE TABLE "applications" (
 CREATE UNIQUE INDEX "app_id_idx" ON "applications" USING btree ("appId");
 
 --
--- Class InstrumentScore as table instrument_scores
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "instrument_scores" (
     "id" bigserial PRIMARY KEY,
@@ -57,7 +59,8 @@ CREATE TABLE "instrument_scores" (
     "updatedAt" timestamp without time zone NOT NULL,
     "deletedAt" timestamp without time zone,
     "version" bigint NOT NULL,
-    "syncStatus" text
+    "syncStatus" text,
+    "annotationsJson" text
 );
 
 -- Indexes
@@ -66,7 +69,7 @@ CREATE UNIQUE INDEX "instrument_score_unique" ON "instrument_scores" USING btree
 CREATE INDEX "instrument_score_version_idx" ON "instrument_scores" USING btree ("scoreId", "version");
 
 --
--- Class Score as table scores
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "scores" (
     "id" bigserial PRIMARY KEY,
@@ -88,7 +91,7 @@ CREATE UNIQUE INDEX "score_user_title_composer_unique" ON "scores" USING btree (
 CREATE INDEX "score_user_version_idx" ON "scores" USING btree ("userId", "version");
 
 --
--- Class SetlistScore as table setlist_scores
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "setlist_scores" (
     "id" bigserial PRIMARY KEY,
@@ -107,7 +110,7 @@ CREATE INDEX "setlist_score_idx" ON "setlist_scores" USING btree ("setlistId");
 CREATE UNIQUE INDEX "setlist_score_unique" ON "setlist_scores" USING btree ("setlistId", "scoreId");
 
 --
--- Class Setlist as table setlists
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "setlists" (
     "id" bigserial PRIMARY KEY,
@@ -127,7 +130,7 @@ CREATE UNIQUE INDEX "setlist_user_name_unique" ON "setlists" USING btree ("userI
 CREATE INDEX "setlist_version_idx" ON "setlists" USING btree ("userId", "version");
 
 --
--- Class TeamAnnotation as table team_annotations
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "team_annotations" (
     "id" bigserial PRIMARY KEY,
@@ -149,7 +152,7 @@ CREATE TABLE "team_annotations" (
 CREATE INDEX "team_annotation_team_score_idx" ON "team_annotations" USING btree ("teamScoreId");
 
 --
--- Class TeamMember as table team_members
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "team_members" (
     "id" bigserial PRIMARY KEY,
@@ -165,7 +168,7 @@ CREATE INDEX "team_member_user_idx" ON "team_members" USING btree ("userId");
 CREATE UNIQUE INDEX "team_member_unique_idx" ON "team_members" USING btree ("teamId", "userId");
 
 --
--- Class TeamScore as table team_scores
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "team_scores" (
     "id" bigserial PRIMARY KEY,
@@ -180,7 +183,7 @@ CREATE INDEX "team_score_team_idx" ON "team_scores" USING btree ("teamId");
 CREATE UNIQUE INDEX "team_score_unique_idx" ON "team_scores" USING btree ("teamId", "scoreId");
 
 --
--- Class TeamSetlist as table team_setlists
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "team_setlists" (
     "id" bigserial PRIMARY KEY,
@@ -195,7 +198,7 @@ CREATE INDEX "team_setlist_team_idx" ON "team_setlists" USING btree ("teamId");
 CREATE UNIQUE INDEX "team_setlist_unique_idx" ON "team_setlists" USING btree ("teamId", "setlistId");
 
 --
--- Class Team as table teams
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "teams" (
     "id" bigserial PRIMARY KEY,
@@ -211,7 +214,7 @@ CREATE TABLE "teams" (
 CREATE UNIQUE INDEX "team_invite_code_idx" ON "teams" USING btree ("inviteCode");
 
 --
--- Class UserAppData as table user_app_data
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "user_app_data" (
     "id" bigserial PRIMARY KEY,
@@ -227,7 +230,7 @@ CREATE TABLE "user_app_data" (
 CREATE UNIQUE INDEX "user_app_data_user_app_idx" ON "user_app_data" USING btree ("userId", "applicationId");
 
 --
--- Class UserLibrary as table user_libraries
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "user_libraries" (
     "id" bigserial PRIMARY KEY,
@@ -241,7 +244,7 @@ CREATE TABLE "user_libraries" (
 CREATE UNIQUE INDEX "user_library_user_idx" ON "user_libraries" USING btree ("userId");
 
 --
--- Class UserStorage as table user_storage
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "user_storage" (
     "id" bigserial PRIMARY KEY,
@@ -255,7 +258,7 @@ CREATE TABLE "user_storage" (
 CREATE UNIQUE INDEX "user_storage_user_idx" ON "user_storage" USING btree ("userId");
 
 --
--- Class User as table users
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "users" (
     "id" bigserial PRIMARY KEY,
@@ -277,7 +280,7 @@ CREATE TABLE "users" (
 CREATE UNIQUE INDEX "user_username_idx" ON "users" USING btree ("username");
 
 --
--- Class CloudStorageEntry as table serverpod_cloud_storage
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_cloud_storage" (
     "id" bigserial PRIMARY KEY,
@@ -294,7 +297,7 @@ CREATE UNIQUE INDEX "serverpod_cloud_storage_path_idx" ON "serverpod_cloud_stora
 CREATE INDEX "serverpod_cloud_storage_expiration" ON "serverpod_cloud_storage" USING btree ("expiration");
 
 --
--- Class CloudStorageDirectUploadEntry as table serverpod_cloud_storage_direct_upload
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_cloud_storage_direct_upload" (
     "id" bigserial PRIMARY KEY,
@@ -308,7 +311,7 @@ CREATE TABLE "serverpod_cloud_storage_direct_upload" (
 CREATE UNIQUE INDEX "serverpod_cloud_storage_direct_upload_storage_path" ON "serverpod_cloud_storage_direct_upload" USING btree ("storageId", "path");
 
 --
--- Class FutureCallEntry as table serverpod_future_call
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_future_call" (
     "id" bigserial PRIMARY KEY,
@@ -325,7 +328,7 @@ CREATE INDEX "serverpod_future_call_serverId_idx" ON "serverpod_future_call" USI
 CREATE INDEX "serverpod_future_call_identifier_idx" ON "serverpod_future_call" USING btree ("identifier");
 
 --
--- Class ServerHealthConnectionInfo as table serverpod_health_connection_info
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_health_connection_info" (
     "id" bigserial PRIMARY KEY,
@@ -341,7 +344,7 @@ CREATE TABLE "serverpod_health_connection_info" (
 CREATE UNIQUE INDEX "serverpod_health_connection_info_timestamp_idx" ON "serverpod_health_connection_info" USING btree ("timestamp", "serverId", "granularity");
 
 --
--- Class ServerHealthMetric as table serverpod_health_metric
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_health_metric" (
     "id" bigserial PRIMARY KEY,
@@ -357,7 +360,7 @@ CREATE TABLE "serverpod_health_metric" (
 CREATE UNIQUE INDEX "serverpod_health_metric_timestamp_idx" ON "serverpod_health_metric" USING btree ("timestamp", "serverId", "name", "granularity");
 
 --
--- Class LogEntry as table serverpod_log
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_log" (
     "id" bigserial PRIMARY KEY,
@@ -377,7 +380,7 @@ CREATE TABLE "serverpod_log" (
 CREATE INDEX "serverpod_log_sessionLogId_idx" ON "serverpod_log" USING btree ("sessionLogId");
 
 --
--- Class MessageLogEntry as table serverpod_message_log
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_message_log" (
     "id" bigserial PRIMARY KEY,
@@ -394,7 +397,7 @@ CREATE TABLE "serverpod_message_log" (
 );
 
 --
--- Class MethodInfo as table serverpod_method
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_method" (
     "id" bigserial PRIMARY KEY,
@@ -406,7 +409,7 @@ CREATE TABLE "serverpod_method" (
 CREATE UNIQUE INDEX "serverpod_method_endpoint_method_idx" ON "serverpod_method" USING btree ("endpoint", "method");
 
 --
--- Class DatabaseMigrationVersion as table serverpod_migrations
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_migrations" (
     "id" bigserial PRIMARY KEY,
@@ -419,7 +422,7 @@ CREATE TABLE "serverpod_migrations" (
 CREATE UNIQUE INDEX "serverpod_migrations_ids" ON "serverpod_migrations" USING btree ("module");
 
 --
--- Class QueryLogEntry as table serverpod_query_log
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_query_log" (
     "id" bigserial PRIMARY KEY,
@@ -439,7 +442,7 @@ CREATE TABLE "serverpod_query_log" (
 CREATE INDEX "serverpod_query_log_sessionLogId_idx" ON "serverpod_query_log" USING btree ("sessionLogId");
 
 --
--- Class ReadWriteTestEntry as table serverpod_readwrite_test
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_readwrite_test" (
     "id" bigserial PRIMARY KEY,
@@ -447,7 +450,7 @@ CREATE TABLE "serverpod_readwrite_test" (
 );
 
 --
--- Class RuntimeSettings as table serverpod_runtime_settings
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_runtime_settings" (
     "id" bigserial PRIMARY KEY,
@@ -458,7 +461,7 @@ CREATE TABLE "serverpod_runtime_settings" (
 );
 
 --
--- Class SessionLogEntry as table serverpod_session_log
+-- ACTION CREATE TABLE
 --
 CREATE TABLE "serverpod_session_log" (
     "id" bigserial PRIMARY KEY,
@@ -484,7 +487,7 @@ CREATE INDEX "serverpod_session_log_touched_idx" ON "serverpod_session_log" USIN
 CREATE INDEX "serverpod_session_log_isopen_idx" ON "serverpod_session_log" USING btree ("isOpen");
 
 --
--- Foreign relations for "annotations" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "annotations"
     ADD CONSTRAINT "annotations_fk_0"
@@ -494,7 +497,7 @@ ALTER TABLE ONLY "annotations"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "instrument_scores" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "instrument_scores"
     ADD CONSTRAINT "instrument_scores_fk_0"
@@ -504,7 +507,7 @@ ALTER TABLE ONLY "instrument_scores"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "scores" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "scores"
     ADD CONSTRAINT "scores_fk_0"
@@ -514,7 +517,7 @@ ALTER TABLE ONLY "scores"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "setlist_scores" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "setlist_scores"
     ADD CONSTRAINT "setlist_scores_fk_0"
@@ -530,7 +533,7 @@ ALTER TABLE ONLY "setlist_scores"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "setlists" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "setlists"
     ADD CONSTRAINT "setlists_fk_0"
@@ -540,7 +543,7 @@ ALTER TABLE ONLY "setlists"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "team_annotations" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "team_annotations"
     ADD CONSTRAINT "team_annotations_fk_0"
@@ -550,7 +553,7 @@ ALTER TABLE ONLY "team_annotations"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "team_members" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "team_members"
     ADD CONSTRAINT "team_members_fk_0"
@@ -566,7 +569,7 @@ ALTER TABLE ONLY "team_members"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "team_scores" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "team_scores"
     ADD CONSTRAINT "team_scores_fk_0"
@@ -588,7 +591,7 @@ ALTER TABLE ONLY "team_scores"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "team_setlists" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "team_setlists"
     ADD CONSTRAINT "team_setlists_fk_0"
@@ -610,7 +613,7 @@ ALTER TABLE ONLY "team_setlists"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "teams" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "teams"
     ADD CONSTRAINT "teams_fk_0"
@@ -620,7 +623,7 @@ ALTER TABLE ONLY "teams"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "user_app_data" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "user_app_data"
     ADD CONSTRAINT "user_app_data_fk_0"
@@ -630,7 +633,7 @@ ALTER TABLE ONLY "user_app_data"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "user_libraries" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "user_libraries"
     ADD CONSTRAINT "user_libraries_fk_0"
@@ -640,7 +643,7 @@ ALTER TABLE ONLY "user_libraries"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "user_storage" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "user_storage"
     ADD CONSTRAINT "user_storage_fk_0"
@@ -650,7 +653,7 @@ ALTER TABLE ONLY "user_storage"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "serverpod_log" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "serverpod_log"
     ADD CONSTRAINT "serverpod_log_fk_0"
@@ -660,7 +663,7 @@ ALTER TABLE ONLY "serverpod_log"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "serverpod_message_log" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "serverpod_message_log"
     ADD CONSTRAINT "serverpod_message_log_fk_0"
@@ -670,7 +673,7 @@ ALTER TABLE ONLY "serverpod_message_log"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "serverpod_query_log" table
+-- ACTION CREATE FOREIGN KEY
 --
 ALTER TABLE ONLY "serverpod_query_log"
     ADD CONSTRAINT "serverpod_query_log_fk_0"
@@ -684,9 +687,9 @@ ALTER TABLE ONLY "serverpod_query_log"
 -- MIGRATION VERSION FOR musheet
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('musheet', '20251217163930570', now())
+    VALUES ('musheet', '20251220165259902', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20251217163930570', "timestamp" = now();
+    DO UPDATE SET "version" = '20251220165259902', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

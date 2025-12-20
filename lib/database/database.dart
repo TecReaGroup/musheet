@@ -37,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase._internal() : super(_openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -80,7 +80,7 @@ class AppDatabase extends _$AppDatabase {
           if (from < 3) {
             // Add deletedAt to instrument_scores if missing (users upgrading from v2)
             await customStatement("ALTER TABLE instrument_scores ADD COLUMN deleted_at INTEGER");
-            
+
             // Add sync fields to annotations using SQL
             await customStatement("ALTER TABLE annotations ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
             await customStatement("ALTER TABLE annotations ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'");
@@ -94,6 +94,14 @@ class AppDatabase extends _$AppDatabase {
             await customStatement("ALTER TABLE setlist_scores ADD COLUMN server_id INTEGER");
             await customStatement("ALTER TABLE setlist_scores ADD COLUMN updated_at INTEGER");
             await customStatement("ALTER TABLE setlist_scores ADD COLUMN deleted_at INTEGER");
+          }
+          if (from < 4) {
+            // Add orderIndex to instrument_scores
+            await customStatement("ALTER TABLE instrument_scores ADD COLUMN order_index INTEGER NOT NULL DEFAULT 0");
+          }
+          if (from < 5) {
+            // Add annotationsJson to instrument_scores
+            await customStatement("ALTER TABLE instrument_scores ADD COLUMN annotations_json TEXT NOT NULL DEFAULT '[]'");
           }
         },
         beforeOpen: (details) async {

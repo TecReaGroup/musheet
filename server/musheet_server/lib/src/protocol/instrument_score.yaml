@@ -11,6 +11,10 @@ fields:
   deletedAt: DateTime?
   version: int
   syncStatus: String?
+  # Per sync_logic.md §2.6: Annotations are embedded in InstrumentScore as JSON
+  # This field stores all annotations for this instrument score
+  # Format: [{"id": "uuid", "pageNumber": 1, "type": "draw", "color": "#FF0000", ...}, ...]
+  annotationsJson: String?
 indexes:
   instrument_score_idx:
     fields: scoreId

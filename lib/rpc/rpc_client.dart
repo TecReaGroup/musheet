@@ -544,6 +544,53 @@ class RpcClient {
     );
   }
 
+  /// Download PDF by hash (for global deduplication)
+  /// Per APP_SYNC_LOGIC.md §3.4: Download by hash instead of serverId
+  Future<RpcResponse<Uint8List>> downloadPdfByHash(String hash) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'downloadPdfByHash',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'file',
+      method: 'downloadPdfByHash',
+      call: () => _client.file.downloadPdfByHash(_userId!, hash),
+      transform: (result) {
+        if (result == null) {
+          throw RpcError(code: RpcErrorCode.resourceNotFound, message: 'PDF not found');
+        }
+        return result.buffer.asUint8List();
+      },
+    );
+  }
+
+  /// Upload PDF by hash directly (independent of metadata sync)
+  /// Per APP_SYNC_LOGIC.md §3.3: PDF uploads don't require serverId
+  Future<RpcResponse<server.FileUploadResult>> uploadPdfByHash({
+    required Uint8List fileBytes,
+    required String fileName,
+  }) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'uploadPdfByHash',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'file',
+      method: 'uploadPdfByHash',
+      call: () {
+        final byteData = ByteData.view(fileBytes.buffer);
+        return _client.file.uploadPdfByHash(_userId!, byteData, fileName);
+      },
+      transform: (result) => result,
+    );
+  }
+
   // ============================================================================
   // Library Sync Operations (Zotero-style batch sync)
   // NOTE: Legacy syncAll/getSyncStatus methods have been removed.

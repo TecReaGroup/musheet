@@ -98,6 +98,20 @@
           },
           {
             "__className__": "serverpod.ColumnDefinition",
+            "name": "points",
+            "columnType": 0,
+            "isNullable": true,
+            "dartType": "String?"
+          },
+          {
+            "__className__": "serverpod.ColumnDefinition",
+            "name": "strokeWidth",
+            "columnType": 3,
+            "isNullable": true,
+            "dartType": "double?"
+          },
+          {
+            "__className__": "serverpod.ColumnDefinition",
             "name": "createdAt",
             "columnType": 4,
             "isNullable": false,
@@ -379,6 +393,13 @@
           {
             "__className__": "serverpod.ColumnDefinition",
             "name": "syncStatus",
+            "columnType": 0,
+            "isNullable": true,
+            "dartType": "String?"
+          },
+          {
+            "__className__": "serverpod.ColumnDefinition",
+            "name": "annotationsJson",
             "columnType": 0,
             "isNullable": true,
             "dartType": "String?"

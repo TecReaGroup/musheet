@@ -663,9 +663,9 @@ class $InstrumentScoresTable extends InstrumentScores
   late final GeneratedColumn<String> pdfPath = GeneratedColumn<String>(
     'pdf_path',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _thumbnailMeta = const VerificationMeta(
     'thumbnail',
@@ -688,6 +688,18 @@ class $InstrumentScoresTable extends InstrumentScores
     false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _orderIndexMeta = const VerificationMeta(
+    'orderIndex',
+  );
+  @override
+  late final GeneratedColumn<int> orderIndex = GeneratedColumn<int>(
+    'order_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
   );
   static const VerificationMeta _versionMeta = const VerificationMeta(
     'version',
@@ -769,6 +781,18 @@ class $InstrumentScoresTable extends InstrumentScores
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _annotationsJsonMeta = const VerificationMeta(
+    'annotationsJson',
+  );
+  @override
+  late final GeneratedColumn<String> annotationsJson = GeneratedColumn<String>(
+    'annotations_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -778,6 +802,7 @@ class $InstrumentScoresTable extends InstrumentScores
     pdfPath,
     thumbnail,
     dateAdded,
+    orderIndex,
     version,
     syncStatus,
     serverId,
@@ -785,6 +810,7 @@ class $InstrumentScoresTable extends InstrumentScores
     pdfHash,
     updatedAt,
     deletedAt,
+    annotationsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -836,8 +862,6 @@ class $InstrumentScoresTable extends InstrumentScores
         _pdfPathMeta,
         pdfPath.isAcceptableOrUnknown(data['pdf_path']!, _pdfPathMeta),
       );
-    } else if (isInserting) {
-      context.missing(_pdfPathMeta);
     }
     if (data.containsKey('thumbnail')) {
       context.handle(
@@ -852,6 +876,12 @@ class $InstrumentScoresTable extends InstrumentScores
       );
     } else if (isInserting) {
       context.missing(_dateAddedMeta);
+    }
+    if (data.containsKey('order_index')) {
+      context.handle(
+        _orderIndexMeta,
+        orderIndex.isAcceptableOrUnknown(data['order_index']!, _orderIndexMeta),
+      );
     }
     if (data.containsKey('version')) {
       context.handle(
@@ -898,6 +928,15 @@ class $InstrumentScoresTable extends InstrumentScores
         deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
       );
     }
+    if (data.containsKey('annotations_json')) {
+      context.handle(
+        _annotationsJsonMeta,
+        annotationsJson.isAcceptableOrUnknown(
+          data['annotations_json']!,
+          _annotationsJsonMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -926,7 +965,7 @@ class $InstrumentScoresTable extends InstrumentScores
       pdfPath: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}pdf_path'],
-      )!,
+      ),
       thumbnail: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}thumbnail'],
@@ -934,6 +973,10 @@ class $InstrumentScoresTable extends InstrumentScores
       dateAdded: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}date_added'],
+      )!,
+      orderIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_index'],
       )!,
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -963,6 +1006,10 @@ class $InstrumentScoresTable extends InstrumentScores
         DriftSqlType.dateTime,
         data['${effectivePrefix}deleted_at'],
       ),
+      annotationsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}annotations_json'],
+      )!,
     );
   }
 
@@ -978,9 +1025,10 @@ class InstrumentScoreEntity extends DataClass
   final String scoreId;
   final String instrumentType;
   final String? customInstrument;
-  final String pdfPath;
+  final String? pdfPath;
   final String? thumbnail;
   final DateTime dateAdded;
+  final int orderIndex;
   final int version;
   final String syncStatus;
   final int? serverId;
@@ -988,14 +1036,16 @@ class InstrumentScoreEntity extends DataClass
   final String? pdfHash;
   final DateTime? updatedAt;
   final DateTime? deletedAt;
+  final String annotationsJson;
   const InstrumentScoreEntity({
     required this.id,
     required this.scoreId,
     required this.instrumentType,
     this.customInstrument,
-    required this.pdfPath,
+    this.pdfPath,
     this.thumbnail,
     required this.dateAdded,
+    required this.orderIndex,
     required this.version,
     required this.syncStatus,
     this.serverId,
@@ -1003,6 +1053,7 @@ class InstrumentScoreEntity extends DataClass
     this.pdfHash,
     this.updatedAt,
     this.deletedAt,
+    required this.annotationsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1013,11 +1064,14 @@ class InstrumentScoreEntity extends DataClass
     if (!nullToAbsent || customInstrument != null) {
       map['custom_instrument'] = Variable<String>(customInstrument);
     }
-    map['pdf_path'] = Variable<String>(pdfPath);
+    if (!nullToAbsent || pdfPath != null) {
+      map['pdf_path'] = Variable<String>(pdfPath);
+    }
     if (!nullToAbsent || thumbnail != null) {
       map['thumbnail'] = Variable<String>(thumbnail);
     }
     map['date_added'] = Variable<DateTime>(dateAdded);
+    map['order_index'] = Variable<int>(orderIndex);
     map['version'] = Variable<int>(version);
     map['sync_status'] = Variable<String>(syncStatus);
     if (!nullToAbsent || serverId != null) {
@@ -1033,6 +1087,7 @@ class InstrumentScoreEntity extends DataClass
     if (!nullToAbsent || deletedAt != null) {
       map['deleted_at'] = Variable<DateTime>(deletedAt);
     }
+    map['annotations_json'] = Variable<String>(annotationsJson);
     return map;
   }
 
@@ -1044,11 +1099,14 @@ class InstrumentScoreEntity extends DataClass
       customInstrument: customInstrument == null && nullToAbsent
           ? const Value.absent()
           : Value(customInstrument),
-      pdfPath: Value(pdfPath),
+      pdfPath: pdfPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfPath),
       thumbnail: thumbnail == null && nullToAbsent
           ? const Value.absent()
           : Value(thumbnail),
       dateAdded: Value(dateAdded),
+      orderIndex: Value(orderIndex),
       version: Value(version),
       syncStatus: Value(syncStatus),
       serverId: serverId == null && nullToAbsent
@@ -1064,6 +1122,7 @@ class InstrumentScoreEntity extends DataClass
       deletedAt: deletedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(deletedAt),
+      annotationsJson: Value(annotationsJson),
     );
   }
 
@@ -1077,9 +1136,10 @@ class InstrumentScoreEntity extends DataClass
       scoreId: serializer.fromJson<String>(json['scoreId']),
       instrumentType: serializer.fromJson<String>(json['instrumentType']),
       customInstrument: serializer.fromJson<String?>(json['customInstrument']),
-      pdfPath: serializer.fromJson<String>(json['pdfPath']),
+      pdfPath: serializer.fromJson<String?>(json['pdfPath']),
       thumbnail: serializer.fromJson<String?>(json['thumbnail']),
       dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
+      orderIndex: serializer.fromJson<int>(json['orderIndex']),
       version: serializer.fromJson<int>(json['version']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       serverId: serializer.fromJson<int?>(json['serverId']),
@@ -1087,6 +1147,7 @@ class InstrumentScoreEntity extends DataClass
       pdfHash: serializer.fromJson<String?>(json['pdfHash']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
       deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+      annotationsJson: serializer.fromJson<String>(json['annotationsJson']),
     );
   }
   @override
@@ -1097,9 +1158,10 @@ class InstrumentScoreEntity extends DataClass
       'scoreId': serializer.toJson<String>(scoreId),
       'instrumentType': serializer.toJson<String>(instrumentType),
       'customInstrument': serializer.toJson<String?>(customInstrument),
-      'pdfPath': serializer.toJson<String>(pdfPath),
+      'pdfPath': serializer.toJson<String?>(pdfPath),
       'thumbnail': serializer.toJson<String?>(thumbnail),
       'dateAdded': serializer.toJson<DateTime>(dateAdded),
+      'orderIndex': serializer.toJson<int>(orderIndex),
       'version': serializer.toJson<int>(version),
       'syncStatus': serializer.toJson<String>(syncStatus),
       'serverId': serializer.toJson<int?>(serverId),
@@ -1107,6 +1169,7 @@ class InstrumentScoreEntity extends DataClass
       'pdfHash': serializer.toJson<String?>(pdfHash),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
       'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+      'annotationsJson': serializer.toJson<String>(annotationsJson),
     };
   }
 
@@ -1115,9 +1178,10 @@ class InstrumentScoreEntity extends DataClass
     String? scoreId,
     String? instrumentType,
     Value<String?> customInstrument = const Value.absent(),
-    String? pdfPath,
+    Value<String?> pdfPath = const Value.absent(),
     Value<String?> thumbnail = const Value.absent(),
     DateTime? dateAdded,
+    int? orderIndex,
     int? version,
     String? syncStatus,
     Value<int?> serverId = const Value.absent(),
@@ -1125,6 +1189,7 @@ class InstrumentScoreEntity extends DataClass
     Value<String?> pdfHash = const Value.absent(),
     Value<DateTime?> updatedAt = const Value.absent(),
     Value<DateTime?> deletedAt = const Value.absent(),
+    String? annotationsJson,
   }) => InstrumentScoreEntity(
     id: id ?? this.id,
     scoreId: scoreId ?? this.scoreId,
@@ -1132,9 +1197,10 @@ class InstrumentScoreEntity extends DataClass
     customInstrument: customInstrument.present
         ? customInstrument.value
         : this.customInstrument,
-    pdfPath: pdfPath ?? this.pdfPath,
+    pdfPath: pdfPath.present ? pdfPath.value : this.pdfPath,
     thumbnail: thumbnail.present ? thumbnail.value : this.thumbnail,
     dateAdded: dateAdded ?? this.dateAdded,
+    orderIndex: orderIndex ?? this.orderIndex,
     version: version ?? this.version,
     syncStatus: syncStatus ?? this.syncStatus,
     serverId: serverId.present ? serverId.value : this.serverId,
@@ -1142,6 +1208,7 @@ class InstrumentScoreEntity extends DataClass
     pdfHash: pdfHash.present ? pdfHash.value : this.pdfHash,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
     deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+    annotationsJson: annotationsJson ?? this.annotationsJson,
   );
   InstrumentScoreEntity copyWithCompanion(InstrumentScoresCompanion data) {
     return InstrumentScoreEntity(
@@ -1156,6 +1223,9 @@ class InstrumentScoreEntity extends DataClass
       pdfPath: data.pdfPath.present ? data.pdfPath.value : this.pdfPath,
       thumbnail: data.thumbnail.present ? data.thumbnail.value : this.thumbnail,
       dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
+      orderIndex: data.orderIndex.present
+          ? data.orderIndex.value
+          : this.orderIndex,
       version: data.version.present ? data.version.value : this.version,
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
@@ -1167,6 +1237,9 @@ class InstrumentScoreEntity extends DataClass
       pdfHash: data.pdfHash.present ? data.pdfHash.value : this.pdfHash,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
       deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+      annotationsJson: data.annotationsJson.present
+          ? data.annotationsJson.value
+          : this.annotationsJson,
     );
   }
 
@@ -1180,13 +1253,15 @@ class InstrumentScoreEntity extends DataClass
           ..write('pdfPath: $pdfPath, ')
           ..write('thumbnail: $thumbnail, ')
           ..write('dateAdded: $dateAdded, ')
+          ..write('orderIndex: $orderIndex, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('serverId: $serverId, ')
           ..write('pdfSyncStatus: $pdfSyncStatus, ')
           ..write('pdfHash: $pdfHash, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('deletedAt: $deletedAt')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('annotationsJson: $annotationsJson')
           ..write(')'))
         .toString();
   }
@@ -1200,6 +1275,7 @@ class InstrumentScoreEntity extends DataClass
     pdfPath,
     thumbnail,
     dateAdded,
+    orderIndex,
     version,
     syncStatus,
     serverId,
@@ -1207,6 +1283,7 @@ class InstrumentScoreEntity extends DataClass
     pdfHash,
     updatedAt,
     deletedAt,
+    annotationsJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -1219,13 +1296,15 @@ class InstrumentScoreEntity extends DataClass
           other.pdfPath == this.pdfPath &&
           other.thumbnail == this.thumbnail &&
           other.dateAdded == this.dateAdded &&
+          other.orderIndex == this.orderIndex &&
           other.version == this.version &&
           other.syncStatus == this.syncStatus &&
           other.serverId == this.serverId &&
           other.pdfSyncStatus == this.pdfSyncStatus &&
           other.pdfHash == this.pdfHash &&
           other.updatedAt == this.updatedAt &&
-          other.deletedAt == this.deletedAt);
+          other.deletedAt == this.deletedAt &&
+          other.annotationsJson == this.annotationsJson);
 }
 
 class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
@@ -1233,9 +1312,10 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
   final Value<String> scoreId;
   final Value<String> instrumentType;
   final Value<String?> customInstrument;
-  final Value<String> pdfPath;
+  final Value<String?> pdfPath;
   final Value<String?> thumbnail;
   final Value<DateTime> dateAdded;
+  final Value<int> orderIndex;
   final Value<int> version;
   final Value<String> syncStatus;
   final Value<int?> serverId;
@@ -1243,6 +1323,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
   final Value<String?> pdfHash;
   final Value<DateTime?> updatedAt;
   final Value<DateTime?> deletedAt;
+  final Value<String> annotationsJson;
   final Value<int> rowid;
   const InstrumentScoresCompanion({
     this.id = const Value.absent(),
@@ -1252,6 +1333,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     this.pdfPath = const Value.absent(),
     this.thumbnail = const Value.absent(),
     this.dateAdded = const Value.absent(),
+    this.orderIndex = const Value.absent(),
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.serverId = const Value.absent(),
@@ -1259,6 +1341,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     this.pdfHash = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.annotationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   InstrumentScoresCompanion.insert({
@@ -1266,9 +1349,10 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     required String scoreId,
     required String instrumentType,
     this.customInstrument = const Value.absent(),
-    required String pdfPath,
+    this.pdfPath = const Value.absent(),
     this.thumbnail = const Value.absent(),
     required DateTime dateAdded,
+    this.orderIndex = const Value.absent(),
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.serverId = const Value.absent(),
@@ -1276,11 +1360,11 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     this.pdfHash = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.deletedAt = const Value.absent(),
+    this.annotationsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        scoreId = Value(scoreId),
        instrumentType = Value(instrumentType),
-       pdfPath = Value(pdfPath),
        dateAdded = Value(dateAdded);
   static Insertable<InstrumentScoreEntity> custom({
     Expression<String>? id,
@@ -1290,6 +1374,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Expression<String>? pdfPath,
     Expression<String>? thumbnail,
     Expression<DateTime>? dateAdded,
+    Expression<int>? orderIndex,
     Expression<int>? version,
     Expression<String>? syncStatus,
     Expression<int>? serverId,
@@ -1297,6 +1382,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Expression<String>? pdfHash,
     Expression<DateTime>? updatedAt,
     Expression<DateTime>? deletedAt,
+    Expression<String>? annotationsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1307,6 +1393,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       if (pdfPath != null) 'pdf_path': pdfPath,
       if (thumbnail != null) 'thumbnail': thumbnail,
       if (dateAdded != null) 'date_added': dateAdded,
+      if (orderIndex != null) 'order_index': orderIndex,
       if (version != null) 'version': version,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (serverId != null) 'server_id': serverId,
@@ -1314,6 +1401,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       if (pdfHash != null) 'pdf_hash': pdfHash,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (deletedAt != null) 'deleted_at': deletedAt,
+      if (annotationsJson != null) 'annotations_json': annotationsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1323,9 +1411,10 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Value<String>? scoreId,
     Value<String>? instrumentType,
     Value<String?>? customInstrument,
-    Value<String>? pdfPath,
+    Value<String?>? pdfPath,
     Value<String?>? thumbnail,
     Value<DateTime>? dateAdded,
+    Value<int>? orderIndex,
     Value<int>? version,
     Value<String>? syncStatus,
     Value<int?>? serverId,
@@ -1333,6 +1422,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Value<String?>? pdfHash,
     Value<DateTime?>? updatedAt,
     Value<DateTime?>? deletedAt,
+    Value<String>? annotationsJson,
     Value<int>? rowid,
   }) {
     return InstrumentScoresCompanion(
@@ -1343,6 +1433,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       pdfPath: pdfPath ?? this.pdfPath,
       thumbnail: thumbnail ?? this.thumbnail,
       dateAdded: dateAdded ?? this.dateAdded,
+      orderIndex: orderIndex ?? this.orderIndex,
       version: version ?? this.version,
       syncStatus: syncStatus ?? this.syncStatus,
       serverId: serverId ?? this.serverId,
@@ -1350,6 +1441,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       pdfHash: pdfHash ?? this.pdfHash,
       updatedAt: updatedAt ?? this.updatedAt,
       deletedAt: deletedAt ?? this.deletedAt,
+      annotationsJson: annotationsJson ?? this.annotationsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1378,6 +1470,9 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     if (dateAdded.present) {
       map['date_added'] = Variable<DateTime>(dateAdded.value);
     }
+    if (orderIndex.present) {
+      map['order_index'] = Variable<int>(orderIndex.value);
+    }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
     }
@@ -1399,6 +1494,9 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     if (deletedAt.present) {
       map['deleted_at'] = Variable<DateTime>(deletedAt.value);
     }
+    if (annotationsJson.present) {
+      map['annotations_json'] = Variable<String>(annotationsJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1415,6 +1513,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
           ..write('pdfPath: $pdfPath, ')
           ..write('thumbnail: $thumbnail, ')
           ..write('dateAdded: $dateAdded, ')
+          ..write('orderIndex: $orderIndex, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('serverId: $serverId, ')
@@ -1422,6 +1521,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
           ..write('pdfHash: $pdfHash, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('deletedAt: $deletedAt, ')
+          ..write('annotationsJson: $annotationsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4381,9 +4481,10 @@ typedef $$InstrumentScoresTableCreateCompanionBuilder =
       required String scoreId,
       required String instrumentType,
       Value<String?> customInstrument,
-      required String pdfPath,
+      Value<String?> pdfPath,
       Value<String?> thumbnail,
       required DateTime dateAdded,
+      Value<int> orderIndex,
       Value<int> version,
       Value<String> syncStatus,
       Value<int?> serverId,
@@ -4391,6 +4492,7 @@ typedef $$InstrumentScoresTableCreateCompanionBuilder =
       Value<String?> pdfHash,
       Value<DateTime?> updatedAt,
       Value<DateTime?> deletedAt,
+      Value<String> annotationsJson,
       Value<int> rowid,
     });
 typedef $$InstrumentScoresTableUpdateCompanionBuilder =
@@ -4399,9 +4501,10 @@ typedef $$InstrumentScoresTableUpdateCompanionBuilder =
       Value<String> scoreId,
       Value<String> instrumentType,
       Value<String?> customInstrument,
-      Value<String> pdfPath,
+      Value<String?> pdfPath,
       Value<String?> thumbnail,
       Value<DateTime> dateAdded,
+      Value<int> orderIndex,
       Value<int> version,
       Value<String> syncStatus,
       Value<int?> serverId,
@@ -4409,6 +4512,7 @@ typedef $$InstrumentScoresTableUpdateCompanionBuilder =
       Value<String?> pdfHash,
       Value<DateTime?> updatedAt,
       Value<DateTime?> deletedAt,
+      Value<String> annotationsJson,
       Value<int> rowid,
     });
 
@@ -4504,6 +4608,11 @@ class $$InstrumentScoresTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get version => $composableBuilder(
     column: $table.version,
     builder: (column) => ColumnFilters(column),
@@ -4536,6 +4645,11 @@ class $$InstrumentScoresTableFilterComposer
 
   ColumnFilters<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get annotationsJson => $composableBuilder(
+    column: $table.annotationsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4627,6 +4741,11 @@ class $$InstrumentScoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get version => $composableBuilder(
     column: $table.version,
     builder: (column) => ColumnOrderings(column),
@@ -4659,6 +4778,11 @@ class $$InstrumentScoresTableOrderingComposer
 
   ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
     column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get annotationsJson => $composableBuilder(
+    column: $table.annotationsJson,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4717,6 +4841,11 @@ class $$InstrumentScoresTableAnnotationComposer
   GeneratedColumn<DateTime> get dateAdded =>
       $composableBuilder(column: $table.dateAdded, builder: (column) => column);
 
+  GeneratedColumn<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
 
@@ -4741,6 +4870,11 @@ class $$InstrumentScoresTableAnnotationComposer
 
   GeneratedColumn<DateTime> get deletedAt =>
       $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  GeneratedColumn<String> get annotationsJson => $composableBuilder(
+    column: $table.annotationsJson,
+    builder: (column) => column,
+  );
 
   $$ScoresTableAnnotationComposer get scoreId {
     final $$ScoresTableAnnotationComposer composer = $composerBuilder(
@@ -4825,9 +4959,10 @@ class $$InstrumentScoresTableTableManager
                 Value<String> scoreId = const Value.absent(),
                 Value<String> instrumentType = const Value.absent(),
                 Value<String?> customInstrument = const Value.absent(),
-                Value<String> pdfPath = const Value.absent(),
+                Value<String?> pdfPath = const Value.absent(),
                 Value<String?> thumbnail = const Value.absent(),
                 Value<DateTime> dateAdded = const Value.absent(),
+                Value<int> orderIndex = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
@@ -4835,6 +4970,7 @@ class $$InstrumentScoresTableTableManager
                 Value<String?> pdfHash = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<String> annotationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InstrumentScoresCompanion(
                 id: id,
@@ -4844,6 +4980,7 @@ class $$InstrumentScoresTableTableManager
                 pdfPath: pdfPath,
                 thumbnail: thumbnail,
                 dateAdded: dateAdded,
+                orderIndex: orderIndex,
                 version: version,
                 syncStatus: syncStatus,
                 serverId: serverId,
@@ -4851,6 +4988,7 @@ class $$InstrumentScoresTableTableManager
                 pdfHash: pdfHash,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                annotationsJson: annotationsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4859,9 +4997,10 @@ class $$InstrumentScoresTableTableManager
                 required String scoreId,
                 required String instrumentType,
                 Value<String?> customInstrument = const Value.absent(),
-                required String pdfPath,
+                Value<String?> pdfPath = const Value.absent(),
                 Value<String?> thumbnail = const Value.absent(),
                 required DateTime dateAdded,
+                Value<int> orderIndex = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
@@ -4869,6 +5008,7 @@ class $$InstrumentScoresTableTableManager
                 Value<String?> pdfHash = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<DateTime?> deletedAt = const Value.absent(),
+                Value<String> annotationsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => InstrumentScoresCompanion.insert(
                 id: id,
@@ -4878,6 +5018,7 @@ class $$InstrumentScoresTableTableManager
                 pdfPath: pdfPath,
                 thumbnail: thumbnail,
                 dateAdded: dateAdded,
+                orderIndex: orderIndex,
                 version: version,
                 syncStatus: syncStatus,
                 serverId: serverId,
@@ -4885,6 +5026,7 @@ class $$InstrumentScoresTableTableManager
                 pdfHash: pdfHash,
                 updatedAt: updatedAt,
                 deletedAt: deletedAt,
+                annotationsJson: annotationsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

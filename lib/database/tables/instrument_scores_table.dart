@@ -7,9 +7,12 @@ class InstrumentScores extends Table {
   TextColumn get scoreId => text().references(Scores, #id, onDelete: KeyAction.cascade)();
   TextColumn get instrumentType => text()();
   TextColumn get customInstrument => text().nullable()();
-  TextColumn get pdfPath => text()();
+  TextColumn get pdfPath => text().nullable()();
   TextColumn get thumbnail => text().nullable()();
   DateTimeColumn get dateAdded => dateTime()();
+
+  // Order index for sorting instrument scores within a score
+  IntColumn get orderIndex => integer().withDefault(const Constant(0))();
 
   // Sync fields (aligned with sync_logic.md)
   IntColumn get version => integer().withDefault(const Constant(1))();
@@ -19,6 +22,11 @@ class InstrumentScores extends Table {
   TextColumn get pdfHash => text().nullable()();
   DateTimeColumn get updatedAt => dateTime().nullable()();
   DateTimeColumn get deletedAt => dateTime().nullable()(); // Soft delete support
+
+  // Per sync_logic.md §2.6: Annotations are embedded in InstrumentScore as JSON
+  // This field stores all annotations for this instrument score
+  // Format: [{"id": "uuid", "pageNumber": 1, "type": "draw", "color": "#FF0000", ...}, ...]
+  TextColumn get annotationsJson => text().withDefault(const Constant('[]'))();
 
   @override
   Set<Column> get primaryKey => {id};
