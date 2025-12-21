@@ -167,24 +167,37 @@ class _MergeResult {
 
 class LibrarySyncService {
   static LibrarySyncService? _instance;
-  
+
   final AppDatabase _db;
   final RpcClient _rpc;
-  
+
   final _statusController = StreamController<SyncStatus>.broadcast();
   SyncStatus _status = const SyncStatus(
     state: SyncState.idle,
     localLibraryVersion: 0,
   );
-  
-  Timer? _periodicSyncTimer;
+
+  // Per APP_SYNC_LOGIC.md §1.3: Minimal trigger mechanism
+  // Only use debounce timer for local data changes
+  // Network recovery and login trigger immediate sync
   Timer? _debounceTimer;
   Timer? _retryTimer;
   bool _isSyncing = false;
-  
+
+  // Per APP_SYNC_LOGIC.md §1.3: Network-aware sync
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  bool _isOnline = true;
+  bool _hasNetwork = true;  // Renamed from _isOnline for clarity
   AppLifecycleListener? _lifecycleListener;
+
+  // PDF Download Priority Queue
+  // User-initiated downloads have priority over background downloads
+  final Set<String> _priorityDownloads = {};  // instrumentScoreIds being downloaded with priority
+  bool _pauseBackgroundDownloads = false;  // Pause background downloads when priority download is active
+
+  // PDF Download Deduplication
+  // Prevent concurrent downloads of the same PDF hash
+  final Set<String> _downloadingHashes = {};  // pdfHashes currently being downloaded
+  final Map<String, Future<String?>> _pendingDownloads = {};  // hash -> future for waiting on in-progress downloads
 
   LibrarySyncService._({required AppDatabase db, required RpcClient rpc})
       : _db = db, _rpc = rpc;
@@ -207,7 +220,16 @@ class LibrarySyncService {
   }
 
   static bool get isInitialized => _instance != null;
-  
+
+  /// Reset the singleton instance (for logout)
+  /// Per APP_SYNC_LOGIC.md §1.5.3: On logout, stop sync service and reset state
+  static void reset() {
+    if (_instance != null) {
+      _instance!.dispose();
+      _instance = null;
+    }
+  }
+
   Stream<SyncStatus> get statusStream => _statusController.stream;
   SyncStatus get status => _status;
 
@@ -243,25 +265,38 @@ class LibrarySyncService {
 
   void _startNetworkMonitoring() {
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen((results) {
-      final wasOnline = _isOnline;
-      _isOnline = results.isNotEmpty && !results.contains(ConnectivityResult.none);
-      
-      if (!wasOnline && _isOnline) {
-        _log('Network restored');
-        syncNow();
-      } else if (wasOnline && !_isOnline) {
-        _log('Network lost');
+      final wasOnline = _hasNetwork;
+      _hasNetwork = results.isNotEmpty && !results.contains(ConnectivityResult.none);
+
+      if (!wasOnline && _hasNetwork) {
+        // Per APP_SYNC_LOGIC.md §1.3: Network recovered - immediate sync
+        _log('Network restored - triggering immediate sync');
+        _updateStatus(_status.copyWith(state: SyncState.idle));
+        requestSync(immediate: true);
+      } else if (wasOnline && !_hasNetwork) {
+        // Per APP_SYNC_LOGIC.md §1.3: Network lost - pause mode
+        _log('Network lost - entering pause mode');
+        _cancelPendingOperations();
         _updateStatus(_status.copyWith(state: SyncState.waitingForNetwork));
       }
     });
   }
 
+  /// Cancel pending debounce timer when network is lost
+  void _cancelPendingOperations() {
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _retryTimer?.cancel();
+    _retryTimer = null;
+  }
+
   void _startLifecycleMonitoring() {
-    // Per sync_logic.md line 662-666: "监听：App 从后台切回前台，动作：触发 Pull 拉取最新数据"
+    // Per APP_SYNC_LOGIC.md §1.3: App resume is treated as a data change trigger
+    // Uses 5s debounce like any other local operation
     _lifecycleListener = AppLifecycleListener(
       onResume: () {
-        _log('App resumed - triggering Pull to fetch latest data');
-        syncNow();
+        _log('App resumed - requesting sync with debounce');
+        requestSync(immediate: false);
       },
     );
   }
@@ -272,28 +307,71 @@ class LibrarySyncService {
   }
 
   // ============================================================================
-  // PUBLIC API
+  // PUBLIC API - Per APP_SYNC_LOGIC.md §1.3: Minimal Trigger Strategy
   // ============================================================================
 
-  Future<void> startBackgroundSync({
-    Duration interval = const Duration(minutes: 5),
-  }) async {
-    _log('Starting background sync: interval=${interval.inMinutes}m');
-    stopBackgroundSync();
-    await syncNow();
-    _periodicSyncTimer = Timer.periodic(interval, (_) => syncNow());
+  /// Start background sync - called after login
+  /// Per APP_SYNC_LOGIC.md §1.3: User login triggers immediate full sync
+  Future<void> startBackgroundSync() async {
+    _log('Starting background sync (login trigger)');
+    // Per APP_SYNC_LOGIC.md §1.3: User login - immediate full sync
+    await requestSync(immediate: true);
   }
 
+  /// Stop background sync - called before logout
+  /// Per APP_SYNC_LOGIC.md §1.3: User logout stops sync
   void stopBackgroundSync() {
-    _periodicSyncTimer?.cancel();
-    _periodicSyncTimer = null;
-    _retryTimer?.cancel();
-    _retryTimer = null;
-    _debounceTimer?.cancel();
-    _debounceTimer = null;
+    _log('Stopping background sync');
+    _cancelPendingOperations();
   }
 
+  /// Unified sync trigger entry point
+  /// Per APP_SYNC_LOGIC.md §1.3: All sync requests go through this method
+  ///
+  /// [immediate]: if true, sync immediately (network recovery, login)
+  ///              if false, use 5s debounce (local data changes)
+  Future<SyncResult> requestSync({bool immediate = false}) async {
+    // Per APP_SYNC_LOGIC.md §1.3: No sync when offline
+    if (!_hasNetwork) {
+      _log('No network - sync request ignored');
+      return SyncResult.failure('No network connection');
+    }
+
+    if (immediate) {
+      // Per APP_SYNC_LOGIC.md §1.3: Immediate sync for network recovery/login
+      _debounceTimer?.cancel();
+      _debounceTimer = null;
+      return await _executeSync();
+    }
+
+    // Per APP_SYNC_LOGIC.md §1.3: 5 second debounce for local data changes
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(seconds: 5), () async {
+      await _executeSync();
+    });
+
+    return const SyncResult(success: true); // Debounce scheduled
+  }
+
+  /// Legacy method - now delegates to requestSync
+  /// Kept for backwards compatibility with existing code
   Future<SyncResult> syncNow() async {
+    return await requestSync(immediate: true);
+  }
+
+  /// Mark data as modified - triggers sync with debounce
+  /// Per APP_SYNC_LOGIC.md §1.3: All local data changes go through here
+  Future<void> markModified({
+    required String entityType,
+    required String entityId,
+  }) async {
+    await _incrementPendingChanges();
+    // Per APP_SYNC_LOGIC.md §1.3: Local data change - 5s debounce
+    requestSync(immediate: false);
+  }
+
+  /// Execute sync - internal method that does the actual sync
+  Future<SyncResult> _executeSync() async {
     if (_isSyncing) {
       _log('Sync already in progress');
       return SyncResult.failure('Sync already in progress');
@@ -302,12 +380,12 @@ class LibrarySyncService {
       _log('Not logged in');
       return SyncResult.failure('Not logged in');
     }
-    if (!_isOnline) {
+    if (!_hasNetwork) {
       _log('No network');
       _updateStatus(_status.copyWith(state: SyncState.waitingForNetwork));
       return SyncResult.failure('No network connection');
     }
-    
+
     _isSyncing = true;
     try {
       return await _performSync();
@@ -316,17 +394,30 @@ class LibrarySyncService {
     }
   }
 
-  Future<void> markModified({
-    required String entityType,
-    required String entityId,
-  }) async {
-    await _incrementPendingChanges();
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(seconds: 5), () => syncNow());
-  }
-
   Future<String?> downloadPdf(String instrumentScoreId) async {
     return _downloadPdfForInstrumentScore(instrumentScoreId);
+  }
+
+  /// Priority download for user-initiated requests
+  /// This method pauses background downloads and gives priority to the requested PDF
+  /// Use this when user opens a score to view
+  Future<String?> downloadPdfWithPriority(String instrumentScoreId) async {
+    _log('Priority download requested for: $instrumentScoreId');
+
+    // Mark as priority download
+    _priorityDownloads.add(instrumentScoreId);
+    _pauseBackgroundDownloads = true;
+
+    try {
+      final result = await _downloadPdfForInstrumentScore(instrumentScoreId);
+      return result;
+    } finally {
+      _priorityDownloads.remove(instrumentScoreId);
+      // Resume background downloads if no more priority downloads
+      if (_priorityDownloads.isEmpty) {
+        _pauseBackgroundDownloads = false;
+      }
+    }
   }
 
   /// Alias for compatibility
@@ -378,7 +469,8 @@ class LibrarySyncService {
   }
 
   void dispose() {
-    stopBackgroundSync();
+    _log('Disposing LibrarySyncService');
+    _cancelPendingOperations();
     _connectivitySubscription?.cancel();
     _lifecycleListener?.dispose();
     _statusController.close();
@@ -430,21 +522,23 @@ class LibrarySyncService {
         conflicts = pullResult.conflicts;
         _log('Pull: pulled=$pulled, conflicts=$conflicts');
       }
-      
-      // STEP 4: PDF sync
-      _log('STEP 3: PDF sync');
-      await _syncPendingPdfs();
-      
+
+      // Mark sync as complete BEFORE PDF downloads
+      // This allows UI to refresh immediately with the new metadata
       await _saveSyncState(lastSyncAt: DateTime.now());
       _updateStatus(_status.copyWith(
         state: SyncState.idle,
         lastSyncAt: DateTime.now(),
         pendingChanges: 0,
       ));
-      
+
       final duration = DateTime.now().difference(startTime);
-      _log('=== SYNC COMPLETE: ${duration.inMilliseconds}ms ===');
-      
+      _log('=== METADATA SYNC COMPLETE: ${duration.inMilliseconds}ms ===');
+
+      // STEP 4: PDF sync (runs in background, doesn't block return)
+      _log('STEP 3: PDF sync (background)');
+      _syncPendingPdfs(); // Fire and forget - no await
+
       return SyncResult(
         success: true,
         pushed: pushed,
@@ -490,26 +584,10 @@ class LibrarySyncService {
     final deletedSetlists = await _getDeletedSetlists();
     final deletedSetlistScores = await _getDeletedSetlistScores();
 
-    // Also check if any InstrumentScore needs sync because its annotations changed
-    final instrumentScoresWithPendingAnnotations = await _getInstrumentScoresWithPendingAnnotations();
+    // Note: InstrumentScores with annotation changes are already marked as 'pending'
+    // directly in database_service.updateAnnotations(), so no need for separate check
 
-    // Merge InstrumentScores that need sync due to annotation changes
-    final allPendingInstrumentScores = <InstrumentScoreEntity>[];
-    final seenIds = <String>{};
-    for (final is_ in pendingInstrumentScores) {
-      if (!seenIds.contains(is_.id)) {
-        allPendingInstrumentScores.add(is_);
-        seenIds.add(is_.id);
-      }
-    }
-    for (final is_ in instrumentScoresWithPendingAnnotations) {
-      if (!seenIds.contains(is_.id)) {
-        allPendingInstrumentScores.add(is_);
-        seenIds.add(is_.id);
-      }
-    }
-
-    if (pendingScores.isEmpty && allPendingInstrumentScores.isEmpty &&
+    if (pendingScores.isEmpty && pendingInstrumentScores.isEmpty &&
         pendingSetlists.isEmpty && pendingSetlistScores.isEmpty &&
         deletedScores.isEmpty && deletedInstrumentScores.isEmpty &&
         deletedSetlists.isEmpty && deletedSetlistScores.isEmpty) {
@@ -518,7 +596,7 @@ class LibrarySyncService {
 
     // Check if we need multi-pass sync (when parent entities lack serverIds)
     final needsMultiPass = await _checkNeedsMultiPassSync(
-      allPendingInstrumentScores,
+      pendingInstrumentScores,
       [], // No longer passing annotations - they are embedded
       pendingSetlistScores,
     );
@@ -545,7 +623,7 @@ class LibrarySyncService {
       });
     }
 
-    for (final instrumentScore in allPendingInstrumentScores) {
+    for (final instrumentScore in pendingInstrumentScores) {
       final parentScores = await (_db.select(_db.scores)
         ..where((s) => s.id.equals(instrumentScore.scoreId))).get();
       if (parentScores.isEmpty) {
@@ -560,6 +638,23 @@ class LibrarySyncService {
       }
 
       final instrumentName = instrumentScore.customInstrument ?? instrumentScore.instrumentType;
+
+      // Calculate pdfHash if not already set and PDF file exists
+      // This ensures pdfHash is included in the push request
+      String? pdfHash = instrumentScore.pdfHash;
+      if ((pdfHash == null || pdfHash.isEmpty) &&
+          instrumentScore.pdfPath != null && instrumentScore.pdfPath!.isNotEmpty) {
+        final file = File(instrumentScore.pdfPath!);
+        if (file.existsSync()) {
+          final bytes = await file.readAsBytes();
+          pdfHash = md5.convert(bytes).toString();
+          // Update the database with the calculated hash
+          await (_db.update(_db.instrumentScores)
+            ..where((s) => s.id.equals(instrumentScore.id)))
+            .write(InstrumentScoresCompanion(pdfHash: Value(pdfHash)));
+          _log('Calculated pdfHash for ${instrumentScore.id}: $pdfHash');
+        }
+      }
 
       // Per sync_logic.md §2.6: Get all annotations for this InstrumentScore and embed them
       final annotations = await (_db.select(_db.annotations)
@@ -600,7 +695,7 @@ class LibrarySyncService {
           'scoreId': parentServerId,
           'instrumentName': instrumentName,
           'pdfPath': instrumentScore.pdfPath,
-          'pdfHash': instrumentScore.pdfHash,
+          'pdfHash': pdfHash, // Use calculated hash
           'orderIndex': instrumentScore.orderIndex,
           'annotationsJson': jsonEncode(annotationsJsonList), // Embedded annotations
         }),
@@ -751,9 +846,8 @@ class LibrarySyncService {
     for (final id in acceptedInstrumentScoreIds) {
       await (_db.update(_db.instrumentScores)..where((s) => s.id.equals(id)))
         .write(const InstrumentScoresCompanion(syncStatus: Value('synced')));
-      // Also mark all annotations for this InstrumentScore as synced
-      await (_db.update(_db.annotations)..where((a) => a.instrumentScoreId.equals(id)))
-        .write(const AnnotationsCompanion(syncStatus: Value('synced')));
+      // Note: Annotations don't have syncStatus field anymore.
+      // They are embedded in InstrumentScore and synced together.
     }
 
     for (final id in acceptedSetlistIds) {
@@ -1179,11 +1273,27 @@ class LibrarySyncService {
         _logError('PDF upload failed', e);
       }
     }
-    
+
+    // Background downloads - respect priority queue
     final pendingDownloads = await (_db.select(_db.instrumentScores)
       ..where((s) => s.pdfSyncStatus.equals('needsDownload'))).get();
-    
+
     for (final instrumentScore in pendingDownloads) {
+      // Skip if this is already being downloaded with priority
+      if (_priorityDownloads.contains(instrumentScore.id)) {
+        continue;
+      }
+
+      // Pause if a priority download is in progress
+      while (_pauseBackgroundDownloads) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+
+      // Double check priority status after waiting
+      if (_priorityDownloads.contains(instrumentScore.id)) {
+        continue;
+      }
+
       try {
         await _downloadPdfForInstrumentScore(instrumentScore.id);
       } catch (e) {
@@ -1250,6 +1360,7 @@ class LibrarySyncService {
 
   /// Download PDF for an InstrumentScore
   /// Per APP_SYNC_LOGIC.md §3.4: Download by hash, not by serverId
+  /// Per APP_SYNC_LOGIC.md §3.5: Use hash as filename for local deduplication
   Future<String?> _downloadPdfForInstrumentScore(String instrumentScoreId) async {
     final records = await (_db.select(_db.instrumentScores)
       ..where((s) => s.id.equals(instrumentScoreId))).get();
@@ -1264,6 +1375,43 @@ class LibrarySyncService {
       return null;
     }
 
+    // Check if this hash is already being downloaded by another request
+    if (_downloadingHashes.contains(pdfHash)) {
+      _log('PDF download already in progress for hash: $pdfHash, waiting...');
+      // Wait for the pending download to complete
+      final pendingFuture = _pendingDownloads[pdfHash];
+      if (pendingFuture != null) {
+        final result = await pendingFuture;
+        // Update this instrument score's database record to point to the downloaded file
+        if (result != null) {
+          await (_db.update(_db.instrumentScores)
+            ..where((s) => s.id.equals(instrumentScoreId)))
+            .write(InstrumentScoresCompanion(
+              pdfPath: Value(result),
+              pdfSyncStatus: const Value('synced'),
+            ));
+        }
+        return result;
+      }
+    }
+
+    // Mark this hash as being downloaded
+    _downloadingHashes.add(pdfHash);
+
+    // Create the download future and store it for other waiters
+    final downloadFuture = _executeDownload(instrumentScoreId, pdfHash);
+    _pendingDownloads[pdfHash] = downloadFuture;
+
+    try {
+      return await downloadFuture;
+    } finally {
+      _downloadingHashes.remove(pdfHash);
+      _pendingDownloads.remove(pdfHash);
+    }
+  }
+
+  /// Actually execute the PDF download
+  Future<String?> _executeDownload(String instrumentScoreId, String pdfHash) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final pdfDir = Directory(p.join(appDir.path, 'pdfs'));
@@ -1271,16 +1419,18 @@ class LibrarySyncService {
         await pdfDir.create(recursive: true);
       }
 
-      final localPath = p.join(pdfDir.path, '${instrumentScore.id}.pdf');
+      // Use hash as filename for deduplication
+      // Per APP_SYNC_LOGIC.md: /documents/pdfs/{hash}.pdf
+      final localPath = p.join(pdfDir.path, '$pdfHash.pdf');
 
-      // Check if file exists and hash matches
+      // Check if file with this hash already exists (local deduplication)
       if (File(localPath).existsSync()) {
         final bytes = await File(localPath).readAsBytes();
         final localHash = md5.convert(bytes).toString();
 
-        // If hash matches, no need to download
+        // If hash matches, just update database reference (no download needed)
         if (pdfHash == localHash) {
-          _log('PDF already exists and hash matches: $instrumentScoreId');
+          _log('PDF already exists locally (dedup): $pdfHash');
           await (_db.update(_db.instrumentScores)
             ..where((s) => s.id.equals(instrumentScoreId)))
             .write(InstrumentScoresCompanion(
@@ -1289,7 +1439,8 @@ class LibrarySyncService {
             ));
           return localPath;
         }
-        _log('PDF hash mismatch, re-downloading: local=$localHash, server=$pdfHash');
+        // Hash mismatch - file corrupted, re-download
+        _log('PDF hash mismatch, re-downloading: local=$localHash, expected=$pdfHash');
       }
 
       // Download PDF from server by hash
@@ -1308,9 +1459,9 @@ class LibrarySyncService {
         throw Exception('Downloaded PDF hash mismatch');
       }
 
-      // Save to file
+      // Save to file using hash as filename
       await File(localPath).writeAsBytes(pdfBytes);
-      _log('PDF downloaded successfully: $instrumentScoreId -> $localPath');
+      _log('PDF downloaded successfully: $pdfHash -> $localPath');
 
       // Update database
       await (_db.update(_db.instrumentScores)
@@ -1341,23 +1492,15 @@ class LibrarySyncService {
     final pendingInstrumentScores = await (_db.select(_db.instrumentScores)
       ..where((s) => s.syncStatus.equals('pending'))).get();
     // Note: Per sync_logic.md §2.6, Annotations are embedded in InstrumentScore
-    // They are synced as part of InstrumentScore, so we count InstrumentScores
-    // that have pending annotations instead of counting annotations directly
-    final instrumentScoresWithPendingAnnotations = await _getInstrumentScoresWithPendingAnnotations();
+    // InstrumentScores with annotation changes are already marked as 'pending'
+    // directly in database_service.updateAnnotations()
     final pendingSetlists = await (_db.select(_db.setlists)
       ..where((s) => s.syncStatus.equals('pending'))).get();
     final pendingSetlistScores = await (_db.select(_db.setlistScores)
       ..where((s) => s.syncStatus.equals('pending'))).get();
 
-    // Count unique InstrumentScores (avoid double counting those already pending)
-    final pendingInstrumentScoreIds = pendingInstrumentScores.map((is_) => is_.id).toSet();
-    final additionalFromAnnotations = instrumentScoresWithPendingAnnotations
-        .where((is_) => !pendingInstrumentScoreIds.contains(is_.id))
-        .length;
-
     return pendingScores.length + pendingInstrumentScores.length +
-           additionalFromAnnotations + pendingSetlists.length +
-           pendingSetlistScores.length;
+           pendingSetlists.length + pendingSetlistScores.length;
   }
 
   Future<void> _incrementPendingChanges() async {
@@ -1448,57 +1591,31 @@ class LibrarySyncService {
       ..where((s) => s.syncStatus.equals('pending'))).get();
   }
 
-  /// Get InstrumentScores that have pending annotations (need to sync due to annotation changes)
-  /// Per sync_logic.md §2.6: Annotations are embedded in InstrumentScore
-  Future<List<InstrumentScoreEntity>> _getInstrumentScoresWithPendingAnnotations() async {
-    // Find all annotations with syncStatus = 'pending'
-    final pendingAnnotations = await (_db.select(_db.annotations)
-      ..where((a) => a.syncStatus.equals('pending'))).get();
-
-    if (pendingAnnotations.isEmpty) return [];
-
-    // Get unique InstrumentScore IDs
-    final instrumentScoreIds = pendingAnnotations
-        .map((a) => a.instrumentScoreId)
-        .toSet();
-
-    // Fetch those InstrumentScores
-    final instrumentScores = <InstrumentScoreEntity>[];
-    for (final id in instrumentScoreIds) {
-      final records = await (_db.select(_db.instrumentScores)
-        ..where((is_) => is_.id.equals(id))
-        ..where((is_) => is_.deletedAt.isNull())).get();
-      instrumentScores.addAll(records);
-    }
-
-    return instrumentScores;
-  }
+  // Note: _getInstrumentScoresWithPendingAnnotations() is no longer needed.
+  // Per APP_SYNC_LOGIC.md §2.6: When annotations change, InstrumentScore is marked
+  // as 'pending' directly in database_service.updateAnnotations().
+  // This ensures InstrumentScores with annotation changes are included in
+  // the regular pending InstrumentScores query.
 
   /// Sync embedded annotations from server JSON to local Annotations table
   /// Per sync_logic.md §2.6: Annotations are synced as part of InstrumentScore
+  /// Strategy: Full replacement - server data completely replaces local data
   Future<void> _syncEmbeddedAnnotations(String instrumentScoreId, String? annotationsJsonStr) async {
+    // Delete all existing annotations for this InstrumentScore
+    await (_db.delete(_db.annotations)
+      ..where((a) => a.instrumentScoreId.equals(instrumentScoreId))).go();
+
     if (annotationsJsonStr == null || annotationsJsonStr.isEmpty || annotationsJsonStr == '[]') {
-      // No annotations from server - clear local ones if they are synced (not pending)
-      await (_db.delete(_db.annotations)
-        ..where((a) => a.instrumentScoreId.equals(instrumentScoreId))
-        ..where((a) => a.syncStatus.equals('synced'))).go();
+      // No annotations from server - we've already cleared local ones
       return;
     }
 
     try {
       final List<dynamic> annotationsList = jsonDecode(annotationsJsonStr) as List<dynamic>;
 
-      // Get current local annotations for this InstrumentScore
-      final localAnnotations = await (_db.select(_db.annotations)
-        ..where((a) => a.instrumentScoreId.equals(instrumentScoreId))).get();
-      final localAnnotationIds = localAnnotations.map((a) => a.id).toSet();
-
-      final serverAnnotationIds = <String>{};
-
       for (final annMap in annotationsList) {
         final annData = annMap as Map<String, dynamic>;
         final annId = annData['id'] as String;
-        serverAnnotationIds.add(annId);
 
         // Convert points to JSON string for database storage
         // Server may send points as List<double> (decoded JSON array)
@@ -1512,46 +1629,20 @@ class LibrarySyncService {
           }
         }
 
-        if (localAnnotationIds.contains(annId)) {
-          // Update existing annotation (only if not pending)
-          final localAnn = localAnnotations.firstWhere((a) => a.id == annId);
-          if (localAnn.syncStatus != 'pending') {
-            await (_db.update(_db.annotations)..where((a) => a.id.equals(annId)))
-              .write(AnnotationsCompanion(
-                pageNumber: Value(annData['pageNumber'] as int? ?? 1),
-                annotationType: Value(annData['type'] as String? ?? 'draw'),
-                color: Value(annData['color'] as String? ?? '#000000'),
-                strokeWidth: Value((annData['strokeWidth'] as num?)?.toDouble() ?? 2.0),
-                points: Value(pointsJsonStr),
-                textContent: Value(annData['textContent'] as String?),
-                posX: Value((annData['posX'] as num?)?.toDouble()),
-                posY: Value((annData['posY'] as num?)?.toDouble()),
-                syncStatus: const Value('synced'),
-              ));
-          }
-        } else {
-          // Insert new annotation from server
-          await _db.into(_db.annotations).insert(AnnotationsCompanion.insert(
-            id: annId,
-            instrumentScoreId: instrumentScoreId,
-            annotationType: annData['type'] as String? ?? 'draw',
-            color: annData['color'] as String? ?? '#000000',
-            strokeWidth: (annData['strokeWidth'] as num?)?.toDouble() ?? 2.0,
-            points: Value(pointsJsonStr),
-            textContent: Value(annData['textContent'] as String?),
-            posX: Value((annData['posX'] as num?)?.toDouble()),
-            posY: Value((annData['posY'] as num?)?.toDouble()),
-            pageNumber: Value(annData['pageNumber'] as int? ?? 1),
-            syncStatus: const Value('synced'),
-          ));
-        }
-      }
-
-      // Delete annotations that are on server but no longer exist (only synced ones)
-      for (final localAnn in localAnnotations) {
-        if (!serverAnnotationIds.contains(localAnn.id) && localAnn.syncStatus == 'synced') {
-          await (_db.delete(_db.annotations)..where((a) => a.id.equals(localAnn.id))).go();
-        }
+        // Insert annotation from server
+        await _db.into(_db.annotations).insert(AnnotationsCompanion.insert(
+          id: annId,
+          instrumentScoreId: instrumentScoreId,
+          annotationType: annData['type'] as String? ?? 'draw',
+          color: annData['color'] as String? ?? '#000000',
+          strokeWidth: (annData['strokeWidth'] as num?)?.toDouble() ?? 2.0,
+          points: Value(pointsJsonStr),
+          textContent: Value(annData['textContent'] as String?),
+          posX: Value((annData['posX'] as num?)?.toDouble()),
+          posY: Value((annData['posY'] as num?)?.toDouble()),
+          pageNumber: Value(annData['pageNumber'] as int? ?? 1),
+          updatedAt: Value(DateTime.now()),
+        ));
       }
     } catch (e) {
       _log('Error syncing embedded annotations: $e');
@@ -1751,14 +1842,14 @@ class LibrarySyncService {
 
   void _log(String message) {
     if (kDebugMode) {
-      debugPrint('[LibrarySyncService] $message');
+      debugPrint('[SYNC] $message');
     }
   }
 
   void _logError(String message, Object error, [StackTrace? stack]) {
     if (kDebugMode) {
-      debugPrint('[LibrarySyncService] ✗ $message: $error');
-      if (stack != null) debugPrint('[LibrarySyncService] Stack: $stack');
+      debugPrint('[SYNC] ERROR: $message: $error');
+      if (stack != null) debugPrint('[SYNC] StackTrace: $stack');
     }
   }
 }

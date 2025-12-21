@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
@@ -7,6 +8,7 @@ import '../widgets/common_widgets.dart';
 import '../models/instrument_score.dart';
 import '../providers/auth_provider.dart';
 import '../providers/storage_providers.dart';
+import '../providers/sync_provider.dart';
 import '../services/backend_service.dart';
 import 'library_screen.dart' show preferredInstrumentProvider, teamEnabledProvider;
 import '../router/app_router.dart';
@@ -374,13 +376,83 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+  /// Show sign out confirmation dialog with pending changes warning
+  /// Per APP_SYNC_LOGIC.md §1.5.3: Check for unsynced data before logout
+  Future<void> _showSignOutConfirmation(BuildContext context, WidgetRef ref) async {
+    // Check for pending changes
+    final pendingCount = await ref.read(authProvider.notifier).getPendingChangesCount();
+
+    if (!context.mounted) return;
+
+    if (pendingCount > 0) {
+      // Show warning dialog with pending changes count
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Unsynced Data'),
+          content: Text(
+            'You have $pendingCount unsynced changes that will be lost if you sign out.\n\n'
+            'Are you sure you want to sign out?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.red500),
+              child: const Text('Sign Out Anyway'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !context.mounted) return;
+    } else {
+      // No pending changes, just confirm
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Sign Out'),
+          content: const Text(
+            'All local data will be deleted. Are you sure you want to sign out?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.red500),
+              child: const Text('Sign Out'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true || !context.mounted) return;
+    }
+
+    // Perform logout
+    await ref.read(authProvider.notifier).logout();
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Signed out successfully')),
+      );
+    }
+  }
+
   void _showUserProfileSheet(BuildContext context, WidgetRef ref, AuthData authData) {
+    final parentContext = context; // Save parent context for use after bottom sheet closes
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => SafeArea(
+      builder: (sheetContext) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -398,8 +470,8 @@ class SettingsScreen extends ConsumerWidget {
               leading: const Icon(AppIcons.refreshCw),
               title: const Text('Sync Now'),
               onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
+                Navigator.pop(sheetContext);
+                ScaffoldMessenger.of(parentContext).showSnackBar(
                   const SnackBar(content: Text('Syncing...')),
                 );
               },
@@ -408,22 +480,18 @@ class SettingsScreen extends ConsumerWidget {
               leading: Icon(AppIcons.cloud, color: AppColors.gray600),
               title: const Text('Cloud Sync Settings'),
               onTap: () {
-                Navigator.pop(context);
-                context.go(AppRoutes.cloudSync);
+                Navigator.pop(sheetContext);
+                parentContext.go(AppRoutes.cloudSync);
               },
             ),
             const Divider(),
             ListTile(
               leading: Icon(AppIcons.close, color: AppColors.red500),
               title: Text('Sign Out', style: TextStyle(color: AppColors.red500)),
-              onTap: () async {
-                Navigator.pop(context);
-                await ref.read(authProvider.notifier).logout();
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Signed out')),
-                  );
-                }
+              onTap: () {
+                Navigator.pop(sheetContext);
+                // Use parent context which remains valid after bottom sheet closes
+                _showSignOutConfirmation(parentContext, ref);
               },
             ),
             const SizedBox(height: 16),
@@ -565,6 +633,29 @@ class _LoginDialogState extends ConsumerState<LoginDialog> {
             backgroundColor: AppColors.emerald500,
           ),
         );
+
+        // Trigger sync after successful login
+        // Note: Don't use ref after Navigator.pop() - widget may be unmounted
+        // The syncCompletionWatcherProvider will handle UI refresh when sync completes
+        if (kDebugMode) debugPrint('[LoginDialog] Login success, triggering sync...');
+        try {
+          // Invalidate sync service provider to re-initialize with new credentials
+          ref.invalidate(syncServiceProvider);
+
+          // Wait for sync service to initialize
+          final syncService = await ref.read(syncServiceProvider.future);
+          if (syncService != null) {
+            if (kDebugMode) debugPrint('[LoginDialog] Starting background sync...');
+            await syncService.startBackgroundSync();
+
+            // Fire and forget - syncCompletionWatcherProvider will refresh UI when done
+            // Don't await or use ref after this point as widget may be unmounted
+            syncService.syncNow();
+            if (kDebugMode) debugPrint('[LoginDialog] Sync triggered');
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('[LoginDialog] Sync trigger failed: $e');
+        }
       } else if (mounted) {
         final authError = ref.read(authProvider).error;
         setState(() => _error = authError ?? 'Authentication failed');

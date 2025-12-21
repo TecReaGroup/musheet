@@ -45,6 +45,10 @@ final sharedFilePathProvider = NotifierProvider<SharedFilePathNotifier, String?>
 // Flag to prevent multiple auth initialization attempts
 bool _authInitialized = false;
 
+// Flag to track if initial app loading is complete
+// Once true, we don't show splash screen for provider reloads
+bool _initialLoadComplete = false;
+
 class MuSheetApp extends ConsumerWidget {
   const MuSheetApp({super.key});
 
@@ -71,14 +75,16 @@ class MuSheetApp extends ConsumerWidget {
     // Activate the sync completion watcher to auto-refresh data after sync
     ref.watch(syncCompletionWatcherProvider);
 
-    // Show splash until all data is loaded
+    // Show splash until all data is loaded (only during initial app load)
     final isLoading = storageInit.isLoading ||
         scoresAsync.isLoading ||
         setlistsAsync.isLoading;
 
     final hasError = storageInit.hasError || scoresAsync.hasError || setlistsAsync.hasError;
 
-    if (isLoading) {
+    // Only show splash screen during initial app loading
+    // After initial load, don't show splash for subsequent provider reloads (login/logout)
+    if (isLoading && !_initialLoadComplete) {
       return AnnotatedRegion<SystemUiOverlayStyle>(
         value: _systemUiStyle,
         child: MaterialApp(
@@ -101,6 +107,12 @@ class MuSheetApp extends ConsumerWidget {
           home: ErrorScreen(error: error.toString()),
         ),
       );
+    }
+
+    // Mark initial load as complete once we reach this point
+    // This prevents splash screen from showing on subsequent provider reloads
+    if (!_initialLoadComplete) {
+      _initialLoadComplete = true;
     }
 
     // Trigger background session restoration (non-blocking)

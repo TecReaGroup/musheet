@@ -14,44 +14,41 @@ final databaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase();
 });
 
-/// Provider for sync service - uses new LibrarySyncService with Zotero-style sync
+/// Provider for sync service - uses LibrarySyncService with event-driven sync
+/// Per APP_SYNC_LOGIC.md §1.3: Sync is triggered by events, not periodic timers
 final syncServiceProvider = FutureProvider<LibrarySyncService?>((ref) async {
-  if (kDebugMode) debugPrint('[SyncProvider] syncServiceProvider rebuilding...');
-  
+  if (kDebugMode) debugPrint('[PROV] syncServiceProvider rebuilding...');
+
   final db = ref.watch(databaseProvider);
   // Watch authProvider to re-evaluate when auth state changes
   final authData = ref.watch(authProvider);
   if (kDebugMode) {
-    debugPrint('[SyncProvider] authState: ${authData.state}, isAuthenticated: ${authData.isAuthenticated}');
+    debugPrint('[PROV] authState: ${authData.state}, isAuthenticated: ${authData.isAuthenticated}');
   }
 
   // Check if RpcClient is initialized and has valid auth credentials
-  // We use RpcClient.isLoggedIn instead of authData.isAuthenticated because:
-  // - authData.isAuthenticated requires user profile to be loaded (user != null)
-  // - RpcClient.isLoggedIn only requires token and userId to be set
-  // This allows sync to work immediately after restoring token from preferences
   if (!RpcClient.isInitialized) {
-    if (kDebugMode) debugPrint('[SyncProvider] RpcClient not initialized - returning null');
+    if (kDebugMode) debugPrint('[PROV] RpcClient not initialized - returning null');
     return null;
   }
-  
+
   if (!RpcClient.instance.isLoggedIn) {
-    if (kDebugMode) debugPrint('[SyncProvider] RpcClient not logged in (userId: ${RpcClient.instance.userId}) - returning null');
+    if (kDebugMode) debugPrint('[PROV] RpcClient not logged in (userId: ${RpcClient.instance.userId}) - returning null');
     return null;
   }
 
   // Initialize if not already done
   if (!LibrarySyncService.isInitialized) {
     if (kDebugMode) {
-      debugPrint('[SyncProvider] Initializing LibrarySyncService for user ${RpcClient.instance.userId}');
+      debugPrint('[PROV] Initializing LibrarySyncService for user ${RpcClient.instance.userId}');
     }
     await LibrarySyncService.initialize(
       db: db,
       rpc: RpcClient.instance,
     );
-    if (kDebugMode) debugPrint('[SyncProvider] LibrarySyncService initialized successfully');
+    if (kDebugMode) debugPrint('[PROV] LibrarySyncService initialized successfully');
   } else {
-    if (kDebugMode) debugPrint('[SyncProvider] LibrarySyncService already initialized');
+    if (kDebugMode) debugPrint('[PROV] LibrarySyncService already initialized');
   }
 
   return LibrarySyncService.instance;
@@ -107,7 +104,8 @@ final syncStatusProvider = Provider<SyncStatus>((ref) {
   );
 });
 
-/// Provider to trigger sync
+/// Provider to trigger sync - returns a function to request sync
+/// Per APP_SYNC_LOGIC.md §1.3: Uses requestSync with immediate=true for manual trigger
 final syncTriggerProvider = Provider<Future<SyncResult> Function()>((ref) {
   final syncServiceAsync = ref.watch(syncServiceProvider);
   return syncServiceAsync.when(
@@ -116,7 +114,7 @@ final syncTriggerProvider = Provider<Future<SyncResult> Function()>((ref) {
         return () async => SyncResult.failure('Not logged in');
       }
       return () async {
-        final result = await syncService.syncNow();
+        final result = await syncService.requestSync(immediate: true);
         // Refresh scores and setlists after sync
         if (result.success && (result.pushedCount > 0 || result.pulledCount > 0)) {
           ref.invalidate(scoresProvider);
@@ -130,18 +128,18 @@ final syncTriggerProvider = Provider<Future<SyncResult> Function()>((ref) {
   );
 });
 
-/// Provider that auto-starts background sync when logged in
+/// Provider that auto-starts sync when logged in
+/// Per APP_SYNC_LOGIC.md §1.3: User login triggers immediate full sync
 final backgroundSyncProvider = Provider<void>((ref) {
   final syncServiceAsync = ref.watch(syncServiceProvider);
 
   syncServiceAsync.whenData((syncService) {
-    // Only check if syncService is not null - the sync provider already validates auth
     if (syncService != null) {
-      if (kDebugMode) debugPrint('[SyncProvider] Starting background sync');
-      // Start background sync when logged in
+      if (kDebugMode) debugPrint('[PROV] User logged in - triggering initial sync');
+      // Per APP_SYNC_LOGIC.md §1.3: User login triggers immediate full sync
       syncService.startBackgroundSync();
 
-      // Stop when provider is disposed
+      // Stop when provider is disposed (logout)
       ref.onDispose(() {
         syncService.stopBackgroundSync();
       });
@@ -184,11 +182,12 @@ final syncCompletionWatcherProvider = Provider<void>((ref) {
 
       if (wasSyncing && isNowIdle) {
         if (kDebugMode) {
-          debugPrint('[SyncProvider] Sync completed - refreshing scores and setlists');
+          debugPrint('[PROV] Sync completed - refreshing scores and setlists');
         }
-        // Invalidate providers to reload data from database
-        ref.invalidate(scoresProvider);
-        ref.invalidate(setlistsAsyncProvider);
+        // Use silent refresh to reload data from database without triggering loading state
+        // This prevents the splash screen from appearing during background sync
+        ref.read(scoresProvider.notifier).refresh(silent: true);
+        ref.read(setlistsAsyncProvider.notifier).refresh(silent: true);
       }
 
       previousState = status.state;

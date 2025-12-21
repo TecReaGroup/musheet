@@ -21,40 +21,64 @@ docker exec -it musheet_postgres psql -U musheet -d musheet
 ### 查看所有 Scores
 
 ```sql
-SELECT * FROM scores;
+SELECT id, "userId", title, composer, bpm, version, "syncStatus", "createdAt", "updatedAt", "deletedAt"
+FROM scores;
 ```
 
 ### 查看所有 InstrumentScores
 
 ```sql
-SELECT * FROM instrument_scores ORDER BY id;
+-- 不显示 annotationsJson（内容过长）
+SELECT id, "scoreId", "instrumentName", "pdfHash", "pdfPath", version, "syncStatus", "createdAt", "updatedAt", "deletedAt"
+FROM instrument_scores
+ORDER BY id;
 ```
 
 ### 查看所有 Setlists
 
 ```sql
-SELECT * FROM setlists;
+SELECT id, "userId", name, description, version, "syncStatus", "createdAt", "updatedAt", "deletedAt"
+FROM setlists;
 ```
 
 ### 查看 Setlist-Score 关联
 
 ```sql
-SELECT * FROM setlist_scores
+SELECT "setlistId", "scoreId", "orderIndex", version, "syncStatus", "createdAt", "updatedAt", "deletedAt"
+FROM setlist_scores
 ORDER BY "setlistId", "orderIndex";
 ```
 
-### 查看 Annotations
+### 查看 Annotations（仅元数据）
 
 ```sql
+-- Annotations 现在嵌入在 InstrumentScore.annotationsJson 中
+-- 此查询仅用于查看独立的 annotations 表（如果仍在使用）
 SELECT id, "instrumentScoreId", "userId", "pageNumber", type, "createdAt"
 FROM annotations
+ORDER BY id;
+```
+
+### 查看 InstrumentScore 的 Annotations 数量
+
+```sql
+-- 统计每个 InstrumentScore 的 annotations 数量（不显示具体内容）
+SELECT
+  id,
+  "instrumentName",
+  CASE
+    WHEN "annotationsJson" IS NULL OR "annotationsJson" = '[]' THEN 0
+    ELSE jsonb_array_length("annotationsJson"::jsonb)
+  END as annotations_count
+FROM instrument_scores
 ORDER BY id;
 ```
 
 ### 查看用户库版本信息
 
 ```sql
-SELECT * FROM user_libraries;
+SELECT "userId", "libraryVersion", "lastSyncedAt"
+FROM user_libraries;
 ```
 
 ### 查看用户存储使用情况
@@ -107,13 +131,15 @@ GROUP BY "syncStatus";
 ### 查看 Score 及其关联的 InstrumentScores
 
 ```sql
+-- 不显示 annotationsJson
 SELECT
   s.id as score_id,
   s.title,
-  s.version,
+  s.version as score_version,
   i.id as inst_score_id,
   i."instrumentName",
-  i."pdfPath"
+  i."pdfHash",
+  i.version as inst_version
 FROM scores s
 LEFT JOIN instrument_scores i ON s.id = i."scoreId"
 WHERE s."deletedAt" IS NULL
@@ -190,9 +216,9 @@ docker exec musheet_server ls -lh /app/uploads/users/1/pdfs/2_約書亞\ 我安�
 docker exec musheet_server find /app/uploads/users/1/pdfs/ -type f
 ```
 
-**然后查询数据库中的 pdfPath**：
+**然后查询数据库中的 pdfHash**：
 ```sql
-SELECT "pdfPath" FROM instrument_scores WHERE "pdfPath" IS NOT NULL;
+SELECT id, "instrumentName", "pdfHash" FROM instrument_scores WHERE "pdfHash" IS NOT NULL;
 ```
 
 ## 版本和同步状态查询

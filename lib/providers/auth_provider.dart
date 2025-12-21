@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/backend_service.dart';
 import '../rpc/rpc_client.dart' hide LocalUserProfile, AuthResultData;
+import '../database/database.dart';
+import '../sync/library_sync_service.dart';
 import 'storage_providers.dart';
 
 /// Authentication state
@@ -399,25 +402,71 @@ class AuthNotifier extends Notifier<AuthData> {
   }
 
   /// Logout current user
+  /// Per APP_SYNC_LOGIC.md §1.5.3: Complete logout flow with data cleanup
   Future<void> logout() async {
+    if (kDebugMode) debugPrint('[AUTH] Logout started');
     state = state.copyWith(state: AuthState.loading);
 
     try {
-      await BackendService.instance.logout();
-    } catch (_) {
-      // Ignore logout errors
-    }
-    
-    // Clear RpcClient auth
-    if (RpcClient.isInitialized) {
-      RpcClient.instance.clearAuth();
+      // 1. Stop sync service first
+      if (LibrarySyncService.isInitialized) {
+        LibrarySyncService.instance.stopBackgroundSync();
+        if (kDebugMode) debugPrint('[AUTH] Sync service stopped');
+      }
+
+      // 2. Call server logout (ignore errors)
+      if (BackendService.isInitialized) {
+        try {
+          await BackendService.instance.logout();
+          if (kDebugMode) debugPrint('[AUTH] Server logout success');
+        } catch (e) {
+          if (kDebugMode) debugPrint('[AUTH] Server logout failed: $e');
+        }
+      }
+
+      // 3. Clear local database data
+      if (kDebugMode) debugPrint('[AUTH] Clearing local data...');
+      final db = AppDatabase();
+      await db.deleteAllLocalPdfFiles();
+      if (kDebugMode) debugPrint('[AUTH] PDF files deleted');
+      await db.clearAllUserData();
+      if (kDebugMode) debugPrint('[AUTH] Database cleared');
+
+      // 4. Reset sync service singleton
+      LibrarySyncService.reset();
+      if (kDebugMode) debugPrint('[AUTH] Sync service reset');
+
+      // 5. Clear RpcClient auth
+      if (RpcClient.isInitialized) {
+        RpcClient.instance.clearAuth();
+        if (kDebugMode) debugPrint('[AUTH] RpcClient auth cleared');
+      }
+
+      // 6. Clear stored auth token
+      final prefs = ref.read(preferencesProvider);
+      await prefs?.setAuthToken(null);
+      if (kDebugMode) debugPrint('[AUTH] Auth token cleared');
+
+      // Note: UI providers (scoresProvider, setlistsAsyncProvider) will automatically
+      // reload from the now-empty database when they are next accessed.
+      // We don't invalidate them here to avoid triggering the splash screen.
+
+    } catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('[AUTH] Logout error: $e');
+        debugPrint('[AUTH] Stack: $stack');
+      }
     }
 
-    // Clear stored auth
-    final prefs = ref.read(preferencesProvider);
-    await prefs?.setAuthToken(null);
-    
     state = const AuthData(state: AuthState.unauthenticated);
+    if (kDebugMode) debugPrint('[AUTH] Logout completed');
+  }
+
+  /// Check if there are pending (unsynced) changes
+  /// Used by UI to warn user before logout
+  Future<int> getPendingChangesCount() async {
+    final db = AppDatabase();
+    return await db.getPendingChangesCount();
   }
 
   /// Refresh user profile

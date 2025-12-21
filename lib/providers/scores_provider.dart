@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/score.dart';
 import '../models/annotation.dart';
 import 'storage_providers.dart';
 import 'sync_provider.dart';
+import 'auth_provider.dart';
 
 /// Helper to extract value from AsyncValue
 List<Score> _getScoresValue(AsyncValue<List<Score>> asyncValue) {
@@ -17,6 +19,12 @@ List<Score> _getScoresValue(AsyncValue<List<Score>> asyncValue) {
 class ScoresNotifier extends AsyncNotifier<List<Score>> {
   @override
   Future<List<Score>> build() async {
+    // Watch auth state - when user logs out, return empty list immediately
+    final authState = ref.watch(authProvider);
+    if (authState.state == AuthState.unauthenticated) {
+      return [];
+    }
+
     // Load scores from database on initialization
     final dbService = ref.read(databaseServiceProvider);
     return dbService.getAllScores();
@@ -253,11 +261,17 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
   }
 
   /// Refresh scores from database
-  Future<void> refresh() async {
-    state = const AsyncLoading();
+  /// If silent is true, don't set loading state (for background refreshes)
+  Future<void> refresh({bool silent = false}) async {
+    if (kDebugMode) debugPrint('[ScoresProvider] refresh(silent: $silent) called');
+    if (!silent) {
+      state = const AsyncLoading();
+    }
     state = await AsyncValue.guard(() async {
       final dbService = ref.read(databaseServiceProvider);
-      return dbService.getAllScores();
+      final scores = await dbService.getAllScores();
+      if (kDebugMode) debugPrint('[ScoresProvider] refresh loaded ${scores.length} scores');
+      return scores;
     });
   }
 }

@@ -1639,41 +1639,6 @@ class $AnnotationsTable extends Annotations
     requiredDuringInsert: false,
     defaultValue: const Constant(1),
   );
-  static const VerificationMeta _versionMeta = const VerificationMeta(
-    'version',
-  );
-  @override
-  late final GeneratedColumn<int> version = GeneratedColumn<int>(
-    'version',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultValue: const Constant(1),
-  );
-  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
-    'syncStatus',
-  );
-  @override
-  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
-    'sync_status',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant('pending'),
-  );
-  static const VerificationMeta _serverIdMeta = const VerificationMeta(
-    'serverId',
-  );
-  @override
-  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
-    'server_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -1697,9 +1662,6 @@ class $AnnotationsTable extends Annotations
     posX,
     posY,
     pageNumber,
-    version,
-    syncStatus,
-    serverId,
     updatedAt,
   ];
   @override
@@ -1793,24 +1755,6 @@ class $AnnotationsTable extends Annotations
         pageNumber.isAcceptableOrUnknown(data['page_number']!, _pageNumberMeta),
       );
     }
-    if (data.containsKey('version')) {
-      context.handle(
-        _versionMeta,
-        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
-      );
-    }
-    if (data.containsKey('sync_status')) {
-      context.handle(
-        _syncStatusMeta,
-        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
-      );
-    }
-    if (data.containsKey('server_id')) {
-      context.handle(
-        _serverIdMeta,
-        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
-      );
-    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -1866,18 +1810,6 @@ class $AnnotationsTable extends Annotations
         DriftSqlType.int,
         data['${effectivePrefix}page_number'],
       )!,
-      version: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}version'],
-      )!,
-      syncStatus: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}sync_status'],
-      )!,
-      serverId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}server_id'],
-      ),
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}updated_at'],
@@ -1903,9 +1835,6 @@ class AnnotationEntity extends DataClass
   final double? posX;
   final double? posY;
   final int pageNumber;
-  final int version;
-  final String syncStatus;
-  final int? serverId;
   final DateTime? updatedAt;
   const AnnotationEntity({
     required this.id,
@@ -1918,9 +1847,6 @@ class AnnotationEntity extends DataClass
     this.posX,
     this.posY,
     required this.pageNumber,
-    required this.version,
-    required this.syncStatus,
-    this.serverId,
     this.updatedAt,
   });
   @override
@@ -1944,11 +1870,6 @@ class AnnotationEntity extends DataClass
       map['pos_y'] = Variable<double>(posY);
     }
     map['page_number'] = Variable<int>(pageNumber);
-    map['version'] = Variable<int>(version);
-    map['sync_status'] = Variable<String>(syncStatus);
-    if (!nullToAbsent || serverId != null) {
-      map['server_id'] = Variable<int>(serverId);
-    }
     if (!nullToAbsent || updatedAt != null) {
       map['updated_at'] = Variable<DateTime>(updatedAt);
     }
@@ -1971,11 +1892,6 @@ class AnnotationEntity extends DataClass
       posX: posX == null && nullToAbsent ? const Value.absent() : Value(posX),
       posY: posY == null && nullToAbsent ? const Value.absent() : Value(posY),
       pageNumber: Value(pageNumber),
-      version: Value(version),
-      syncStatus: Value(syncStatus),
-      serverId: serverId == null && nullToAbsent
-          ? const Value.absent()
-          : Value(serverId),
       updatedAt: updatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(updatedAt),
@@ -1998,9 +1914,6 @@ class AnnotationEntity extends DataClass
       posX: serializer.fromJson<double?>(json['posX']),
       posY: serializer.fromJson<double?>(json['posY']),
       pageNumber: serializer.fromJson<int>(json['pageNumber']),
-      version: serializer.fromJson<int>(json['version']),
-      syncStatus: serializer.fromJson<String>(json['syncStatus']),
-      serverId: serializer.fromJson<int?>(json['serverId']),
       updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
     );
   }
@@ -2018,9 +1931,6 @@ class AnnotationEntity extends DataClass
       'posX': serializer.toJson<double?>(posX),
       'posY': serializer.toJson<double?>(posY),
       'pageNumber': serializer.toJson<int>(pageNumber),
-      'version': serializer.toJson<int>(version),
-      'syncStatus': serializer.toJson<String>(syncStatus),
-      'serverId': serializer.toJson<int?>(serverId),
       'updatedAt': serializer.toJson<DateTime?>(updatedAt),
     };
   }
@@ -2036,9 +1946,6 @@ class AnnotationEntity extends DataClass
     Value<double?> posX = const Value.absent(),
     Value<double?> posY = const Value.absent(),
     int? pageNumber,
-    int? version,
-    String? syncStatus,
-    Value<int?> serverId = const Value.absent(),
     Value<DateTime?> updatedAt = const Value.absent(),
   }) => AnnotationEntity(
     id: id ?? this.id,
@@ -2051,9 +1958,6 @@ class AnnotationEntity extends DataClass
     posX: posX.present ? posX.value : this.posX,
     posY: posY.present ? posY.value : this.posY,
     pageNumber: pageNumber ?? this.pageNumber,
-    version: version ?? this.version,
-    syncStatus: syncStatus ?? this.syncStatus,
-    serverId: serverId.present ? serverId.value : this.serverId,
     updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
   );
   AnnotationEntity copyWithCompanion(AnnotationsCompanion data) {
@@ -2078,11 +1982,6 @@ class AnnotationEntity extends DataClass
       pageNumber: data.pageNumber.present
           ? data.pageNumber.value
           : this.pageNumber,
-      version: data.version.present ? data.version.value : this.version,
-      syncStatus: data.syncStatus.present
-          ? data.syncStatus.value
-          : this.syncStatus,
-      serverId: data.serverId.present ? data.serverId.value : this.serverId,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -2100,9 +1999,6 @@ class AnnotationEntity extends DataClass
           ..write('posX: $posX, ')
           ..write('posY: $posY, ')
           ..write('pageNumber: $pageNumber, ')
-          ..write('version: $version, ')
-          ..write('syncStatus: $syncStatus, ')
-          ..write('serverId: $serverId, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -2120,9 +2016,6 @@ class AnnotationEntity extends DataClass
     posX,
     posY,
     pageNumber,
-    version,
-    syncStatus,
-    serverId,
     updatedAt,
   );
   @override
@@ -2139,9 +2032,6 @@ class AnnotationEntity extends DataClass
           other.posX == this.posX &&
           other.posY == this.posY &&
           other.pageNumber == this.pageNumber &&
-          other.version == this.version &&
-          other.syncStatus == this.syncStatus &&
-          other.serverId == this.serverId &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -2156,9 +2046,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
   final Value<double?> posX;
   final Value<double?> posY;
   final Value<int> pageNumber;
-  final Value<int> version;
-  final Value<String> syncStatus;
-  final Value<int?> serverId;
   final Value<DateTime?> updatedAt;
   final Value<int> rowid;
   const AnnotationsCompanion({
@@ -2172,9 +2059,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
     this.posX = const Value.absent(),
     this.posY = const Value.absent(),
     this.pageNumber = const Value.absent(),
-    this.version = const Value.absent(),
-    this.syncStatus = const Value.absent(),
-    this.serverId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -2189,9 +2073,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
     this.posX = const Value.absent(),
     this.posY = const Value.absent(),
     this.pageNumber = const Value.absent(),
-    this.version = const Value.absent(),
-    this.syncStatus = const Value.absent(),
-    this.serverId = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -2210,9 +2091,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
     Expression<double>? posX,
     Expression<double>? posY,
     Expression<int>? pageNumber,
-    Expression<int>? version,
-    Expression<String>? syncStatus,
-    Expression<int>? serverId,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -2227,9 +2105,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
       if (posX != null) 'pos_x': posX,
       if (posY != null) 'pos_y': posY,
       if (pageNumber != null) 'page_number': pageNumber,
-      if (version != null) 'version': version,
-      if (syncStatus != null) 'sync_status': syncStatus,
-      if (serverId != null) 'server_id': serverId,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -2246,9 +2121,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
     Value<double?>? posX,
     Value<double?>? posY,
     Value<int>? pageNumber,
-    Value<int>? version,
-    Value<String>? syncStatus,
-    Value<int?>? serverId,
     Value<DateTime?>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -2263,9 +2135,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
       posX: posX ?? this.posX,
       posY: posY ?? this.posY,
       pageNumber: pageNumber ?? this.pageNumber,
-      version: version ?? this.version,
-      syncStatus: syncStatus ?? this.syncStatus,
-      serverId: serverId ?? this.serverId,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -2304,15 +2173,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
     if (pageNumber.present) {
       map['page_number'] = Variable<int>(pageNumber.value);
     }
-    if (version.present) {
-      map['version'] = Variable<int>(version.value);
-    }
-    if (syncStatus.present) {
-      map['sync_status'] = Variable<String>(syncStatus.value);
-    }
-    if (serverId.present) {
-      map['server_id'] = Variable<int>(serverId.value);
-    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
@@ -2335,9 +2195,6 @@ class AnnotationsCompanion extends UpdateCompanion<AnnotationEntity> {
           ..write('posX: $posX, ')
           ..write('posY: $posY, ')
           ..write('pageNumber: $pageNumber, ')
-          ..write('version: $version, ')
-          ..write('syncStatus: $syncStatus, ')
-          ..write('serverId: $serverId, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -5132,9 +4989,6 @@ typedef $$AnnotationsTableCreateCompanionBuilder =
       Value<double?> posX,
       Value<double?> posY,
       Value<int> pageNumber,
-      Value<int> version,
-      Value<String> syncStatus,
-      Value<int?> serverId,
       Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
@@ -5150,9 +5004,6 @@ typedef $$AnnotationsTableUpdateCompanionBuilder =
       Value<double?> posX,
       Value<double?> posY,
       Value<int> pageNumber,
-      Value<int> version,
-      Value<String> syncStatus,
-      Value<int?> serverId,
       Value<DateTime?> updatedAt,
       Value<int> rowid,
     });
@@ -5235,21 +5086,6 @@ class $$AnnotationsTableFilterComposer
 
   ColumnFilters<int> get pageNumber => $composableBuilder(
     column: $table.pageNumber,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get version => $composableBuilder(
-    column: $table.version,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get syncStatus => $composableBuilder(
-    column: $table.syncStatus,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<int> get serverId => $composableBuilder(
-    column: $table.serverId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5336,21 +5172,6 @@ class $$AnnotationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get version => $composableBuilder(
-    column: $table.version,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get syncStatus => $composableBuilder(
-    column: $table.syncStatus,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<int> get serverId => $composableBuilder(
-    column: $table.serverId,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -5424,17 +5245,6 @@ class $$AnnotationsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get version =>
-      $composableBuilder(column: $table.version, builder: (column) => column);
-
-  GeneratedColumn<String> get syncStatus => $composableBuilder(
-    column: $table.syncStatus,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<int> get serverId =>
-      $composableBuilder(column: $table.serverId, builder: (column) => column);
-
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
@@ -5500,9 +5310,6 @@ class $$AnnotationsTableTableManager
                 Value<double?> posX = const Value.absent(),
                 Value<double?> posY = const Value.absent(),
                 Value<int> pageNumber = const Value.absent(),
-                Value<int> version = const Value.absent(),
-                Value<String> syncStatus = const Value.absent(),
-                Value<int?> serverId = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion(
@@ -5516,9 +5323,6 @@ class $$AnnotationsTableTableManager
                 posX: posX,
                 posY: posY,
                 pageNumber: pageNumber,
-                version: version,
-                syncStatus: syncStatus,
-                serverId: serverId,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -5534,9 +5338,6 @@ class $$AnnotationsTableTableManager
                 Value<double?> posX = const Value.absent(),
                 Value<double?> posY = const Value.absent(),
                 Value<int> pageNumber = const Value.absent(),
-                Value<int> version = const Value.absent(),
-                Value<String> syncStatus = const Value.absent(),
-                Value<int?> serverId = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => AnnotationsCompanion.insert(
@@ -5550,9 +5351,6 @@ class $$AnnotationsTableTableManager
                 posX: posX,
                 posY: posY,
                 pageNumber: pageNumber,
-                version: version,
-                syncStatus: syncStatus,
-                serverId: serverId,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

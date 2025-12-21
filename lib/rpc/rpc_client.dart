@@ -154,7 +154,7 @@ class RpcClient {
     _instance?.dispose();
     _instance = RpcClient._(config: config);
     if (kDebugMode) {
-      debugPrint('[RpcClient] Initialized: ${config.baseUrl}');
+      debugPrint('[RPC] Initialized: ${config.baseUrl}');
     }
   }
 
@@ -300,7 +300,7 @@ class RpcClient {
       ));
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('[RpcClient] Heartbeat failed: $e');
+        debugPrint('[RPC] Heartbeat failed: $e');
       }
       _handleDisconnection();
     }
@@ -341,7 +341,7 @@ class RpcClient {
     _userId = userId;
     _authProvider.setToken(token);
     if (kDebugMode) {
-      debugPrint('[RpcClient] Auth set for user: $userId');
+      debugPrint('[RPC] Auth set for user: $userId');
     }
   }
 
@@ -351,7 +351,7 @@ class RpcClient {
     _userId = null;
     _authProvider.setToken(null);
     if (kDebugMode) {
-      debugPrint('[RpcClient] Auth cleared');
+      debugPrint('[RPC] Auth cleared');
     }
   }
 
@@ -608,7 +608,7 @@ class RpcClient {
     }
 
     if (kDebugMode) {
-      debugPrint('[RpcClient] libraryPull: userId=$_userId, since=$since');
+      debugPrint('[RPC] libraryPull: userId=$_userId, since=$since');
     }
 
     return _executeCallNullable(
@@ -618,12 +618,12 @@ class RpcClient {
       transform: (result) {
         if (result == null) {
           if (kDebugMode) {
-            debugPrint('[RpcClient] libraryPull: server returned null, using empty result');
+            debugPrint('[RPC] libraryPull: server returned null, using empty result');
           }
           return LibrarySyncPullResult(libraryVersion: since);
         }
         if (kDebugMode) {
-          debugPrint('[RpcClient] libraryPull: received response with libraryVersion=${result.libraryVersion}');
+          debugPrint('[RPC] libraryPull: received response with libraryVersion=${result.libraryVersion}');
         }
         return LibrarySyncPullResult.fromServerpod(result);
       },
@@ -650,7 +650,7 @@ class RpcClient {
 
     // Build push request with null-safe type conversions
     if (kDebugMode) {
-      debugPrint('[RpcClient] Building SyncPushRequest: scores=${scores.length}, instrumentScores=${instrumentScores.length}, annotations=${annotations.length}, setlists=${setlists.length}, setlistScores=${setlistScores.length}, deletes=${deletes.length}');
+      debugPrint('[RPC] Building SyncPushRequest: scores=${scores.length}, instrumentScores=${instrumentScores.length}, annotations=${annotations.length}, setlists=${setlists.length}, setlistScores=${setlistScores.length}, deletes=${deletes.length}');
     }
     
     try {
@@ -705,7 +705,7 @@ class RpcClient {
       );
       
       if (kDebugMode) {
-        debugPrint('[RpcClient] SyncPushRequest built successfully');
+        debugPrint('[RPC] SyncPushRequest built successfully');
       }
 
       return _executeCall(
@@ -718,8 +718,8 @@ class RpcClient {
       );
     } catch (e, stack) {
       if (kDebugMode) {
-        debugPrint('[RpcClient] Error building SyncPushRequest: $e');
-        debugPrint('[RpcClient] Stack: $stack');
+        debugPrint('[RPC] Error building SyncPushRequest: $e');
+        debugPrint('[RPC] Stack: $stack');
       }
       return RpcResponse.failure(
         RpcError.fromException(e, stack),

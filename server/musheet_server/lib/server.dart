@@ -25,12 +25,12 @@ Future<AuthenticationInfo?> customAuthHandler(Session session, String token) asy
             authId: token,
           );
         } else {
-          session.log('[AUTH] ❌ User $userId not found or disabled', level: LogLevel.warning);
+          session.log('[AUTH] User not found or disabled: userId=$userId', level: LogLevel.warning);
         }
       }
     }
   } catch (e) {
-    session.log('[AUTH] ❌ Token validation error: $e', level: LogLevel.warning);
+    session.log('[AUTH] Token validation error: $e', level: LogLevel.warning);
   }
   
   return null;

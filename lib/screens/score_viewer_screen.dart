@@ -46,12 +46,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   String _selectedTool = 'none'; // 'none', 'pen', 'eraser'
   Color _penColor = Colors.black;
   double _penWidth = 2.0;
-  
+
+  // PDF download state for loading indicator
+  bool _isDownloadingPdf = false;
+
   // Annotations stored per page: Map<pageNumber, List<Annotation>>
   final Map<int, List<Annotation>> _pageAnnotations = {};
   // Undo/Redo stacks per page
   final Map<int, List<Annotation>> _pageUndoStacks = {};
-  
+
   bool _showMetronome = false;
   bool _showSetlistNav = false;
   bool _showPenOptions = false;
@@ -104,6 +107,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     
     // Cache the notifier for safe dispose usage
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _scoresNotifier = ref.read(scoresProvider.notifier);
     });
   }
@@ -160,6 +164,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     var pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
 
     if (pdfPath.isEmpty || instrumentScoreId == null) {
+      if (!mounted) return;
       setState(() {
         _pdfError = 'No PDF file specified';
       });
@@ -170,7 +175,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     if (!pdfPath.startsWith('http://') && !pdfPath.startsWith('https://')) {
       final file = File(pdfPath);
       if (!await file.exists()) {
-        // Try to download from server
+        if (!mounted) return;
+
+        // Try to download from server with priority
         final syncServiceAsync = ref.read(syncServiceProvider);
         final syncService = switch (syncServiceAsync) {
           AsyncData(:final value) => value,
@@ -178,14 +185,23 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         };
         if (syncService != null) {
           setState(() {
-            _pdfError = null;  // Clear error while downloading
+            _pdfError = null;
+            _isDownloadingPdf = true;  // Show loading indicator
           });
 
-          final downloadedPath = await syncService.downloadPdfForInstrumentScore(instrumentScoreId);
+          // Use priority download to ensure this PDF is downloaded first
+          final downloadedPath = await syncService.downloadPdfWithPriority(instrumentScoreId);
+
+          if (!mounted) return;
+
           if (downloadedPath != null) {
             pdfPath = downloadedPath;
+            setState(() {
+              _isDownloadingPdf = false;
+            });
           } else {
             setState(() {
+              _isDownloadingPdf = false;
               _pdfError = 'PDF file not found locally or on server';
             });
             return;
@@ -199,6 +215,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       }
     }
 
+    if (!mounted) return;
+
     try {
       PdfDocument doc;
       if (pdfPath.startsWith('http://') || pdfPath.startsWith('https://')) {
@@ -206,12 +224,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       } else {
         doc = await PdfDocument.openFile(pdfPath);
       }
+      if (!mounted) {
+        doc.dispose();
+        return;
+      }
       setState(() {
         _pdfDocument = doc;
         _totalPages = doc.pages.length;
         _pdfError = null;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _pdfError = 'Failed to load PDF: $e';
       });
@@ -223,16 +246,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       setState(() => _showInstrumentPicker = false);
       return;
     }
-    
+
     // Record the instrument index being switched to
     final instrumentIndex = widget.score.instrumentScores.indexWhere((s) => s.id == instrumentScore.id);
     if (instrumentIndex >= 0) {
       ref.read(lastOpenedInstrumentInScoreProvider.notifier).recordLastOpened(widget.score.id, instrumentIndex);
     }
-    
+
     // Dispose old document
     _pdfDocument?.dispose();
-    
+
+    if (!mounted) return;
     setState(() {
       _currentInstrumentScore = instrumentScore;
       _pdfDocument = null;
@@ -241,7 +265,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       _pdfError = null;
       _showInstrumentPicker = false;
     });
-    
+
     // Reload annotations and PDF for new instrument
     _initAnnotations();
     await _loadPdfDocument();
@@ -589,7 +613,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   Widget _buildPdfViewer() {
     final pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
-    
+
     // Check if it's a valid file path
     if (pdfPath.isEmpty) {
       return _buildErrorState('No PDF file specified');
@@ -600,7 +624,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       return _buildErrorState(_pdfError!);
     }
 
-    // Show loading state while document is being loaded
+    // Show loading state while document is being loaded or downloaded
     if (_pdfDocument == null) {
       return Center(
         child: Column(
@@ -612,12 +636,22 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Loading PDF...',
+              _isDownloadingPdf ? 'Downloading PDF...' : 'Loading PDF...',
               style: TextStyle(
                 color: AppColors.gray500,
                 fontSize: 14,
               ),
             ),
+            if (_isDownloadingPdf) ...[
+              const SizedBox(height: 8),
+              Text(
+                'This may take a moment',
+                style: TextStyle(
+                  color: AppColors.gray400,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ],
         ),
       );
@@ -634,9 +668,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       penWidth: _penWidth,
       annotations: _pageAnnotations[_currentPage] ?? [],
       onAnnotationAdded: (annotation) {
+        if (!mounted) return;
         _addAnnotation(annotation);
       },
       onAnnotationErased: (annotation) {
+        if (!mounted) return;
         setState(() {
           _pageAnnotations[_currentPage]?.remove(annotation);
           _pageUndoStacks[_currentPage] ??= [];
@@ -646,6 +682,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         _saveAnnotations();
       },
       onTap: () {
+        if (!mounted) return;
         if (_isDrawMode) {
           // In draw mode, tap closes pen options
           if (_showPenOptions) {
@@ -677,11 +714,13 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         }
       },
       onSwipeLeft: () {
+        if (!mounted) return;
         if (_currentPage < _totalPages) {
           _goToPage(_currentPage + 1);
         }
       },
       onSwipeRight: () {
+        if (!mounted) return;
         if (_currentPage > 1) {
           _goToPage(_currentPage - 1);
         }
@@ -1942,6 +1981,7 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
                     _contentSize = constraints.biggest;
                     // Notify parent of size change for export scaling
                     WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
                       widget.onSizeChanged?.call(_contentSize);
                     });
                   }

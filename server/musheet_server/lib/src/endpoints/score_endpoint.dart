@@ -8,11 +8,7 @@ import '../helpers/auth_helper.dart';
 class ScoreEndpoint extends Endpoint {
   /// Get all user scores (with optional incremental sync)
   Future<List<Score>> getScores(Session session, int userId, {DateTime? since}) async {
-    session.log('╔════════════════════════════════════════════╗', level: LogLevel.info);
-    session.log('║     SCORE.getScores CALLED                 ║', level: LogLevel.info);
-    session.log('╚════════════════════════════════════════════╝', level: LogLevel.info);
-    session.log('[SCORE] Provided userId: $userId, since: $since', level: LogLevel.info);
-    session.log('[SCORE] Session authenticated: ${session.authenticated != null ? 'YES (userIdentifier=${session.authenticated!.userIdentifier})' : 'NO - session.authenticated is NULL'}', level: LogLevel.info);
+    session.log('[SCORE] getScores called: userId=$userId, since=$since', level: LogLevel.info);
     
     // Validate authentication - use auth userId if available, fallback to provided userId
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
@@ -54,14 +50,9 @@ class ScoreEndpoint extends Endpoint {
 
   /// Create or update score (with conflict detection and uniqueness check)
   Future<ScoreSyncResult> upsertScore(Session session, int userId, Score score) async {
-    session.log('╔════════════════════════════════════════════╗', level: LogLevel.info);
-    session.log('║     SCORE.upsertScore CALLED               ║', level: LogLevel.info);
-    session.log('╚════════════════════════════════════════════╝', level: LogLevel.info);
-    session.log('[SCORE] Provided userId: $userId, scoreId: ${score.id}, title: ${score.title}', level: LogLevel.info);
-    session.log('[SCORE] Session authenticated: ${session.authenticated != null ? 'YES (userIdentifier=${session.authenticated!.userIdentifier})' : 'NO - session.authenticated is NULL'}', level: LogLevel.info);
-    
+    session.log('[SCORE] upsertScore called: userId=$userId, scoreId=${score.id}, title=${score.title}', level: LogLevel.info);
+
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
-    session.log('[SCORE] Validated userId: $validatedUserId', level: LogLevel.info);
     
     if (score.id != null) {
       // Update existing by ID
@@ -70,13 +61,13 @@ class ScoreEndpoint extends Endpoint {
       if (existing != null) {
         // Verify ownership
         if (existing.userId != validatedUserId) {
-          session.log('[SCORE] ❌ User $validatedUserId does not own score ${score.id} (owned by ${existing.userId})', level: LogLevel.warning);
+          session.log('[SCORE] Permission denied: user $validatedUserId does not own score ${score.id}', level: LogLevel.warning);
           throw PermissionDeniedException('Not your score');
         }
 
         // Optimistic lock check
         if (existing.version > score.version) {
-          session.log('[SCORE] ⚠️ Version conflict: client=${score.version}, server=${existing.version}', level: LogLevel.warning);
+          session.log('[SCORE] Version conflict: client=${score.version}, server=${existing.version}', level: LogLevel.warning);
           return ScoreSyncResult(
             status: 'conflict',
             serverVersion: existing,
@@ -88,7 +79,7 @@ class ScoreEndpoint extends Endpoint {
         score.version = existing.version + 1;
         score.updatedAt = DateTime.now();
         final updated = await Score.db.updateRow(session, score);
-        session.log('[SCORE] ✅ Updated score: ${score.title} (new version: ${score.version})', level: LogLevel.info);
+        session.log('[SCORE] Updated: title=${score.title}, version=${score.version}', level: LogLevel.info);
         return ScoreSyncResult(status: 'success', serverVersion: updated);
       }
     }
@@ -116,7 +107,7 @@ class ScoreEndpoint extends Endpoint {
       
       // Optimistic lock check
       if (existing.version > score.version) {
-        session.log('[SCORE] ⚠️ Version conflict: client=${score.version}, server=${existing.version}', level: LogLevel.warning);
+        session.log('[SCORE] Version conflict: client=${score.version}, server=${existing.version}', level: LogLevel.warning);
         return ScoreSyncResult(
           status: 'conflict',
           serverVersion: existing,
@@ -129,7 +120,7 @@ class ScoreEndpoint extends Endpoint {
       existing.version = existing.version + 1;
       existing.updatedAt = DateTime.now();
       final updated = await Score.db.updateRow(session, existing);
-      session.log('[SCORE] ✅ Updated existing score: ${score.title} (new version: ${existing.version})', level: LogLevel.info);
+      session.log('[SCORE] Updated existing: title=${score.title}, version=${existing.version}', level: LogLevel.info);
       return ScoreSyncResult(status: 'success', serverVersion: updated);
     }
 
@@ -140,7 +131,7 @@ class ScoreEndpoint extends Endpoint {
     score.createdAt = DateTime.now();
     score.updatedAt = DateTime.now();
     final created = await Score.db.insertRow(session, score);
-    session.log('[SCORE] ✅ Created score with id: ${created.id}', level: LogLevel.info);
+    session.log('[SCORE] Created: id=${created.id}', level: LogLevel.info);
     
     return ScoreSyncResult(status: 'success', serverVersion: created);
   }
@@ -203,18 +194,18 @@ class ScoreEndpoint extends Endpoint {
     
     final score = await Score.db.findById(session, scoreId);
     if (score == null) {
-      session.log('[SCORE] ⚠️ Score $scoreId not found', level: LogLevel.warning);
+      session.log('[SCORE] Score $scoreId not found', level: LogLevel.warning);
       return false;
     }
     if (score.userId != validatedUserId) {
-      session.log('[SCORE] ❌ User $validatedUserId does not own score $scoreId', level: LogLevel.warning);
+      session.log('[SCORE] Permission denied: user $validatedUserId does not own score $scoreId', level: LogLevel.warning);
       throw PermissionDeniedException('Not your score');
     }
 
     score.deletedAt = DateTime.now();
     score.updatedAt = DateTime.now();
     await Score.db.updateRow(session, score);
-    session.log('[SCORE] ✅ Soft deleted score: ${score.title}', level: LogLevel.info);
+    session.log('[SCORE] Deleted: title=${score.title}', level: LogLevel.info);
 
     // Recalculate storage
     await _recalculateStorage(session, validatedUserId);

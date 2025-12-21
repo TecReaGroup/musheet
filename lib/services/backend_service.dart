@@ -151,7 +151,7 @@ class BackendService {
     _client.authKeyProvider = _authKeyProvider;
     
     if (kDebugMode) {
-      print('[Backend] Initialized: $_baseUrl');
+      print('[API] Initialized: $_baseUrl');
     }
   }
 
@@ -186,7 +186,7 @@ class BackendService {
     _userId = userId;
     _authKeyProvider.setToken(token);
     if (kDebugMode) {
-      print('[Backend] Auth set for user: $userId');
+      print('[API] Auth set for user: $userId');
     }
   }
 
@@ -196,7 +196,7 @@ class BackendService {
     _userId = null;
     _authKeyProvider.setToken(null);
     if (kDebugMode) {
-      print('[Backend] Auth cleared');
+      print('[API] Auth cleared');
     }
   }
 
@@ -215,11 +215,11 @@ class BackendService {
     try {
       final result = await _client.status.health();
       _status = BackendStatus.connected;
-      if (kDebugMode) print('[Backend] ✓ Connected');
+      if (kDebugMode) print('[API] ok Connected');
       return ApiResult(data: {'status': 'ok', 'raw': result}, statusCode: 200);
     } catch (e) {
       _status = BackendStatus.error;
-      if (kDebugMode) print('[Backend] ✗ Connection failed: $e');
+      if (kDebugMode) print('[API] failed: Connection failed: $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -230,7 +230,7 @@ class BackendService {
       final result = await _client.status.info();
       return ApiResult(data: {'info': result}, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ Get info failed: $e');
+      if (kDebugMode) print('[API] failed: Get info failed: $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -243,7 +243,7 @@ class BackendService {
     required String password,
     String? displayName,
   }) async {
-    if (kDebugMode) print('[Backend] → register($username)');
+    if (kDebugMode) print('[API] → register($username)');
     try {
       final result = await _client.auth.register(username, password, displayName: displayName);
       final authResult = AuthResultData.fromServerpod(result);
@@ -252,13 +252,13 @@ class BackendService {
         _authToken = authResult.token;
         _userId = authResult.userId;
         _authKeyProvider.setToken(authResult.token);
-        if (kDebugMode) print('[Backend] ✓ register → userId: ${authResult.userId}');
+        if (kDebugMode) print('[API] ok register → userId: ${authResult.userId}');
       } else {
-        if (kDebugMode) print('[Backend] ✗ register → ${authResult.error}');
+        if (kDebugMode) print('[API] failed: register → ${authResult.error}');
       }
       return ApiResult(data: authResult, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ register → $e');
+      if (kDebugMode) print('[API] failed: register → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -268,7 +268,7 @@ class BackendService {
     required String username,
     required String password,
   }) async {
-    if (kDebugMode) print('[Backend] → login($username)');
+    if (kDebugMode) print('[API] → login($username)');
     try {
       final result = await _client.auth.login(username, password);
       final authResult = AuthResultData.fromServerpod(result);
@@ -277,32 +277,32 @@ class BackendService {
         _authToken = authResult.token;
         _userId = authResult.userId;
         _authKeyProvider.setToken(authResult.token);
-        if (kDebugMode) print('[Backend] ✓ login → userId: ${authResult.userId}');
+        if (kDebugMode) print('[API] ok login → userId: ${authResult.userId}');
       } else {
-        if (kDebugMode) print('[Backend] ✗ login → ${authResult.error}');
+        if (kDebugMode) print('[API] failed: login → ${authResult.error}');
       }
       return ApiResult(data: authResult, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ login → $e');
+      if (kDebugMode) print('[API] failed: login → $e');
       return ApiResult(error: e.toString());
     }
   }
 
   /// Logout current user
   Future<ApiResult<bool>> logout() async {
-    if (kDebugMode) print('[Backend] → logout()');
+    if (kDebugMode) print('[API] → logout()');
     try {
       await _client.auth.logout();
       _authToken = null;
       _userId = null;
       _authKeyProvider.setToken(null);
-      if (kDebugMode) print('[Backend] ✓ logout');
+      if (kDebugMode) print('[API] ok logout');
       return ApiResult(data: true, statusCode: 200);
     } catch (e) {
       _authToken = null;
       _userId = null;
       _authKeyProvider.setToken(null);
-      if (kDebugMode) print('[Backend] ✗ logout → $e');
+      if (kDebugMode) print('[API] failed: logout → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -314,7 +314,7 @@ class BackendService {
       final result = await _client.auth.validateToken(_authToken!);
       return ApiResult(data: result != null, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ validateToken → $e');
+      if (kDebugMode) print('[API] failed: validateToken → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -328,7 +328,7 @@ class BackendService {
       final result = await _client.profile.getProfile(_userId!);
       return ApiResult(data: LocalUserProfile.fromServerpod(result), statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ getProfile → $e');
+      if (kDebugMode) print('[API] failed: getProfile → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -347,7 +347,7 @@ class BackendService {
       );
       return ApiResult(data: LocalUserProfile.fromServerpod(result), statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ updateProfile → $e');
+      if (kDebugMode) print('[API] failed: updateProfile → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -363,14 +363,14 @@ class BackendService {
     required String fileName,
   }) async {
     if (_userId == null) return ApiResult(error: 'Not logged in');
-    if (kDebugMode) print('[Backend] → uploadPdf($instrumentScoreId, ${fileBytes.length} bytes)');
+    if (kDebugMode) print('[API] → uploadPdf($instrumentScoreId, ${fileBytes.length} bytes)');
     try {
       final byteData = ByteData.view(fileBytes.buffer);
       final result = await _client.file.uploadPdf(_userId!, instrumentScoreId, byteData, fileName);
-      if (kDebugMode) print('[Backend] ✓ uploadPdf → ${result.path}');
+      if (kDebugMode) print('[API] ok uploadPdf → ${result.path}');
       return ApiResult(data: result, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ uploadPdf → $e');
+      if (kDebugMode) print('[API] failed: uploadPdf → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -382,10 +382,10 @@ class BackendService {
       final result = await _client.file.downloadPdf(_userId!, instrumentScoreId);
       if (result == null) return ApiResult(error: 'PDF not found on server');
       final bytes = result.buffer.asUint8List();
-      if (kDebugMode) print('[Backend] ✓ downloadPdf($instrumentScoreId) → ${bytes.length} bytes');
+      if (kDebugMode) print('[API] ok downloadPdf($instrumentScoreId) → ${bytes.length} bytes');
       return ApiResult(data: bytes, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ downloadPdf → $e');
+      if (kDebugMode) print('[API] failed: downloadPdf → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -398,7 +398,7 @@ class BackendService {
       if (result == null) return ApiResult(error: 'PDF URL not available');
       return ApiResult(data: result, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ getPdfUrl → $e');
+      if (kDebugMode) print('[API] failed: getPdfUrl → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -408,10 +408,10 @@ class BackendService {
     if (_userId == null) return ApiResult(error: 'Not logged in');
     try {
       final result = await _client.file.deletePdf(_userId!, instrumentScoreId);
-      if (kDebugMode) print('[Backend] ✓ deletePdf($instrumentScoreId)');
+      if (kDebugMode) print('[API] ok deletePdf($instrumentScoreId)');
       return ApiResult(data: result, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ deletePdf → $e');
+      if (kDebugMode) print('[API] failed: deletePdf → $e');
       return ApiResult(error: e.toString());
     }
   }
@@ -421,20 +421,20 @@ class BackendService {
   /// Print debug info
   void debugPrint() {
     if (kDebugMode) {
-      print('[Backend] Status: $_status, User: $_userId, Auth: ${_authToken != null}');
+      print('[API] Status: $_status, User: $_userId, Auth: ${_authToken != null}');
     }
   }
 
   /// Delete all user data from server (DEBUG ONLY)
   Future<ApiResult<DeleteUserDataResult>> deleteAllUserData() async {
     if (_userId == null) return ApiResult(error: 'Not logged in');
-    if (kDebugMode) print('[Backend] ⚠️ deleteAllUserData(user:$_userId)');
+    if (kDebugMode) print('[API] WARNING: deleteAllUserData(user:$_userId)');
     try {
       final result = await _client.profile.deleteAllUserData(_userId!);
-      if (kDebugMode) print('[Backend] ✓ deleteAllUserData → ${result.deletedScores} scores, ${result.deletedInstrumentScores} IS, ${result.deletedSetlists} setlists');
+      if (kDebugMode) print('[API] ok deleteAllUserData → ${result.deletedScores} scores, ${result.deletedInstrumentScores} IS, ${result.deletedSetlists} setlists');
       return ApiResult(data: result, statusCode: 200);
     } catch (e) {
-      if (kDebugMode) print('[Backend] ✗ deleteAllUserData → $e');
+      if (kDebugMode) print('[API] failed: deleteAllUserData → $e');
       return ApiResult(error: e.toString());
     }
   }

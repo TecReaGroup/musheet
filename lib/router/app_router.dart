@@ -132,12 +132,32 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.scoreViewer,
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
+          
+          // Handle potential serialization: convert Map to Score if needed
+          final score = extra['score'] is Score
+              ? extra['score'] as Score
+              : Score.fromJson(extra['score'] as Map<String, dynamic>);
+          
+          final instrumentScore = extra['instrumentScore'] == null
+              ? null
+              : (extra['instrumentScore'] is InstrumentScore
+                  ? extra['instrumentScore'] as InstrumentScore
+                  : InstrumentScore.fromJson(extra['instrumentScore'] as Map<String, dynamic>));
+          
+          final setlistScores = extra['setlistScores'] == null
+              ? null
+              : (extra['setlistScores'] as List).map((item) {
+                  return item is Score
+                      ? item
+                      : Score.fromJson(item as Map<String, dynamic>);
+                }).toList();
+          
           return MaterialPage(
             key: state.pageKey,
             child: ScoreViewerScreen(
-              score: extra['score'] as Score,
-              instrumentScore: extra['instrumentScore'] as InstrumentScore?,
-              setlistScores: extra['setlistScores'] as List<Score>?,
+              score: score,
+              instrumentScore: instrumentScore,
+              setlistScores: setlistScores,
               currentIndex: extra['currentIndex'] as int?,
               setlistName: extra['setlistName'] as String?,
             ),
@@ -148,7 +168,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.scoreDetail,
         pageBuilder: (context, state) {
-          final score = state.extra as Score;
+          // Handle potential serialization: convert Map to Score if needed
+          final score = state.extra is Score
+              ? state.extra as Score
+              : Score.fromJson(state.extra as Map<String, dynamic>);
           return MaterialPage(
             key: state.pageKey,
             child: ScoreDetailScreen(score: score),
@@ -159,7 +182,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.setlistDetail,
         pageBuilder: (context, state) {
-          final setlist = state.extra as Setlist;
+          // Handle potential serialization: convert Map to Setlist if needed
+          final setlist = state.extra is Setlist
+              ? state.extra as Setlist
+              : Setlist.fromJson(state.extra as Map<String, dynamic>);
           return MaterialPage(
             key: state.pageKey,
             child: SetlistDetailScreen(setlist: setlist),

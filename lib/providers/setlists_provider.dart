@@ -3,6 +3,7 @@ import '../models/setlist.dart';
 import '../models/score.dart';
 import 'scores_provider.dart';
 import 'storage_providers.dart';
+import 'auth_provider.dart';
 
 /// Helper to extract value from AsyncValue
 List<Setlist> _getSetlistsValue(AsyncValue<List<Setlist>> asyncValue) {
@@ -17,6 +18,12 @@ List<Setlist> _getSetlistsValue(AsyncValue<List<Setlist>> asyncValue) {
 class SetlistsNotifier extends AsyncNotifier<List<Setlist>> {
   @override
   Future<List<Setlist>> build() async {
+    // Watch auth state - when user logs out, return empty list immediately
+    final authState = ref.watch(authProvider);
+    if (authState.state == AuthState.unauthenticated) {
+      return [];
+    }
+
     // Load setlists from database on initialization
     final dbService = ref.read(databaseServiceProvider);
     return dbService.getAllSetlists();
@@ -133,8 +140,11 @@ class SetlistsNotifier extends AsyncNotifier<List<Setlist>> {
   }
 
   /// Refresh setlists from database
-  Future<void> refresh() async {
-    state = const AsyncLoading();
+  /// If silent is true, don't set loading state (for background refreshes)
+  Future<void> refresh({bool silent = false}) async {
+    if (!silent) {
+      state = const AsyncLoading();
+    }
     state = await AsyncValue.guard(() async {
       final dbService = ref.read(databaseServiceProvider);
       return dbService.getAllSetlists();

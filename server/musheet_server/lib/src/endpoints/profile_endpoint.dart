@@ -261,8 +261,8 @@ class ProfileEndpoint extends Endpoint {
       where: (t) => t.userId.equals(validatedUserId),
     );
 
-    session.log('[PROFILE] ✅ Deleted: $deletedScores scores, $deletedInstrumentScores instrument scores, '
-        '$deletedAnnotations annotations, $deletedSetlists setlists, $deletedSetlistScores setlist scores',
+    session.log('[PROFILE] Deleted: scores=$deletedScores, instrumentScores=$deletedInstrumentScores, '
+        'annotations=$deletedAnnotations, setlists=$deletedSetlists, setlistScores=$deletedSetlistScores',
         level: LogLevel.info);
 
     return DeleteUserDataResult(

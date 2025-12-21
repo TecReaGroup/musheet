@@ -60,7 +60,7 @@ class DatabaseService {
         // Restore the deleted score instead of creating new
         final existingScore = deletedScores.first;
         if (kDebugMode) {
-          debugPrint('[DatabaseService] Restoring soft-deleted Score: id=${existingScore.id}, title="${score.title}", composer="${score.composer}", serverId=${existingScore.serverId}');
+          debugPrint('[DB] Restoring soft-deleted Score: id=${existingScore.id}, title="${score.title}"');
         }
         
         await (_db.update(_db.scores)
@@ -89,6 +89,8 @@ class DatabaseService {
             composer: score.composer,
             bpm: Value(score.bpm),
             dateAdded: score.dateAdded,
+            syncStatus: const Value('pending'),
+            updatedAt: Value(DateTime.now()),
           ));
 
       // Insert instrument scores
@@ -124,10 +126,7 @@ class DatabaseService {
           .get();
 
       if (kDebugMode) {
-        debugPrint('[DatabaseService] deleteScore: scoreId=$scoreId, instrumentScores=${instrumentScores.length}');
-        for (final is_ in instrumentScores) {
-          debugPrint('[DatabaseService]   - InstrumentScore: id=${is_.id}, serverId=${is_.serverId}, syncStatus=${is_.syncStatus}');
-        }
+        debugPrint('[DB] Deleting Score: id=$scoreId, instrumentScores=${instrumentScores.length}');
       }
 
       // Cascade: Physically delete annotations for each InstrumentScore
@@ -143,12 +142,12 @@ class DatabaseService {
             ..where((is_) => is_.scoreId.equals(scoreId)))
           .write(InstrumentScoresCompanion(
             deletedAt: Value(now),
-            syncStatus: const Value('pending_delete'),
+            syncStatus: const Value('pending'),
             updatedAt: Value(now),
           ));
 
       if (kDebugMode) {
-        debugPrint('[DatabaseService] ✓ Cascade soft-deleted ${instrumentScores.length} InstrumentScores and their Annotations (marked for sync)');
+        debugPrint('[DB] Cascade deleted ${instrumentScores.length} InstrumentScores');
       }
 
       // Cascade: Soft delete setlist-score associations
@@ -156,7 +155,7 @@ class DatabaseService {
             ..where((ss) => ss.scoreId.equals(scoreId)))
           .write(SetlistScoresCompanion(
             deletedAt: Value(now),
-            syncStatus: const Value('pending_delete'),
+            syncStatus: const Value('pending'),
             updatedAt: Value(now),
           ));
 
@@ -164,13 +163,13 @@ class DatabaseService {
       await (_db.update(_db.scores)..where((s) => s.id.equals(scoreId))).write(
         ScoresCompanion(
           deletedAt: Value(now),
-          syncStatus: const Value('pending_delete'),
+          syncStatus: const Value('pending'),
           updatedAt: Value(now),
         ),
       );
       
       if (kDebugMode) {
-        debugPrint('[DatabaseService] ✓ Soft-deleted Score: scoreId=$scoreId (marked for sync with cascaded deletions)');
+        debugPrint('[DB] Score deleted: id=$scoreId');
       }
     });
   }
@@ -218,7 +217,7 @@ class DatabaseService {
       // Restore the deleted instrument score instead of creating new
       final existingInstrumentScore = deletedInstrumentScores.first;
       if (kDebugMode) {
-        debugPrint('[DatabaseService] Restoring soft-deleted InstrumentScore: id=${existingInstrumentScore.id}, scoreId=$scoreId, instrumentName="$instrumentName", serverId=${existingInstrumentScore.serverId}');
+        debugPrint('[DB] Restoring InstrumentScore: id=${existingInstrumentScore.id}');
       }
       
       await (_db.update(_db.instrumentScores)
@@ -264,6 +263,7 @@ class DatabaseService {
           syncStatus: const Value('pending'),
           // CRITICAL: Set PDF sync status so the PDF will be uploaded
           pdfSyncStatus: const Value('pending'),
+          updatedAt: Value(DateTime.now()),
         ));
 
     // Insert annotations
@@ -293,7 +293,7 @@ class DatabaseService {
       
       if (instrumentScores.isEmpty) {
         if (kDebugMode) {
-          debugPrint('[DatabaseService] InstrumentScore not found: $instrumentScoreId');
+          debugPrint('[DB] InstrumentScore not found: $instrumentScoreId');
         }
         return;
       }
@@ -307,7 +307,7 @@ class DatabaseService {
           .go();
       
       if (kDebugMode) {
-        debugPrint('[DatabaseService] ✓ Cascade physically deleted Annotations for InstrumentScore: $instrumentScoreId');
+        debugPrint('[DB] Annotations deleted for InstrumentScore: $instrumentScoreId');
       }
       
       // Check if this InstrumentScore has been synced to server
@@ -317,12 +317,12 @@ class DatabaseService {
               ..where((is_) => is_.id.equals(instrumentScoreId)))
             .write(InstrumentScoresCompanion(
               deletedAt: Value(now),
-              syncStatus: const Value('pending_delete'),
+              syncStatus: const Value('pending'),
               updatedAt: Value(now),
             ));
         
         if (kDebugMode) {
-          debugPrint('[DatabaseService] ✓ Soft-deleted InstrumentScore: $instrumentScoreId (serverId=${instrumentScore.serverId}, marked for sync)');
+          debugPrint('[DB] InstrumentScore soft-deleted: $instrumentScoreId');
         }
       } else {
         // Physical delete: this was never synced, so just remove it locally
@@ -331,7 +331,7 @@ class DatabaseService {
             .go();
         
         if (kDebugMode) {
-          debugPrint('[DatabaseService] ✓ Physically deleted InstrumentScore: $instrumentScoreId (never synced)');
+          debugPrint('[DB] InstrumentScore deleted: $instrumentScoreId');
         }
       }
     });
@@ -367,6 +367,7 @@ class DatabaseService {
   }
 
   /// Update annotations for an instrument score
+  /// Per APP_SYNC_LOGIC.md §2.6: When annotations change, mark InstrumentScore as pending
   Future<void> updateAnnotations(
       String instrumentScoreId, List<models.Annotation> annotations) async {
     await _db.transaction(() async {
@@ -379,6 +380,15 @@ class DatabaseService {
       for (final annotation in annotations) {
         await _insertAnnotation(instrumentScoreId, annotation);
       }
+
+      // Mark the InstrumentScore as pending to trigger sync
+      // Per APP_SYNC_LOGIC.md §2.6: Annotations are embedded in InstrumentScore
+      await (_db.update(_db.instrumentScores)
+            ..where((is_) => is_.id.equals(instrumentScoreId)))
+          .write(InstrumentScoresCompanion(
+            syncStatus: const Value('pending'),
+            updatedAt: Value(DateTime.now()),
+          ));
     });
   }
 
@@ -441,7 +451,7 @@ class DatabaseService {
         setlistIdToUse = existingSetlist.id;
         
         if (kDebugMode) {
-          debugPrint('[DatabaseService] Restoring soft-deleted Setlist: id=${existingSetlist.id}, name="${setlist.name}", serverId=${existingSetlist.serverId}');
+          debugPrint('[DB] Restoring Setlist: id=${existingSetlist.id}, name="${setlist.name}"');
         }
 
         await (_db.update(_db.setlists)
@@ -465,6 +475,8 @@ class DatabaseService {
               name: setlist.name,
               description: setlist.description,
               dateCreated: setlist.dateCreated,
+              syncStatus: const Value('pending'),
+              updatedAt: Value(DateTime.now()),
             ));
       }
 
@@ -474,6 +486,8 @@ class DatabaseService {
               setlistId: setlistIdToUse,
               scoreId: setlist.scoreIds[i],
               orderIndex: i,
+              syncStatus: const Value('pending'),
+              updatedAt: Value(DateTime.now()),
             ));
       }
     });
@@ -501,6 +515,8 @@ class DatabaseService {
               setlistId: setlist.id,
               scoreId: setlist.scoreIds[i],
               orderIndex: i,
+              syncStatus: const Value('pending'),
+              updatedAt: Value(DateTime.now()),
             ));
       }
     });
@@ -513,7 +529,7 @@ class DatabaseService {
       final now = DateTime.now();
       
       if (kDebugMode) {
-        debugPrint('[DatabaseService] deleteSetlist: setlistId=$setlistId');
+        debugPrint('[DB] Deleting Setlist: id=$setlistId');
       }
 
       // Cascade: Soft delete setlist-score associations
@@ -521,25 +537,25 @@ class DatabaseService {
             ..where((ss) => ss.setlistId.equals(setlistId)))
           .write(SetlistScoresCompanion(
             deletedAt: Value(now),
-            syncStatus: const Value('pending_delete'),
+            syncStatus: const Value('pending'),
             updatedAt: Value(now),
           ));
 
       if (kDebugMode) {
-        debugPrint('[DatabaseService] ✓ Cascade soft-deleted SetlistScores for setlist (marked for sync)');
+        debugPrint('[DB] SetlistScores deleted for Setlist');
       }
 
       // Soft delete Setlist: mark as deleted and pending sync
       await (_db.update(_db.setlists)..where((s) => s.id.equals(setlistId))).write(
         SetlistsCompanion(
           deletedAt: Value(now),
-          syncStatus: const Value('pending_delete'),
+          syncStatus: const Value('pending'),
           updatedAt: Value(now),
         ),
       );
       
       if (kDebugMode) {
-        debugPrint('[DatabaseService] ✓ Soft-deleted Setlist: setlistId=$setlistId (marked for sync with cascaded deletions)');
+        debugPrint('[DB] Setlist deleted: id=$setlistId');
       }
     });
   }
