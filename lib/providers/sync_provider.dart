@@ -168,3 +168,30 @@ final lastSyncTimeProvider = Provider<DateTime?>((ref) {
   final status = ref.watch(syncStatusProvider);
   return status.lastSyncAt;
 });
+
+/// Provider that watches sync status and refreshes data when sync completes
+/// This ensures UI is always updated after background sync pulls new data
+final syncCompletionWatcherProvider = Provider<void>((ref) {
+  SyncState? previousState;
+
+  ref.listen<AsyncValue<SyncStatus>>(syncStatusStreamProvider, (previous, next) {
+    next.whenData((status) {
+      // Detect transition from syncing state to idle (sync completed)
+      final wasSyncing = previousState == SyncState.pushing ||
+                         previousState == SyncState.pulling ||
+                         previousState == SyncState.merging;
+      final isNowIdle = status.state == SyncState.idle;
+
+      if (wasSyncing && isNowIdle) {
+        if (kDebugMode) {
+          debugPrint('[SyncProvider] Sync completed - refreshing scores and setlists');
+        }
+        // Invalidate providers to reload data from database
+        ref.invalidate(scoresProvider);
+        ref.invalidate(setlistsAsyncProvider);
+      }
+
+      previousState = status.state;
+    });
+  });
+});

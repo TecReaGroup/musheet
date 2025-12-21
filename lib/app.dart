@@ -68,6 +68,9 @@ class MuSheetApp extends ConsumerWidget {
     // Watch the setlists provider to trigger initial load
     final setlistsAsync = ref.watch(setlistsAsyncProvider);
 
+    // Activate the sync completion watcher to auto-refresh data after sync
+    ref.watch(syncCompletionWatcherProvider);
+
     // Show splash until all data is loaded
     final isLoading = storageInit.isLoading ||
         scoresAsync.isLoading ||
@@ -124,6 +127,7 @@ class MuSheetApp extends ConsumerWidget {
             debugPrint('[App] Calling startBackgroundSync...');
             await syncService.startBackgroundSync();
             debugPrint('[App] startBackgroundSync completed');
+            // Note: UI refresh after sync is handled by syncCompletionWatcherProvider
           } else {
             debugPrint('[App] Sync service is null, skipping background sync');
           }

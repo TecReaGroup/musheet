@@ -318,6 +318,7 @@ class AuthNotifier extends Notifier<AuthData> {
         state = state.copyWith(
           state: AuthState.authenticated,
           user: result.data!.user,
+          backendStatus: BackendStatus.connected,
         );
         return true;
       } else {
@@ -361,7 +362,7 @@ class AuthNotifier extends Notifier<AuthData> {
       if (result.isSuccess && result.data?.success == true) {
         final prefs = ref.read(preferencesProvider);
         await prefs?.setAuthToken(result.data!.token);
-        
+
         // Ensure RpcClient is initialized (use same URL as BackendService)
         if (!RpcClient.isInitialized) {
           final url = prefs?.getServerUrl();
@@ -369,15 +370,16 @@ class AuthNotifier extends Notifier<AuthData> {
             RpcClient.initialize(RpcClientConfig(baseUrl: url));
           }
         }
-        
+
         // Also set RpcClient credentials
         if (RpcClient.isInitialized && result.data!.token != null && result.data!.userId != null) {
           RpcClient.instance.setAuthCredentials(result.data!.token!, result.data!.userId!);
         }
-        
+
         state = state.copyWith(
           state: AuthState.authenticated,
           user: result.data!.user,
+          backendStatus: BackendStatus.connected,
         );
         return true;
       } else {
