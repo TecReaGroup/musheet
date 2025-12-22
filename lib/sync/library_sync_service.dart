@@ -694,7 +694,7 @@ class LibrarySyncService {
         'data': jsonEncode({
           'scoreId': parentServerId,
           'instrumentName': instrumentName,
-          'pdfPath': instrumentScore.pdfPath,
+          // pdfPath is local-only, not sent to server (per APP_SYNC_LOGIC.md)
           'pdfHash': pdfHash, // Use calculated hash
           'orderIndex': instrumentScore.orderIndex,
           'annotationsJson': jsonEncode(annotationsJsonList), // Embedded annotations
@@ -1131,7 +1131,8 @@ class LibrarySyncService {
         id: newLocalId,
         scoreId: localScoreId,
         instrumentType: data['instrumentName'] as String,
-        pdfPath: Value(data['pdfPath'] as String?),
+        // pdfPath is local-only, server doesn't send it. Will be set after PDF download.
+        pdfPath: const Value(null),
         dateAdded: serverData.updatedAt ?? DateTime.now(),
         orderIndex: Value(data['orderIndex'] as int? ?? 0),
         serverId: Value(serverId),

@@ -101,30 +101,39 @@ class AuthNotifier extends Notifier<AuthData> {
     _isInitialized = true;
 
     final prefs = ref.read(preferencesProvider);
-    if (prefs == null) return;
+    if (prefs == null) {
+      print('[AUTH] prefs is null, returning');
+      return;
+    }
 
     // Initialize backend service and RpcClient if URL is saved
     final savedUrl = prefs.getServerUrl();
+    print('[AUTH] savedUrl: $savedUrl');
     if (savedUrl != null && savedUrl.isNotEmpty) {
       if (!BackendService.isInitialized) {
         BackendService.initialize(baseUrl: savedUrl);
+        print('[AUTH] BackendService initialized');
       }
       if (!RpcClient.isInitialized) {
         RpcClient.initialize(RpcClientConfig(baseUrl: savedUrl));
+        print('[AUTH] RpcClient initialized');
       }
     }
 
     // Check for saved auth token
     final token = prefs.getAuthToken();
+    print('[AUTH] token exists: ${token != null && token.isNotEmpty}');
     if (token != null && token.isNotEmpty) {
       // IMPORTANT: Set credentials BEFORE changing state
       // This ensures sync service has access to credentials when it starts
       final userId = _extractUserIdFromToken(token);
+      print('[AUTH] extracted userId: $userId');
       if (BackendService.isInitialized) {
         BackendService.instance.setAuthCredentials(token, userId);
       }
       if (RpcClient.isInitialized) {
         RpcClient.instance.setAuthCredentials(token, userId);
+        print('[AUTH] RpcClient credentials set, isLoggedIn: ${RpcClient.instance.isLoggedIn}');
       }
 
       // Now change state (which might trigger sync providers)

@@ -213,9 +213,10 @@ class ProfileEndpoint extends Endpoint {
         );
         deletedAnnotations += deletedAnns.length;
 
-        // Delete PDF file if exists
-        if (is_.pdfPath != null) {
-          await _deleteFile(is_.pdfPath!);
+        // Delete PDF file if exists (derive path from hash)
+        if (is_.pdfHash != null) {
+          final pdfPath = 'global/pdfs/${is_.pdfHash}.pdf';
+          await _deleteFile(pdfPath);
         }
       }
 

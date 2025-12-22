@@ -17,23 +17,24 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 /// Provider for sync service - uses LibrarySyncService with event-driven sync
 /// Per APP_SYNC_LOGIC.md §1.3: Sync is triggered by events, not periodic timers
 final syncServiceProvider = FutureProvider<LibrarySyncService?>((ref) async {
-  if (kDebugMode) debugPrint('[PROV] syncServiceProvider rebuilding...');
+  // Use print for release builds to help diagnose issues
+  print('[PROV] syncServiceProvider rebuilding...');
 
   final db = ref.watch(databaseProvider);
   // Watch authProvider to re-evaluate when auth state changes
   final authData = ref.watch(authProvider);
-  if (kDebugMode) {
-    debugPrint('[PROV] authState: ${authData.state}, isAuthenticated: ${authData.isAuthenticated}');
-  }
+  print('[PROV] authState: ${authData.state}, isAuthenticated: ${authData.isAuthenticated}');
 
   // Check if RpcClient is initialized and has valid auth credentials
   if (!RpcClient.isInitialized) {
-    if (kDebugMode) debugPrint('[PROV] RpcClient not initialized - returning null');
+    print('[PROV] RpcClient not initialized - returning null');
     return null;
   }
 
+  print('[PROV] RpcClient.isLoggedIn: ${RpcClient.instance.isLoggedIn}, userId: ${RpcClient.instance.userId}');
+
   if (!RpcClient.instance.isLoggedIn) {
-    if (kDebugMode) debugPrint('[PROV] RpcClient not logged in (userId: ${RpcClient.instance.userId}) - returning null');
+    print('[PROV] RpcClient not logged in - returning null');
     return null;
   }
 

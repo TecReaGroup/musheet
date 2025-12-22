@@ -263,18 +263,18 @@ class ScoreEndpoint extends Endpoint {
   }
 
   /// Create or update instrument score (with uniqueness check on instrumentName + scoreId)
+  /// Note: pdfPath removed from server model - PDF files are managed by hash
   Future<InstrumentScore> upsertInstrumentScore(
     Session session,
     int userId,
     int scoreId,
     String instrumentName, {
     int orderIndex = 0,
-    String? pdfPath,
   }) async {
     session.log('[SCORE] upsertInstrumentScore called - scoreId: $scoreId, instrumentName: $instrumentName', level: LogLevel.debug);
-    
+
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
-    
+
     // Verify ownership
     final score = await Score.db.findById(session, scoreId);
     if (score == null) throw NotFoundException('Score not found');
@@ -291,18 +291,16 @@ class ScoreEndpoint extends Endpoint {
       final existing = existingList.first;
       session.log('[SCORE] Found existing InstrumentScore with id: ${existing.id}, updating...', level: LogLevel.debug);
       existing.orderIndex = orderIndex;
-      if (pdfPath != null) existing.pdfPath = pdfPath;
       existing.updatedAt = DateTime.now();
       return await InstrumentScore.db.updateRow(session, existing);
     }
 
-    // Create new
+    // Create new (pdfPath removed from server model)
     session.log('[SCORE] Creating new InstrumentScore for $instrumentName', level: LogLevel.debug);
     final instrumentScore = InstrumentScore(
       scoreId: scoreId,
       instrumentName: instrumentName,
       orderIndex: orderIndex,
-      pdfPath: pdfPath,
       version: 1,
       syncStatus: 'synced',
       createdAt: DateTime.now(),

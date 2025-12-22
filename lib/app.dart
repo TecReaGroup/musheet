@@ -132,6 +132,9 @@ class MuSheetApp extends ConsumerWidget {
           await ref.read(authProvider.notifier).restoreSession();
           debugPrint('[App] restoreSession completed');
           // Start background sync if logged in - await the FutureProvider
+          // Invalidate sync provider to ensure it re-evaluates with new auth state
+          // This is necessary because the provider may have been built before RpcClient was logged in
+          ref.invalidate(syncServiceProvider);
           debugPrint('[App] Awaiting syncServiceProvider.future...');
           final syncService = await ref.read(syncServiceProvider.future);
           debugPrint('[App] syncServiceProvider resolved: ${syncService != null ? "service available" : "null"}');

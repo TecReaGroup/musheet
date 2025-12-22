@@ -3,7 +3,8 @@ table: instrument_scores
 fields:
   scoreId: int, relation(parent=scores)
   instrumentName: String
-  pdfPath: String?
+  # pdfPath removed per APP_SYNC_LOGIC.md - server derives path from pdfHash
+  # Client stores local path separately, not synced to server
   pdfHash: String?
   orderIndex: int
   createdAt: DateTime

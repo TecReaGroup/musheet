@@ -290,7 +290,8 @@ class LibrarySyncEndpoint extends Endpoint {
         data: jsonEncode({
           'scoreId': is_.scoreId,
           'instrumentName': is_.instrumentName,
-          'pdfPath': is_.pdfPath,
+          // pdfPath removed from server model per APP_SYNC_LOGIC.md
+          // Client derives local path from pdfHash
           'pdfHash': is_.pdfHash,
           'orderIndex': is_.orderIndex,
           'createdAt': is_.createdAt.toIso8601String(),
@@ -577,7 +578,7 @@ class LibrarySyncEndpoint extends Endpoint {
       final existing = await InstrumentScore.db.findById(session, change.serverId!);
       if (existing != null) {
         existing.instrumentName = instrumentName;
-        existing.pdfPath = data['pdfPath'] as String?;
+        // pdfPath removed from server model - only store pdfHash
         existing.pdfHash = data['pdfHash'] as String?;
         existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
         existing.annotationsJson = annotationsJsonStr;
@@ -599,7 +600,7 @@ class LibrarySyncEndpoint extends Endpoint {
       // If found, update it instead of creating new (restore if deleted)
       if (existingInstruments.isNotEmpty) {
         final existing = existingInstruments.first;
-        existing.pdfPath = data['pdfPath'] as String?;
+        // pdfPath removed from server model - only store pdfHash
         existing.pdfHash = data['pdfHash'] as String?;
         existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
         existing.annotationsJson = annotationsJsonStr;
@@ -611,10 +612,10 @@ class LibrarySyncEndpoint extends Endpoint {
         instrumentScoreId = existing.id;
       } else {
         // Create new only if no existing found
+        // pdfPath removed from server model - only store pdfHash
         final instrumentScore = InstrumentScore(
           scoreId: scoreId,
           instrumentName: instrumentName,
-          pdfPath: data['pdfPath'] as String?,
           pdfHash: data['pdfHash'] as String?,
           orderIndex: data['orderIndex'] as int? ?? 0,
           annotationsJson: annotationsJsonStr,

@@ -90,8 +90,7 @@ class FileEndpoint extends Endpoint {
     }
     // If file exists, we don't need to save it again (deduplication)
 
-    // Update record with hash (path is derived from hash)
-    instrumentScore.pdfPath = globalPath;
+    // Update record with hash (pdfPath removed - path is derived from hash)
     instrumentScore.pdfHash = hash;
     instrumentScore.updatedAt = DateTime.now();
     await InstrumentScore.db.updateRow(session, instrumentScore);
@@ -110,11 +109,13 @@ class FileEndpoint extends Endpoint {
     }
 
     final instrumentScore = await InstrumentScore.db.findById(session, instrumentScoreId);
-    if (instrumentScore == null || instrumentScore.pdfPath == null) {
+    if (instrumentScore == null || instrumentScore.pdfHash == null) {
       return null;
     }
 
-    return await _readFile(instrumentScore.pdfPath!);
+    // Derive path from hash
+    final globalPath = 'global/pdfs/${instrumentScore.pdfHash}.pdf';
+    return await _readFile(globalPath);
   }
 
   /// Download PDF by hash (for global deduplication)
@@ -147,12 +148,13 @@ class FileEndpoint extends Endpoint {
     }
 
     final instrumentScore = await InstrumentScore.db.findById(session, instrumentScoreId);
-    if (instrumentScore == null || instrumentScore.pdfPath == null) {
+    if (instrumentScore == null || instrumentScore.pdfHash == null) {
       return null;
     }
 
+    // Derive path from hash
     final serverUrl = Platform.environment['SERVER_URL'] ?? 'http://localhost:8080';
-    return '$serverUrl/files/${instrumentScore.pdfPath}';
+    return '$serverUrl/files/global/pdfs/${instrumentScore.pdfHash}.pdf';
   }
 
   /// Delete PDF file
@@ -169,8 +171,7 @@ class FileEndpoint extends Endpoint {
     if (instrumentScore.pdfHash != null) {
       final hash = instrumentScore.pdfHash!;
 
-      // Clear reference from this InstrumentScore
-      instrumentScore.pdfPath = null;
+      // Clear hash reference from this InstrumentScore (pdfPath removed from model)
       instrumentScore.pdfHash = null;
       instrumentScore.updatedAt = DateTime.now();
       await InstrumentScore.db.updateRow(session, instrumentScore);
