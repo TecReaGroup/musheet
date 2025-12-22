@@ -83,6 +83,7 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
   }
 
   /// Trigger background sync if available
+  /// Per APP_SYNC_LOGIC.md §1.3: Local data changes use 5s debounce
   void _triggerSync() {
     final syncServiceAsync = ref.read(syncServiceProvider);
     final syncService = switch (syncServiceAsync) {
@@ -90,7 +91,8 @@ class ScoresNotifier extends AsyncNotifier<List<Score>> {
       _ => null,
     };
     if (syncService != null) {
-      syncService.syncNow();
+      // Per APP_SYNC_LOGIC.md §1.3: Use debounce for local data changes
+      syncService.requestSync(immediate: false);
     }
   }
 
