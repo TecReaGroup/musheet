@@ -219,27 +219,6 @@ class SettingsScreen extends ConsumerWidget {
                 icon: AppIcons.infoOutline,
                 label: 'About MuSheet',
                 onTap: () => context.go(AppRoutes.about),
-                showDivider: true,
-              ),
-              SettingsListItem(
-                icon: AppIcons.bug,
-                label: 'Backend Debug',
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.blue50,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'DEV',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.blue500,
-                    ),
-                  ),
-                ),
-                onTap: () => context.go(AppRoutes.backendDebug),
                 isLast: true,
               ),
             ],
