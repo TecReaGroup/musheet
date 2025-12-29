@@ -89,12 +89,15 @@ class AppIcons {
   
   // People & User
   static const person = LucideIcons.user;
+  static const rotateCcwKey = LucideIcons.rotateCcwKey;  // For password change
   
   // Editing & Drawing
   static const undo = LucideIcons.undo;
   static const redo = LucideIcons.redo;
   static const autoFixHigh = LucideIcons.eraser;
   static const dragHandle = LucideIcons.gripVertical;
+  static const rotateCcw = LucideIcons.rotateCcw;
+  static const rotateCw = LucideIcons.rotateCw;
   
   // Files & Documents
   static const pictureAsPdfOutlined = LucideIcons.fileText;
@@ -123,6 +126,7 @@ class AppIcons {
   static const bug = LucideIcons.bug;
   static const lightbulb = LucideIcons.lightbulb;
   static const refreshCw = LucideIcons.refreshCw;
+  static const refreshCcw = LucideIcons.refreshCcw;
   static const sync = LucideIcons.refreshCcw;
   static const wifi = LucideIcons.wifi;
   static const wifiOff = LucideIcons.wifiOff;
@@ -130,4 +134,8 @@ class AppIcons {
   // Special
   static const workspacePremium = LucideIcons.award;
   static const fiberManualRecord = LucideIcons.circle;
+
+  // Camera & Images
+  static const camera = LucideIcons.camera;
+  static const image = LucideIcons.image;
 }

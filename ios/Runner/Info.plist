@@ -74,5 +74,10 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Camera and Photo Library permissions for image_picker -->
+		<key>NSCameraUsageDescription</key>
+		<string>MuSheet needs camera access to take profile photos.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>MuSheet needs photo library access to select profile photos.</string>
 	</dict>
 </plist>

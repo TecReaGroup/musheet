@@ -21,12 +21,14 @@ class AuthData {
   final LocalUserProfile? user;
   final String? error;
   final BackendStatus backendStatus;
+  final Uint8List? avatarBytes; // Cached avatar image
 
   const AuthData({
     this.state = AuthState.initial,
     this.user,
     this.error,
     this.backendStatus = BackendStatus.disconnected,
+    this.avatarBytes,
   });
 
   AuthData copyWith({
@@ -34,18 +36,22 @@ class AuthData {
     LocalUserProfile? user,
     String? error,
     BackendStatus? backendStatus,
+    Uint8List? avatarBytes,
+    bool clearAvatar = false,
   }) {
     return AuthData(
       state: state ?? this.state,
       user: user ?? this.user,
       error: error,
       backendStatus: backendStatus ?? this.backendStatus,
+      avatarBytes: clearAvatar ? null : (avatarBytes ?? this.avatarBytes),
     );
   }
 
   bool get isAuthenticated => state == AuthState.authenticated && user != null;
   bool get isLoading => state == AuthState.loading;
   bool get isConnected => backendStatus == BackendStatus.connected;
+  bool get hasAvatar => user?.avatarUrl != null && user!.avatarUrl!.startsWith('avatar:');
 }
 
 /// Backend configuration
@@ -102,38 +108,31 @@ class AuthNotifier extends Notifier<AuthData> {
 
     final prefs = ref.read(preferencesProvider);
     if (prefs == null) {
-      print('[AUTH] prefs is null, returning');
       return;
     }
 
     // Initialize backend service and RpcClient if URL is saved
     final savedUrl = prefs.getServerUrl();
-    print('[AUTH] savedUrl: $savedUrl');
     if (savedUrl != null && savedUrl.isNotEmpty) {
       if (!BackendService.isInitialized) {
         BackendService.initialize(baseUrl: savedUrl);
-        print('[AUTH] BackendService initialized');
       }
       if (!RpcClient.isInitialized) {
         RpcClient.initialize(RpcClientConfig(baseUrl: savedUrl));
-        print('[AUTH] RpcClient initialized');
       }
     }
 
     // Check for saved auth token
     final token = prefs.getAuthToken();
-    print('[AUTH] token exists: ${token != null && token.isNotEmpty}');
     if (token != null && token.isNotEmpty) {
       // IMPORTANT: Set credentials BEFORE changing state
       // This ensures sync service has access to credentials when it starts
       final userId = _extractUserIdFromToken(token);
-      print('[AUTH] extracted userId: $userId');
       if (BackendService.isInitialized) {
         BackendService.instance.setAuthCredentials(token, userId);
       }
       if (RpcClient.isInitialized) {
         RpcClient.instance.setAuthCredentials(token, userId);
-        print('[AUTH] RpcClient credentials set, isLoggedIn: ${RpcClient.instance.isLoggedIn}');
       }
 
       // Now change state (which might trigger sync providers)
@@ -181,12 +180,14 @@ class AuthNotifier extends Notifier<AuthData> {
         if (validateResult.isSuccess && validateResult.data == true) {
           // Get user profile in background
           final profileResult = await BackendService.instance.getProfile();
-          
+
           if (profileResult.isSuccess) {
             state = state.copyWith(
               state: AuthState.authenticated,
               user: profileResult.data,
             );
+            // Load avatar after profile is set
+            await _loadAvatarIfNeeded();
           }
           // If profile fetch fails, keep authenticated state
         } else {
@@ -326,12 +327,15 @@ class AuthNotifier extends Notifier<AuthData> {
         if (RpcClient.isInitialized && result.data!.token != null && result.data!.userId != null) {
           RpcClient.instance.setAuthCredentials(result.data!.token!, result.data!.userId!);
         }
-        
+
         state = state.copyWith(
           state: AuthState.authenticated,
           user: result.data!.user,
           backendStatus: BackendStatus.connected,
         );
+        // Refresh profile to get complete user data including avatarUrl, then load avatar
+        await refreshProfile();
+        await _loadAvatarIfNeeded();
         return true;
       } else {
         state = state.copyWith(
@@ -393,6 +397,9 @@ class AuthNotifier extends Notifier<AuthData> {
           user: result.data!.user,
           backendStatus: BackendStatus.connected,
         );
+        // Refresh profile to get complete user data including avatarUrl, then load avatar
+        await refreshProfile();
+        await _loadAvatarIfNeeded();
         return true;
       } else {
         state = state.copyWith(
@@ -496,6 +503,25 @@ class AuthNotifier extends Notifier<AuthData> {
   /// Clear error
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  /// Load avatar from server and cache it
+  Future<void> _loadAvatarIfNeeded() async {
+    if (!state.hasAvatar || state.user?.id == null) return;
+
+    try {
+      final result = await BackendService.instance.getAvatar(userId: state.user!.id);
+      if (result.isSuccess && result.data != null) {
+        state = state.copyWith(avatarBytes: result.data);
+      }
+    } catch (_) {
+      // Ignore avatar loading errors
+    }
+  }
+
+  /// Update cached avatar bytes (called after uploading new avatar)
+  void updateCachedAvatar(Uint8List? bytes) {
+    state = state.copyWith(avatarBytes: bytes, clearAvatar: bytes == null);
   }
 }
 

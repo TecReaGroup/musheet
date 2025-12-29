@@ -163,12 +163,55 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     final instrumentScoreId = _currentInstrumentScore?.id;
     var pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
 
-    if (pdfPath.isEmpty || instrumentScoreId == null) {
+    // No instrument score ID means we can't load anything
+    if (instrumentScoreId == null) {
       if (!mounted) return;
       setState(() {
         _pdfError = 'No PDF file specified';
       });
       return;
+    }
+
+    // Helper function to try downloading PDF from server
+    Future<String?> tryDownloadPdf() async {
+      final syncServiceAsync = ref.read(syncServiceProvider);
+      final syncService = switch (syncServiceAsync) {
+        AsyncData(:final value) => value,
+        _ => null,
+      };
+      if (syncService != null) {
+        setState(() {
+          _pdfError = null;
+          _isDownloadingPdf = true;
+        });
+
+        final downloadedPath = await syncService.downloadPdfWithPriority(instrumentScoreId);
+
+        if (!mounted) return null;
+
+        setState(() {
+          _isDownloadingPdf = false;
+        });
+
+        return downloadedPath;
+      }
+      return null;
+    }
+
+    // If pdfPath is empty, try to download from server first
+    // This handles the case when synced data doesn't have local PDF yet
+    if (pdfPath.isEmpty) {
+      if (!mounted) return;
+
+      final downloadedPath = await tryDownloadPdf();
+      if (downloadedPath != null) {
+        pdfPath = downloadedPath;
+      } else {
+        setState(() {
+          _pdfError = 'PDF file not found on server';
+        });
+        return;
+      }
     }
 
     // Check if PDF file exists locally
@@ -178,37 +221,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         if (!mounted) return;
 
         // Try to download from server with priority
-        final syncServiceAsync = ref.read(syncServiceProvider);
-        final syncService = switch (syncServiceAsync) {
-          AsyncData(:final value) => value,
-          _ => null,
-        };
-        if (syncService != null) {
-          setState(() {
-            _pdfError = null;
-            _isDownloadingPdf = true;  // Show loading indicator
-          });
+        final downloadedPath = await tryDownloadPdf();
 
-          // Use priority download to ensure this PDF is downloaded first
-          final downloadedPath = await syncService.downloadPdfWithPriority(instrumentScoreId);
+        if (!mounted) return;
 
-          if (!mounted) return;
-
-          if (downloadedPath != null) {
-            pdfPath = downloadedPath;
-            setState(() {
-              _isDownloadingPdf = false;
-            });
-          } else {
-            setState(() {
-              _isDownloadingPdf = false;
-              _pdfError = 'PDF file not found locally or on server';
-            });
-            return;
-          }
+        if (downloadedPath != null) {
+          pdfPath = downloadedPath;
         } else {
           setState(() {
-            _pdfError = 'PDF file not found: $pdfPath';
+            _pdfError = 'PDF file not found locally or on server';
           });
           return;
         }
@@ -613,9 +634,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   Widget _buildPdfViewer() {
     final pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
+    final hasInstrumentScoreId = _currentInstrumentScore?.id != null;
 
-    // Check if it's a valid file path
-    if (pdfPath.isEmpty) {
+    // Only show error if we have no instrument score ID at all
+    // If pdfPath is empty but we have an ID, we might be downloading
+    if (pdfPath.isEmpty && !hasInstrumentScoreId) {
       return _buildErrorState('No PDF file specified');
     }
 
@@ -625,6 +648,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     }
 
     // Show loading state while document is being loaded or downloaded
+    // This includes when pdfPath is empty but we're trying to download
     if (_pdfDocument == null) {
       return Center(
         child: Column(

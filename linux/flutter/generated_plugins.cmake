@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  file_selector_linux
   gtk
   sqlite3_flutter_libs
   syncfusion_pdfviewer_linux

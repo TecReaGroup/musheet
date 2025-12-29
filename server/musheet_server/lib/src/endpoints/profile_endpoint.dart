@@ -43,9 +43,8 @@ class ProfileEndpoint extends Endpoint {
       id: validatedUserId,
       username: user.username,
       displayName: user.displayName,
-      avatarUrl: user.avatarPath != null
-          ? _getAvatarUrl(user.avatarPath!)
-          : null,
+      // Return whether user has avatar (client uses getAvatar RPC to fetch)
+      avatarUrl: user.avatarPath != null ? 'avatar:$validatedUserId' : null,
       bio: user.bio,
       preferredInstrument: user.preferredInstrument,
       teams: teams,
@@ -119,8 +118,9 @@ class ProfileEndpoint extends Endpoint {
 
     return AvatarUploadResult(
       success: true,
-      avatarUrl: _getAvatarUrl(path),
-      thumbnailUrl: _getAvatarUrl(path),
+      // Return avatar identifier (client uses getAvatar RPC to fetch)
+      avatarUrl: 'avatar:$validatedUserId',
+      thumbnailUrl: 'avatar:$validatedUserId',
     );
   }
 
@@ -171,7 +171,7 @@ class ProfileEndpoint extends Endpoint {
       id: user.id!,
       username: user.username,
       displayName: user.displayName,
-      avatarUrl: user.avatarPath != null ? _getAvatarUrl(user.avatarPath!) : null,
+      avatarUrl: user.avatarPath != null ? 'avatar:${user.id}' : null,
       bio: user.bio,
       preferredInstrument: user.preferredInstrument,
     );
@@ -278,9 +278,16 @@ class ProfileEndpoint extends Endpoint {
 
   // === Helper methods ===
 
-  String _getAvatarUrl(String path) {
-    final serverUrl = Platform.environment['SERVER_URL'] ?? 'http://localhost:8080';
-    return '$serverUrl/files/$path';
+  /// Get avatar image data by user ID
+  Future<ByteData?> getAvatar(Session session, int userId) async {
+    final user = await User.db.findById(session, userId);
+    if (user == null || user.avatarPath == null) return null;
+
+    final file = File('uploads/${user.avatarPath}');
+    if (!await file.exists()) return null;
+
+    final bytes = await file.readAsBytes();
+    return ByteData.view(bytes.buffer);
   }
 
   Future<void> _saveFile(String path, ByteData data) async {

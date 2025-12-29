@@ -352,6 +352,64 @@ class BackendService {
     }
   }
 
+  /// Change user password
+  Future<ApiResult<bool>> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    if (_userId == null) return ApiResult(error: 'Not logged in');
+    try {
+      final result = await _client.auth.changePassword(
+        _userId!,
+        oldPassword,
+        newPassword,
+      );
+      if (kDebugMode) print('[API] ok changePassword');
+      return ApiResult(data: result, statusCode: 200);
+    } catch (e) {
+      if (kDebugMode) print('[API] failed: changePassword → $e');
+      return ApiResult(error: e.toString());
+    }
+  }
+
+  /// Upload avatar image
+  Future<ApiResult<String>> uploadAvatar({
+    required Uint8List imageBytes,
+    required String fileName,
+  }) async {
+    if (_userId == null) return ApiResult(error: 'Not logged in');
+    if (kDebugMode) print('[API] → uploadAvatar(${imageBytes.length} bytes)');
+    try {
+      final byteData = ByteData.view(imageBytes.buffer);
+      final result = await _client.profile.uploadAvatar(_userId!, byteData, fileName);
+      if (result.success) {
+        if (kDebugMode) print('[API] ok uploadAvatar');
+        return ApiResult(data: 'avatar:$_userId', statusCode: 200);
+      } else {
+        return ApiResult(error: result.errorMessage ?? 'Upload failed');
+      }
+    } catch (e) {
+      if (kDebugMode) print('[API] failed: uploadAvatar → $e');
+      return ApiResult(error: e.toString());
+    }
+  }
+
+  /// Get avatar image bytes by user ID
+  Future<ApiResult<Uint8List>> getAvatar({required int userId}) async {
+    try {
+      final result = await _client.profile.getAvatar(userId);
+      if (result == null) {
+        return ApiResult(error: 'Avatar not found');
+      }
+      final bytes = result.buffer.asUint8List();
+      if (kDebugMode) print('[API] ok getAvatar($userId) → ${bytes.length} bytes');
+      return ApiResult(data: bytes, statusCode: 200);
+    } catch (e) {
+      if (kDebugMode) print('[API] failed: getAvatar → $e');
+      return ApiResult(error: e.toString());
+    }
+  }
+
   // ============== File API ==============
   // NOTE: Score and Setlist sync operations have been moved to LibrarySyncService
   // which uses batch sync via libraryPush/libraryPull for better efficiency

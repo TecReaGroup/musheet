@@ -55,9 +55,13 @@ Update:
 Add:
   Icon: assets/icons/app_icon.svg
 
+icon:
+  change password icon: rotate-ccw-key
+
 todo:
 
 complete settings page:
+
 i18n international support:
 
 team mode:
@@ -76,3 +80,4 @@ control webui:
     settings manager
     storage manager
     data monitor
+

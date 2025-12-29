@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/user_avatar.dart';
 import '../models/instrument_score.dart';
 import '../providers/auth_provider.dart';
 import 'library_screen.dart' show preferredInstrumentProvider, teamEnabledProvider;
@@ -62,8 +63,8 @@ class SettingsScreen extends ConsumerWidget {
                 child: InkWell(
                   onTap: () {
                     if (authData.isAuthenticated) {
-                      // Show user profile options
-                      _showUserProfileSheet(context, ref, authData);
+                      // Navigate to profile screen
+                      context.go(AppRoutes.profile);
                     } else {
                       // Navigate to login screen
                       _navigateToLogin(context);
@@ -293,23 +294,14 @@ class SettingsScreen extends ConsumerWidget {
     final user = authData.user;
     final displayName = user?.displayName ?? 'User';
     final username = user?.username ?? '';
-    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
     return Row(
       children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [AppColors.blue500, Color(0xFF9333EA)]),
-            borderRadius: BorderRadius.circular(32),
-          ),
-          child: Center(
-            child: Text(
-              initial,
-              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w600),
-            ),
-          ),
+        UserAvatar(
+          userId: user?.id,
+          avatarIdentifier: user?.avatarUrl,
+          displayName: displayName,
+          size: 64,
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -348,128 +340,4 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  /// Show sign out confirmation dialog with pending changes warning
-  /// Per APP_SYNC_LOGIC.md §1.5.3: Check for unsynced data before logout
-  Future<void> _showSignOutConfirmation(BuildContext context, WidgetRef ref) async {
-    // Check for pending changes
-    final pendingCount = await ref.read(authProvider.notifier).getPendingChangesCount();
-
-    if (!context.mounted) return;
-
-    if (pendingCount > 0) {
-      // Show warning dialog with pending changes count
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Unsynced Data'),
-          content: Text(
-            'You have $pendingCount unsynced changes that will be lost if you sign out.\n\n'
-            'Are you sure you want to sign out?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.red500),
-              child: const Text('Sign Out Anyway'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed != true || !context.mounted) return;
-    } else {
-      // No pending changes, just confirm
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Sign Out'),
-          content: const Text(
-            'All local data will be deleted. Are you sure you want to sign out?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.red500),
-              child: const Text('Sign Out'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirmed != true || !context.mounted) return;
-    }
-
-    // Perform logout
-    await ref.read(authProvider.notifier).logout();
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed out successfully')),
-      );
-    }
-  }
-
-  void _showUserProfileSheet(BuildContext context, WidgetRef ref, AuthData authData) {
-    final parentContext = context; // Save parent context for use after bottom sheet closes
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.gray300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            ListTile(
-              leading: const Icon(AppIcons.refreshCw),
-              title: const Text('Sync Now'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                ScaffoldMessenger.of(parentContext).showSnackBar(
-                  const SnackBar(content: Text('Syncing...')),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(AppIcons.cloud, color: AppColors.gray600),
-              title: const Text('Cloud Sync Settings'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                parentContext.go(AppRoutes.cloudSync);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(AppIcons.close, color: AppColors.red500),
-              title: Text('Sign Out', style: TextStyle(color: AppColors.red500)),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                // Use parent context which remains valid after bottom sheet closes
-                _showSignOutConfirmation(parentContext, ref);
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
 }

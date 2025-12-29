@@ -20,8 +20,6 @@ Profile 指与“用户账号”绑定、**跨设备一致**的用户信息（�
 
 ## 2. 与“曲库同步”的关系：独立通道
 
-[`APP_SYNC_LOGIC.md`](docs/sync_logic/APP_SYNC_LOGIC.md) 定义的同步主流程（Push→Pull→PDF）针对的是 **Library 元数据**（Score / InstrumentScore / Setlist / SetlistScore）与 PDF 文件。
-
 Profile 同步 **不属于 libraryVersion 同步通道**，原因：
 
 - Profile 不参与曲库/曲单的依赖关系与版本号推进
@@ -65,8 +63,6 @@ MuSheet 使用 [`PreferencesService`](lib/services/preferences_service.dart:32) 
 
 ## 4. 同步触发点（何时 Pull / Push）
 
-Profile 同步遵循与 [`APP_SYNC_LOGIC.md`](docs/sync_logic/APP_SYNC_LOGIC.md) 一致的理念：
-
 - UI 先展示本地状态（即使是旧的/空的）
 - 网络在后台补齐（Pull）
 - 用户修改立即写入“目标存储”并尽快 Push（但 Profile 修改频率低，可直接实时 push）
@@ -81,7 +77,7 @@ Profile 同步遵循与 [`APP_SYNC_LOGIC.md`](docs/sync_logic/APP_SYNC_LOGIC.md)
 效果：
 
 - 在线：刷新 UI 显示的 `displayName / username` 等
-- 离线：保持“已登录但离线”的状态（token 仍在本地），UI 可继续使用本地曲库（如已存在），Profile 可能不更新
+- 离线：保持“已登录但离线”的状态（token 仍在本地），UI 可继续使用本地曲库（如已存在），Profile 可能不更新，每段时间自动重连，从而监测网络状态
 
 ### 4.2 用户更新 Profile：Push（updateProfile）
 
@@ -155,22 +151,3 @@ Profile 数据本身存储在服务器，不会因客户端登出而被删除；
 - 资料卡片提示 offline 状态，有网络后自动刷新，而不需要重新登录
 - 在线恢复后：先恢复会话并 Pull Profile，再按需同步 Library
 
----
-
-## 8. 当前实现的“云端 Profile vs 本地偏好”建议（避免混淆）
-
-由于工程同时存在：
-
-- 云端字段 `preferredInstrument`（Profile）
-- 本地偏好键 `preferred_instrument`（SharedPreferences）
-
-建议在产品层面明确语义（并在文案上区分）：
-
-- “默认打开哪种分谱（本机）”：继续使用本地偏好
-- “个人资料的主乐器（跨设备）”：写入 Profile.preferredInstrument
-
-若未来希望“跨设备同步默认乐器选择”，则需要在登录后：
-
-- Pull Profile 后，将 `preferredInstrument` 写入本地偏好；并在本地修改时同时 Push Profile
-
-这部分属于产品决策与后续增强，不影响 [`APP_SYNC_LOGIC.md`](docs/sync_logic/APP_SYNC_LOGIC.md) 的曲库同步主流程。
