@@ -9,6 +9,7 @@ import '../exceptions/exceptions.dart';
 /// Authentication endpoint for user login/logout and password management
 class AuthEndpoint extends Endpoint {
   /// Register a new user
+  /// First registered user automatically becomes admin
   Future<AuthResult> register(
     Session session,
     String username,
@@ -47,13 +48,17 @@ class AuthEndpoint extends Endpoint {
       );
     }
 
+    // Check if this is the first user - make them admin
+    final userCount = await User.db.count(session);
+    final isFirstUser = userCount == 0;
+
     // Create new user
     final now = DateTime.now();
     final user = User(
       username: username,
       passwordHash: hashPassword(password),
       displayName: displayName ?? username,
-      isAdmin: false,
+      isAdmin: isFirstUser, // First user becomes admin
       isDisabled: false,
       mustChangePassword: false,
       createdAt: now,
