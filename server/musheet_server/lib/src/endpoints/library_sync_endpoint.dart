@@ -289,7 +289,8 @@ class LibrarySyncEndpoint extends Endpoint {
         version: is_.version,
         data: jsonEncode({
           'scoreId': is_.scoreId,
-          'instrumentName': is_.instrumentName,
+          'instrumentType': is_.instrumentType,
+          'customInstrument': is_.customInstrument,
           // pdfPath removed from server model per APP_SYNC_LOGIC.md
           // Client derives local path from pdfHash
           'pdfHash': is_.pdfHash,
@@ -560,7 +561,8 @@ class LibrarySyncEndpoint extends Endpoint {
     }
 
     final scoreId = data['scoreId'] as int;
-    final instrumentName = data['instrumentName'] as String;
+    final instrumentType = data['instrumentType'] as String;
+    final customInstrument = data['customInstrument'] as String?;
 
     // Verify ownership
     final score = await Score.db.findById(session, scoreId);
@@ -577,7 +579,8 @@ class LibrarySyncEndpoint extends Endpoint {
       // Update existing
       final existing = await InstrumentScore.db.findById(session, change.serverId!);
       if (existing != null) {
-        existing.instrumentName = instrumentName;
+        existing.instrumentType = instrumentType;
+        existing.customInstrument = customInstrument;
         // pdfPath removed from server model - only store pdfHash
         existing.pdfHash = data['pdfHash'] as String?;
         existing.orderIndex = data['orderIndex'] as int? ?? existing.orderIndex;
@@ -591,10 +594,14 @@ class LibrarySyncEndpoint extends Endpoint {
     }
 
     if (instrumentScoreId == null) {
-      // Check for existing InstrumentScore with same (scoreId, instrumentName), including deleted ones
+      // Check for existing InstrumentScore with same (scoreId, instrumentType, customInstrument), including deleted ones
       final existingInstruments = await InstrumentScore.db.find(
         session,
-        where: (t) => t.scoreId.equals(scoreId) & t.instrumentName.equals(instrumentName),
+        where: (t) => t.scoreId.equals(scoreId) &
+                      t.instrumentType.equals(instrumentType) &
+                      ((customInstrument != null)
+                        ? t.customInstrument.equals(customInstrument)
+                        : t.customInstrument.equals(null)),
       );
 
       // If found, update it instead of creating new (restore if deleted)
@@ -615,7 +622,8 @@ class LibrarySyncEndpoint extends Endpoint {
         // pdfPath removed from server model - only store pdfHash
         final instrumentScore = InstrumentScore(
           scoreId: scoreId,
-          instrumentName: instrumentName,
+          instrumentType: instrumentType,
+          customInstrument: customInstrument,
           pdfHash: data['pdfHash'] as String?,
           orderIndex: data['orderIndex'] as int? ?? 0,
           annotationsJson: annotationsJsonStr,

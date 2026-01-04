@@ -746,6 +746,185 @@ class RpcClient {
   }
 
   // ============================================================================
+  // Team Sync API
+  // ============================================================================
+
+  /// Pull team changes since a given team library version
+  Future<RpcResponse<TeamSyncPullResult>> teamSyncPull({
+    required int teamId,
+    int since = 0,
+  }) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'teamSyncPull',
+      );
+    }
+
+    if (kDebugMode) {
+      debugPrint('[RPC] teamSyncPull: userId=$_userId, teamId=$teamId, since=$since');
+    }
+
+    return _executeCallNullable(
+      endpoint: 'teamSync',
+      method: 'pull',
+      call: () => _client.teamSync.pull(_userId!, teamId, since: since),
+      transform: (result) {
+        if (result == null) {
+          if (kDebugMode) {
+            debugPrint('[RPC] teamSyncPull: server returned null, using empty result');
+          }
+          return TeamSyncPullResult(teamLibraryVersion: since);
+        }
+        if (kDebugMode) {
+          debugPrint('[RPC] teamSyncPull: received response with teamLibraryVersion=${result.teamLibraryVersion}');
+        }
+        return TeamSyncPullResult.fromServerpod(result);
+      },
+    );
+  }
+
+  /// Push team local changes to server
+  Future<RpcResponse<TeamSyncPushResult>> teamSyncPush({
+    required int teamId,
+    required int clientTeamLibraryVersion,
+    List<Map<String, dynamic>> teamScores = const [],
+    List<Map<String, dynamic>> teamInstrumentScores = const [],
+    List<Map<String, dynamic>> teamSetlists = const [],
+    List<Map<String, dynamic>> teamSetlistScores = const [],
+    List<String> deletes = const [],
+  }) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'teamSyncPush',
+      );
+    }
+
+    if (kDebugMode) {
+      debugPrint('[RPC] Building TeamSyncPushRequest: teamScores=${teamScores.length}, '
+          'teamInstrumentScores=${teamInstrumentScores.length}, '
+          'teamSetlists=${teamSetlists.length}, deletes=${deletes.length}');
+    }
+
+    try {
+      final request = server.TeamSyncPushRequest(
+        clientTeamLibraryVersion: clientTeamLibraryVersion,
+        teamScores: teamScores.isEmpty ? null : teamScores.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        teamInstrumentScores: teamInstrumentScores.isEmpty ? null : teamInstrumentScores.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        teamSetlists: teamSetlists.isEmpty ? null : teamSetlists.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        teamSetlistScores: teamSetlistScores.isEmpty ? null : teamSetlistScores.map((s) => server.SyncEntityChange(
+          entityType: s['entityType'] as String,
+          entityId: s['entityId'] as String,
+          serverId: s['serverId'] as int?,
+          operation: s['operation'] as String,
+          version: (s['version'] as int?) ?? 1,
+          data: s['data'] as String,
+          localUpdatedAt: DateTime.parse(s['localUpdatedAt'] as String),
+        )).toList(),
+        deletes: deletes.isEmpty ? null : deletes,
+      );
+
+      if (kDebugMode) {
+        debugPrint('[RPC] TeamSyncPushRequest built successfully');
+      }
+
+      return _executeCall(
+        endpoint: 'teamSync',
+        method: 'push',
+        call: () => _client.teamSync.push(_userId!, teamId, request),
+        transform: (result) {
+          return TeamSyncPushResult.fromServerpod(result);
+        },
+      );
+    } catch (e, stack) {
+      if (kDebugMode) {
+        debugPrint('[RPC] Error building TeamSyncPushRequest: $e');
+        debugPrint('[RPC] Stack: $stack');
+      }
+      return RpcResponse.failure(
+        RpcError.fromException(e, stack),
+        requestId: 'teamSyncPush',
+      );
+    }
+  }
+
+  /// Get current team library version
+  Future<RpcResponse<int>> getTeamLibraryVersion({required int teamId}) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'getTeamLibraryVersion',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'teamSync',
+      method: 'getTeamLibraryVersion',
+      call: () => _client.teamSync.getTeamLibraryVersion(_userId!, teamId),
+      transform: (result) => result,
+    );
+  }
+
+  /// Get all teams the current user is a member of
+  Future<RpcResponse<List<server.TeamWithRole>>> getMyTeams() async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'getMyTeams',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'team',
+      method: 'getMyTeams',
+      call: () => _client.team.getMyTeams(_userId!),
+      transform: (result) => result,
+    );
+  }
+
+  /// Get team members for a specific team
+  Future<RpcResponse<List<server.TeamMemberInfo>>> getMyTeamMembers(int teamId) async {
+    if (_userId == null) {
+      return RpcResponse.failure(
+        RpcError(code: RpcErrorCode.authenticationRequired),
+        requestId: 'getMyTeamMembers',
+      );
+    }
+
+    return _executeCall(
+      endpoint: 'team',
+      method: 'getMyTeamMembers',
+      call: () => _client.team.getMyTeamMembers(_userId!, teamId),
+      transform: (result) => result,
+    );
+  }
+
+  // ============================================================================
   // Internal Execution
   // ============================================================================
 
@@ -1016,6 +1195,81 @@ class LibrarySyncPushResult {
       conflict: (result.conflict as bool?) ?? false,
       newLibraryVersion: result.newLibraryVersion as int?,
       serverLibraryVersion: result.serverLibraryVersion as int?,
+      accepted: (result.accepted as List?)?.cast<String>() ?? [],
+      serverIdMapping: (result.serverIdMapping as Map?)?.cast<String, int>() ?? {},
+      errorMessage: result.errorMessage as String?,
+    );
+  }
+}
+
+// ============================================================================
+// Team Sync Result Types
+// ============================================================================
+
+/// Result from team pull operation
+class TeamSyncPullResult {
+  final int teamLibraryVersion;
+  final List<SyncEntityData> teamScores;
+  final List<SyncEntityData> teamInstrumentScores;
+  final List<SyncEntityData> teamSetlists;
+  final List<SyncEntityData> teamSetlistScores;
+  final List<String> deleted;
+  final bool isFullSync;
+
+  TeamSyncPullResult({
+    required this.teamLibraryVersion,
+    this.teamScores = const [],
+    this.teamInstrumentScores = const [],
+    this.teamSetlists = const [],
+    this.teamSetlistScores = const [],
+    this.deleted = const [],
+    this.isFullSync = false,
+  });
+
+  factory TeamSyncPullResult.fromServerpod(dynamic result) {
+    return TeamSyncPullResult(
+      teamLibraryVersion: (result.teamLibraryVersion as int?) ?? 0,
+      teamScores: _parseEntityList(result.teamScores),
+      teamInstrumentScores: _parseEntityList(result.teamInstrumentScores),
+      teamSetlists: _parseEntityList(result.teamSetlists),
+      teamSetlistScores: _parseEntityList(result.teamSetlistScores),
+      deleted: (result.deleted as List?)?.cast<String>() ?? [],
+      isFullSync: (result.isFullSync as bool?) ?? false,
+    );
+  }
+
+  static List<SyncEntityData> _parseEntityList(dynamic list) {
+    if (list == null) return [];
+    return (list as List).map((s) => SyncEntityData.fromServerpod(s)).toList();
+  }
+}
+
+/// Result from team push operation
+class TeamSyncPushResult {
+  final bool success;
+  final bool conflict;
+  final int? newTeamLibraryVersion;
+  final int? serverTeamLibraryVersion;
+  final List<String> accepted;
+  final Map<String, int> serverIdMapping;
+  final String? errorMessage;
+
+  TeamSyncPushResult({
+    required this.success,
+    this.conflict = false,
+    this.newTeamLibraryVersion,
+    this.serverTeamLibraryVersion,
+    this.accepted = const [],
+    this.serverIdMapping = const {},
+    this.errorMessage,
+  });
+
+  factory TeamSyncPushResult.fromServerpod(dynamic result) {
+    return TeamSyncPushResult(
+      success: (result.success as bool?) ?? false,
+      conflict: (result.conflict as bool?) ?? false,
+      newTeamLibraryVersion: result.newTeamLibraryVersion as int?,
+      serverTeamLibraryVersion: result.serverTeamLibraryVersion as int?,
       accepted: (result.accepted as List?)?.cast<String>() ?? [],
       serverIdMapping: (result.serverIdMapping as Map?)?.cast<String, int>() ?? {},
       errorMessage: result.errorMessage as String?,

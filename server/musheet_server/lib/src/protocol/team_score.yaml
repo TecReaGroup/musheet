@@ -1,14 +1,31 @@
+# TeamScore - Independent copy of Score for Team
+# This is NOT a reference to Score, but a full copy of data
 class: TeamScore
 table: team_scores
 fields:
   teamId: int, relation(parent=teams)
-  scoreId: int, relation(parent=scores)
-  sharedById: int, relation(parent=users)
-  sharedAt: DateTime
+  # Core score fields (copied from personal Score)
+  title: String
+  composer: String?
+  bpm: int?
+  # Tracking who created/copied this
+  createdById: int, relation(parent=users)
+  # Source tracking (nullable - null means directly created in team)
+  sourceScoreId: int?
+  # Sync fields
+  createdAt: DateTime
+  updatedAt: DateTime
+  deletedAt: DateTime?
+  version: int
+  syncStatus: String?
 indexes:
   team_score_team_idx:
     fields: teamId
     type: btree
-  team_score_unique_idx:
-    fields: teamId, scoreId
+  # Unique constraint: same team cannot have duplicate title+composer
+  team_score_unique_title_composer:
+    fields: teamId, title, composer
     unique: true
+  team_score_version_idx:
+    fields: teamId, version
+    type: btree

@@ -2,7 +2,9 @@ class: InstrumentScore
 table: instrument_scores
 fields:
   scoreId: int, relation(parent=scores)
-  instrumentName: String
+  # Unified with frontend: instrumentType + customInstrument
+  instrumentType: String
+  customInstrument: String?
   # pdfPath removed per APP_SYNC_LOGIC.md - server derives path from pdfHash
   # Client stores local path separately, not synced to server
   pdfHash: String?
@@ -20,8 +22,9 @@ indexes:
   instrument_score_idx:
     fields: scoreId
     type: btree
+  # Unique constraint: same score cannot have duplicate instrument type+custom
   instrument_score_unique:
-    fields: scoreId, instrumentName
+    fields: scoreId, instrumentType, customInstrument
     unique: true
   instrument_score_version_idx:
     fields: scoreId, version

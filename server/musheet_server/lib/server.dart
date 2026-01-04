@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:serverpod/serverpod.dart';
@@ -119,9 +120,16 @@ class Server {
         '/',
       );
 
-      print('[SERVER] Admin Web UI mounted at /admin and /');
+      developer.log(
+        '[SERVER] Admin Web UI mounted at /admin and /',
+        name: 'musheet_server',
+      );
     } else {
-      print('[SERVER] Admin Web UI directory not found: $webAdminDir');
+      developer.log(
+        '[SERVER] Admin Web UI directory not found: ${webAdminDir.path}',
+        name: 'musheet_server',
+        level: 900, // warning
+      );
     }
 
     await pod.start();

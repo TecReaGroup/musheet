@@ -3,6 +3,7 @@ import '../database/database.dart';
 import '../services/database_service.dart';
 import '../services/preferences_service.dart';
 import '../services/file_storage_service.dart';
+import '../services/pdf_reference_service.dart';
 
 /// Provider for the AppDatabase instance
 /// This is a singleton that persists throughout the app lifecycle
@@ -23,6 +24,14 @@ final databaseServiceProvider = Provider<DatabaseService>((ref) {
 /// Handles PDF file storage and management
 final fileStorageServiceProvider = Provider<FileStorageService>((ref) {
   return FileStorageService();
+});
+
+/// Provider for the PdfReferenceService
+/// Manages PDF reference counting and cleanup
+final pdfReferenceServiceProvider = Provider<PdfReferenceService>((ref) {
+  final database = ref.watch(appDatabaseProvider);
+  final fileStorage = ref.watch(fileStorageServiceProvider);
+  return PdfReferenceService(database, fileStorage);
 });
 
 /// FutureProvider for PreferencesService (requires async initialization)
@@ -226,6 +235,12 @@ final totalStorageUsedProvider = FutureProvider<int>((ref) async {
 final scoreStorageUsedProvider = FutureProvider.family<int, String>((ref, scoreId) async {
   final fileService = ref.watch(fileStorageServiceProvider);
   return fileService.getScoreStorageUsed(scoreId);
+});
+
+/// Provider for detailed PDF storage statistics including orphan detection
+final pdfStorageStatsProvider = FutureProvider<PdfStorageStats>((ref) async {
+  final pdfRefService = ref.watch(pdfReferenceServiceProvider);
+  return pdfRefService.getStorageStats();
 });
 
 // ============== Initialization Provider ==============

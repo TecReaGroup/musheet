@@ -5,6 +5,7 @@ import '../rpc/rpc_client.dart' hide LocalUserProfile, AuthResultData;
 import '../database/database.dart';
 import '../sync/library_sync_service.dart';
 import 'storage_providers.dart';
+import 'teams_provider.dart';
 
 /// Authentication state
 enum AuthState {
@@ -188,6 +189,14 @@ class AuthNotifier extends Notifier<AuthData> {
             );
             // Load avatar after profile is set
             await _loadAvatarIfNeeded();
+            // Refresh teams now that auth is valid
+            if (kDebugMode) {
+              debugPrint('[AUTH] Refreshing teams after successful auth...');
+            }
+            await ref.read(teamsStateProvider.notifier).refresh();
+            if (kDebugMode) {
+              debugPrint('[AUTH] Teams refresh completed');
+            }
           }
           // If profile fetch fails, keep authenticated state
         } else {
@@ -336,6 +345,8 @@ class AuthNotifier extends Notifier<AuthData> {
         // Refresh profile to get complete user data including avatarUrl, then load avatar
         await refreshProfile();
         await _loadAvatarIfNeeded();
+        // Refresh teams now that we're registered
+        await ref.read(teamsStateProvider.notifier).refresh();
         return true;
       } else {
         state = state.copyWith(
@@ -400,6 +411,8 @@ class AuthNotifier extends Notifier<AuthData> {
         // Refresh profile to get complete user data including avatarUrl, then load avatar
         await refreshProfile();
         await _loadAvatarIfNeeded();
+        // Refresh teams now that we're logged in
+        await ref.read(teamsStateProvider.notifier).refresh();
         return true;
       } else {
         state = state.copyWith(

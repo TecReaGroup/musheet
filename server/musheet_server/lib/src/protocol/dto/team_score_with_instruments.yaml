@@ -1,0 +1,5 @@
+# DTO: TeamScore with its TeamInstrumentScores
+class: TeamScoreWithInstruments
+fields:
+  teamScore: TeamScore
+  instrumentScores: List<TeamInstrumentScore>

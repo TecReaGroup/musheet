@@ -9,6 +9,8 @@ import '../screens/settings_screen.dart';
 import '../screens/score_viewer_screen.dart';
 import '../screens/score_detail_screen.dart';
 import '../screens/setlist_detail_screen.dart';
+import '../screens/team_score_viewer_screen.dart';
+import '../screens/team_setlist_detail_screen.dart';
 import '../screens/settings/instrument_preference_screen.dart';
 import '../screens/settings/cloud_sync_screen.dart';
 import '../screens/settings/bluetooth_devices_screen.dart';
@@ -19,6 +21,7 @@ import '../screens/settings/login_screen.dart';
 import '../screens/settings/profile_screen.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
+import '../models/team.dart';
 import '../app.dart';
 
 // Route paths
@@ -30,6 +33,8 @@ class AppRoutes {
   static const String scoreViewer = '/score-viewer';
   static const String scoreDetail = '/score-detail';
   static const String setlistDetail = '/setlist-detail';
+  static const String teamScoreViewer = '/team-score-viewer';
+  static const String teamSetlistDetail = '/team-setlist-detail';
   static const String instrumentPreference = '/instrument-preference';
   static const String cloudSync = '/cloud-sync';
   static const String bluetoothDevices = '/bluetooth-devices';
@@ -201,6 +206,65 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // Team Score Viewer Route
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.teamScoreViewer,
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+
+          final teamScore = extra['teamScore'] is TeamScore
+              ? extra['teamScore'] as TeamScore
+              : TeamScore.fromJson(extra['teamScore'] as Map<String, dynamic>);
+
+          final instrumentScore = extra['instrumentScore'] == null
+              ? null
+              : (extra['instrumentScore'] is TeamInstrumentScore
+                  ? extra['instrumentScore'] as TeamInstrumentScore
+                  : TeamInstrumentScore.fromJson(extra['instrumentScore'] as Map<String, dynamic>));
+
+          final setlistScores = extra['setlistScores'] == null
+              ? null
+              : (extra['setlistScores'] as List).map((item) {
+                  return item is TeamScore
+                      ? item
+                      : TeamScore.fromJson(item as Map<String, dynamic>);
+                }).toList();
+
+          return MaterialPage(
+            key: state.pageKey,
+            child: TeamScoreViewerScreen(
+              teamScore: teamScore,
+              instrumentScore: instrumentScore,
+              setlistScores: setlistScores,
+              currentIndex: extra['currentIndex'] as int?,
+              setlistName: extra['setlistName'] as String?,
+            ),
+          );
+        },
+      ),
+      // Team Setlist Detail Route
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.teamSetlistDetail,
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+
+          final setlist = extra['setlist'] is TeamSetlist
+              ? extra['setlist'] as TeamSetlist
+              : TeamSetlist.fromJson(extra['setlist'] as Map<String, dynamic>);
+
+          final teamServerId = extra['teamServerId'] as int;
+
+          return MaterialPage(
+            key: state.pageKey,
+            child: TeamSetlistDetailScreen(
+              setlist: setlist,
+              teamServerId: teamServerId,
+            ),
+          );
+        },
+      ),
     ],
   );
 });
@@ -249,6 +313,41 @@ class AppNavigation {
 
   static void navigateToSetlistDetail(BuildContext context, Setlist setlist) {
     context.push(AppRoutes.setlistDetail, extra: setlist);
+  }
+
+  // Team navigation methods
+  static void navigateToTeamScoreViewer(
+    BuildContext context, {
+    required TeamScore teamScore,
+    TeamInstrumentScore? instrumentScore,
+    List<TeamScore>? setlistScores,
+    int? currentIndex,
+    String? setlistName,
+  }) {
+    context.push(
+      AppRoutes.teamScoreViewer,
+      extra: {
+        'teamScore': teamScore,
+        'instrumentScore': instrumentScore,
+        'setlistScores': setlistScores,
+        'currentIndex': currentIndex,
+        'setlistName': setlistName,
+      },
+    );
+  }
+
+  static void navigateToTeamSetlistDetail(
+    BuildContext context,
+    TeamSetlist setlist, {
+    required int teamServerId,
+  }) {
+    context.push(
+      AppRoutes.teamSetlistDetail,
+      extra: {
+        'setlist': setlist,
+        'teamServerId': teamServerId,
+      },
+    );
   }
 
   static void navigateToInstrumentPreference(BuildContext context) {

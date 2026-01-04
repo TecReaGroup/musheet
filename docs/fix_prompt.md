@@ -1,7 +1,7 @@
 A:
-只是分析而不要修改文件：前后端还有什么不符合设计文档APP_SYNC_LOGIC.md SERVER_SYNC_LOGIC.md的地方吗？或者可能存在的错误逻辑, 仔细分析 确保完全实现设计文档且无bug 中文回答
+只是分析而不要修改文件：前后端还有什么不符合设计文档team_screen.dart的地方吗？或者可能存在的错误逻辑, 仔细分析 确保完全实现设计文档且无bug 中文回答
 
-直接重构代码，修复所有问题，不用考虑迁移问题，完全使用设计方案里的实现方式，用问题积极和我讨论。前端代码在：./lib，后端代码在：./server
+直接重构代码，计修复方案，一步一步修复所有问题，不用考虑迁移问题，完全使用设计方案里的实现方式，用问题积极和我讨论。前端代码在：./lib，后端代码在：./server
 
 serverpod command：
 "C:\Users\roupe\AppData\Local\Pub\Cache\bin\serverpod.bat" generate

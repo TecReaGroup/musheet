@@ -146,3 +146,45 @@ class AppAccessDeniedException extends MuSheetException {
   AppAccessDeniedException(String appId)
       : super('Access denied to application: $appId', 'APP_ACCESS_DENIED');
 }
+
+/// Team score already exists (same title+composer in team)
+class TeamScoreExistsException extends MuSheetException {
+  TeamScoreExistsException([String message = 'Score with same title and composer already exists in team'])
+      : super(message, 'TEAM_SCORE_EXISTS');
+}
+
+/// Team score not found
+class TeamScoreNotFoundException extends MuSheetException {
+  TeamScoreNotFoundException([String message = 'Team score not found'])
+      : super(message, 'TEAM_SCORE_NOT_FOUND');
+}
+
+/// Team instrument score already exists
+class TeamInstrumentScoreExistsException extends MuSheetException {
+  TeamInstrumentScoreExistsException([String message = 'Instrument score already exists in team score'])
+      : super(message, 'TEAM_INSTRUMENT_SCORE_EXISTS');
+}
+
+/// Team instrument score not found
+class TeamInstrumentScoreNotFoundException extends MuSheetException {
+  TeamInstrumentScoreNotFoundException([String message = 'Team instrument score not found'])
+      : super(message, 'TEAM_INSTRUMENT_SCORE_NOT_FOUND');
+}
+
+/// Team setlist already exists (same name in team)
+class TeamSetlistExistsException extends MuSheetException {
+  TeamSetlistExistsException([String message = 'Setlist with same name already exists in team'])
+      : super(message, 'TEAM_SETLIST_EXISTS');
+}
+
+/// Team setlist not found
+class TeamSetlistNotFoundException extends MuSheetException {
+  TeamSetlistNotFoundException([String message = 'Team setlist not found'])
+      : super(message, 'TEAM_SETLIST_NOT_FOUND');
+}
+
+/// Already in setlist
+class AlreadyInSetlistException extends MuSheetException {
+  AlreadyInSetlistException([String message = 'Score is already in this setlist'])
+      : super(message, 'ALREADY_IN_SETLIST');
+}

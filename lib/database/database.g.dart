@@ -3772,6 +3772,4253 @@ class SyncStateCompanion extends UpdateCompanion<SyncStateEntity> {
   }
 }
 
+class $TeamsTable extends Teams with TableInfo<$TeamsTable, TeamEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TeamsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    serverId,
+    name,
+    description,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'teams';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TeamEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_serverIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TeamEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TeamEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+    );
+  }
+
+  @override
+  $TeamsTable createAlias(String alias) {
+    return $TeamsTable(attachedDatabase, alias);
+  }
+}
+
+class TeamEntity extends DataClass implements Insertable<TeamEntity> {
+  final String id;
+  final int serverId;
+  final String name;
+  final String? description;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  const TeamEntity({
+    required this.id,
+    required this.serverId,
+    required this.name,
+    this.description,
+    required this.createdAt,
+    this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['server_id'] = Variable<int>(serverId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    return map;
+  }
+
+  TeamsCompanion toCompanion(bool nullToAbsent) {
+    return TeamsCompanion(
+      id: Value(id),
+      serverId: Value(serverId),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+    );
+  }
+
+  factory TeamEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TeamEntity(
+      id: serializer.fromJson<String>(json['id']),
+      serverId: serializer.fromJson<int>(json['serverId']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'serverId': serializer.toJson<int>(serverId),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+    };
+  }
+
+  TeamEntity copyWith({
+    String? id,
+    int? serverId,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+  }) => TeamEntity(
+    id: id ?? this.id,
+    serverId: serverId ?? this.serverId,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+  );
+  TeamEntity copyWithCompanion(TeamsCompanion data) {
+    return TeamEntity(
+      id: data.id.present ? data.id.value : this.id,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamEntity(')
+          ..write('id: $id, ')
+          ..write('serverId: $serverId, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, serverId, name, description, createdAt, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TeamEntity &&
+          other.id == this.id &&
+          other.serverId == this.serverId &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class TeamsCompanion extends UpdateCompanion<TeamEntity> {
+  final Value<String> id;
+  final Value<int> serverId;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
+  const TeamsCompanion({
+    this.id = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TeamsCompanion.insert({
+    required String id,
+    required int serverId,
+    required String name,
+    this.description = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       serverId = Value(serverId),
+       name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<TeamEntity> custom({
+    Expression<String>? id,
+    Expression<int>? serverId,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (serverId != null) 'server_id': serverId,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TeamsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? serverId,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return TeamsCompanion(
+      id: id ?? this.id,
+      serverId: serverId ?? this.serverId,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamsCompanion(')
+          ..write('id: $id, ')
+          ..write('serverId: $serverId, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TeamMembersTable extends TeamMembers
+    with TableInfo<$TeamMembersTable, TeamMemberEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TeamMembersTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _teamIdMeta = const VerificationMeta('teamId');
+  @override
+  late final GeneratedColumn<String> teamId = GeneratedColumn<String>(
+    'team_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES teams (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+    'user_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('member'),
+  );
+  static const VerificationMeta _joinedAtMeta = const VerificationMeta(
+    'joinedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> joinedAt = GeneratedColumn<DateTime>(
+    'joined_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    teamId,
+    userId,
+    username,
+    displayName,
+    role,
+    joinedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'team_members';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TeamMemberEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('team_id')) {
+      context.handle(
+        _teamIdMeta,
+        teamId.isAcceptableOrUnknown(data['team_id']!, _teamIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_teamIdMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_userIdMeta);
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_usernameMeta);
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    }
+    if (data.containsKey('joined_at')) {
+      context.handle(
+        _joinedAtMeta,
+        joinedAt.isAcceptableOrUnknown(data['joined_at']!, _joinedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_joinedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TeamMemberEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TeamMemberEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      teamId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}team_id'],
+      )!,
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}user_id'],
+      )!,
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      )!,
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      ),
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      joinedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}joined_at'],
+      )!,
+    );
+  }
+
+  @override
+  $TeamMembersTable createAlias(String alias) {
+    return $TeamMembersTable(attachedDatabase, alias);
+  }
+}
+
+class TeamMemberEntity extends DataClass
+    implements Insertable<TeamMemberEntity> {
+  final String id;
+  final String teamId;
+  final int userId;
+  final String username;
+  final String? displayName;
+  final String role;
+  final DateTime joinedAt;
+  const TeamMemberEntity({
+    required this.id,
+    required this.teamId,
+    required this.userId,
+    required this.username,
+    this.displayName,
+    required this.role,
+    required this.joinedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['team_id'] = Variable<String>(teamId);
+    map['user_id'] = Variable<int>(userId);
+    map['username'] = Variable<String>(username);
+    if (!nullToAbsent || displayName != null) {
+      map['display_name'] = Variable<String>(displayName);
+    }
+    map['role'] = Variable<String>(role);
+    map['joined_at'] = Variable<DateTime>(joinedAt);
+    return map;
+  }
+
+  TeamMembersCompanion toCompanion(bool nullToAbsent) {
+    return TeamMembersCompanion(
+      id: Value(id),
+      teamId: Value(teamId),
+      userId: Value(userId),
+      username: Value(username),
+      displayName: displayName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(displayName),
+      role: Value(role),
+      joinedAt: Value(joinedAt),
+    );
+  }
+
+  factory TeamMemberEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TeamMemberEntity(
+      id: serializer.fromJson<String>(json['id']),
+      teamId: serializer.fromJson<String>(json['teamId']),
+      userId: serializer.fromJson<int>(json['userId']),
+      username: serializer.fromJson<String>(json['username']),
+      displayName: serializer.fromJson<String?>(json['displayName']),
+      role: serializer.fromJson<String>(json['role']),
+      joinedAt: serializer.fromJson<DateTime>(json['joinedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'teamId': serializer.toJson<String>(teamId),
+      'userId': serializer.toJson<int>(userId),
+      'username': serializer.toJson<String>(username),
+      'displayName': serializer.toJson<String?>(displayName),
+      'role': serializer.toJson<String>(role),
+      'joinedAt': serializer.toJson<DateTime>(joinedAt),
+    };
+  }
+
+  TeamMemberEntity copyWith({
+    String? id,
+    String? teamId,
+    int? userId,
+    String? username,
+    Value<String?> displayName = const Value.absent(),
+    String? role,
+    DateTime? joinedAt,
+  }) => TeamMemberEntity(
+    id: id ?? this.id,
+    teamId: teamId ?? this.teamId,
+    userId: userId ?? this.userId,
+    username: username ?? this.username,
+    displayName: displayName.present ? displayName.value : this.displayName,
+    role: role ?? this.role,
+    joinedAt: joinedAt ?? this.joinedAt,
+  );
+  TeamMemberEntity copyWithCompanion(TeamMembersCompanion data) {
+    return TeamMemberEntity(
+      id: data.id.present ? data.id.value : this.id,
+      teamId: data.teamId.present ? data.teamId.value : this.teamId,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      username: data.username.present ? data.username.value : this.username,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
+      role: data.role.present ? data.role.value : this.role,
+      joinedAt: data.joinedAt.present ? data.joinedAt.value : this.joinedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamMemberEntity(')
+          ..write('id: $id, ')
+          ..write('teamId: $teamId, ')
+          ..write('userId: $userId, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('role: $role, ')
+          ..write('joinedAt: $joinedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, teamId, userId, username, displayName, role, joinedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TeamMemberEntity &&
+          other.id == this.id &&
+          other.teamId == this.teamId &&
+          other.userId == this.userId &&
+          other.username == this.username &&
+          other.displayName == this.displayName &&
+          other.role == this.role &&
+          other.joinedAt == this.joinedAt);
+}
+
+class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
+  final Value<String> id;
+  final Value<String> teamId;
+  final Value<int> userId;
+  final Value<String> username;
+  final Value<String?> displayName;
+  final Value<String> role;
+  final Value<DateTime> joinedAt;
+  final Value<int> rowid;
+  const TeamMembersCompanion({
+    this.id = const Value.absent(),
+    this.teamId = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.username = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.role = const Value.absent(),
+    this.joinedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TeamMembersCompanion.insert({
+    required String id,
+    required String teamId,
+    required int userId,
+    required String username,
+    this.displayName = const Value.absent(),
+    this.role = const Value.absent(),
+    required DateTime joinedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       teamId = Value(teamId),
+       userId = Value(userId),
+       username = Value(username),
+       joinedAt = Value(joinedAt);
+  static Insertable<TeamMemberEntity> custom({
+    Expression<String>? id,
+    Expression<String>? teamId,
+    Expression<int>? userId,
+    Expression<String>? username,
+    Expression<String>? displayName,
+    Expression<String>? role,
+    Expression<DateTime>? joinedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (teamId != null) 'team_id': teamId,
+      if (userId != null) 'user_id': userId,
+      if (username != null) 'username': username,
+      if (displayName != null) 'display_name': displayName,
+      if (role != null) 'role': role,
+      if (joinedAt != null) 'joined_at': joinedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TeamMembersCompanion copyWith({
+    Value<String>? id,
+    Value<String>? teamId,
+    Value<int>? userId,
+    Value<String>? username,
+    Value<String?>? displayName,
+    Value<String>? role,
+    Value<DateTime>? joinedAt,
+    Value<int>? rowid,
+  }) {
+    return TeamMembersCompanion(
+      id: id ?? this.id,
+      teamId: teamId ?? this.teamId,
+      userId: userId ?? this.userId,
+      username: username ?? this.username,
+      displayName: displayName ?? this.displayName,
+      role: role ?? this.role,
+      joinedAt: joinedAt ?? this.joinedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (teamId.present) {
+      map['team_id'] = Variable<String>(teamId.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<int>(userId.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (joinedAt.present) {
+      map['joined_at'] = Variable<DateTime>(joinedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamMembersCompanion(')
+          ..write('id: $id, ')
+          ..write('teamId: $teamId, ')
+          ..write('userId: $userId, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('role: $role, ')
+          ..write('joinedAt: $joinedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TeamScoresTable extends TeamScores
+    with TableInfo<$TeamScoresTable, TeamScoreEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TeamScoresTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _teamIdMeta = const VerificationMeta('teamId');
+  @override
+  late final GeneratedColumn<int> teamId = GeneratedColumn<int>(
+    'team_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _composerMeta = const VerificationMeta(
+    'composer',
+  );
+  @override
+  late final GeneratedColumn<String> composer = GeneratedColumn<String>(
+    'composer',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _bpmMeta = const VerificationMeta('bpm');
+  @override
+  late final GeneratedColumn<int> bpm = GeneratedColumn<int>(
+    'bpm',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(120),
+  );
+  static const VerificationMeta _createdByIdMeta = const VerificationMeta(
+    'createdById',
+  );
+  @override
+  late final GeneratedColumn<int> createdById = GeneratedColumn<int>(
+    'created_by_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceScoreIdMeta = const VerificationMeta(
+    'sourceScoreId',
+  );
+  @override
+  late final GeneratedColumn<int> sourceScoreId = GeneratedColumn<int>(
+    'source_score_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    teamId,
+    title,
+    composer,
+    bpm,
+    createdById,
+    sourceScoreId,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'team_scores';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TeamScoreEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('team_id')) {
+      context.handle(
+        _teamIdMeta,
+        teamId.isAcceptableOrUnknown(data['team_id']!, _teamIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_teamIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('composer')) {
+      context.handle(
+        _composerMeta,
+        composer.isAcceptableOrUnknown(data['composer']!, _composerMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_composerMeta);
+    }
+    if (data.containsKey('bpm')) {
+      context.handle(
+        _bpmMeta,
+        bpm.isAcceptableOrUnknown(data['bpm']!, _bpmMeta),
+      );
+    }
+    if (data.containsKey('created_by_id')) {
+      context.handle(
+        _createdByIdMeta,
+        createdById.isAcceptableOrUnknown(
+          data['created_by_id']!,
+          _createdByIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdByIdMeta);
+    }
+    if (data.containsKey('source_score_id')) {
+      context.handle(
+        _sourceScoreIdMeta,
+        sourceScoreId.isAcceptableOrUnknown(
+          data['source_score_id']!,
+          _sourceScoreIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TeamScoreEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TeamScoreEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      teamId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}team_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      composer: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}composer'],
+      )!,
+      bpm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}bpm'],
+      )!,
+      createdById: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by_id'],
+      )!,
+      sourceScoreId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}source_score_id'],
+      ),
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $TeamScoresTable createAlias(String alias) {
+    return $TeamScoresTable(attachedDatabase, alias);
+  }
+}
+
+class TeamScoreEntity extends DataClass implements Insertable<TeamScoreEntity> {
+  final String id;
+  final int teamId;
+  final String title;
+  final String composer;
+  final int bpm;
+  final int createdById;
+  final int? sourceScoreId;
+  final int version;
+  final String syncStatus;
+  final int? serverId;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  const TeamScoreEntity({
+    required this.id,
+    required this.teamId,
+    required this.title,
+    required this.composer,
+    required this.bpm,
+    required this.createdById,
+    this.sourceScoreId,
+    required this.version,
+    required this.syncStatus,
+    this.serverId,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['team_id'] = Variable<int>(teamId);
+    map['title'] = Variable<String>(title);
+    map['composer'] = Variable<String>(composer);
+    map['bpm'] = Variable<int>(bpm);
+    map['created_by_id'] = Variable<int>(createdById);
+    if (!nullToAbsent || sourceScoreId != null) {
+      map['source_score_id'] = Variable<int>(sourceScoreId);
+    }
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  TeamScoresCompanion toCompanion(bool nullToAbsent) {
+    return TeamScoresCompanion(
+      id: Value(id),
+      teamId: Value(teamId),
+      title: Value(title),
+      composer: Value(composer),
+      bpm: Value(bpm),
+      createdById: Value(createdById),
+      sourceScoreId: sourceScoreId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceScoreId),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory TeamScoreEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TeamScoreEntity(
+      id: serializer.fromJson<String>(json['id']),
+      teamId: serializer.fromJson<int>(json['teamId']),
+      title: serializer.fromJson<String>(json['title']),
+      composer: serializer.fromJson<String>(json['composer']),
+      bpm: serializer.fromJson<int>(json['bpm']),
+      createdById: serializer.fromJson<int>(json['createdById']),
+      sourceScoreId: serializer.fromJson<int?>(json['sourceScoreId']),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'teamId': serializer.toJson<int>(teamId),
+      'title': serializer.toJson<String>(title),
+      'composer': serializer.toJson<String>(composer),
+      'bpm': serializer.toJson<int>(bpm),
+      'createdById': serializer.toJson<int>(createdById),
+      'sourceScoreId': serializer.toJson<int?>(sourceScoreId),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'serverId': serializer.toJson<int?>(serverId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  TeamScoreEntity copyWith({
+    String? id,
+    int? teamId,
+    String? title,
+    String? composer,
+    int? bpm,
+    int? createdById,
+    Value<int?> sourceScoreId = const Value.absent(),
+    int? version,
+    String? syncStatus,
+    Value<int?> serverId = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => TeamScoreEntity(
+    id: id ?? this.id,
+    teamId: teamId ?? this.teamId,
+    title: title ?? this.title,
+    composer: composer ?? this.composer,
+    bpm: bpm ?? this.bpm,
+    createdById: createdById ?? this.createdById,
+    sourceScoreId: sourceScoreId.present
+        ? sourceScoreId.value
+        : this.sourceScoreId,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  TeamScoreEntity copyWithCompanion(TeamScoresCompanion data) {
+    return TeamScoreEntity(
+      id: data.id.present ? data.id.value : this.id,
+      teamId: data.teamId.present ? data.teamId.value : this.teamId,
+      title: data.title.present ? data.title.value : this.title,
+      composer: data.composer.present ? data.composer.value : this.composer,
+      bpm: data.bpm.present ? data.bpm.value : this.bpm,
+      createdById: data.createdById.present
+          ? data.createdById.value
+          : this.createdById,
+      sourceScoreId: data.sourceScoreId.present
+          ? data.sourceScoreId.value
+          : this.sourceScoreId,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamScoreEntity(')
+          ..write('id: $id, ')
+          ..write('teamId: $teamId, ')
+          ..write('title: $title, ')
+          ..write('composer: $composer, ')
+          ..write('bpm: $bpm, ')
+          ..write('createdById: $createdById, ')
+          ..write('sourceScoreId: $sourceScoreId, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    teamId,
+    title,
+    composer,
+    bpm,
+    createdById,
+    sourceScoreId,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TeamScoreEntity &&
+          other.id == this.id &&
+          other.teamId == this.teamId &&
+          other.title == this.title &&
+          other.composer == this.composer &&
+          other.bpm == this.bpm &&
+          other.createdById == this.createdById &&
+          other.sourceScoreId == this.sourceScoreId &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.serverId == this.serverId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class TeamScoresCompanion extends UpdateCompanion<TeamScoreEntity> {
+  final Value<String> id;
+  final Value<int> teamId;
+  final Value<String> title;
+  final Value<String> composer;
+  final Value<int> bpm;
+  final Value<int> createdById;
+  final Value<int?> sourceScoreId;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<int?> serverId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const TeamScoresCompanion({
+    this.id = const Value.absent(),
+    this.teamId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.composer = const Value.absent(),
+    this.bpm = const Value.absent(),
+    this.createdById = const Value.absent(),
+    this.sourceScoreId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TeamScoresCompanion.insert({
+    required String id,
+    required int teamId,
+    required String title,
+    required String composer,
+    this.bpm = const Value.absent(),
+    required int createdById,
+    this.sourceScoreId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       teamId = Value(teamId),
+       title = Value(title),
+       composer = Value(composer),
+       createdById = Value(createdById),
+       createdAt = Value(createdAt);
+  static Insertable<TeamScoreEntity> custom({
+    Expression<String>? id,
+    Expression<int>? teamId,
+    Expression<String>? title,
+    Expression<String>? composer,
+    Expression<int>? bpm,
+    Expression<int>? createdById,
+    Expression<int>? sourceScoreId,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<int>? serverId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (teamId != null) 'team_id': teamId,
+      if (title != null) 'title': title,
+      if (composer != null) 'composer': composer,
+      if (bpm != null) 'bpm': bpm,
+      if (createdById != null) 'created_by_id': createdById,
+      if (sourceScoreId != null) 'source_score_id': sourceScoreId,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (serverId != null) 'server_id': serverId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TeamScoresCompanion copyWith({
+    Value<String>? id,
+    Value<int>? teamId,
+    Value<String>? title,
+    Value<String>? composer,
+    Value<int>? bpm,
+    Value<int>? createdById,
+    Value<int?>? sourceScoreId,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<int?>? serverId,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return TeamScoresCompanion(
+      id: id ?? this.id,
+      teamId: teamId ?? this.teamId,
+      title: title ?? this.title,
+      composer: composer ?? this.composer,
+      bpm: bpm ?? this.bpm,
+      createdById: createdById ?? this.createdById,
+      sourceScoreId: sourceScoreId ?? this.sourceScoreId,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      serverId: serverId ?? this.serverId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (teamId.present) {
+      map['team_id'] = Variable<int>(teamId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (composer.present) {
+      map['composer'] = Variable<String>(composer.value);
+    }
+    if (bpm.present) {
+      map['bpm'] = Variable<int>(bpm.value);
+    }
+    if (createdById.present) {
+      map['created_by_id'] = Variable<int>(createdById.value);
+    }
+    if (sourceScoreId.present) {
+      map['source_score_id'] = Variable<int>(sourceScoreId.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamScoresCompanion(')
+          ..write('id: $id, ')
+          ..write('teamId: $teamId, ')
+          ..write('title: $title, ')
+          ..write('composer: $composer, ')
+          ..write('bpm: $bpm, ')
+          ..write('createdById: $createdById, ')
+          ..write('sourceScoreId: $sourceScoreId, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TeamInstrumentScoresTable extends TeamInstrumentScores
+    with TableInfo<$TeamInstrumentScoresTable, TeamInstrumentScoreEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TeamInstrumentScoresTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _teamScoreIdMeta = const VerificationMeta(
+    'teamScoreId',
+  );
+  @override
+  late final GeneratedColumn<String> teamScoreId = GeneratedColumn<String>(
+    'team_score_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES team_scores (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _instrumentTypeMeta = const VerificationMeta(
+    'instrumentType',
+  );
+  @override
+  late final GeneratedColumn<String> instrumentType = GeneratedColumn<String>(
+    'instrument_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _customInstrumentMeta = const VerificationMeta(
+    'customInstrument',
+  );
+  @override
+  late final GeneratedColumn<String> customInstrument = GeneratedColumn<String>(
+    'custom_instrument',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pdfPathMeta = const VerificationMeta(
+    'pdfPath',
+  );
+  @override
+  late final GeneratedColumn<String> pdfPath = GeneratedColumn<String>(
+    'pdf_path',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _thumbnailMeta = const VerificationMeta(
+    'thumbnail',
+  );
+  @override
+  late final GeneratedColumn<String> thumbnail = GeneratedColumn<String>(
+    'thumbnail',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _orderIndexMeta = const VerificationMeta(
+    'orderIndex',
+  );
+  @override
+  late final GeneratedColumn<int> orderIndex = GeneratedColumn<int>(
+    'order_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _pdfHashMeta = const VerificationMeta(
+    'pdfHash',
+  );
+  @override
+  late final GeneratedColumn<String> pdfHash = GeneratedColumn<String>(
+    'pdf_hash',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _pdfSyncStatusMeta = const VerificationMeta(
+    'pdfSyncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> pdfSyncStatus = GeneratedColumn<String>(
+    'pdf_sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _annotationsJsonMeta = const VerificationMeta(
+    'annotationsJson',
+  );
+  @override
+  late final GeneratedColumn<String> annotationsJson = GeneratedColumn<String>(
+    'annotations_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _sourceInstrumentScoreIdMeta =
+      const VerificationMeta('sourceInstrumentScoreId');
+  @override
+  late final GeneratedColumn<int> sourceInstrumentScoreId =
+      GeneratedColumn<int>(
+        'source_instrument_score_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    teamScoreId,
+    instrumentType,
+    customInstrument,
+    pdfPath,
+    thumbnail,
+    orderIndex,
+    pdfHash,
+    pdfSyncStatus,
+    annotationsJson,
+    sourceInstrumentScoreId,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'team_instrument_scores';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TeamInstrumentScoreEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('team_score_id')) {
+      context.handle(
+        _teamScoreIdMeta,
+        teamScoreId.isAcceptableOrUnknown(
+          data['team_score_id']!,
+          _teamScoreIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_teamScoreIdMeta);
+    }
+    if (data.containsKey('instrument_type')) {
+      context.handle(
+        _instrumentTypeMeta,
+        instrumentType.isAcceptableOrUnknown(
+          data['instrument_type']!,
+          _instrumentTypeMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_instrumentTypeMeta);
+    }
+    if (data.containsKey('custom_instrument')) {
+      context.handle(
+        _customInstrumentMeta,
+        customInstrument.isAcceptableOrUnknown(
+          data['custom_instrument']!,
+          _customInstrumentMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pdf_path')) {
+      context.handle(
+        _pdfPathMeta,
+        pdfPath.isAcceptableOrUnknown(data['pdf_path']!, _pdfPathMeta),
+      );
+    }
+    if (data.containsKey('thumbnail')) {
+      context.handle(
+        _thumbnailMeta,
+        thumbnail.isAcceptableOrUnknown(data['thumbnail']!, _thumbnailMeta),
+      );
+    }
+    if (data.containsKey('order_index')) {
+      context.handle(
+        _orderIndexMeta,
+        orderIndex.isAcceptableOrUnknown(data['order_index']!, _orderIndexMeta),
+      );
+    }
+    if (data.containsKey('pdf_hash')) {
+      context.handle(
+        _pdfHashMeta,
+        pdfHash.isAcceptableOrUnknown(data['pdf_hash']!, _pdfHashMeta),
+      );
+    }
+    if (data.containsKey('pdf_sync_status')) {
+      context.handle(
+        _pdfSyncStatusMeta,
+        pdfSyncStatus.isAcceptableOrUnknown(
+          data['pdf_sync_status']!,
+          _pdfSyncStatusMeta,
+        ),
+      );
+    }
+    if (data.containsKey('annotations_json')) {
+      context.handle(
+        _annotationsJsonMeta,
+        annotationsJson.isAcceptableOrUnknown(
+          data['annotations_json']!,
+          _annotationsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_instrument_score_id')) {
+      context.handle(
+        _sourceInstrumentScoreIdMeta,
+        sourceInstrumentScoreId.isAcceptableOrUnknown(
+          data['source_instrument_score_id']!,
+          _sourceInstrumentScoreIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TeamInstrumentScoreEntity map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TeamInstrumentScoreEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      teamScoreId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}team_score_id'],
+      )!,
+      instrumentType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}instrument_type'],
+      )!,
+      customInstrument: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_instrument'],
+      ),
+      pdfPath: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_path'],
+      ),
+      thumbnail: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}thumbnail'],
+      ),
+      orderIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_index'],
+      )!,
+      pdfHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_hash'],
+      ),
+      pdfSyncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_sync_status'],
+      )!,
+      annotationsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}annotations_json'],
+      )!,
+      sourceInstrumentScoreId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}source_instrument_score_id'],
+      ),
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $TeamInstrumentScoresTable createAlias(String alias) {
+    return $TeamInstrumentScoresTable(attachedDatabase, alias);
+  }
+}
+
+class TeamInstrumentScoreEntity extends DataClass
+    implements Insertable<TeamInstrumentScoreEntity> {
+  final String id;
+  final String teamScoreId;
+  final String instrumentType;
+  final String? customInstrument;
+  final String? pdfPath;
+  final String? thumbnail;
+  final int orderIndex;
+  final String? pdfHash;
+  final String pdfSyncStatus;
+  final String annotationsJson;
+  final int? sourceInstrumentScoreId;
+  final int version;
+  final String syncStatus;
+  final int? serverId;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  const TeamInstrumentScoreEntity({
+    required this.id,
+    required this.teamScoreId,
+    required this.instrumentType,
+    this.customInstrument,
+    this.pdfPath,
+    this.thumbnail,
+    required this.orderIndex,
+    this.pdfHash,
+    required this.pdfSyncStatus,
+    required this.annotationsJson,
+    this.sourceInstrumentScoreId,
+    required this.version,
+    required this.syncStatus,
+    this.serverId,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['team_score_id'] = Variable<String>(teamScoreId);
+    map['instrument_type'] = Variable<String>(instrumentType);
+    if (!nullToAbsent || customInstrument != null) {
+      map['custom_instrument'] = Variable<String>(customInstrument);
+    }
+    if (!nullToAbsent || pdfPath != null) {
+      map['pdf_path'] = Variable<String>(pdfPath);
+    }
+    if (!nullToAbsent || thumbnail != null) {
+      map['thumbnail'] = Variable<String>(thumbnail);
+    }
+    map['order_index'] = Variable<int>(orderIndex);
+    if (!nullToAbsent || pdfHash != null) {
+      map['pdf_hash'] = Variable<String>(pdfHash);
+    }
+    map['pdf_sync_status'] = Variable<String>(pdfSyncStatus);
+    map['annotations_json'] = Variable<String>(annotationsJson);
+    if (!nullToAbsent || sourceInstrumentScoreId != null) {
+      map['source_instrument_score_id'] = Variable<int>(
+        sourceInstrumentScoreId,
+      );
+    }
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  TeamInstrumentScoresCompanion toCompanion(bool nullToAbsent) {
+    return TeamInstrumentScoresCompanion(
+      id: Value(id),
+      teamScoreId: Value(teamScoreId),
+      instrumentType: Value(instrumentType),
+      customInstrument: customInstrument == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customInstrument),
+      pdfPath: pdfPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfPath),
+      thumbnail: thumbnail == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thumbnail),
+      orderIndex: Value(orderIndex),
+      pdfHash: pdfHash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pdfHash),
+      pdfSyncStatus: Value(pdfSyncStatus),
+      annotationsJson: Value(annotationsJson),
+      sourceInstrumentScoreId: sourceInstrumentScoreId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceInstrumentScoreId),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory TeamInstrumentScoreEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TeamInstrumentScoreEntity(
+      id: serializer.fromJson<String>(json['id']),
+      teamScoreId: serializer.fromJson<String>(json['teamScoreId']),
+      instrumentType: serializer.fromJson<String>(json['instrumentType']),
+      customInstrument: serializer.fromJson<String?>(json['customInstrument']),
+      pdfPath: serializer.fromJson<String?>(json['pdfPath']),
+      thumbnail: serializer.fromJson<String?>(json['thumbnail']),
+      orderIndex: serializer.fromJson<int>(json['orderIndex']),
+      pdfHash: serializer.fromJson<String?>(json['pdfHash']),
+      pdfSyncStatus: serializer.fromJson<String>(json['pdfSyncStatus']),
+      annotationsJson: serializer.fromJson<String>(json['annotationsJson']),
+      sourceInstrumentScoreId: serializer.fromJson<int?>(
+        json['sourceInstrumentScoreId'],
+      ),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'teamScoreId': serializer.toJson<String>(teamScoreId),
+      'instrumentType': serializer.toJson<String>(instrumentType),
+      'customInstrument': serializer.toJson<String?>(customInstrument),
+      'pdfPath': serializer.toJson<String?>(pdfPath),
+      'thumbnail': serializer.toJson<String?>(thumbnail),
+      'orderIndex': serializer.toJson<int>(orderIndex),
+      'pdfHash': serializer.toJson<String?>(pdfHash),
+      'pdfSyncStatus': serializer.toJson<String>(pdfSyncStatus),
+      'annotationsJson': serializer.toJson<String>(annotationsJson),
+      'sourceInstrumentScoreId': serializer.toJson<int?>(
+        sourceInstrumentScoreId,
+      ),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'serverId': serializer.toJson<int?>(serverId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  TeamInstrumentScoreEntity copyWith({
+    String? id,
+    String? teamScoreId,
+    String? instrumentType,
+    Value<String?> customInstrument = const Value.absent(),
+    Value<String?> pdfPath = const Value.absent(),
+    Value<String?> thumbnail = const Value.absent(),
+    int? orderIndex,
+    Value<String?> pdfHash = const Value.absent(),
+    String? pdfSyncStatus,
+    String? annotationsJson,
+    Value<int?> sourceInstrumentScoreId = const Value.absent(),
+    int? version,
+    String? syncStatus,
+    Value<int?> serverId = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => TeamInstrumentScoreEntity(
+    id: id ?? this.id,
+    teamScoreId: teamScoreId ?? this.teamScoreId,
+    instrumentType: instrumentType ?? this.instrumentType,
+    customInstrument: customInstrument.present
+        ? customInstrument.value
+        : this.customInstrument,
+    pdfPath: pdfPath.present ? pdfPath.value : this.pdfPath,
+    thumbnail: thumbnail.present ? thumbnail.value : this.thumbnail,
+    orderIndex: orderIndex ?? this.orderIndex,
+    pdfHash: pdfHash.present ? pdfHash.value : this.pdfHash,
+    pdfSyncStatus: pdfSyncStatus ?? this.pdfSyncStatus,
+    annotationsJson: annotationsJson ?? this.annotationsJson,
+    sourceInstrumentScoreId: sourceInstrumentScoreId.present
+        ? sourceInstrumentScoreId.value
+        : this.sourceInstrumentScoreId,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  TeamInstrumentScoreEntity copyWithCompanion(
+    TeamInstrumentScoresCompanion data,
+  ) {
+    return TeamInstrumentScoreEntity(
+      id: data.id.present ? data.id.value : this.id,
+      teamScoreId: data.teamScoreId.present
+          ? data.teamScoreId.value
+          : this.teamScoreId,
+      instrumentType: data.instrumentType.present
+          ? data.instrumentType.value
+          : this.instrumentType,
+      customInstrument: data.customInstrument.present
+          ? data.customInstrument.value
+          : this.customInstrument,
+      pdfPath: data.pdfPath.present ? data.pdfPath.value : this.pdfPath,
+      thumbnail: data.thumbnail.present ? data.thumbnail.value : this.thumbnail,
+      orderIndex: data.orderIndex.present
+          ? data.orderIndex.value
+          : this.orderIndex,
+      pdfHash: data.pdfHash.present ? data.pdfHash.value : this.pdfHash,
+      pdfSyncStatus: data.pdfSyncStatus.present
+          ? data.pdfSyncStatus.value
+          : this.pdfSyncStatus,
+      annotationsJson: data.annotationsJson.present
+          ? data.annotationsJson.value
+          : this.annotationsJson,
+      sourceInstrumentScoreId: data.sourceInstrumentScoreId.present
+          ? data.sourceInstrumentScoreId.value
+          : this.sourceInstrumentScoreId,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamInstrumentScoreEntity(')
+          ..write('id: $id, ')
+          ..write('teamScoreId: $teamScoreId, ')
+          ..write('instrumentType: $instrumentType, ')
+          ..write('customInstrument: $customInstrument, ')
+          ..write('pdfPath: $pdfPath, ')
+          ..write('thumbnail: $thumbnail, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('pdfHash: $pdfHash, ')
+          ..write('pdfSyncStatus: $pdfSyncStatus, ')
+          ..write('annotationsJson: $annotationsJson, ')
+          ..write('sourceInstrumentScoreId: $sourceInstrumentScoreId, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    teamScoreId,
+    instrumentType,
+    customInstrument,
+    pdfPath,
+    thumbnail,
+    orderIndex,
+    pdfHash,
+    pdfSyncStatus,
+    annotationsJson,
+    sourceInstrumentScoreId,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TeamInstrumentScoreEntity &&
+          other.id == this.id &&
+          other.teamScoreId == this.teamScoreId &&
+          other.instrumentType == this.instrumentType &&
+          other.customInstrument == this.customInstrument &&
+          other.pdfPath == this.pdfPath &&
+          other.thumbnail == this.thumbnail &&
+          other.orderIndex == this.orderIndex &&
+          other.pdfHash == this.pdfHash &&
+          other.pdfSyncStatus == this.pdfSyncStatus &&
+          other.annotationsJson == this.annotationsJson &&
+          other.sourceInstrumentScoreId == this.sourceInstrumentScoreId &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.serverId == this.serverId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class TeamInstrumentScoresCompanion
+    extends UpdateCompanion<TeamInstrumentScoreEntity> {
+  final Value<String> id;
+  final Value<String> teamScoreId;
+  final Value<String> instrumentType;
+  final Value<String?> customInstrument;
+  final Value<String?> pdfPath;
+  final Value<String?> thumbnail;
+  final Value<int> orderIndex;
+  final Value<String?> pdfHash;
+  final Value<String> pdfSyncStatus;
+  final Value<String> annotationsJson;
+  final Value<int?> sourceInstrumentScoreId;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<int?> serverId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const TeamInstrumentScoresCompanion({
+    this.id = const Value.absent(),
+    this.teamScoreId = const Value.absent(),
+    this.instrumentType = const Value.absent(),
+    this.customInstrument = const Value.absent(),
+    this.pdfPath = const Value.absent(),
+    this.thumbnail = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+    this.pdfHash = const Value.absent(),
+    this.pdfSyncStatus = const Value.absent(),
+    this.annotationsJson = const Value.absent(),
+    this.sourceInstrumentScoreId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TeamInstrumentScoresCompanion.insert({
+    required String id,
+    required String teamScoreId,
+    required String instrumentType,
+    this.customInstrument = const Value.absent(),
+    this.pdfPath = const Value.absent(),
+    this.thumbnail = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+    this.pdfHash = const Value.absent(),
+    this.pdfSyncStatus = const Value.absent(),
+    this.annotationsJson = const Value.absent(),
+    this.sourceInstrumentScoreId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       teamScoreId = Value(teamScoreId),
+       instrumentType = Value(instrumentType),
+       createdAt = Value(createdAt);
+  static Insertable<TeamInstrumentScoreEntity> custom({
+    Expression<String>? id,
+    Expression<String>? teamScoreId,
+    Expression<String>? instrumentType,
+    Expression<String>? customInstrument,
+    Expression<String>? pdfPath,
+    Expression<String>? thumbnail,
+    Expression<int>? orderIndex,
+    Expression<String>? pdfHash,
+    Expression<String>? pdfSyncStatus,
+    Expression<String>? annotationsJson,
+    Expression<int>? sourceInstrumentScoreId,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<int>? serverId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (teamScoreId != null) 'team_score_id': teamScoreId,
+      if (instrumentType != null) 'instrument_type': instrumentType,
+      if (customInstrument != null) 'custom_instrument': customInstrument,
+      if (pdfPath != null) 'pdf_path': pdfPath,
+      if (thumbnail != null) 'thumbnail': thumbnail,
+      if (orderIndex != null) 'order_index': orderIndex,
+      if (pdfHash != null) 'pdf_hash': pdfHash,
+      if (pdfSyncStatus != null) 'pdf_sync_status': pdfSyncStatus,
+      if (annotationsJson != null) 'annotations_json': annotationsJson,
+      if (sourceInstrumentScoreId != null)
+        'source_instrument_score_id': sourceInstrumentScoreId,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (serverId != null) 'server_id': serverId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TeamInstrumentScoresCompanion copyWith({
+    Value<String>? id,
+    Value<String>? teamScoreId,
+    Value<String>? instrumentType,
+    Value<String?>? customInstrument,
+    Value<String?>? pdfPath,
+    Value<String?>? thumbnail,
+    Value<int>? orderIndex,
+    Value<String?>? pdfHash,
+    Value<String>? pdfSyncStatus,
+    Value<String>? annotationsJson,
+    Value<int?>? sourceInstrumentScoreId,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<int?>? serverId,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return TeamInstrumentScoresCompanion(
+      id: id ?? this.id,
+      teamScoreId: teamScoreId ?? this.teamScoreId,
+      instrumentType: instrumentType ?? this.instrumentType,
+      customInstrument: customInstrument ?? this.customInstrument,
+      pdfPath: pdfPath ?? this.pdfPath,
+      thumbnail: thumbnail ?? this.thumbnail,
+      orderIndex: orderIndex ?? this.orderIndex,
+      pdfHash: pdfHash ?? this.pdfHash,
+      pdfSyncStatus: pdfSyncStatus ?? this.pdfSyncStatus,
+      annotationsJson: annotationsJson ?? this.annotationsJson,
+      sourceInstrumentScoreId:
+          sourceInstrumentScoreId ?? this.sourceInstrumentScoreId,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      serverId: serverId ?? this.serverId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (teamScoreId.present) {
+      map['team_score_id'] = Variable<String>(teamScoreId.value);
+    }
+    if (instrumentType.present) {
+      map['instrument_type'] = Variable<String>(instrumentType.value);
+    }
+    if (customInstrument.present) {
+      map['custom_instrument'] = Variable<String>(customInstrument.value);
+    }
+    if (pdfPath.present) {
+      map['pdf_path'] = Variable<String>(pdfPath.value);
+    }
+    if (thumbnail.present) {
+      map['thumbnail'] = Variable<String>(thumbnail.value);
+    }
+    if (orderIndex.present) {
+      map['order_index'] = Variable<int>(orderIndex.value);
+    }
+    if (pdfHash.present) {
+      map['pdf_hash'] = Variable<String>(pdfHash.value);
+    }
+    if (pdfSyncStatus.present) {
+      map['pdf_sync_status'] = Variable<String>(pdfSyncStatus.value);
+    }
+    if (annotationsJson.present) {
+      map['annotations_json'] = Variable<String>(annotationsJson.value);
+    }
+    if (sourceInstrumentScoreId.present) {
+      map['source_instrument_score_id'] = Variable<int>(
+        sourceInstrumentScoreId.value,
+      );
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamInstrumentScoresCompanion(')
+          ..write('id: $id, ')
+          ..write('teamScoreId: $teamScoreId, ')
+          ..write('instrumentType: $instrumentType, ')
+          ..write('customInstrument: $customInstrument, ')
+          ..write('pdfPath: $pdfPath, ')
+          ..write('thumbnail: $thumbnail, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('pdfHash: $pdfHash, ')
+          ..write('pdfSyncStatus: $pdfSyncStatus, ')
+          ..write('annotationsJson: $annotationsJson, ')
+          ..write('sourceInstrumentScoreId: $sourceInstrumentScoreId, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TeamSetlistsTable extends TeamSetlists
+    with TableInfo<$TeamSetlistsTable, TeamSetlistEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TeamSetlistsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _teamIdMeta = const VerificationMeta('teamId');
+  @override
+  late final GeneratedColumn<int> teamId = GeneratedColumn<int>(
+    'team_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _descriptionMeta = const VerificationMeta(
+    'description',
+  );
+  @override
+  late final GeneratedColumn<String> description = GeneratedColumn<String>(
+    'description',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdByIdMeta = const VerificationMeta(
+    'createdById',
+  );
+  @override
+  late final GeneratedColumn<int> createdById = GeneratedColumn<int>(
+    'created_by_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceSetlistIdMeta = const VerificationMeta(
+    'sourceSetlistId',
+  );
+  @override
+  late final GeneratedColumn<int> sourceSetlistId = GeneratedColumn<int>(
+    'source_setlist_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    teamId,
+    name,
+    description,
+    createdById,
+    sourceSetlistId,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'team_setlists';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TeamSetlistEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('team_id')) {
+      context.handle(
+        _teamIdMeta,
+        teamId.isAcceptableOrUnknown(data['team_id']!, _teamIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_teamIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('description')) {
+      context.handle(
+        _descriptionMeta,
+        description.isAcceptableOrUnknown(
+          data['description']!,
+          _descriptionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_by_id')) {
+      context.handle(
+        _createdByIdMeta,
+        createdById.isAcceptableOrUnknown(
+          data['created_by_id']!,
+          _createdByIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdByIdMeta);
+    }
+    if (data.containsKey('source_setlist_id')) {
+      context.handle(
+        _sourceSetlistIdMeta,
+        sourceSetlistId.isAcceptableOrUnknown(
+          data['source_setlist_id']!,
+          _sourceSetlistIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TeamSetlistEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TeamSetlistEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      teamId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}team_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      description: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}description'],
+      ),
+      createdById: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_by_id'],
+      )!,
+      sourceSetlistId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}source_setlist_id'],
+      ),
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $TeamSetlistsTable createAlias(String alias) {
+    return $TeamSetlistsTable(attachedDatabase, alias);
+  }
+}
+
+class TeamSetlistEntity extends DataClass
+    implements Insertable<TeamSetlistEntity> {
+  final String id;
+  final int teamId;
+  final String name;
+  final String? description;
+  final int createdById;
+  final int? sourceSetlistId;
+  final int version;
+  final String syncStatus;
+  final int? serverId;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  const TeamSetlistEntity({
+    required this.id,
+    required this.teamId,
+    required this.name,
+    this.description,
+    required this.createdById,
+    this.sourceSetlistId,
+    required this.version,
+    required this.syncStatus,
+    this.serverId,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['team_id'] = Variable<int>(teamId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || description != null) {
+      map['description'] = Variable<String>(description);
+    }
+    map['created_by_id'] = Variable<int>(createdById);
+    if (!nullToAbsent || sourceSetlistId != null) {
+      map['source_setlist_id'] = Variable<int>(sourceSetlistId);
+    }
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  TeamSetlistsCompanion toCompanion(bool nullToAbsent) {
+    return TeamSetlistsCompanion(
+      id: Value(id),
+      teamId: Value(teamId),
+      name: Value(name),
+      description: description == null && nullToAbsent
+          ? const Value.absent()
+          : Value(description),
+      createdById: Value(createdById),
+      sourceSetlistId: sourceSetlistId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceSetlistId),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory TeamSetlistEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TeamSetlistEntity(
+      id: serializer.fromJson<String>(json['id']),
+      teamId: serializer.fromJson<int>(json['teamId']),
+      name: serializer.fromJson<String>(json['name']),
+      description: serializer.fromJson<String?>(json['description']),
+      createdById: serializer.fromJson<int>(json['createdById']),
+      sourceSetlistId: serializer.fromJson<int?>(json['sourceSetlistId']),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'teamId': serializer.toJson<int>(teamId),
+      'name': serializer.toJson<String>(name),
+      'description': serializer.toJson<String?>(description),
+      'createdById': serializer.toJson<int>(createdById),
+      'sourceSetlistId': serializer.toJson<int?>(sourceSetlistId),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'serverId': serializer.toJson<int?>(serverId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  TeamSetlistEntity copyWith({
+    String? id,
+    int? teamId,
+    String? name,
+    Value<String?> description = const Value.absent(),
+    int? createdById,
+    Value<int?> sourceSetlistId = const Value.absent(),
+    int? version,
+    String? syncStatus,
+    Value<int?> serverId = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => TeamSetlistEntity(
+    id: id ?? this.id,
+    teamId: teamId ?? this.teamId,
+    name: name ?? this.name,
+    description: description.present ? description.value : this.description,
+    createdById: createdById ?? this.createdById,
+    sourceSetlistId: sourceSetlistId.present
+        ? sourceSetlistId.value
+        : this.sourceSetlistId,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  TeamSetlistEntity copyWithCompanion(TeamSetlistsCompanion data) {
+    return TeamSetlistEntity(
+      id: data.id.present ? data.id.value : this.id,
+      teamId: data.teamId.present ? data.teamId.value : this.teamId,
+      name: data.name.present ? data.name.value : this.name,
+      description: data.description.present
+          ? data.description.value
+          : this.description,
+      createdById: data.createdById.present
+          ? data.createdById.value
+          : this.createdById,
+      sourceSetlistId: data.sourceSetlistId.present
+          ? data.sourceSetlistId.value
+          : this.sourceSetlistId,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamSetlistEntity(')
+          ..write('id: $id, ')
+          ..write('teamId: $teamId, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdById: $createdById, ')
+          ..write('sourceSetlistId: $sourceSetlistId, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    teamId,
+    name,
+    description,
+    createdById,
+    sourceSetlistId,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TeamSetlistEntity &&
+          other.id == this.id &&
+          other.teamId == this.teamId &&
+          other.name == this.name &&
+          other.description == this.description &&
+          other.createdById == this.createdById &&
+          other.sourceSetlistId == this.sourceSetlistId &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.serverId == this.serverId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class TeamSetlistsCompanion extends UpdateCompanion<TeamSetlistEntity> {
+  final Value<String> id;
+  final Value<int> teamId;
+  final Value<String> name;
+  final Value<String?> description;
+  final Value<int> createdById;
+  final Value<int?> sourceSetlistId;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<int?> serverId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const TeamSetlistsCompanion({
+    this.id = const Value.absent(),
+    this.teamId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.description = const Value.absent(),
+    this.createdById = const Value.absent(),
+    this.sourceSetlistId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TeamSetlistsCompanion.insert({
+    required String id,
+    required int teamId,
+    required String name,
+    this.description = const Value.absent(),
+    required int createdById,
+    this.sourceSetlistId = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       teamId = Value(teamId),
+       name = Value(name),
+       createdById = Value(createdById),
+       createdAt = Value(createdAt);
+  static Insertable<TeamSetlistEntity> custom({
+    Expression<String>? id,
+    Expression<int>? teamId,
+    Expression<String>? name,
+    Expression<String>? description,
+    Expression<int>? createdById,
+    Expression<int>? sourceSetlistId,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<int>? serverId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (teamId != null) 'team_id': teamId,
+      if (name != null) 'name': name,
+      if (description != null) 'description': description,
+      if (createdById != null) 'created_by_id': createdById,
+      if (sourceSetlistId != null) 'source_setlist_id': sourceSetlistId,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (serverId != null) 'server_id': serverId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TeamSetlistsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? teamId,
+    Value<String>? name,
+    Value<String?>? description,
+    Value<int>? createdById,
+    Value<int?>? sourceSetlistId,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<int?>? serverId,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return TeamSetlistsCompanion(
+      id: id ?? this.id,
+      teamId: teamId ?? this.teamId,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      createdById: createdById ?? this.createdById,
+      sourceSetlistId: sourceSetlistId ?? this.sourceSetlistId,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      serverId: serverId ?? this.serverId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (teamId.present) {
+      map['team_id'] = Variable<int>(teamId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (description.present) {
+      map['description'] = Variable<String>(description.value);
+    }
+    if (createdById.present) {
+      map['created_by_id'] = Variable<int>(createdById.value);
+    }
+    if (sourceSetlistId.present) {
+      map['source_setlist_id'] = Variable<int>(sourceSetlistId.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamSetlistsCompanion(')
+          ..write('id: $id, ')
+          ..write('teamId: $teamId, ')
+          ..write('name: $name, ')
+          ..write('description: $description, ')
+          ..write('createdById: $createdById, ')
+          ..write('sourceSetlistId: $sourceSetlistId, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TeamSetlistScoresTable extends TeamSetlistScores
+    with TableInfo<$TeamSetlistScoresTable, TeamSetlistScoreEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TeamSetlistScoresTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _teamSetlistIdMeta = const VerificationMeta(
+    'teamSetlistId',
+  );
+  @override
+  late final GeneratedColumn<String> teamSetlistId = GeneratedColumn<String>(
+    'team_setlist_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES team_setlists (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _teamScoreIdMeta = const VerificationMeta(
+    'teamScoreId',
+  );
+  @override
+  late final GeneratedColumn<String> teamScoreId = GeneratedColumn<String>(
+    'team_score_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES team_scores (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _orderIndexMeta = const VerificationMeta(
+    'orderIndex',
+  );
+  @override
+  late final GeneratedColumn<int> orderIndex = GeneratedColumn<int>(
+    'order_index',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _versionMeta = const VerificationMeta(
+    'version',
+  );
+  @override
+  late final GeneratedColumn<int> version = GeneratedColumn<int>(
+    'version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _syncStatusMeta = const VerificationMeta(
+    'syncStatus',
+  );
+  @override
+  late final GeneratedColumn<String> syncStatus = GeneratedColumn<String>(
+    'sync_status',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('pending'),
+  );
+  static const VerificationMeta _serverIdMeta = const VerificationMeta(
+    'serverId',
+  );
+  @override
+  late final GeneratedColumn<int> serverId = GeneratedColumn<int>(
+    'server_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _deletedAtMeta = const VerificationMeta(
+    'deletedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deletedAt = GeneratedColumn<DateTime>(
+    'deleted_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    teamSetlistId,
+    teamScoreId,
+    orderIndex,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'team_setlist_scores';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TeamSetlistScoreEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('team_setlist_id')) {
+      context.handle(
+        _teamSetlistIdMeta,
+        teamSetlistId.isAcceptableOrUnknown(
+          data['team_setlist_id']!,
+          _teamSetlistIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_teamSetlistIdMeta);
+    }
+    if (data.containsKey('team_score_id')) {
+      context.handle(
+        _teamScoreIdMeta,
+        teamScoreId.isAcceptableOrUnknown(
+          data['team_score_id']!,
+          _teamScoreIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_teamScoreIdMeta);
+    }
+    if (data.containsKey('order_index')) {
+      context.handle(
+        _orderIndexMeta,
+        orderIndex.isAcceptableOrUnknown(data['order_index']!, _orderIndexMeta),
+      );
+    }
+    if (data.containsKey('version')) {
+      context.handle(
+        _versionMeta,
+        version.isAcceptableOrUnknown(data['version']!, _versionMeta),
+      );
+    }
+    if (data.containsKey('sync_status')) {
+      context.handle(
+        _syncStatusMeta,
+        syncStatus.isAcceptableOrUnknown(data['sync_status']!, _syncStatusMeta),
+      );
+    }
+    if (data.containsKey('server_id')) {
+      context.handle(
+        _serverIdMeta,
+        serverId.isAcceptableOrUnknown(data['server_id']!, _serverIdMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    if (data.containsKey('deleted_at')) {
+      context.handle(
+        _deletedAtMeta,
+        deletedAt.isAcceptableOrUnknown(data['deleted_at']!, _deletedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TeamSetlistScoreEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TeamSetlistScoreEntity(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      teamSetlistId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}team_setlist_id'],
+      )!,
+      teamScoreId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}team_score_id'],
+      )!,
+      orderIndex: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}order_index'],
+      )!,
+      version: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}version'],
+      )!,
+      syncStatus: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}sync_status'],
+      )!,
+      serverId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}server_id'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      ),
+      deletedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}deleted_at'],
+      ),
+    );
+  }
+
+  @override
+  $TeamSetlistScoresTable createAlias(String alias) {
+    return $TeamSetlistScoresTable(attachedDatabase, alias);
+  }
+}
+
+class TeamSetlistScoreEntity extends DataClass
+    implements Insertable<TeamSetlistScoreEntity> {
+  final String id;
+  final String teamSetlistId;
+  final String teamScoreId;
+  final int orderIndex;
+  final int version;
+  final String syncStatus;
+  final int? serverId;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? deletedAt;
+  const TeamSetlistScoreEntity({
+    required this.id,
+    required this.teamSetlistId,
+    required this.teamScoreId,
+    required this.orderIndex,
+    required this.version,
+    required this.syncStatus,
+    this.serverId,
+    required this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['team_setlist_id'] = Variable<String>(teamSetlistId);
+    map['team_score_id'] = Variable<String>(teamScoreId);
+    map['order_index'] = Variable<int>(orderIndex);
+    map['version'] = Variable<int>(version);
+    map['sync_status'] = Variable<String>(syncStatus);
+    if (!nullToAbsent || serverId != null) {
+      map['server_id'] = Variable<int>(serverId);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || updatedAt != null) {
+      map['updated_at'] = Variable<DateTime>(updatedAt);
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt);
+    }
+    return map;
+  }
+
+  TeamSetlistScoresCompanion toCompanion(bool nullToAbsent) {
+    return TeamSetlistScoresCompanion(
+      id: Value(id),
+      teamSetlistId: Value(teamSetlistId),
+      teamScoreId: Value(teamScoreId),
+      orderIndex: Value(orderIndex),
+      version: Value(version),
+      syncStatus: Value(syncStatus),
+      serverId: serverId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(serverId),
+      createdAt: Value(createdAt),
+      updatedAt: updatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(updatedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory TeamSetlistScoreEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TeamSetlistScoreEntity(
+      id: serializer.fromJson<String>(json['id']),
+      teamSetlistId: serializer.fromJson<String>(json['teamSetlistId']),
+      teamScoreId: serializer.fromJson<String>(json['teamScoreId']),
+      orderIndex: serializer.fromJson<int>(json['orderIndex']),
+      version: serializer.fromJson<int>(json['version']),
+      syncStatus: serializer.fromJson<String>(json['syncStatus']),
+      serverId: serializer.fromJson<int?>(json['serverId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime?>(json['updatedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'teamSetlistId': serializer.toJson<String>(teamSetlistId),
+      'teamScoreId': serializer.toJson<String>(teamScoreId),
+      'orderIndex': serializer.toJson<int>(orderIndex),
+      'version': serializer.toJson<int>(version),
+      'syncStatus': serializer.toJson<String>(syncStatus),
+      'serverId': serializer.toJson<int?>(serverId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime?>(updatedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  TeamSetlistScoreEntity copyWith({
+    String? id,
+    String? teamSetlistId,
+    String? teamScoreId,
+    int? orderIndex,
+    int? version,
+    String? syncStatus,
+    Value<int?> serverId = const Value.absent(),
+    DateTime? createdAt,
+    Value<DateTime?> updatedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => TeamSetlistScoreEntity(
+    id: id ?? this.id,
+    teamSetlistId: teamSetlistId ?? this.teamSetlistId,
+    teamScoreId: teamScoreId ?? this.teamScoreId,
+    orderIndex: orderIndex ?? this.orderIndex,
+    version: version ?? this.version,
+    syncStatus: syncStatus ?? this.syncStatus,
+    serverId: serverId.present ? serverId.value : this.serverId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt.present ? updatedAt.value : this.updatedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  TeamSetlistScoreEntity copyWithCompanion(TeamSetlistScoresCompanion data) {
+    return TeamSetlistScoreEntity(
+      id: data.id.present ? data.id.value : this.id,
+      teamSetlistId: data.teamSetlistId.present
+          ? data.teamSetlistId.value
+          : this.teamSetlistId,
+      teamScoreId: data.teamScoreId.present
+          ? data.teamScoreId.value
+          : this.teamScoreId,
+      orderIndex: data.orderIndex.present
+          ? data.orderIndex.value
+          : this.orderIndex,
+      version: data.version.present ? data.version.value : this.version,
+      syncStatus: data.syncStatus.present
+          ? data.syncStatus.value
+          : this.syncStatus,
+      serverId: data.serverId.present ? data.serverId.value : this.serverId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamSetlistScoreEntity(')
+          ..write('id: $id, ')
+          ..write('teamSetlistId: $teamSetlistId, ')
+          ..write('teamScoreId: $teamScoreId, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    teamSetlistId,
+    teamScoreId,
+    orderIndex,
+    version,
+    syncStatus,
+    serverId,
+    createdAt,
+    updatedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TeamSetlistScoreEntity &&
+          other.id == this.id &&
+          other.teamSetlistId == this.teamSetlistId &&
+          other.teamScoreId == this.teamScoreId &&
+          other.orderIndex == this.orderIndex &&
+          other.version == this.version &&
+          other.syncStatus == this.syncStatus &&
+          other.serverId == this.serverId &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class TeamSetlistScoresCompanion
+    extends UpdateCompanion<TeamSetlistScoreEntity> {
+  final Value<String> id;
+  final Value<String> teamSetlistId;
+  final Value<String> teamScoreId;
+  final Value<int> orderIndex;
+  final Value<int> version;
+  final Value<String> syncStatus;
+  final Value<int?> serverId;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> updatedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const TeamSetlistScoresCompanion({
+    this.id = const Value.absent(),
+    this.teamSetlistId = const Value.absent(),
+    this.teamScoreId = const Value.absent(),
+    this.orderIndex = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TeamSetlistScoresCompanion.insert({
+    required String id,
+    required String teamSetlistId,
+    required String teamScoreId,
+    this.orderIndex = const Value.absent(),
+    this.version = const Value.absent(),
+    this.syncStatus = const Value.absent(),
+    this.serverId = const Value.absent(),
+    required DateTime createdAt,
+    this.updatedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       teamSetlistId = Value(teamSetlistId),
+       teamScoreId = Value(teamScoreId),
+       createdAt = Value(createdAt);
+  static Insertable<TeamSetlistScoreEntity> custom({
+    Expression<String>? id,
+    Expression<String>? teamSetlistId,
+    Expression<String>? teamScoreId,
+    Expression<int>? orderIndex,
+    Expression<int>? version,
+    Expression<String>? syncStatus,
+    Expression<int>? serverId,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<DateTime>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (teamSetlistId != null) 'team_setlist_id': teamSetlistId,
+      if (teamScoreId != null) 'team_score_id': teamScoreId,
+      if (orderIndex != null) 'order_index': orderIndex,
+      if (version != null) 'version': version,
+      if (syncStatus != null) 'sync_status': syncStatus,
+      if (serverId != null) 'server_id': serverId,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TeamSetlistScoresCompanion copyWith({
+    Value<String>? id,
+    Value<String>? teamSetlistId,
+    Value<String>? teamScoreId,
+    Value<int>? orderIndex,
+    Value<int>? version,
+    Value<String>? syncStatus,
+    Value<int?>? serverId,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? updatedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return TeamSetlistScoresCompanion(
+      id: id ?? this.id,
+      teamSetlistId: teamSetlistId ?? this.teamSetlistId,
+      teamScoreId: teamScoreId ?? this.teamScoreId,
+      orderIndex: orderIndex ?? this.orderIndex,
+      version: version ?? this.version,
+      syncStatus: syncStatus ?? this.syncStatus,
+      serverId: serverId ?? this.serverId,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (teamSetlistId.present) {
+      map['team_setlist_id'] = Variable<String>(teamSetlistId.value);
+    }
+    if (teamScoreId.present) {
+      map['team_score_id'] = Variable<String>(teamScoreId.value);
+    }
+    if (orderIndex.present) {
+      map['order_index'] = Variable<int>(orderIndex.value);
+    }
+    if (version.present) {
+      map['version'] = Variable<int>(version.value);
+    }
+    if (syncStatus.present) {
+      map['sync_status'] = Variable<String>(syncStatus.value);
+    }
+    if (serverId.present) {
+      map['server_id'] = Variable<int>(serverId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<DateTime>(deletedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamSetlistScoresCompanion(')
+          ..write('id: $id, ')
+          ..write('teamSetlistId: $teamSetlistId, ')
+          ..write('teamScoreId: $teamScoreId, ')
+          ..write('orderIndex: $orderIndex, ')
+          ..write('version: $version, ')
+          ..write('syncStatus: $syncStatus, ')
+          ..write('serverId: $serverId, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TeamSyncStateTable extends TeamSyncState
+    with TableInfo<$TeamSyncStateTable, TeamSyncStateEntity> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TeamSyncStateTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _teamIdMeta = const VerificationMeta('teamId');
+  @override
+  late final GeneratedColumn<int> teamId = GeneratedColumn<int>(
+    'team_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _teamLibraryVersionMeta =
+      const VerificationMeta('teamLibraryVersion');
+  @override
+  late final GeneratedColumn<int> teamLibraryVersion = GeneratedColumn<int>(
+    'team_library_version',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastSyncAtMeta = const VerificationMeta(
+    'lastSyncAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> lastSyncAt = GeneratedColumn<DateTime>(
+    'last_sync_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    teamId,
+    teamLibraryVersion,
+    lastSyncAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'team_sync_state';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TeamSyncStateEntity> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('team_id')) {
+      context.handle(
+        _teamIdMeta,
+        teamId.isAcceptableOrUnknown(data['team_id']!, _teamIdMeta),
+      );
+    }
+    if (data.containsKey('team_library_version')) {
+      context.handle(
+        _teamLibraryVersionMeta,
+        teamLibraryVersion.isAcceptableOrUnknown(
+          data['team_library_version']!,
+          _teamLibraryVersionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('last_sync_at')) {
+      context.handle(
+        _lastSyncAtMeta,
+        lastSyncAt.isAcceptableOrUnknown(
+          data['last_sync_at']!,
+          _lastSyncAtMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {teamId};
+  @override
+  TeamSyncStateEntity map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TeamSyncStateEntity(
+      teamId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}team_id'],
+      )!,
+      teamLibraryVersion: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}team_library_version'],
+      )!,
+      lastSyncAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}last_sync_at'],
+      ),
+    );
+  }
+
+  @override
+  $TeamSyncStateTable createAlias(String alias) {
+    return $TeamSyncStateTable(attachedDatabase, alias);
+  }
+}
+
+class TeamSyncStateEntity extends DataClass
+    implements Insertable<TeamSyncStateEntity> {
+  final int teamId;
+  final int teamLibraryVersion;
+  final DateTime? lastSyncAt;
+  const TeamSyncStateEntity({
+    required this.teamId,
+    required this.teamLibraryVersion,
+    this.lastSyncAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['team_id'] = Variable<int>(teamId);
+    map['team_library_version'] = Variable<int>(teamLibraryVersion);
+    if (!nullToAbsent || lastSyncAt != null) {
+      map['last_sync_at'] = Variable<DateTime>(lastSyncAt);
+    }
+    return map;
+  }
+
+  TeamSyncStateCompanion toCompanion(bool nullToAbsent) {
+    return TeamSyncStateCompanion(
+      teamId: Value(teamId),
+      teamLibraryVersion: Value(teamLibraryVersion),
+      lastSyncAt: lastSyncAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastSyncAt),
+    );
+  }
+
+  factory TeamSyncStateEntity.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TeamSyncStateEntity(
+      teamId: serializer.fromJson<int>(json['teamId']),
+      teamLibraryVersion: serializer.fromJson<int>(json['teamLibraryVersion']),
+      lastSyncAt: serializer.fromJson<DateTime?>(json['lastSyncAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'teamId': serializer.toJson<int>(teamId),
+      'teamLibraryVersion': serializer.toJson<int>(teamLibraryVersion),
+      'lastSyncAt': serializer.toJson<DateTime?>(lastSyncAt),
+    };
+  }
+
+  TeamSyncStateEntity copyWith({
+    int? teamId,
+    int? teamLibraryVersion,
+    Value<DateTime?> lastSyncAt = const Value.absent(),
+  }) => TeamSyncStateEntity(
+    teamId: teamId ?? this.teamId,
+    teamLibraryVersion: teamLibraryVersion ?? this.teamLibraryVersion,
+    lastSyncAt: lastSyncAt.present ? lastSyncAt.value : this.lastSyncAt,
+  );
+  TeamSyncStateEntity copyWithCompanion(TeamSyncStateCompanion data) {
+    return TeamSyncStateEntity(
+      teamId: data.teamId.present ? data.teamId.value : this.teamId,
+      teamLibraryVersion: data.teamLibraryVersion.present
+          ? data.teamLibraryVersion.value
+          : this.teamLibraryVersion,
+      lastSyncAt: data.lastSyncAt.present
+          ? data.lastSyncAt.value
+          : this.lastSyncAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamSyncStateEntity(')
+          ..write('teamId: $teamId, ')
+          ..write('teamLibraryVersion: $teamLibraryVersion, ')
+          ..write('lastSyncAt: $lastSyncAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(teamId, teamLibraryVersion, lastSyncAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TeamSyncStateEntity &&
+          other.teamId == this.teamId &&
+          other.teamLibraryVersion == this.teamLibraryVersion &&
+          other.lastSyncAt == this.lastSyncAt);
+}
+
+class TeamSyncStateCompanion extends UpdateCompanion<TeamSyncStateEntity> {
+  final Value<int> teamId;
+  final Value<int> teamLibraryVersion;
+  final Value<DateTime?> lastSyncAt;
+  const TeamSyncStateCompanion({
+    this.teamId = const Value.absent(),
+    this.teamLibraryVersion = const Value.absent(),
+    this.lastSyncAt = const Value.absent(),
+  });
+  TeamSyncStateCompanion.insert({
+    this.teamId = const Value.absent(),
+    this.teamLibraryVersion = const Value.absent(),
+    this.lastSyncAt = const Value.absent(),
+  });
+  static Insertable<TeamSyncStateEntity> custom({
+    Expression<int>? teamId,
+    Expression<int>? teamLibraryVersion,
+    Expression<DateTime>? lastSyncAt,
+  }) {
+    return RawValuesInsertable({
+      if (teamId != null) 'team_id': teamId,
+      if (teamLibraryVersion != null)
+        'team_library_version': teamLibraryVersion,
+      if (lastSyncAt != null) 'last_sync_at': lastSyncAt,
+    });
+  }
+
+  TeamSyncStateCompanion copyWith({
+    Value<int>? teamId,
+    Value<int>? teamLibraryVersion,
+    Value<DateTime?>? lastSyncAt,
+  }) {
+    return TeamSyncStateCompanion(
+      teamId: teamId ?? this.teamId,
+      teamLibraryVersion: teamLibraryVersion ?? this.teamLibraryVersion,
+      lastSyncAt: lastSyncAt ?? this.lastSyncAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (teamId.present) {
+      map['team_id'] = Variable<int>(teamId.value);
+    }
+    if (teamLibraryVersion.present) {
+      map['team_library_version'] = Variable<int>(teamLibraryVersion.value);
+    }
+    if (lastSyncAt.present) {
+      map['last_sync_at'] = Variable<DateTime>(lastSyncAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TeamSyncStateCompanion(')
+          ..write('teamId: $teamId, ')
+          ..write('teamLibraryVersion: $teamLibraryVersion, ')
+          ..write('lastSyncAt: $lastSyncAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -3784,6 +8031,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SetlistScoresTable setlistScores = $SetlistScoresTable(this);
   late final $AppStateTable appState = $AppStateTable(this);
   late final $SyncStateTable syncState = $SyncStateTable(this);
+  late final $TeamsTable teams = $TeamsTable(this);
+  late final $TeamMembersTable teamMembers = $TeamMembersTable(this);
+  late final $TeamScoresTable teamScores = $TeamScoresTable(this);
+  late final $TeamInstrumentScoresTable teamInstrumentScores =
+      $TeamInstrumentScoresTable(this);
+  late final $TeamSetlistsTable teamSetlists = $TeamSetlistsTable(this);
+  late final $TeamSetlistScoresTable teamSetlistScores =
+      $TeamSetlistScoresTable(this);
+  late final $TeamSyncStateTable teamSyncState = $TeamSyncStateTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3796,6 +8052,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     setlistScores,
     appState,
     syncState,
+    teams,
+    teamMembers,
+    teamScores,
+    teamInstrumentScores,
+    teamSetlists,
+    teamSetlistScores,
+    teamSyncState,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -3826,6 +8089,34 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('setlist_scores', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'teams',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('team_members', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'team_scores',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('team_instrument_scores', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'team_setlists',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('team_setlist_scores', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'team_scores',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('team_setlist_scores', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -6578,6 +10869,2998 @@ typedef $$SyncStateTableProcessedTableManager =
       SyncStateEntity,
       PrefetchHooks Function()
     >;
+typedef $$TeamsTableCreateCompanionBuilder =
+    TeamsCompanion Function({
+      required String id,
+      required int serverId,
+      required String name,
+      Value<String?> description,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$TeamsTableUpdateCompanionBuilder =
+    TeamsCompanion Function({
+      Value<String> id,
+      Value<int> serverId,
+      Value<String> name,
+      Value<String?> description,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<int> rowid,
+    });
+
+final class $$TeamsTableReferences
+    extends BaseReferences<_$AppDatabase, $TeamsTable, TeamEntity> {
+  $$TeamsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$TeamMembersTable, List<TeamMemberEntity>>
+  _teamMembersRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.teamMembers,
+    aliasName: $_aliasNameGenerator(db.teams.id, db.teamMembers.teamId),
+  );
+
+  $$TeamMembersTableProcessedTableManager get teamMembersRefs {
+    final manager = $$TeamMembersTableTableManager(
+      $_db,
+      $_db.teamMembers,
+    ).filter((f) => f.teamId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_teamMembersRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$TeamsTableFilterComposer extends Composer<_$AppDatabase, $TeamsTable> {
+  $$TeamsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> teamMembersRefs(
+    Expression<bool> Function($$TeamMembersTableFilterComposer f) f,
+  ) {
+    final $$TeamMembersTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.teamMembers,
+      getReferencedColumn: (t) => t.teamId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamMembersTableFilterComposer(
+            $db: $db,
+            $table: $db.teamMembers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TeamsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TeamsTable> {
+  $$TeamsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TeamsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TeamsTable> {
+  $$TeamsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> teamMembersRefs<T extends Object>(
+    Expression<T> Function($$TeamMembersTableAnnotationComposer a) f,
+  ) {
+    final $$TeamMembersTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.teamMembers,
+      getReferencedColumn: (t) => t.teamId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamMembersTableAnnotationComposer(
+            $db: $db,
+            $table: $db.teamMembers,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TeamsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TeamsTable,
+          TeamEntity,
+          $$TeamsTableFilterComposer,
+          $$TeamsTableOrderingComposer,
+          $$TeamsTableAnnotationComposer,
+          $$TeamsTableCreateCompanionBuilder,
+          $$TeamsTableUpdateCompanionBuilder,
+          (TeamEntity, $$TeamsTableReferences),
+          TeamEntity,
+          PrefetchHooks Function({bool teamMembersRefs})
+        > {
+  $$TeamsTableTableManager(_$AppDatabase db, $TeamsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TeamsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TeamsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TeamsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> serverId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamsCompanion(
+                id: id,
+                serverId: serverId,
+                name: name,
+                description: description,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int serverId,
+                required String name,
+                Value<String?> description = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamsCompanion.insert(
+                id: id,
+                serverId: serverId,
+                name: name,
+                description: description,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) =>
+                    (e.readTable(table), $$TeamsTableReferences(db, table, e)),
+              )
+              .toList(),
+          prefetchHooksCallback: ({teamMembersRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (teamMembersRefs) db.teamMembers],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (teamMembersRefs)
+                    await $_getPrefetchedData<
+                      TeamEntity,
+                      $TeamsTable,
+                      TeamMemberEntity
+                    >(
+                      currentTable: table,
+                      referencedTable: $$TeamsTableReferences
+                          ._teamMembersRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$TeamsTableReferences(db, table, p0).teamMembersRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.teamId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$TeamsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TeamsTable,
+      TeamEntity,
+      $$TeamsTableFilterComposer,
+      $$TeamsTableOrderingComposer,
+      $$TeamsTableAnnotationComposer,
+      $$TeamsTableCreateCompanionBuilder,
+      $$TeamsTableUpdateCompanionBuilder,
+      (TeamEntity, $$TeamsTableReferences),
+      TeamEntity,
+      PrefetchHooks Function({bool teamMembersRefs})
+    >;
+typedef $$TeamMembersTableCreateCompanionBuilder =
+    TeamMembersCompanion Function({
+      required String id,
+      required String teamId,
+      required int userId,
+      required String username,
+      Value<String?> displayName,
+      Value<String> role,
+      required DateTime joinedAt,
+      Value<int> rowid,
+    });
+typedef $$TeamMembersTableUpdateCompanionBuilder =
+    TeamMembersCompanion Function({
+      Value<String> id,
+      Value<String> teamId,
+      Value<int> userId,
+      Value<String> username,
+      Value<String?> displayName,
+      Value<String> role,
+      Value<DateTime> joinedAt,
+      Value<int> rowid,
+    });
+
+final class $$TeamMembersTableReferences
+    extends BaseReferences<_$AppDatabase, $TeamMembersTable, TeamMemberEntity> {
+  $$TeamMembersTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $TeamsTable _teamIdTable(_$AppDatabase db) => db.teams.createAlias(
+    $_aliasNameGenerator(db.teamMembers.teamId, db.teams.id),
+  );
+
+  $$TeamsTableProcessedTableManager get teamId {
+    final $_column = $_itemColumn<String>('team_id')!;
+
+    final manager = $$TeamsTableTableManager(
+      $_db,
+      $_db.teams,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_teamIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$TeamMembersTableFilterComposer
+    extends Composer<_$AppDatabase, $TeamMembersTable> {
+  $$TeamMembersTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get joinedAt => $composableBuilder(
+    column: $table.joinedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$TeamsTableFilterComposer get teamId {
+    final $$TeamsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamId,
+      referencedTable: $db.teams,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamsTableFilterComposer(
+            $db: $db,
+            $table: $db.teams,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamMembersTableOrderingComposer
+    extends Composer<_$AppDatabase, $TeamMembersTable> {
+  $$TeamMembersTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get userId => $composableBuilder(
+    column: $table.userId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get joinedAt => $composableBuilder(
+    column: $table.joinedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$TeamsTableOrderingComposer get teamId {
+    final $$TeamsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamId,
+      referencedTable: $db.teams,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamsTableOrderingComposer(
+            $db: $db,
+            $table: $db.teams,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamMembersTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TeamMembersTable> {
+  $$TeamMembersTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get joinedAt =>
+      $composableBuilder(column: $table.joinedAt, builder: (column) => column);
+
+  $$TeamsTableAnnotationComposer get teamId {
+    final $$TeamsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamId,
+      referencedTable: $db.teams,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.teams,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamMembersTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TeamMembersTable,
+          TeamMemberEntity,
+          $$TeamMembersTableFilterComposer,
+          $$TeamMembersTableOrderingComposer,
+          $$TeamMembersTableAnnotationComposer,
+          $$TeamMembersTableCreateCompanionBuilder,
+          $$TeamMembersTableUpdateCompanionBuilder,
+          (TeamMemberEntity, $$TeamMembersTableReferences),
+          TeamMemberEntity,
+          PrefetchHooks Function({bool teamId})
+        > {
+  $$TeamMembersTableTableManager(_$AppDatabase db, $TeamMembersTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TeamMembersTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TeamMembersTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TeamMembersTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> teamId = const Value.absent(),
+                Value<int> userId = const Value.absent(),
+                Value<String> username = const Value.absent(),
+                Value<String?> displayName = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<DateTime> joinedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamMembersCompanion(
+                id: id,
+                teamId: teamId,
+                userId: userId,
+                username: username,
+                displayName: displayName,
+                role: role,
+                joinedAt: joinedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String teamId,
+                required int userId,
+                required String username,
+                Value<String?> displayName = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                required DateTime joinedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => TeamMembersCompanion.insert(
+                id: id,
+                teamId: teamId,
+                userId: userId,
+                username: username,
+                displayName: displayName,
+                role: role,
+                joinedAt: joinedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TeamMembersTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({teamId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (teamId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.teamId,
+                                referencedTable: $$TeamMembersTableReferences
+                                    ._teamIdTable(db),
+                                referencedColumn: $$TeamMembersTableReferences
+                                    ._teamIdTable(db)
+                                    .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$TeamMembersTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TeamMembersTable,
+      TeamMemberEntity,
+      $$TeamMembersTableFilterComposer,
+      $$TeamMembersTableOrderingComposer,
+      $$TeamMembersTableAnnotationComposer,
+      $$TeamMembersTableCreateCompanionBuilder,
+      $$TeamMembersTableUpdateCompanionBuilder,
+      (TeamMemberEntity, $$TeamMembersTableReferences),
+      TeamMemberEntity,
+      PrefetchHooks Function({bool teamId})
+    >;
+typedef $$TeamScoresTableCreateCompanionBuilder =
+    TeamScoresCompanion Function({
+      required String id,
+      required int teamId,
+      required String title,
+      required String composer,
+      Value<int> bpm,
+      required int createdById,
+      Value<int?> sourceScoreId,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$TeamScoresTableUpdateCompanionBuilder =
+    TeamScoresCompanion Function({
+      Value<String> id,
+      Value<int> teamId,
+      Value<String> title,
+      Value<String> composer,
+      Value<int> bpm,
+      Value<int> createdById,
+      Value<int?> sourceScoreId,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+final class $$TeamScoresTableReferences
+    extends BaseReferences<_$AppDatabase, $TeamScoresTable, TeamScoreEntity> {
+  $$TeamScoresTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<
+    $TeamInstrumentScoresTable,
+    List<TeamInstrumentScoreEntity>
+  >
+  _teamInstrumentScoresRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.teamInstrumentScores,
+        aliasName: $_aliasNameGenerator(
+          db.teamScores.id,
+          db.teamInstrumentScores.teamScoreId,
+        ),
+      );
+
+  $$TeamInstrumentScoresTableProcessedTableManager
+  get teamInstrumentScoresRefs {
+    final manager = $$TeamInstrumentScoresTableTableManager(
+      $_db,
+      $_db.teamInstrumentScores,
+    ).filter((f) => f.teamScoreId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _teamInstrumentScoresRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $TeamSetlistScoresTable,
+    List<TeamSetlistScoreEntity>
+  >
+  _teamSetlistScoresRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.teamSetlistScores,
+        aliasName: $_aliasNameGenerator(
+          db.teamScores.id,
+          db.teamSetlistScores.teamScoreId,
+        ),
+      );
+
+  $$TeamSetlistScoresTableProcessedTableManager get teamSetlistScoresRefs {
+    final manager = $$TeamSetlistScoresTableTableManager(
+      $_db,
+      $_db.teamSetlistScores,
+    ).filter((f) => f.teamScoreId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _teamSetlistScoresRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$TeamScoresTableFilterComposer
+    extends Composer<_$AppDatabase, $TeamScoresTable> {
+  $$TeamScoresTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get teamId => $composableBuilder(
+    column: $table.teamId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get composer => $composableBuilder(
+    column: $table.composer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get bpm => $composableBuilder(
+    column: $table.bpm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdById => $composableBuilder(
+    column: $table.createdById,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sourceScoreId => $composableBuilder(
+    column: $table.sourceScoreId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> teamInstrumentScoresRefs(
+    Expression<bool> Function($$TeamInstrumentScoresTableFilterComposer f) f,
+  ) {
+    final $$TeamInstrumentScoresTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.teamInstrumentScores,
+      getReferencedColumn: (t) => t.teamScoreId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamInstrumentScoresTableFilterComposer(
+            $db: $db,
+            $table: $db.teamInstrumentScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> teamSetlistScoresRefs(
+    Expression<bool> Function($$TeamSetlistScoresTableFilterComposer f) f,
+  ) {
+    final $$TeamSetlistScoresTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.teamSetlistScores,
+      getReferencedColumn: (t) => t.teamScoreId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamSetlistScoresTableFilterComposer(
+            $db: $db,
+            $table: $db.teamSetlistScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TeamScoresTableOrderingComposer
+    extends Composer<_$AppDatabase, $TeamScoresTable> {
+  $$TeamScoresTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get teamId => $composableBuilder(
+    column: $table.teamId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get composer => $composableBuilder(
+    column: $table.composer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get bpm => $composableBuilder(
+    column: $table.bpm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdById => $composableBuilder(
+    column: $table.createdById,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sourceScoreId => $composableBuilder(
+    column: $table.sourceScoreId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TeamScoresTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TeamScoresTable> {
+  $$TeamScoresTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get teamId =>
+      $composableBuilder(column: $table.teamId, builder: (column) => column);
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get composer =>
+      $composableBuilder(column: $table.composer, builder: (column) => column);
+
+  GeneratedColumn<int> get bpm =>
+      $composableBuilder(column: $table.bpm, builder: (column) => column);
+
+  GeneratedColumn<int> get createdById => $composableBuilder(
+    column: $table.createdById,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sourceScoreId => $composableBuilder(
+    column: $table.sourceScoreId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  Expression<T> teamInstrumentScoresRefs<T extends Object>(
+    Expression<T> Function($$TeamInstrumentScoresTableAnnotationComposer a) f,
+  ) {
+    final $$TeamInstrumentScoresTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.teamInstrumentScores,
+          getReferencedColumn: (t) => t.teamScoreId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TeamInstrumentScoresTableAnnotationComposer(
+                $db: $db,
+                $table: $db.teamInstrumentScores,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> teamSetlistScoresRefs<T extends Object>(
+    Expression<T> Function($$TeamSetlistScoresTableAnnotationComposer a) f,
+  ) {
+    final $$TeamSetlistScoresTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.teamSetlistScores,
+          getReferencedColumn: (t) => t.teamScoreId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TeamSetlistScoresTableAnnotationComposer(
+                $db: $db,
+                $table: $db.teamSetlistScores,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$TeamScoresTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TeamScoresTable,
+          TeamScoreEntity,
+          $$TeamScoresTableFilterComposer,
+          $$TeamScoresTableOrderingComposer,
+          $$TeamScoresTableAnnotationComposer,
+          $$TeamScoresTableCreateCompanionBuilder,
+          $$TeamScoresTableUpdateCompanionBuilder,
+          (TeamScoreEntity, $$TeamScoresTableReferences),
+          TeamScoreEntity,
+          PrefetchHooks Function({
+            bool teamInstrumentScoresRefs,
+            bool teamSetlistScoresRefs,
+          })
+        > {
+  $$TeamScoresTableTableManager(_$AppDatabase db, $TeamScoresTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TeamScoresTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TeamScoresTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TeamScoresTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> teamId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String> composer = const Value.absent(),
+                Value<int> bpm = const Value.absent(),
+                Value<int> createdById = const Value.absent(),
+                Value<int?> sourceScoreId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamScoresCompanion(
+                id: id,
+                teamId: teamId,
+                title: title,
+                composer: composer,
+                bpm: bpm,
+                createdById: createdById,
+                sourceScoreId: sourceScoreId,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int teamId,
+                required String title,
+                required String composer,
+                Value<int> bpm = const Value.absent(),
+                required int createdById,
+                Value<int?> sourceScoreId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamScoresCompanion.insert(
+                id: id,
+                teamId: teamId,
+                title: title,
+                composer: composer,
+                bpm: bpm,
+                createdById: createdById,
+                sourceScoreId: sourceScoreId,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TeamScoresTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({
+                teamInstrumentScoresRefs = false,
+                teamSetlistScoresRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (teamInstrumentScoresRefs) db.teamInstrumentScores,
+                    if (teamSetlistScoresRefs) db.teamSetlistScores,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (teamInstrumentScoresRefs)
+                        await $_getPrefetchedData<
+                          TeamScoreEntity,
+                          $TeamScoresTable,
+                          TeamInstrumentScoreEntity
+                        >(
+                          currentTable: table,
+                          referencedTable: $$TeamScoresTableReferences
+                              ._teamInstrumentScoresRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$TeamScoresTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).teamInstrumentScoresRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.teamScoreId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (teamSetlistScoresRefs)
+                        await $_getPrefetchedData<
+                          TeamScoreEntity,
+                          $TeamScoresTable,
+                          TeamSetlistScoreEntity
+                        >(
+                          currentTable: table,
+                          referencedTable: $$TeamScoresTableReferences
+                              ._teamSetlistScoresRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$TeamScoresTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).teamSetlistScoresRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.teamScoreId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$TeamScoresTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TeamScoresTable,
+      TeamScoreEntity,
+      $$TeamScoresTableFilterComposer,
+      $$TeamScoresTableOrderingComposer,
+      $$TeamScoresTableAnnotationComposer,
+      $$TeamScoresTableCreateCompanionBuilder,
+      $$TeamScoresTableUpdateCompanionBuilder,
+      (TeamScoreEntity, $$TeamScoresTableReferences),
+      TeamScoreEntity,
+      PrefetchHooks Function({
+        bool teamInstrumentScoresRefs,
+        bool teamSetlistScoresRefs,
+      })
+    >;
+typedef $$TeamInstrumentScoresTableCreateCompanionBuilder =
+    TeamInstrumentScoresCompanion Function({
+      required String id,
+      required String teamScoreId,
+      required String instrumentType,
+      Value<String?> customInstrument,
+      Value<String?> pdfPath,
+      Value<String?> thumbnail,
+      Value<int> orderIndex,
+      Value<String?> pdfHash,
+      Value<String> pdfSyncStatus,
+      Value<String> annotationsJson,
+      Value<int?> sourceInstrumentScoreId,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$TeamInstrumentScoresTableUpdateCompanionBuilder =
+    TeamInstrumentScoresCompanion Function({
+      Value<String> id,
+      Value<String> teamScoreId,
+      Value<String> instrumentType,
+      Value<String?> customInstrument,
+      Value<String?> pdfPath,
+      Value<String?> thumbnail,
+      Value<int> orderIndex,
+      Value<String?> pdfHash,
+      Value<String> pdfSyncStatus,
+      Value<String> annotationsJson,
+      Value<int?> sourceInstrumentScoreId,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+final class $$TeamInstrumentScoresTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $TeamInstrumentScoresTable,
+          TeamInstrumentScoreEntity
+        > {
+  $$TeamInstrumentScoresTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $TeamScoresTable _teamScoreIdTable(_$AppDatabase db) =>
+      db.teamScores.createAlias(
+        $_aliasNameGenerator(
+          db.teamInstrumentScores.teamScoreId,
+          db.teamScores.id,
+        ),
+      );
+
+  $$TeamScoresTableProcessedTableManager get teamScoreId {
+    final $_column = $_itemColumn<String>('team_score_id')!;
+
+    final manager = $$TeamScoresTableTableManager(
+      $_db,
+      $_db.teamScores,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_teamScoreIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$TeamInstrumentScoresTableFilterComposer
+    extends Composer<_$AppDatabase, $TeamInstrumentScoresTable> {
+  $$TeamInstrumentScoresTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get instrumentType => $composableBuilder(
+    column: $table.instrumentType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customInstrument => $composableBuilder(
+    column: $table.customInstrument,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfPath => $composableBuilder(
+    column: $table.pdfPath,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get thumbnail => $composableBuilder(
+    column: $table.thumbnail,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfHash => $composableBuilder(
+    column: $table.pdfHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfSyncStatus => $composableBuilder(
+    column: $table.pdfSyncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get annotationsJson => $composableBuilder(
+    column: $table.annotationsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sourceInstrumentScoreId => $composableBuilder(
+    column: $table.sourceInstrumentScoreId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$TeamScoresTableFilterComposer get teamScoreId {
+    final $$TeamScoresTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamScoreId,
+      referencedTable: $db.teamScores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamScoresTableFilterComposer(
+            $db: $db,
+            $table: $db.teamScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamInstrumentScoresTableOrderingComposer
+    extends Composer<_$AppDatabase, $TeamInstrumentScoresTable> {
+  $$TeamInstrumentScoresTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get instrumentType => $composableBuilder(
+    column: $table.instrumentType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customInstrument => $composableBuilder(
+    column: $table.customInstrument,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfPath => $composableBuilder(
+    column: $table.pdfPath,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get thumbnail => $composableBuilder(
+    column: $table.thumbnail,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfHash => $composableBuilder(
+    column: $table.pdfHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfSyncStatus => $composableBuilder(
+    column: $table.pdfSyncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get annotationsJson => $composableBuilder(
+    column: $table.annotationsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sourceInstrumentScoreId => $composableBuilder(
+    column: $table.sourceInstrumentScoreId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$TeamScoresTableOrderingComposer get teamScoreId {
+    final $$TeamScoresTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamScoreId,
+      referencedTable: $db.teamScores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamScoresTableOrderingComposer(
+            $db: $db,
+            $table: $db.teamScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamInstrumentScoresTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TeamInstrumentScoresTable> {
+  $$TeamInstrumentScoresTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get instrumentType => $composableBuilder(
+    column: $table.instrumentType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customInstrument => $composableBuilder(
+    column: $table.customInstrument,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfPath =>
+      $composableBuilder(column: $table.pdfPath, builder: (column) => column);
+
+  GeneratedColumn<String> get thumbnail =>
+      $composableBuilder(column: $table.thumbnail, builder: (column) => column);
+
+  GeneratedColumn<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get pdfHash =>
+      $composableBuilder(column: $table.pdfHash, builder: (column) => column);
+
+  GeneratedColumn<String> get pdfSyncStatus => $composableBuilder(
+    column: $table.pdfSyncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get annotationsJson => $composableBuilder(
+    column: $table.annotationsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sourceInstrumentScoreId => $composableBuilder(
+    column: $table.sourceInstrumentScoreId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  $$TeamScoresTableAnnotationComposer get teamScoreId {
+    final $$TeamScoresTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamScoreId,
+      referencedTable: $db.teamScores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamScoresTableAnnotationComposer(
+            $db: $db,
+            $table: $db.teamScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamInstrumentScoresTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TeamInstrumentScoresTable,
+          TeamInstrumentScoreEntity,
+          $$TeamInstrumentScoresTableFilterComposer,
+          $$TeamInstrumentScoresTableOrderingComposer,
+          $$TeamInstrumentScoresTableAnnotationComposer,
+          $$TeamInstrumentScoresTableCreateCompanionBuilder,
+          $$TeamInstrumentScoresTableUpdateCompanionBuilder,
+          (TeamInstrumentScoreEntity, $$TeamInstrumentScoresTableReferences),
+          TeamInstrumentScoreEntity,
+          PrefetchHooks Function({bool teamScoreId})
+        > {
+  $$TeamInstrumentScoresTableTableManager(
+    _$AppDatabase db,
+    $TeamInstrumentScoresTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TeamInstrumentScoresTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TeamInstrumentScoresTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$TeamInstrumentScoresTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> teamScoreId = const Value.absent(),
+                Value<String> instrumentType = const Value.absent(),
+                Value<String?> customInstrument = const Value.absent(),
+                Value<String?> pdfPath = const Value.absent(),
+                Value<String?> thumbnail = const Value.absent(),
+                Value<int> orderIndex = const Value.absent(),
+                Value<String?> pdfHash = const Value.absent(),
+                Value<String> pdfSyncStatus = const Value.absent(),
+                Value<String> annotationsJson = const Value.absent(),
+                Value<int?> sourceInstrumentScoreId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamInstrumentScoresCompanion(
+                id: id,
+                teamScoreId: teamScoreId,
+                instrumentType: instrumentType,
+                customInstrument: customInstrument,
+                pdfPath: pdfPath,
+                thumbnail: thumbnail,
+                orderIndex: orderIndex,
+                pdfHash: pdfHash,
+                pdfSyncStatus: pdfSyncStatus,
+                annotationsJson: annotationsJson,
+                sourceInstrumentScoreId: sourceInstrumentScoreId,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String teamScoreId,
+                required String instrumentType,
+                Value<String?> customInstrument = const Value.absent(),
+                Value<String?> pdfPath = const Value.absent(),
+                Value<String?> thumbnail = const Value.absent(),
+                Value<int> orderIndex = const Value.absent(),
+                Value<String?> pdfHash = const Value.absent(),
+                Value<String> pdfSyncStatus = const Value.absent(),
+                Value<String> annotationsJson = const Value.absent(),
+                Value<int?> sourceInstrumentScoreId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamInstrumentScoresCompanion.insert(
+                id: id,
+                teamScoreId: teamScoreId,
+                instrumentType: instrumentType,
+                customInstrument: customInstrument,
+                pdfPath: pdfPath,
+                thumbnail: thumbnail,
+                orderIndex: orderIndex,
+                pdfHash: pdfHash,
+                pdfSyncStatus: pdfSyncStatus,
+                annotationsJson: annotationsJson,
+                sourceInstrumentScoreId: sourceInstrumentScoreId,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TeamInstrumentScoresTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({teamScoreId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (teamScoreId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.teamScoreId,
+                                referencedTable:
+                                    $$TeamInstrumentScoresTableReferences
+                                        ._teamScoreIdTable(db),
+                                referencedColumn:
+                                    $$TeamInstrumentScoresTableReferences
+                                        ._teamScoreIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$TeamInstrumentScoresTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TeamInstrumentScoresTable,
+      TeamInstrumentScoreEntity,
+      $$TeamInstrumentScoresTableFilterComposer,
+      $$TeamInstrumentScoresTableOrderingComposer,
+      $$TeamInstrumentScoresTableAnnotationComposer,
+      $$TeamInstrumentScoresTableCreateCompanionBuilder,
+      $$TeamInstrumentScoresTableUpdateCompanionBuilder,
+      (TeamInstrumentScoreEntity, $$TeamInstrumentScoresTableReferences),
+      TeamInstrumentScoreEntity,
+      PrefetchHooks Function({bool teamScoreId})
+    >;
+typedef $$TeamSetlistsTableCreateCompanionBuilder =
+    TeamSetlistsCompanion Function({
+      required String id,
+      required int teamId,
+      required String name,
+      Value<String?> description,
+      required int createdById,
+      Value<int?> sourceSetlistId,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$TeamSetlistsTableUpdateCompanionBuilder =
+    TeamSetlistsCompanion Function({
+      Value<String> id,
+      Value<int> teamId,
+      Value<String> name,
+      Value<String?> description,
+      Value<int> createdById,
+      Value<int?> sourceSetlistId,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+final class $$TeamSetlistsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $TeamSetlistsTable, TeamSetlistEntity> {
+  $$TeamSetlistsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<
+    $TeamSetlistScoresTable,
+    List<TeamSetlistScoreEntity>
+  >
+  _teamSetlistScoresRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.teamSetlistScores,
+        aliasName: $_aliasNameGenerator(
+          db.teamSetlists.id,
+          db.teamSetlistScores.teamSetlistId,
+        ),
+      );
+
+  $$TeamSetlistScoresTableProcessedTableManager get teamSetlistScoresRefs {
+    final manager = $$TeamSetlistScoresTableTableManager(
+      $_db,
+      $_db.teamSetlistScores,
+    ).filter((f) => f.teamSetlistId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _teamSetlistScoresRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$TeamSetlistsTableFilterComposer
+    extends Composer<_$AppDatabase, $TeamSetlistsTable> {
+  $$TeamSetlistsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get teamId => $composableBuilder(
+    column: $table.teamId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdById => $composableBuilder(
+    column: $table.createdById,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sourceSetlistId => $composableBuilder(
+    column: $table.sourceSetlistId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> teamSetlistScoresRefs(
+    Expression<bool> Function($$TeamSetlistScoresTableFilterComposer f) f,
+  ) {
+    final $$TeamSetlistScoresTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.teamSetlistScores,
+      getReferencedColumn: (t) => t.teamSetlistId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamSetlistScoresTableFilterComposer(
+            $db: $db,
+            $table: $db.teamSetlistScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$TeamSetlistsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TeamSetlistsTable> {
+  $$TeamSetlistsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get teamId => $composableBuilder(
+    column: $table.teamId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdById => $composableBuilder(
+    column: $table.createdById,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sourceSetlistId => $composableBuilder(
+    column: $table.sourceSetlistId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TeamSetlistsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TeamSetlistsTable> {
+  $$TeamSetlistsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get teamId =>
+      $composableBuilder(column: $table.teamId, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get description => $composableBuilder(
+    column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get createdById => $composableBuilder(
+    column: $table.createdById,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sourceSetlistId => $composableBuilder(
+    column: $table.sourceSetlistId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  Expression<T> teamSetlistScoresRefs<T extends Object>(
+    Expression<T> Function($$TeamSetlistScoresTableAnnotationComposer a) f,
+  ) {
+    final $$TeamSetlistScoresTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.teamSetlistScores,
+          getReferencedColumn: (t) => t.teamSetlistId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$TeamSetlistScoresTableAnnotationComposer(
+                $db: $db,
+                $table: $db.teamSetlistScores,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$TeamSetlistsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TeamSetlistsTable,
+          TeamSetlistEntity,
+          $$TeamSetlistsTableFilterComposer,
+          $$TeamSetlistsTableOrderingComposer,
+          $$TeamSetlistsTableAnnotationComposer,
+          $$TeamSetlistsTableCreateCompanionBuilder,
+          $$TeamSetlistsTableUpdateCompanionBuilder,
+          (TeamSetlistEntity, $$TeamSetlistsTableReferences),
+          TeamSetlistEntity,
+          PrefetchHooks Function({bool teamSetlistScoresRefs})
+        > {
+  $$TeamSetlistsTableTableManager(_$AppDatabase db, $TeamSetlistsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TeamSetlistsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TeamSetlistsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TeamSetlistsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> teamId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> description = const Value.absent(),
+                Value<int> createdById = const Value.absent(),
+                Value<int?> sourceSetlistId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamSetlistsCompanion(
+                id: id,
+                teamId: teamId,
+                name: name,
+                description: description,
+                createdById: createdById,
+                sourceSetlistId: sourceSetlistId,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int teamId,
+                required String name,
+                Value<String?> description = const Value.absent(),
+                required int createdById,
+                Value<int?> sourceSetlistId = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamSetlistsCompanion.insert(
+                id: id,
+                teamId: teamId,
+                name: name,
+                description: description,
+                createdById: createdById,
+                sourceSetlistId: sourceSetlistId,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TeamSetlistsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({teamSetlistScoresRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (teamSetlistScoresRefs) db.teamSetlistScores,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (teamSetlistScoresRefs)
+                    await $_getPrefetchedData<
+                      TeamSetlistEntity,
+                      $TeamSetlistsTable,
+                      TeamSetlistScoreEntity
+                    >(
+                      currentTable: table,
+                      referencedTable: $$TeamSetlistsTableReferences
+                          ._teamSetlistScoresRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$TeamSetlistsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).teamSetlistScoresRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.teamSetlistId == item.id,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$TeamSetlistsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TeamSetlistsTable,
+      TeamSetlistEntity,
+      $$TeamSetlistsTableFilterComposer,
+      $$TeamSetlistsTableOrderingComposer,
+      $$TeamSetlistsTableAnnotationComposer,
+      $$TeamSetlistsTableCreateCompanionBuilder,
+      $$TeamSetlistsTableUpdateCompanionBuilder,
+      (TeamSetlistEntity, $$TeamSetlistsTableReferences),
+      TeamSetlistEntity,
+      PrefetchHooks Function({bool teamSetlistScoresRefs})
+    >;
+typedef $$TeamSetlistScoresTableCreateCompanionBuilder =
+    TeamSetlistScoresCompanion Function({
+      required String id,
+      required String teamSetlistId,
+      required String teamScoreId,
+      Value<int> orderIndex,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      required DateTime createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$TeamSetlistScoresTableUpdateCompanionBuilder =
+    TeamSetlistScoresCompanion Function({
+      Value<String> id,
+      Value<String> teamSetlistId,
+      Value<String> teamScoreId,
+      Value<int> orderIndex,
+      Value<int> version,
+      Value<String> syncStatus,
+      Value<int?> serverId,
+      Value<DateTime> createdAt,
+      Value<DateTime?> updatedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+final class $$TeamSetlistScoresTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $TeamSetlistScoresTable,
+          TeamSetlistScoreEntity
+        > {
+  $$TeamSetlistScoresTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $TeamSetlistsTable _teamSetlistIdTable(_$AppDatabase db) =>
+      db.teamSetlists.createAlias(
+        $_aliasNameGenerator(
+          db.teamSetlistScores.teamSetlistId,
+          db.teamSetlists.id,
+        ),
+      );
+
+  $$TeamSetlistsTableProcessedTableManager get teamSetlistId {
+    final $_column = $_itemColumn<String>('team_setlist_id')!;
+
+    final manager = $$TeamSetlistsTableTableManager(
+      $_db,
+      $_db.teamSetlists,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_teamSetlistIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $TeamScoresTable _teamScoreIdTable(_$AppDatabase db) =>
+      db.teamScores.createAlias(
+        $_aliasNameGenerator(
+          db.teamSetlistScores.teamScoreId,
+          db.teamScores.id,
+        ),
+      );
+
+  $$TeamScoresTableProcessedTableManager get teamScoreId {
+    final $_column = $_itemColumn<String>('team_score_id')!;
+
+    final manager = $$TeamScoresTableTableManager(
+      $_db,
+      $_db.teamScores,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_teamScoreIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$TeamSetlistScoresTableFilterComposer
+    extends Composer<_$AppDatabase, $TeamSetlistScoresTable> {
+  $$TeamSetlistScoresTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$TeamSetlistsTableFilterComposer get teamSetlistId {
+    final $$TeamSetlistsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamSetlistId,
+      referencedTable: $db.teamSetlists,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamSetlistsTableFilterComposer(
+            $db: $db,
+            $table: $db.teamSetlists,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TeamScoresTableFilterComposer get teamScoreId {
+    final $$TeamScoresTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamScoreId,
+      referencedTable: $db.teamScores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamScoresTableFilterComposer(
+            $db: $db,
+            $table: $db.teamScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamSetlistScoresTableOrderingComposer
+    extends Composer<_$AppDatabase, $TeamSetlistScoresTable> {
+  $$TeamSetlistScoresTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get version => $composableBuilder(
+    column: $table.version,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get serverId => $composableBuilder(
+    column: $table.serverId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$TeamSetlistsTableOrderingComposer get teamSetlistId {
+    final $$TeamSetlistsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamSetlistId,
+      referencedTable: $db.teamSetlists,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamSetlistsTableOrderingComposer(
+            $db: $db,
+            $table: $db.teamSetlists,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TeamScoresTableOrderingComposer get teamScoreId {
+    final $$TeamScoresTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamScoreId,
+      referencedTable: $db.teamScores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamScoresTableOrderingComposer(
+            $db: $db,
+            $table: $db.teamScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamSetlistScoresTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TeamSetlistScoresTable> {
+  $$TeamSetlistScoresTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get orderIndex => $composableBuilder(
+    column: $table.orderIndex,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get version =>
+      $composableBuilder(column: $table.version, builder: (column) => column);
+
+  GeneratedColumn<String> get syncStatus => $composableBuilder(
+    column: $table.syncStatus,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get serverId =>
+      $composableBuilder(column: $table.serverId, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  $$TeamSetlistsTableAnnotationComposer get teamSetlistId {
+    final $$TeamSetlistsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamSetlistId,
+      referencedTable: $db.teamSetlists,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamSetlistsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.teamSetlists,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$TeamScoresTableAnnotationComposer get teamScoreId {
+    final $$TeamScoresTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.teamScoreId,
+      referencedTable: $db.teamScores,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$TeamScoresTableAnnotationComposer(
+            $db: $db,
+            $table: $db.teamScores,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$TeamSetlistScoresTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TeamSetlistScoresTable,
+          TeamSetlistScoreEntity,
+          $$TeamSetlistScoresTableFilterComposer,
+          $$TeamSetlistScoresTableOrderingComposer,
+          $$TeamSetlistScoresTableAnnotationComposer,
+          $$TeamSetlistScoresTableCreateCompanionBuilder,
+          $$TeamSetlistScoresTableUpdateCompanionBuilder,
+          (TeamSetlistScoreEntity, $$TeamSetlistScoresTableReferences),
+          TeamSetlistScoreEntity,
+          PrefetchHooks Function({bool teamSetlistId, bool teamScoreId})
+        > {
+  $$TeamSetlistScoresTableTableManager(
+    _$AppDatabase db,
+    $TeamSetlistScoresTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TeamSetlistScoresTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TeamSetlistScoresTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TeamSetlistScoresTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> teamSetlistId = const Value.absent(),
+                Value<String> teamScoreId = const Value.absent(),
+                Value<int> orderIndex = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamSetlistScoresCompanion(
+                id: id,
+                teamSetlistId: teamSetlistId,
+                teamScoreId: teamScoreId,
+                orderIndex: orderIndex,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String teamSetlistId,
+                required String teamScoreId,
+                Value<int> orderIndex = const Value.absent(),
+                Value<int> version = const Value.absent(),
+                Value<String> syncStatus = const Value.absent(),
+                Value<int?> serverId = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> updatedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TeamSetlistScoresCompanion.insert(
+                id: id,
+                teamSetlistId: teamSetlistId,
+                teamScoreId: teamScoreId,
+                orderIndex: orderIndex,
+                version: version,
+                syncStatus: syncStatus,
+                serverId: serverId,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$TeamSetlistScoresTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({teamSetlistId = false, teamScoreId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (teamSetlistId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.teamSetlistId,
+                                    referencedTable:
+                                        $$TeamSetlistScoresTableReferences
+                                            ._teamSetlistIdTable(db),
+                                    referencedColumn:
+                                        $$TeamSetlistScoresTableReferences
+                                            ._teamSetlistIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (teamScoreId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.teamScoreId,
+                                    referencedTable:
+                                        $$TeamSetlistScoresTableReferences
+                                            ._teamScoreIdTable(db),
+                                    referencedColumn:
+                                        $$TeamSetlistScoresTableReferences
+                                            ._teamScoreIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$TeamSetlistScoresTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TeamSetlistScoresTable,
+      TeamSetlistScoreEntity,
+      $$TeamSetlistScoresTableFilterComposer,
+      $$TeamSetlistScoresTableOrderingComposer,
+      $$TeamSetlistScoresTableAnnotationComposer,
+      $$TeamSetlistScoresTableCreateCompanionBuilder,
+      $$TeamSetlistScoresTableUpdateCompanionBuilder,
+      (TeamSetlistScoreEntity, $$TeamSetlistScoresTableReferences),
+      TeamSetlistScoreEntity,
+      PrefetchHooks Function({bool teamSetlistId, bool teamScoreId})
+    >;
+typedef $$TeamSyncStateTableCreateCompanionBuilder =
+    TeamSyncStateCompanion Function({
+      Value<int> teamId,
+      Value<int> teamLibraryVersion,
+      Value<DateTime?> lastSyncAt,
+    });
+typedef $$TeamSyncStateTableUpdateCompanionBuilder =
+    TeamSyncStateCompanion Function({
+      Value<int> teamId,
+      Value<int> teamLibraryVersion,
+      Value<DateTime?> lastSyncAt,
+    });
+
+class $$TeamSyncStateTableFilterComposer
+    extends Composer<_$AppDatabase, $TeamSyncStateTable> {
+  $$TeamSyncStateTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get teamId => $composableBuilder(
+    column: $table.teamId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get teamLibraryVersion => $composableBuilder(
+    column: $table.teamLibraryVersion,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get lastSyncAt => $composableBuilder(
+    column: $table.lastSyncAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$TeamSyncStateTableOrderingComposer
+    extends Composer<_$AppDatabase, $TeamSyncStateTable> {
+  $$TeamSyncStateTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get teamId => $composableBuilder(
+    column: $table.teamId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get teamLibraryVersion => $composableBuilder(
+    column: $table.teamLibraryVersion,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get lastSyncAt => $composableBuilder(
+    column: $table.lastSyncAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TeamSyncStateTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TeamSyncStateTable> {
+  $$TeamSyncStateTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get teamId =>
+      $composableBuilder(column: $table.teamId, builder: (column) => column);
+
+  GeneratedColumn<int> get teamLibraryVersion => $composableBuilder(
+    column: $table.teamLibraryVersion,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get lastSyncAt => $composableBuilder(
+    column: $table.lastSyncAt,
+    builder: (column) => column,
+  );
+}
+
+class $$TeamSyncStateTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TeamSyncStateTable,
+          TeamSyncStateEntity,
+          $$TeamSyncStateTableFilterComposer,
+          $$TeamSyncStateTableOrderingComposer,
+          $$TeamSyncStateTableAnnotationComposer,
+          $$TeamSyncStateTableCreateCompanionBuilder,
+          $$TeamSyncStateTableUpdateCompanionBuilder,
+          (
+            TeamSyncStateEntity,
+            BaseReferences<
+              _$AppDatabase,
+              $TeamSyncStateTable,
+              TeamSyncStateEntity
+            >,
+          ),
+          TeamSyncStateEntity,
+          PrefetchHooks Function()
+        > {
+  $$TeamSyncStateTableTableManager(_$AppDatabase db, $TeamSyncStateTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TeamSyncStateTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TeamSyncStateTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TeamSyncStateTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> teamId = const Value.absent(),
+                Value<int> teamLibraryVersion = const Value.absent(),
+                Value<DateTime?> lastSyncAt = const Value.absent(),
+              }) => TeamSyncStateCompanion(
+                teamId: teamId,
+                teamLibraryVersion: teamLibraryVersion,
+                lastSyncAt: lastSyncAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> teamId = const Value.absent(),
+                Value<int> teamLibraryVersion = const Value.absent(),
+                Value<DateTime?> lastSyncAt = const Value.absent(),
+              }) => TeamSyncStateCompanion.insert(
+                teamId: teamId,
+                teamLibraryVersion: teamLibraryVersion,
+                lastSyncAt: lastSyncAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TeamSyncStateTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TeamSyncStateTable,
+      TeamSyncStateEntity,
+      $$TeamSyncStateTableFilterComposer,
+      $$TeamSyncStateTableOrderingComposer,
+      $$TeamSyncStateTableAnnotationComposer,
+      $$TeamSyncStateTableCreateCompanionBuilder,
+      $$TeamSyncStateTableUpdateCompanionBuilder,
+      (
+        TeamSyncStateEntity,
+        BaseReferences<_$AppDatabase, $TeamSyncStateTable, TeamSyncStateEntity>,
+      ),
+      TeamSyncStateEntity,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -6596,4 +13879,18 @@ class $AppDatabaseManager {
       $$AppStateTableTableManager(_db, _db.appState);
   $$SyncStateTableTableManager get syncState =>
       $$SyncStateTableTableManager(_db, _db.syncState);
+  $$TeamsTableTableManager get teams =>
+      $$TeamsTableTableManager(_db, _db.teams);
+  $$TeamMembersTableTableManager get teamMembers =>
+      $$TeamMembersTableTableManager(_db, _db.teamMembers);
+  $$TeamScoresTableTableManager get teamScores =>
+      $$TeamScoresTableTableManager(_db, _db.teamScores);
+  $$TeamInstrumentScoresTableTableManager get teamInstrumentScores =>
+      $$TeamInstrumentScoresTableTableManager(_db, _db.teamInstrumentScores);
+  $$TeamSetlistsTableTableManager get teamSetlists =>
+      $$TeamSetlistsTableTableManager(_db, _db.teamSetlists);
+  $$TeamSetlistScoresTableTableManager get teamSetlistScores =>
+      $$TeamSetlistScoresTableTableManager(_db, _db.teamSetlistScores);
+  $$TeamSyncStateTableTableManager get teamSyncState =>
+      $$TeamSyncStateTableTableManager(_db, _db.teamSyncState);
 }

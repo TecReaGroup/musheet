@@ -43,6 +43,24 @@ class DatabaseService {
     return _mapScoreEntityToModel(scoreEntity, instrumentScores);
   }
 
+  /// Find scores by title and composer (for Team import feature)
+  /// Returns all non-deleted scores matching the given title and composer
+  Future<List<models.Score>> findScoresByTitleComposer(String title, String composer) async {
+    final scoreEntities = await (_db.select(_db.scores)
+          ..where((s) => s.title.equals(title))
+          ..where((s) => s.composer.equals(composer))
+          ..where((s) => s.deletedAt.isNull()))
+        .get();
+
+    final scores = <models.Score>[];
+    for (final scoreEntity in scoreEntities) {
+      final instrumentScores = await _getInstrumentScoresForScore(scoreEntity.id);
+      scores.add(_mapScoreEntityToModel(scoreEntity, instrumentScores));
+    }
+
+    return scores;
+  }
+
   /// Insert a new score
   /// UNIQUENESS CONSTRAINT: (title, composer, userId) - enforced by backend
   /// If a soft-deleted score with the same (title, composer) exists locally, restore it
@@ -116,10 +134,14 @@ class DatabaseService {
 
   /// Delete a score (soft delete for sync)
   /// Cascade marks related InstrumentScores and Annotations as deleted for sync
-  Future<void> deleteScore(String scoreId) async {
+  /// Returns the list of pdfHashes that were associated with the deleted InstrumentScores.
+  /// The caller should check reference counts and clean up PDFs accordingly.
+  Future<List<String>> deleteScore(String scoreId) async {
+    final pdfHashes = <String>[];
+
     await _db.transaction(() async {
       final now = DateTime.now();
-      
+
       // Get related InstrumentScores first
       final instrumentScores = await (_db.select(_db.instrumentScores)
             ..where((is_) => is_.scoreId.equals(scoreId)))
@@ -127,6 +149,13 @@ class DatabaseService {
 
       if (kDebugMode) {
         debugPrint('[DB] Deleting Score: id=$scoreId, instrumentScores=${instrumentScores.length}');
+      }
+
+      // Collect pdfHashes for cleanup
+      for (final is_ in instrumentScores) {
+        if (is_.pdfHash != null && is_.pdfHash!.isNotEmpty) {
+          pdfHashes.add(is_.pdfHash!);
+        }
       }
 
       // Cascade: Physically delete annotations for each InstrumentScore
@@ -167,11 +196,13 @@ class DatabaseService {
           updatedAt: Value(now),
         ),
       );
-      
+
       if (kDebugMode) {
-        debugPrint('[DB] Score deleted: id=$scoreId');
+        debugPrint('[DB] Score deleted: id=$scoreId, pdfHashes: $pdfHashes');
       }
     });
+
+    return pdfHashes;
   }
 
   // ============== Instrument Score Operations ==============
@@ -282,34 +313,38 @@ class DatabaseService {
 
   /// Delete an instrument score (soft delete for sync)
   /// Cascade deletes associated annotations (physical delete - annotations don't sync deletions)
-  Future<void> deleteInstrumentScore(String instrumentScoreId) async {
+  /// Returns the pdfHash if present, so the caller can check reference counts and clean up.
+  Future<String?> deleteInstrumentScore(String instrumentScoreId) async {
+    String? pdfHash;
+
     await _db.transaction(() async {
       final now = DateTime.now();
-      
+
       // Get the instrument score to check if it has a serverId
       final instrumentScores = await (_db.select(_db.instrumentScores)
             ..where((is_) => is_.id.equals(instrumentScoreId)))
           .get();
-      
+
       if (instrumentScores.isEmpty) {
         if (kDebugMode) {
           debugPrint('[DB] InstrumentScore not found: $instrumentScoreId');
         }
         return;
       }
-      
+
       final instrumentScore = instrumentScores.first;
-      
+      pdfHash = instrumentScore.pdfHash;
+
       // Cascade: Physically delete annotations for this InstrumentScore
       // Per sync_logic.md, annotations don't use soft delete and deletions are not synced
       await (_db.delete(_db.annotations)
             ..where((a) => a.instrumentScoreId.equals(instrumentScoreId)))
           .go();
-      
+
       if (kDebugMode) {
         debugPrint('[DB] Annotations deleted for InstrumentScore: $instrumentScoreId');
       }
-      
+
       // Check if this InstrumentScore has been synced to server
       if (instrumentScore.serverId != null) {
         // Soft delete: mark as deleted and pending sync so server deletion is triggered
@@ -320,21 +355,23 @@ class DatabaseService {
               syncStatus: const Value('pending'),
               updatedAt: Value(now),
             ));
-        
+
         if (kDebugMode) {
-          debugPrint('[DB] InstrumentScore soft-deleted: $instrumentScoreId');
+          debugPrint('[DB] InstrumentScore soft-deleted: $instrumentScoreId, pdfHash: $pdfHash');
         }
       } else {
         // Physical delete: this was never synced, so just remove it locally
         await (_db.delete(_db.instrumentScores)
               ..where((is_) => is_.id.equals(instrumentScoreId)))
             .go();
-        
+
         if (kDebugMode) {
-          debugPrint('[DB] InstrumentScore deleted: $instrumentScoreId');
+          debugPrint('[DB] InstrumentScore deleted: $instrumentScoreId, pdfHash: $pdfHash');
         }
       }
     });
+
+    return pdfHash;
   }
 
   // ============== Annotation Operations ==============
@@ -597,6 +634,7 @@ class DatabaseService {
       ScoreEntity entity, List<models.InstrumentScore> instrumentScores) {
     return models.Score(
       id: entity.id,
+      serverId: entity.serverId, // Include serverId for Team copy logic
       title: entity.title,
       composer: entity.composer,
       bpm: entity.bpm,
@@ -610,6 +648,7 @@ class DatabaseService {
     return models.InstrumentScore(
       id: entity.id,
       pdfUrl: entity.pdfPath ?? '',
+      pdfHash: entity.pdfHash, // Include pdfHash for Team copy logic
       thumbnail: entity.thumbnail,
       instrumentType: models.InstrumentType.values.firstWhere(
         (t) => t.name == entity.instrumentType,

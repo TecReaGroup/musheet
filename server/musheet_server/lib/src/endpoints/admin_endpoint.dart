@@ -276,15 +276,15 @@ class AdminEndpoint extends Endpoint {
     final team = await Team.db.findById(session, teamId);
     if (team == null) return false;
 
-    // Delete team annotations
+    // Delete team instrument scores first (child of team scores)
     final teamScores = await TeamScore.db.find(
       session,
       where: (ts) => ts.teamId.equals(teamId),
     );
     for (final ts in teamScores) {
-      await TeamAnnotation.db.deleteWhere(
+      await TeamInstrumentScore.db.deleteWhere(
         session,
-        where: (a) => a.teamScoreId.equals(ts.id!),
+        where: (tis) => tis.teamScoreId.equals(ts.id!),
       );
     }
 
@@ -293,6 +293,18 @@ class AdminEndpoint extends Endpoint {
       session,
       where: (s) => s.teamId.equals(teamId),
     );
+
+    // Delete team setlist scores first (child of team setlists)
+    final teamSetlists = await TeamSetlist.db.find(
+      session,
+      where: (ts) => ts.teamId.equals(teamId),
+    );
+    for (final ts in teamSetlists) {
+      await TeamSetlistScore.db.deleteWhere(
+        session,
+        where: (tss) => tss.teamSetlistId.equals(ts.id!),
+      );
+    }
 
     // Delete team setlists
     await TeamSetlist.db.deleteWhere(

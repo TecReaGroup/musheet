@@ -6,6 +6,7 @@ enum InstrumentType { vocal, keyboard, drums, bass, guitar, other }
 class InstrumentScore {
   final String id;
   final String pdfUrl;
+  final String? pdfHash; // MD5 hash for PDF deduplication (per TEAM_SYNC_LOGIC.md)
   final String? thumbnail;
   final InstrumentType instrumentType;
   final String? customInstrument;
@@ -15,6 +16,7 @@ class InstrumentScore {
   InstrumentScore({
     required this.id,
     required this.pdfUrl,
+    this.pdfHash,
     this.thumbnail,
     required this.instrumentType,
     this.customInstrument,
@@ -45,6 +47,7 @@ class InstrumentScore {
   InstrumentScore copyWith({
     String? id,
     String? pdfUrl,
+    String? pdfHash,
     String? thumbnail,
     InstrumentType? instrumentType,
     String? customInstrument,
@@ -54,6 +57,7 @@ class InstrumentScore {
       InstrumentScore(
         id: id ?? this.id,
         pdfUrl: pdfUrl ?? this.pdfUrl,
+        pdfHash: pdfHash ?? this.pdfHash,
         thumbnail: thumbnail ?? this.thumbnail,
         instrumentType: instrumentType ?? this.instrumentType,
         customInstrument: customInstrument ?? this.customInstrument,
@@ -64,6 +68,7 @@ class InstrumentScore {
   Map<String, dynamic> toJson() => {
         'id': id,
         'pdfUrl': pdfUrl,
+        'pdfHash': pdfHash,
         'thumbnail': thumbnail,
         'instrumentType': instrumentType.name,
         'customInstrument': customInstrument,
@@ -74,6 +79,7 @@ class InstrumentScore {
   factory InstrumentScore.fromJson(Map<String, dynamic> json) => InstrumentScore(
         id: json['id'],
         pdfUrl: json['pdfUrl'],
+        pdfHash: json['pdfHash'],
         thumbnail: json['thumbnail'],
         instrumentType: json['instrumentType'] != null
             ? InstrumentType.values.firstWhere(

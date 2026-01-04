@@ -1,0 +1,21 @@
+### Team Sync Push Request DTO
+### Push request for team entity changes
+class: TeamSyncPushRequest
+fields:
+  ### Client's current team library version (for conflict detection)
+  clientTeamLibraryVersion: int
+
+  ### List of team score changes
+  teamScores: List<SyncEntityChange>?
+
+  ### List of team instrument score changes (includes annotationsJson)
+  teamInstrumentScores: List<SyncEntityChange>?
+
+  ### List of team setlist changes
+  teamSetlists: List<SyncEntityChange>?
+
+  ### List of team setlist score changes
+  teamSetlistScores: List<SyncEntityChange>?
+
+  ### List of entity IDs to delete (format: "type:id")
+  deletes: List<String>?

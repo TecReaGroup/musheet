@@ -5,6 +5,7 @@ export 'instrument_score.dart' show InstrumentType, InstrumentScore;
 
 class Score {
   final String id;
+  final int? serverId; // Server-assigned ID for sync (per TEAM_SYNC_LOGIC.md)
   final String title;
   final String composer;
   final DateTime dateAdded;
@@ -13,6 +14,7 @@ class Score {
 
   Score({
     required this.id,
+    this.serverId,
     required this.title,
     required this.composer,
     required this.dateAdded,
@@ -47,6 +49,7 @@ class Score {
 
   Score copyWith({
     String? id,
+    int? serverId,
     String? title,
     String? composer,
     DateTime? dateAdded,
@@ -55,6 +58,7 @@ class Score {
   }) =>
       Score(
         id: id ?? this.id,
+        serverId: serverId ?? this.serverId,
         title: title ?? this.title,
         composer: composer ?? this.composer,
         dateAdded: dateAdded ?? this.dateAdded,
@@ -64,6 +68,7 @@ class Score {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'serverId': serverId,
         'title': title,
         'composer': composer,
         'dateAdded': dateAdded.toIso8601String(),
@@ -73,6 +78,7 @@ class Score {
 
   factory Score.fromJson(Map<String, dynamic> json) => Score(
         id: json['id'],
+        serverId: json['serverId'],
         title: json['title'],
         composer: json['composer'],
         dateAdded: DateTime.parse(json['dateAdded']),

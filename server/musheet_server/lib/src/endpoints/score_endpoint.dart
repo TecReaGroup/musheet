@@ -262,16 +262,17 @@ class ScoreEndpoint extends Endpoint {
     );
   }
 
-  /// Create or update instrument score (with uniqueness check on instrumentName + scoreId)
+  /// Create or update instrument score (with uniqueness check on instrumentType + customInstrument + scoreId)
   /// Note: pdfPath removed from server model - PDF files are managed by hash
   Future<InstrumentScore> upsertInstrumentScore(
     Session session,
     int userId,
     int scoreId,
-    String instrumentName, {
+    String instrumentType, {
+    String? customInstrument,
     int orderIndex = 0,
   }) async {
-    session.log('[SCORE] upsertInstrumentScore called - scoreId: $scoreId, instrumentName: $instrumentName', level: LogLevel.debug);
+    session.log('[SCORE] upsertInstrumentScore called - scoreId: $scoreId, instrumentType: $instrumentType', level: LogLevel.debug);
 
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
 
@@ -280,10 +281,14 @@ class ScoreEndpoint extends Endpoint {
     if (score == null) throw NotFoundException('Score not found');
     if (score.userId != validatedUserId) throw PermissionDeniedException('Not your score');
 
-    // Check for existing instrument score with same (scoreId, instrumentName)
+    // Check for existing instrument score with same (scoreId, instrumentType, customInstrument)
     final existingList = await InstrumentScore.db.find(
       session,
-      where: (t) => t.scoreId.equals(scoreId) & t.instrumentName.equals(instrumentName),
+      where: (t) => t.scoreId.equals(scoreId) &
+                    t.instrumentType.equals(instrumentType) &
+                    ((customInstrument != null)
+                      ? t.customInstrument.equals(customInstrument)
+                      : t.customInstrument.equals(null)),
     );
 
     if (existingList.isNotEmpty) {
@@ -296,10 +301,11 @@ class ScoreEndpoint extends Endpoint {
     }
 
     // Create new (pdfPath removed from server model)
-    session.log('[SCORE] Creating new InstrumentScore for $instrumentName', level: LogLevel.debug);
+    session.log('[SCORE] Creating new InstrumentScore for $instrumentType', level: LogLevel.debug);
     final instrumentScore = InstrumentScore(
       scoreId: scoreId,
-      instrumentName: instrumentName,
+      instrumentType: instrumentType,
+      customInstrument: customInstrument,
       orderIndex: orderIndex,
       version: 1,
       syncStatus: 'synced',
@@ -315,10 +321,11 @@ class ScoreEndpoint extends Endpoint {
     Session session,
     int userId,
     int scoreId,
-    String instrumentName, {
+    String instrumentType, {
+    String? customInstrument,
     int orderIndex = 0,
   }) async {
-    return upsertInstrumentScore(session, userId, scoreId, instrumentName, orderIndex: orderIndex);
+    return upsertInstrumentScore(session, userId, scoreId, instrumentType, customInstrument: customInstrument, orderIndex: orderIndex);
   }
 
   /// Delete instrument score

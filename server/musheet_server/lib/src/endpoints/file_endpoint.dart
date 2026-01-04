@@ -230,7 +230,7 @@ class FileEndpoint extends Endpoint {
       if (instrumentScores.isNotEmpty) return true;
     }
 
-    // Check team access
+    // Check team access - look in TeamInstrumentScore
     final teamMembers = await TeamMember.db.find(
       session,
       where: (t) => t.userId.equals(userId),
@@ -243,11 +243,11 @@ class FileEndpoint extends Endpoint {
       );
 
       for (final ts in teamScores) {
-        final instrumentScores = await InstrumentScore.db.find(
+        final teamInstrumentScores = await TeamInstrumentScore.db.find(
           session,
-          where: (t) => t.scoreId.equals(ts.scoreId) & t.pdfHash.equals(hash),
+          where: (t) => t.teamScoreId.equals(ts.id!) & t.pdfHash.equals(hash),
         );
-        if (instrumentScores.isNotEmpty) return true;
+        if (teamInstrumentScores.isNotEmpty) return true;
       }
     }
 
@@ -268,20 +268,9 @@ class FileEndpoint extends Endpoint {
     // Check personal ownership
     if (score.userId == userId) return true;
 
-    // Check team access
-    final teamScores = await TeamScore.db.find(
-      session,
-      where: (t) => t.scoreId.equals(score.id!),
-    );
-
-    for (final ts in teamScores) {
-      final isMember = await TeamMember.db.find(
-        session,
-        where: (t) => t.teamId.equals(ts.teamId) & t.userId.equals(userId),
-      );
-      if (isMember.isNotEmpty) return true;
-    }
-
+    // Check team access - Team has its own TeamInstrumentScore, not linked to personal InstrumentScore
+    // For personal InstrumentScore, only the owner has access
+    // Team access is handled through TeamInstrumentScore separately
     return false;
   }
 

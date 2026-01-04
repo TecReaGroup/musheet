@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:serverpod/serverpod.dart';
 
 import '../generated/protocol.dart';
@@ -29,8 +28,8 @@ class TeamEndpoint extends Endpoint {
     final team = Team(
       name: name,
       description: description,
-      inviteCode: _generateInviteCode(),
       createdById: adminUserId,
+      teamLibraryVersion: 0, // Initialize team library version for sync
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
@@ -87,11 +86,39 @@ class TeamEndpoint extends Endpoint {
       where: (t) => t.teamId.equals(teamId),
     );
 
+    // First get all team scores to delete their instrument scores
+    final teamScores = await TeamScore.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId),
+    );
+
+    // Delete team instrument scores (child of team scores)
+    for (final score in teamScores) {
+      await TeamInstrumentScore.db.deleteWhere(
+        session,
+        where: (t) => t.teamScoreId.equals(score.id!),
+      );
+    }
+
     // Delete team scores
     await TeamScore.db.deleteWhere(
       session,
       where: (t) => t.teamId.equals(teamId),
     );
+
+    // First get all team setlists to delete their setlist scores
+    final teamSetlists = await TeamSetlist.db.find(
+      session,
+      where: (t) => t.teamId.equals(teamId),
+    );
+
+    // Delete team setlist scores (child of team setlists)
+    for (final setlist in teamSetlists) {
+      await TeamSetlistScore.db.deleteWhere(
+        session,
+        where: (t) => t.teamSetlistId.equals(setlist.id!),
+      );
+    }
 
     // Delete team setlists
     await TeamSetlist.db.deleteWhere(
@@ -104,12 +131,12 @@ class TeamEndpoint extends Endpoint {
   }
 
   /// Add member to team (system admin only)
+  /// Per TEAM_SYNC_LOGIC.md: All members are equal with 'member' role
   Future<TeamMember> addMemberToTeam(
     Session session,
     int adminUserId,
     int teamId,
     int userId,
-    String role,
   ) async {
     await _requireSystemAdmin(session, adminUserId);
 
@@ -122,13 +149,14 @@ class TeamEndpoint extends Endpoint {
       throw AlreadyTeamMemberException();
     }
 
+    // All members have 'member' role (per design doc: "成员平等")
     final member = TeamMember(
       teamId: teamId,
       userId: userId,
-      role: role,
+      role: 'member', // Hardcoded: all team members are equal
       joinedAt: DateTime.now(),
     );
-    
+
     return await TeamMember.db.insertRow(session, member);
   }
 
@@ -151,26 +179,9 @@ class TeamEndpoint extends Endpoint {
     return true;
   }
 
-  /// Update member role (system admin only)
-  Future<bool> updateMemberRole(
-    Session session,
-    int adminUserId,
-    int teamId,
-    int userId,
-    String role,
-  ) async {
-    await _requireSystemAdmin(session, adminUserId);
-
-    final members = await TeamMember.db.find(
-      session,
-      where: (t) => t.teamId.equals(teamId) & t.userId.equals(userId),
-    );
-    if (members.isEmpty) return false;
-
-    members.first.role = role;
-    await TeamMember.db.updateRow(session, members.first);
-    return true;
-  }
+  // NOTE: updateMemberRole is removed per TEAM_SYNC_LOGIC.md design:
+  // "成员平等 | 所有成员都有相同的编辑权限"
+  // All members have 'member' role, no role changes allowed.
 
   /// Get team members list (system admin only)
   Future<List<TeamMemberInfo>> getTeamMembers(Session session, int adminUserId, int teamId) async {
@@ -294,9 +305,4 @@ class TeamEndpoint extends Endpoint {
     return members.isNotEmpty;
   }
 
-  String _generateInviteCode() {
-    final random = Random.secure();
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    return List.generate(8, (_) => chars[random.nextInt(chars.length)]).join();
-  }
 }

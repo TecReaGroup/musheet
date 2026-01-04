@@ -3,11 +3,13 @@ table: teams
 fields:
   name: String
   description: String?
-  inviteCode: String
   createdById: int, relation(parent=users)
+  # Team-wide library version for sync (incremented on each change)
+  teamLibraryVersion: int
   createdAt: DateTime
   updatedAt: DateTime
+  deletedAt: DateTime?
 indexes:
-  team_invite_code_idx:
-    fields: inviteCode
-    unique: true
+  team_name_idx:
+    fields: name
+    type: btree

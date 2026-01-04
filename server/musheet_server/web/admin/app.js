@@ -11,6 +11,7 @@ const state = {
     token: localStorage.getItem('admin_token'),
     userId: localStorage.getItem('admin_user_id') ? parseInt(localStorage.getItem('admin_user_id')) : null,
     username: localStorage.getItem('admin_username'),
+    avatarPath: localStorage.getItem('admin_avatar_path'),
     currentPage: 'dashboard',
     usersPage: 0,
     teamsPage: 0,
@@ -105,10 +106,16 @@ async function login(username, password) {
             state.token = result.token;
             state.userId = result.user.id;
             state.username = result.user.displayName || result.user.username;
+            state.avatarPath = result.user.avatarPath || null;
 
             localStorage.setItem('admin_token', result.token);
             localStorage.setItem('admin_user_id', result.user.id.toString());
             localStorage.setItem('admin_username', state.username);
+            if (state.avatarPath) {
+                localStorage.setItem('admin_avatar_path', state.avatarPath);
+            } else {
+                localStorage.removeItem('admin_avatar_path');
+            }
 
             return { success: true };
         } else {
@@ -136,10 +143,16 @@ async function signup(username, password, displayName) {
             state.token = result.token;
             state.userId = result.user.id;
             state.username = result.user.displayName || result.user.username;
+            state.avatarPath = result.user.avatarPath || null;
 
             localStorage.setItem('admin_token', result.token);
             localStorage.setItem('admin_user_id', result.user.id.toString());
             localStorage.setItem('admin_username', state.username);
+            if (state.avatarPath) {
+                localStorage.setItem('admin_avatar_path', state.avatarPath);
+            } else {
+                localStorage.removeItem('admin_avatar_path');
+            }
 
             return { success: true, isAdmin: result.user.isAdmin };
         } else {
@@ -159,10 +172,12 @@ function logout() {
     state.token = null;
     state.userId = null;
     state.username = null;
+    state.avatarPath = null;
 
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user_id');
     localStorage.removeItem('admin_username');
+    localStorage.removeItem('admin_avatar_path');
 
     showPage('login');
 }
@@ -273,12 +288,12 @@ async function getTeamMembers(teamId) {
     });
 }
 
-async function addMemberToTeam(teamId, userId, role) {
+async function addMemberToTeam(teamId, userId) {
+    // Per TEAM_SYNC_LOGIC.md: All members have 'member' role (成员平等)
     return await rpcCall('team', 'addMemberToTeam', {
         adminUserId: state.userId,
         teamId,
-        userId,
-        role
+        userId
     });
 }
 
@@ -290,26 +305,76 @@ async function removeMemberFromTeam(teamId, userId) {
     });
 }
 
-async function updateMemberRole(teamId, userId, role) {
-    return await rpcCall('team', 'updateMemberRole', {
-        adminUserId: state.userId,
-        teamId,
-        userId,
-        role
-    });
-}
+// NOTE: updateMemberRole removed - all members have 'member' role (per TEAM_SYNC_LOGIC.md: 成员平等)
 
 // ============================================
 // UI HELPER FUNCTIONS
 // ============================================
+
+async function loadUserAvatar(userId) {
+    try {
+        const result = await rpcCall('profile', 'getAvatar', { userId });
+
+        if (result && typeof result === 'string') {
+            // Serverpod ByteData is serialized as: decode('base64string', 'base64')
+            const prefix = "decode('";
+            const suffix = "', 'base64')";
+
+            if (result.startsWith(prefix) && result.endsWith(suffix)) {
+                let base64 = result.slice(prefix.length, result.length - suffix.length);
+
+                // Clean up base64 string (remove whitespace, newlines)
+                base64 = base64.replace(/[\s\r\n]/g, '');
+
+                // Convert base64 to Blob URL (handles large images better)
+                const binaryString = atob(base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'image/png' });
+                return URL.createObjectURL(blob);
+            }
+        }
+    } catch (e) {
+        console.log('Failed to load avatar:', e);
+    }
+    return null;
+}
 
 function showPage(page) {
     document.getElementById('login-page').classList.toggle('hidden', page !== 'login');
     document.getElementById('dashboard-page').classList.toggle('hidden', page === 'login');
 
     if (page !== 'login') {
-        document.getElementById('current-user-name').textContent = state.username || 'Admin';
+        const displayName = state.username || 'Admin';
+        document.getElementById('current-user-name').textContent = displayName;
+
+        // Update user avatar
+        const avatarContainer = document.getElementById('user-avatar-container');
+        if (avatarContainer) {
+            // Show initials first
+            avatarContainer.innerHTML = `<span class="avatar-initials">${getInitials(displayName)}</span>`;
+
+            // Then try to load avatar if user has one
+            if (state.avatarPath && state.userId) {
+                loadUserAvatar(state.userId).then(avatarDataUrl => {
+                    if (avatarDataUrl) {
+                        avatarContainer.innerHTML = `<img src="${avatarDataUrl}" alt="Avatar" class="avatar-img">`;
+                    }
+                });
+            }
+        }
     }
+}
+
+function getInitials(name) {
+    if (!name) return 'A';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
 }
 
 function showSection(section) {
@@ -672,11 +737,7 @@ async function handleViewTeamMembers(teamId, teamName) {
                     <td><strong>${escapeHtml(member.username)}</strong></td>
                     <td>${escapeHtml(member.displayName || '-')}</td>
                     <td>
-                        <select class="role-select" onchange="handleUpdateMemberRole(${teamId}, ${member.userId}, this.value)">
-                            <option value="member" ${member.role === 'member' ? 'selected' : ''}>Member</option>
-                            <option value="editor" ${member.role === 'editor' ? 'selected' : ''}>Editor</option>
-                            <option value="admin" ${member.role === 'admin' ? 'selected' : ''}>Admin</option>
-                        </select>
+                        <span class="role-badge">Member</span>
                     </td>
                     <td>${formatDate(member.joinedAt)}</td>
                     <td>
@@ -712,16 +773,7 @@ function handleDeleteTeam(teamId, teamName) {
     });
 }
 
-async function handleUpdateMemberRole(teamId, userId, role) {
-    try {
-        await updateMemberRole(teamId, userId, role);
-        showToast('success', 'Success', 'Role updated');
-    } catch (error) {
-        showToast('error', 'Error', error.message || 'Failed to update role');
-        // Reload to revert
-        handleViewTeamMembers(teamId, document.getElementById('team-members-title').textContent.split(' - ')[0]);
-    }
-}
+// NOTE: handleUpdateMemberRole removed - all members have 'member' role (per TEAM_SYNC_LOGIC.md: 成员平等)
 
 function handleRemoveMember(teamId, userId, username) {
     showConfirm('Remove Member', `Remove "${username}" from this team?`, async () => {
@@ -955,7 +1007,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         errorEl.classList.add('hidden');
 
         const userId = parseInt(document.getElementById('member-user-id').value);
-        const role = document.getElementById('member-role').value;
+        // Role is always 'member' per design doc (成员平等)
 
         if (!userId) {
             errorEl.textContent = 'Please select a user';
@@ -964,7 +1016,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         try {
-            await addMemberToTeam(state.currentTeamId, userId, role);
+            await addMemberToTeam(state.currentTeamId, userId);
             hideModal('add-member-modal');
             showToast('success', 'Success', 'Member added successfully');
             handleViewTeamMembers(state.currentTeamId, document.getElementById('team-members-title').textContent.split(' - ')[0]);

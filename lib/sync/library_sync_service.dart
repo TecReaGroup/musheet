@@ -425,6 +425,59 @@ class LibrarySyncService {
     return downloadPdf(instrumentScoreId);
   }
 
+  /// Download PDF directly by hash (for Team PDF reuse)
+  /// Per TEAM_SYNC_LOGIC.md: Team PDFs use the same hash-based storage
+  /// This enables global deduplication between personal and team libraries
+  Future<String?> downloadPdfByHash(String pdfHash) async {
+    if (pdfHash.isEmpty) return null;
+
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final pdfDir = Directory(p.join(appDir.path, 'pdfs'));
+      if (!pdfDir.existsSync()) {
+        await pdfDir.create(recursive: true);
+      }
+
+      final localPath = p.join(pdfDir.path, '$pdfHash.pdf');
+
+      // Check if file already exists locally
+      if (File(localPath).existsSync()) {
+        final bytes = await File(localPath).readAsBytes();
+        final localHash = md5.convert(bytes).toString();
+
+        if (pdfHash == localHash) {
+          _log('PDF already exists locally (by hash): $pdfHash');
+          return localPath;
+        }
+        // Hash mismatch - corrupted, re-download
+        _log('PDF hash mismatch, re-downloading: $pdfHash');
+      }
+
+      // Download from server
+      final downloadResponse = await _rpc.downloadPdfByHash(pdfHash);
+      if (!downloadResponse.isSuccess || downloadResponse.data == null) {
+        _logError('PDF download by hash failed', downloadResponse.error?.message ?? 'Unknown error');
+        return null;
+      }
+
+      final pdfBytes = downloadResponse.data!;
+      final downloadedHash = md5.convert(pdfBytes).toString();
+
+      if (downloadedHash != pdfHash) {
+        _logError('Downloaded PDF hash mismatch', 'expected=$pdfHash, got=$downloadedHash');
+        return null;
+      }
+
+      await File(localPath).writeAsBytes(pdfBytes);
+      _log('PDF downloaded by hash: $pdfHash -> $localPath');
+
+      return localPath;
+    } catch (e, stack) {
+      _logError('PDF download by hash failed', e, stack);
+      return null;
+    }
+  }
+
   Future<bool> needsPdfDownload(String instrumentScoreId) async {
     final records = await (_db.select(_db.instrumentScores)
       ..where((s) => s.id.equals(instrumentScoreId))).get();
@@ -637,8 +690,6 @@ class LibrarySyncService {
         continue;
       }
 
-      final instrumentName = instrumentScore.customInstrument ?? instrumentScore.instrumentType;
-
       // Calculate pdfHash if not already set and PDF file exists
       // This ensures pdfHash is included in the push request
       String? pdfHash = instrumentScore.pdfHash;
@@ -693,7 +744,8 @@ class LibrarySyncService {
         'version': instrumentScore.version,
         'data': jsonEncode({
           'scoreId': parentServerId,
-          'instrumentName': instrumentName,
+          'instrumentType': instrumentScore.instrumentType,
+          'customInstrument': instrumentScore.customInstrument,
           // pdfPath is local-only, not sent to server (per APP_SYNC_LOGIC.md)
           'pdfHash': pdfHash, // Use calculated hash
           'orderIndex': instrumentScore.orderIndex,
@@ -1130,7 +1182,8 @@ class LibrarySyncService {
       await _db.into(_db.instrumentScores).insert(InstrumentScoresCompanion.insert(
         id: newLocalId,
         scoreId: localScoreId,
-        instrumentType: data['instrumentName'] as String,
+        instrumentType: data['instrumentType'] as String,
+        customInstrument: Value(data['customInstrument'] as String?),
         // pdfPath is local-only, server doesn't send it. Will be set after PDF download.
         pdfPath: const Value(null),
         dateAdded: serverData.updatedAt ?? DateTime.now(),
@@ -1161,7 +1214,8 @@ class LibrarySyncService {
 
     await (_db.update(_db.instrumentScores)..where((is_) => is_.id.equals(local.id)))
       .write(InstrumentScoresCompanion(
-        instrumentType: Value(data['instrumentName'] as String),
+        instrumentType: Value(data['instrumentType'] as String),
+        customInstrument: Value(data['customInstrument'] as String?),
         orderIndex: Value(data['orderIndex'] as int? ?? local.orderIndex),
         syncStatus: const Value('synced'),
         version: Value(serverData.version),
