@@ -1,4 +1,5 @@
 import 'annotation.dart';
+import 'base_models.dart';
 import 'score.dart';
 
 // Re-export from score.dart
@@ -140,16 +141,25 @@ class Team {
 }
 
 /// TeamInstrumentScore - represents an instrument part within a TeamScore
-class TeamInstrumentScore {
+class TeamInstrumentScore with InstrumentScoreBase {
+  @override
   final String id;
   final String teamScoreId;
+  @override
   final InstrumentType instrumentType;
+  @override
   final String? customInstrument;
+  @override
   final String? pdfPath;
+  @override
   final String? pdfHash;
+  @override
   final String? thumbnail;
+  @override
   final int orderIndex;
+  @override
   final List<Annotation>? annotations;
+  @override
   final DateTime createdAt;
 
   TeamInstrumentScore({
@@ -165,25 +175,7 @@ class TeamInstrumentScore {
     required this.createdAt,
   });
 
-  /// Get display name for the instrument
-  String get instrumentDisplayName {
-    if (instrumentType == InstrumentType.other &&
-        customInstrument != null &&
-        customInstrument!.isNotEmpty) {
-      return customInstrument!;
-    }
-    return instrumentType.name[0].toUpperCase() + instrumentType.name.substring(1);
-  }
-
-  /// Get the instrument key for comparison (lowercase)
-  String get instrumentKey {
-    if (instrumentType == InstrumentType.other &&
-        customInstrument != null &&
-        customInstrument!.isNotEmpty) {
-      return customInstrument!.toLowerCase().trim();
-    }
-    return instrumentType.name;
-  }
+  // instrumentDisplayName and instrumentKey are provided by InstrumentScoreBase mixin
 
   TeamInstrumentScore copyWith({
     String? id,
@@ -248,15 +240,20 @@ class TeamInstrumentScore {
 }
 
 /// TeamScore - represents a score in a team (independent from personal Score)
-class TeamScore {
+class TeamScore with ScoreBase {
+  @override
   final String id;
   final int teamId;
+  @override
   final String title;
+  @override
   final String composer;
+  @override
   final int bpm;
   final int createdById;
   final int? sourceScoreId;
   final List<TeamInstrumentScore> instrumentScores;
+  @override
   final DateTime createdAt;
 
   TeamScore({
@@ -271,20 +268,15 @@ class TeamScore {
     required this.createdAt,
   });
 
-  /// Get score key for matching (lowercase title + composer)
-  String get scoreKey => '${title.toLowerCase().trim()}|${composer.toLowerCase().trim()}';
+  // scoreKey is provided by ScoreBase mixin
 
   /// Get all existing instrument keys in this score
   Set<String> get existingInstrumentKeys =>
-      instrumentScores.map((s) => s.instrumentKey).toSet();
+      getExistingInstrumentKeys(instrumentScores);
 
   /// Check if an instrument already exists in this score
-  bool hasInstrument(InstrumentType type, String? customInstrument) {
-    final key = type == InstrumentType.other && customInstrument != null
-        ? customInstrument.toLowerCase().trim()
-        : type.name;
-    return existingInstrumentKeys.contains(key);
-  }
+  bool hasInstrument(InstrumentType type, String? customInstrument) =>
+      hasInstrumentInCollection(instrumentScores, type, customInstrument);
 
   /// Get the first instrument score
   TeamInstrumentScore? get firstInstrumentScore =>
@@ -343,14 +335,18 @@ class TeamScore {
 }
 
 /// TeamSetlist - represents a setlist in a team (independent from personal Setlist)
-class TeamSetlist {
+class TeamSetlist with SetlistBase {
+  @override
   final String id;
   final int teamId;
+  @override
   final String name;
+  @override
   final String? description;
   final int createdById;
   final int? sourceSetlistId;
   final List<String> teamScoreIds;
+  @override
   final DateTime createdAt;
 
   TeamSetlist({
@@ -364,7 +360,8 @@ class TeamSetlist {
     required this.createdAt,
   });
 
-  // Backwards compatibility alias
+  // scoreIds provided by SetlistBase interface, maps to teamScoreIds
+  @override
   List<String> get scoreIds => teamScoreIds;
 
   TeamSetlist copyWith({

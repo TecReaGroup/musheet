@@ -15,6 +15,7 @@ import '../screens/library_screen.dart' show preferredInstrumentProvider;
 /// For library screen (New Score): showTitleComposer = true
 /// For score detail screen (Add Instrument): showTitleComposer = false
 /// For team screen (Team Score): showTitleComposer = true, isTeamScore = true
+/// For team score detail (Add Team Instrument): showTitleComposer = false, isTeamScore = true, existingTeamScore
 class AddScoreWidget extends ConsumerStatefulWidget {
   const AddScoreWidget({
     super.key,
@@ -22,8 +23,10 @@ class AddScoreWidget extends ConsumerStatefulWidget {
     required this.onSuccess,
     this.showTitleComposer = true,
     this.existingScore,
+    this.existingTeamScore,
     this.disabledInstruments = const {},
     this.sourceInstrumentToCopy,
+    this.sourceTeamInstrumentToCopy,
     this.headerIcon = AppIcons.musicNote,
     this.headerIconGradient = const [AppColors.blue400, AppColors.blue600],
     this.headerGradient = const [AppColors.blue50, Colors.white],
@@ -46,16 +49,24 @@ class AddScoreWidget extends ConsumerStatefulWidget {
   /// false for Add Instrument modal in score detail
   final bool showTitleComposer;
   
-  /// If provided, the instrument will be added to this score
+  /// If provided, the instrument will be added to this score (personal mode)
   /// Used when showTitleComposer = false
   final Score? existingScore;
+  
+  /// If provided, the instrument will be added to this team score (team mode)
+  /// Used when showTitleComposer = false and isTeamScore = true
+  final TeamScore? existingTeamScore;
   
   /// Set of instrument keys that are already in use (for disabling)
   final Set<String> disabledInstruments;
   
-  /// If provided, the PDF from this instrument will be copied (copy mode)
+  /// If provided, the PDF from this instrument will be copied (copy mode - personal)
   /// In copy mode, PDF selection is skipped and this instrument's PDF is used
   final InstrumentScore? sourceInstrumentToCopy;
+  
+  /// If provided, the PDF from this team instrument will be copied (copy mode - team)
+  /// In copy mode, PDF selection is skipped and this instrument's PDF is used
+  final TeamInstrumentScore? sourceTeamInstrumentToCopy;
   
   /// Icon for the header
   final IconData headerIcon;
@@ -461,10 +472,11 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   void _handleConfirm() async {
     // In copy mode, PDF is already set from source instrument
     // In normal mode, user must select a PDF
-    if (_selectedPdfPath == null && widget.sourceInstrumentToCopy == null) return;
+    final sourcePdfFromCopy = widget.sourceInstrumentToCopy?.pdfUrl ?? widget.sourceTeamInstrumentToCopy?.pdfPath;
+    if (_selectedPdfPath == null && sourcePdfFromCopy == null) return;
     
     // Use source PDF if in copy mode
-    final pdfPath = widget.sourceInstrumentToCopy?.pdfUrl ?? _selectedPdfPath!;
+    final pdfPath = sourcePdfFromCopy ?? _selectedPdfPath!;
     
     // Check if instrument is disabled
     if (_isInstrumentDisabled(_selectedInstrument!, _customInstrumentController.text)) {
@@ -476,7 +488,32 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     
     final now = DateTime.now();
     
-    // Team score mode
+    // Team score mode - adding to existing team score
+    if (widget.isTeamScore && widget.teamServerId != null && widget.existingTeamScore != null && !widget.showTitleComposer) {
+      // Create the team instrument score
+      final teamInstrumentScore = TeamInstrumentScore(
+        id: '${now.millisecondsSinceEpoch}-tis',
+        teamScoreId: widget.existingTeamScore!.id,
+        instrumentType: _selectedInstrument!,
+        customInstrument: _selectedInstrument == InstrumentType.other
+            ? _customInstrumentController.text.trim()
+            : null,
+        pdfPath: pdfPath,
+        createdAt: now,
+      );
+      
+      // Add instrument to existing team score
+      await ref.read(teamScoreOperationsProvider.notifier).addTeamInstrumentScore(
+        widget.teamServerId!,
+        widget.existingTeamScore!.id,
+        teamInstrumentScore,
+      );
+      
+      widget.onSuccess();
+      return;
+    }
+    
+    // Team score mode - creating new team score
     if (widget.isTeamScore && widget.teamServerId != null) {
       final title = _titleController.text.trim();
       if (title.isEmpty) return;

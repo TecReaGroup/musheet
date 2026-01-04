@@ -290,6 +290,17 @@ class TeamScoresOperationsNotifier extends Notifier<void> {
     ref.invalidate(teamScoresProvider(teamServerId));
   }
 
+  /// Add a new instrument score to an existing team score
+  Future<void> addTeamInstrumentScore(
+    int teamServerId,
+    String teamScoreId,
+    TeamInstrumentScore instrumentScore,
+  ) async {
+    final teamDb = ref.read(teamDatabaseServiceProvider);
+    await teamDb.addTeamInstrumentScore(teamScoreId, instrumentScore);
+    ref.invalidate(teamScoresProvider(teamServerId));
+  }
+
   /// Delete a team instrument score
   Future<void> deleteTeamInstrumentScore(
     int teamServerId,
@@ -299,6 +310,26 @@ class TeamScoresOperationsNotifier extends Notifier<void> {
     final teamDb = ref.read(teamDatabaseServiceProvider);
     await teamDb.deleteTeamInstrumentScore(instrumentScoreId);
     ref.invalidate(teamScoresProvider(teamServerId));
+  }
+
+  /// Import instrument scores from personal library to existing TeamScore
+  /// Per TEAM_SYNC_LOGIC.md §3.3.1: Only allowed from TeamScore detail page
+  Future<CopyScoreResult> importInstrumentsFromLibrary({
+    required int teamServerId,
+    required TeamScore existingTeamScore,
+    required List<score_models.InstrumentScore> personalInstruments,
+  }) async {
+    final copyService = ref.read(teamCopyServiceProvider);
+    final result = await copyService.addInstrumentScoresToExistingTeamScore(
+      existingTeamScore: existingTeamScore,
+      personalInstruments: personalInstruments,
+    );
+
+    if (result.success && result.instrumentsAdded > 0) {
+      ref.invalidate(teamScoresProvider(teamServerId));
+    }
+
+    return result;
   }
 }
 

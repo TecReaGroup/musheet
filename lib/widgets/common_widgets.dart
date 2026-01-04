@@ -1068,6 +1068,7 @@ class ScoreItemCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String meta;
+  final VoidCallback? onTap;
   final VoidCallback? onArrowTap;
 
   const ScoreItemCard({
@@ -1075,6 +1076,7 @@ class ScoreItemCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.meta,
+    this.onTap,
     this.onArrowTap,
   });
 
@@ -1138,6 +1140,7 @@ class SetlistItemCard extends StatelessWidget {
   final String description;
   final int scoreCount;
   final String source; // 'Personal' or 'Team'
+  final VoidCallback? onTap;
   final VoidCallback? onArrowTap;
 
   const SetlistItemCard({
@@ -1146,6 +1149,7 @@ class SetlistItemCard extends StatelessWidget {
     required this.description,
     required this.scoreCount,
     this.source = 'Personal',
+    this.onTap,
     this.onArrowTap,
   });
 
@@ -1197,6 +1201,139 @@ class SetlistItemCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// SWIPEABLE ITEM CARDS - High-level components combining swipe + card
+// ============================================================================
+
+/// Swipeable Score Card - combines SwipeableListItem with ScoreItemCard
+/// Reduces boilerplate when using score cards with swipe-to-delete
+class SwipeableScoreCard extends StatelessWidget {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String meta;
+  
+  // Swipe state (from SwipeHandlerMixin)
+  final String? swipedItemId;
+  final double swipeOffset;
+  final bool isDragging;
+  final bool hasSwiped;
+  
+  // Callbacks
+  final void Function(String id, Offset position) onSwipeStart;
+  final void Function(Offset position) onSwipeUpdate;
+  final VoidCallback onSwipeEnd;
+  final VoidCallback onDelete;
+  final VoidCallback onTap;
+  final VoidCallback onArrowTap;
+
+  const SwipeableScoreCard({
+    super.key,
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.meta,
+    required this.swipedItemId,
+    required this.swipeOffset,
+    required this.isDragging,
+    required this.hasSwiped,
+    required this.onSwipeStart,
+    required this.onSwipeUpdate,
+    required this.onSwipeEnd,
+    required this.onDelete,
+    required this.onTap,
+    required this.onArrowTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SwipeableListItem(
+      id: id,
+      swipedItemId: swipedItemId,
+      swipeOffset: swipeOffset,
+      isDragging: isDragging,
+      hasSwiped: hasSwiped,
+      onSwipeStart: onSwipeStart,
+      onSwipeUpdate: onSwipeUpdate,
+      onSwipeEnd: onSwipeEnd,
+      onDelete: onDelete,
+      onTap: onTap,
+      child: ScoreItemCard(
+        title: title,
+        subtitle: subtitle,
+        meta: meta,
+        onArrowTap: onArrowTap,
+      ),
+    );
+  }
+}
+
+/// Swipeable Setlist Card - combines SwipeableListItem with SetlistItemCard
+/// Reduces boilerplate when using setlist cards with swipe-to-delete
+class SwipeableSetlistCard extends StatelessWidget {
+  final String id;
+  final String name;
+  final String description;
+  final int scoreCount;
+  final String source;
+  
+  // Swipe state (from SwipeHandlerMixin)
+  final String? swipedItemId;
+  final double swipeOffset;
+  final bool isDragging;
+  final bool hasSwiped;
+  
+  // Callbacks
+  final void Function(String id, Offset position) onSwipeStart;
+  final void Function(Offset position) onSwipeUpdate;
+  final VoidCallback onSwipeEnd;
+  final VoidCallback onDelete;
+  final VoidCallback onTap;
+  final VoidCallback onArrowTap;
+
+  const SwipeableSetlistCard({
+    super.key,
+    required this.id,
+    required this.name,
+    required this.description,
+    required this.scoreCount,
+    this.source = 'Personal',
+    required this.swipedItemId,
+    required this.swipeOffset,
+    required this.isDragging,
+    required this.hasSwiped,
+    required this.onSwipeStart,
+    required this.onSwipeUpdate,
+    required this.onSwipeEnd,
+    required this.onDelete,
+    required this.onTap,
+    required this.onArrowTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SwipeableListItem(
+      id: id,
+      swipedItemId: swipedItemId,
+      swipeOffset: swipeOffset,
+      isDragging: isDragging,
+      hasSwiped: hasSwiped,
+      onSwipeStart: onSwipeStart,
+      onSwipeUpdate: onSwipeUpdate,
+      onSwipeEnd: onSwipeEnd,
+      onDelete: onDelete,
+      onTap: onTap,
+      child: SetlistItemCard(
+        name: name,
+        description: description,
+        scoreCount: scoreCount,
+        source: source,
+        onArrowTap: onArrowTap,
       ),
     );
   }

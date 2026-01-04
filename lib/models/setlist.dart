@@ -1,7 +1,13 @@
-class Setlist {
+import 'base_models.dart';
+
+class Setlist with SetlistBase {
+  @override
   final String id;
+  @override
   final String name;
-  final String description;
+  @override
+  final String description; // Non-nullable for personal setlists
+  @override
   final List<String> scoreIds; // Store only score IDs as references
   final DateTime dateCreated;
 
@@ -12,6 +18,10 @@ class Setlist {
     required this.scoreIds,
     required this.dateCreated,
   });
+
+  // Implement base interface
+  @override
+  DateTime get createdAt => dateCreated;
 
   Setlist copyWith({
     String? id,

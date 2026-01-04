@@ -9,8 +9,6 @@ import '../screens/settings_screen.dart';
 import '../screens/score_viewer_screen.dart';
 import '../screens/score_detail_screen.dart';
 import '../screens/setlist_detail_screen.dart';
-import '../screens/team_score_viewer_screen.dart';
-import '../screens/team_score_detail_screen.dart';
 import '../screens/team_setlist_detail_screen.dart';
 import '../screens/settings/instrument_preference_screen.dart';
 import '../screens/settings/cloud_sync_screen.dart';
@@ -235,10 +233,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
           return MaterialPage(
             key: state.pageKey,
-            child: TeamScoreViewerScreen(
+            child: ScoreViewerScreen.team(
               teamScore: teamScore,
-              instrumentScore: instrumentScore,
-              setlistScores: setlistScores,
+              teamInstrumentScore: instrumentScore,
+              teamSetlistScores: setlistScores,
               currentIndex: extra['currentIndex'] as int?,
               setlistName: extra['setlistName'] as String?,
             ),
@@ -260,7 +258,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
           return MaterialPage(
             key: state.pageKey,
-            child: TeamScoreDetailScreen(
+            child: ScoreDetailScreen.team(
               teamScore: teamScore,
               teamServerId: teamServerId,
             ),

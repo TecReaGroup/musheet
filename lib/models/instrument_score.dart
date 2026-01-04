@@ -1,15 +1,22 @@
 import 'annotation.dart';
+import 'base_models.dart';
 
 enum InstrumentType { vocal, keyboard, drums, bass, guitar, other }
 
 /// Represents a single instrument part/sheet within a Score
-class InstrumentScore {
+class InstrumentScore with InstrumentScoreBase {
+  @override
   final String id;
-  final String pdfUrl;
+  final String pdfUrl; // For personal library, this is the local path
+  @override
   final String? pdfHash; // MD5 hash for PDF deduplication (per TEAM_SYNC_LOGIC.md)
+  @override
   final String? thumbnail;
+  @override
   final InstrumentType instrumentType;
+  @override
   final String? customInstrument;
+  @override
   final List<Annotation>? annotations;
   final DateTime dateAdded;
 
@@ -24,25 +31,13 @@ class InstrumentScore {
     required this.dateAdded,
   });
 
-  /// Get display name for the instrument
-  String get instrumentDisplayName {
-    if (instrumentType == InstrumentType.other &&
-        customInstrument != null &&
-        customInstrument!.isNotEmpty) {
-      return customInstrument!;
-    }
-    return instrumentType.name[0].toUpperCase() + instrumentType.name.substring(1);
-  }
-
-  /// Get the instrument key for comparison (lowercase)
-  String get instrumentKey {
-    if (instrumentType == InstrumentType.other &&
-        customInstrument != null &&
-        customInstrument!.isNotEmpty) {
-      return customInstrument!.toLowerCase().trim();
-    }
-    return instrumentType.name;
-  }
+  // Implement base interface requirements
+  @override
+  String? get pdfPath => pdfUrl;
+  @override
+  int get orderIndex => 0; // Personal library doesn't use orderIndex currently
+  @override
+  DateTime get createdAt => dateAdded;
 
   InstrumentScore copyWith({
     String? id,

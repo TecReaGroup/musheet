@@ -5,10 +5,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../models/score.dart';
+import '../models/team.dart';
 import '../models/annotation.dart';
+import '../models/viewer_data.dart';
 import '../providers/scores_provider.dart';
 import '../providers/sync_provider.dart';
+import '../providers/teams_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/metronome_widget.dart';
 import '../utils/icon_mappings.dart';
@@ -17,21 +22,49 @@ import '../providers/setlists_provider.dart';
 import '../router/app_router.dart';
 import 'library_screen.dart' show lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider, preferredInstrumentProvider, getBestInstrumentIndex;
 
+/// Unified Score Viewer Screen
+/// Supports both personal library scores and team scores
 class ScoreViewerScreen extends ConsumerStatefulWidget {
-  final Score score;
+  // Personal library mode
+  final Score? score;
   final InstrumentScore? instrumentScore;
   final List<Score>? setlistScores;
+  
+  // Team mode  
+  final TeamScore? teamScore;
+  final TeamInstrumentScore? teamInstrumentScore;
+  final List<TeamScore>? teamSetlistScores;
+  
+  // Common
   final int? currentIndex;
   final String? setlistName;
 
+  /// Constructor for personal library scores
   const ScoreViewerScreen({
     super.key,
-    required this.score,
+    required Score this.score,
     this.instrumentScore,
     this.setlistScores,
     this.currentIndex,
     this.setlistName,
-  });
+  })  : teamScore = null,
+        teamInstrumentScore = null,
+        teamSetlistScores = null;
+
+  /// Constructor for team scores
+  const ScoreViewerScreen.team({
+    super.key,
+    required TeamScore this.teamScore,
+    this.teamInstrumentScore,
+    this.teamSetlistScores,
+    this.currentIndex,
+    this.setlistName,
+  })  : score = null,
+        instrumentScore = null,
+        setlistScores = null;
+
+  /// Check if this is a team score viewer
+  bool get isTeamMode => teamScore != null;
 
   @override
   ConsumerState<ScoreViewerScreen> createState() => _ScoreViewerScreenState();
@@ -63,8 +96,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   ScrollController? _instrumentScrollController;
   bool _showUI = false;
   
-  // Current instrument score being viewed
-  InstrumentScore? _currentInstrumentScore;
+  // Current instrument score being viewed (unified)
+  ViewerInstrumentData? _currentInstrument;
+  
+  // Team mode state
+  late ViewerScoreData _scoreData;
   
   // Page indicator auto-hide
   bool _showPageIndicator = false;
@@ -78,6 +114,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   // Cached provider notifier for safe dispose usage
   ScoresNotifier? _scoresNotifier;
+  
+  // BPM save debounce for team mode
+  Timer? _bpmSaveDebounce;
 
   final List<Color> _penColors = [
     Colors.black,
@@ -92,24 +131,41 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   // Track last saved BPM to avoid unnecessary updates
   int _lastSavedBpm = 120;
+  
+  // Helper getters
+  bool get _isTeamMode => widget.isTeamMode;
 
   @override
   void initState() {
     super.initState();
-    // Initialize current instrument score
-    _currentInstrumentScore = widget.instrumentScore ?? widget.score.firstInstrumentScore;
+    
+    // Initialize unified score data
+    if (widget.isTeamMode) {
+      _scoreData = ViewerScoreData.fromTeam(widget.teamScore!);
+      _currentInstrument = widget.teamInstrumentScore != null
+          ? ViewerInstrumentData.fromTeam(widget.teamInstrumentScore!)
+          : _scoreData.firstInstrumentScore;
+    } else {
+      _scoreData = ViewerScoreData.fromPersonal(widget.score!);
+      _currentInstrument = widget.instrumentScore != null
+          ? ViewerInstrumentData.fromPersonal(widget.instrumentScore!)
+          : _scoreData.firstInstrumentScore;
+    }
+    
     // Initialize metronome with score's saved BPM
-    _lastSavedBpm = widget.score.bpm;
-    _metronomeController = MetronomeController(bpm: widget.score.bpm);
+    _lastSavedBpm = _scoreData.bpm;
+    _metronomeController = MetronomeController(bpm: _scoreData.bpm);
     _metronomeController!.addListener(_onMetronomeChanged);
     _initAnnotations();
     _loadPdfDocument();
     
-    // Cache the notifier for safe dispose usage
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _scoresNotifier = ref.read(scoresProvider.notifier);
-    });
+    // Cache the notifier for safe dispose usage (personal mode only)
+    if (!_isTeamMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _scoresNotifier = ref.read(scoresProvider.notifier);
+      });
+    }
   }
   
   void _onMetronomeChanged() {
@@ -118,19 +174,36 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       setState(() {});
       
       // Save BPM to score when it changes
-      // Since setlists now use references (scoreIds), updating scores provider is enough
       final currentBpm = _metronomeController?.bpm ?? 120;
       if (currentBpm != _lastSavedBpm) {
         _lastSavedBpm = currentBpm;
-        ref.read(scoresProvider.notifier).updateBpm(widget.score.id, currentBpm);
+        _saveBpm(currentBpm);
       }
+    }
+  }
+  
+  /// Save BPM - handles both personal and team modes
+  void _saveBpm(int bpm) {
+    if (_isTeamMode) {
+      // Team mode: debounce and save via team provider
+      _bpmSaveDebounce?.cancel();
+      _bpmSaveDebounce = Timer(const Duration(milliseconds: 500), () async {
+        final updatedScore = _scoreData.teamScore.copyWith(bpm: bpm);
+        await ref.read(teamScoreOperationsProvider.notifier).updateTeamScore(
+          _scoreData.teamId!,
+          updatedScore,
+        );
+      });
+    } else {
+      // Personal mode: save via scores provider
+      ref.read(scoresProvider.notifier).updateBpm(_scoreData.id, bpm);
     }
   }
   
   void _initAnnotations() {
     // Initialize annotations from current instrument score
     _pageAnnotations.clear();
-    final annotations = _currentInstrumentScore?.annotations ?? [];
+    final annotations = _currentInstrument?.annotations ?? [];
     for (final annotation in annotations) {
       final page = annotation.page;
       _pageAnnotations[page] ??= [];
@@ -160,8 +233,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Future<void> _loadPdfDocument() async {
-    final instrumentScoreId = _currentInstrumentScore?.id;
-    var pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
+    if (_isTeamMode) {
+      await _loadTeamPdfDocument();
+    } else {
+      await _loadPersonalPdfDocument();
+    }
+  }
+  
+  /// Load PDF for personal library mode
+  Future<void> _loadPersonalPdfDocument() async {
+    final instrumentScoreId = _currentInstrument?.id;
+    var pdfPath = _currentInstrument?.pdfPath ?? '';
 
     // No instrument score ID means we can't load anything
     if (instrumentScoreId == null) {
@@ -261,17 +343,120 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       });
     }
   }
+  
+  /// Load PDF for team mode
+  Future<void> _loadTeamPdfDocument() async {
+    if (_currentInstrument == null) {
+      setState(() {
+        _pdfError = 'No instrument score available';
+      });
+      return;
+    }
 
-  void _switchInstrument(InstrumentScore instrumentScore) async {
-    if (instrumentScore.id == _currentInstrumentScore?.id) {
+    setState(() {
+      _isDownloadingPdf = true;
+      _pdfError = null;
+    });
+
+    try {
+      String? pdfPath = _currentInstrument!.pdfPath;
+      final pdfHash = _currentInstrument!.pdfHash;
+
+      // Step 1: Check if we have a valid local file
+      if (pdfPath != null && pdfPath.isNotEmpty) {
+        final file = File(pdfPath);
+        if (await file.exists()) {
+          await _openPdfFile(pdfPath);
+          return;
+        }
+      }
+
+      // Step 2: Check if file exists by hash (global deduplication)
+      if (pdfHash != null && pdfHash.isNotEmpty) {
+        final appDir = await getApplicationDocumentsDirectory();
+        final hashPath = p.join(appDir.path, 'pdfs', '$pdfHash.pdf');
+
+        if (File(hashPath).existsSync()) {
+          await _openPdfFile(hashPath);
+          return;
+        }
+
+        // Step 3: Download from server using sync service
+        final syncServiceAsync = ref.read(syncServiceProvider);
+        final syncService = switch (syncServiceAsync) {
+          AsyncData(:final value) => value,
+          _ => null,
+        };
+
+        if (syncService != null) {
+          final downloadedPath = await syncService.downloadPdfByHash(pdfHash);
+          if (downloadedPath != null) {
+            await _openPdfFile(downloadedPath);
+            return;
+          }
+        }
+
+        // Download failed
+        if (mounted) {
+          setState(() {
+            _pdfError = 'Failed to download PDF. Please check your connection.';
+            _isDownloadingPdf = false;
+          });
+        }
+        return;
+      }
+
+      // No PDF available
+      if (mounted) {
+        setState(() {
+          _pdfError = 'No PDF available for this instrument';
+          _isDownloadingPdf = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pdfError = 'Failed to load PDF: $e';
+          _isDownloadingPdf = false;
+        });
+      }
+    }
+  }
+  
+  /// Open PDF file and update state
+  Future<void> _openPdfFile(String path) async {
+    try {
+      final doc = await PdfDocument.openFile(path);
+      if (mounted) {
+        setState(() {
+          _pdfDocument = doc;
+          _totalPages = doc.pages.length;
+          _isDownloadingPdf = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pdfError = 'Failed to open PDF: $e';
+          _isDownloadingPdf = false;
+        });
+      }
+    }
+  }
+
+  /// Switch instrument - unified for both modes
+  void _switchInstrument(ViewerInstrumentData instrument) async {
+    if (instrument.id == _currentInstrument?.id) {
       setState(() => _showInstrumentPicker = false);
       return;
     }
 
-    // Record the instrument index being switched to
-    final instrumentIndex = widget.score.instrumentScores.indexWhere((s) => s.id == instrumentScore.id);
-    if (instrumentIndex >= 0) {
-      ref.read(lastOpenedInstrumentInScoreProvider.notifier).recordLastOpened(widget.score.id, instrumentIndex);
+    // Record the instrument index being switched to (personal mode only)
+    if (!_isTeamMode) {
+      final instrumentIndex = _scoreData.instrumentScores.indexWhere((s) => s.id == instrument.id);
+      if (instrumentIndex >= 0) {
+        ref.read(lastOpenedInstrumentInScoreProvider.notifier).recordLastOpened(_scoreData.id, instrumentIndex);
+      }
     }
 
     // Dispose old document
@@ -279,7 +464,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
     if (!mounted) return;
     setState(() {
-      _currentInstrumentScore = instrumentScore;
+      _currentInstrument = instrument;
       _pdfDocument = null;
       _currentPage = 1;
       _totalPages = 0;
@@ -294,21 +479,22 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   @override
   void dispose() {
-    // Save annotations before disposing if we were in edit mode
-    if (_isDrawMode) {
+    // Save annotations before disposing if we were in edit mode (personal mode only)
+    if (_isDrawMode && !_isTeamMode) {
       _saveAnnotationsSync();
     }
     
     _pageIndicatorTimer?.cancel();
+    _bpmSaveDebounce?.cancel();
     _metronomeController?.removeListener(_onMetronomeChanged);
     _metronomeController?.dispose();
     _pdfDocument?.dispose();
     super.dispose();
   }
 
-  /// Synchronous version for dispose - uses cached notifier for safe access
+  /// Synchronous version for dispose - uses cached notifier for safe access (personal mode)
   void _saveAnnotationsSync() {
-    if (_currentInstrumentScore == null || _scoresNotifier == null) return;
+    if (_currentInstrument == null || _scoresNotifier == null || _isTeamMode) return;
     
     // Collect all annotations from all pages
     final allAnnotations = <Annotation>[];
@@ -320,8 +506,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     
     // Save to database via cached notifier (safe during dispose)
     _scoresNotifier!.updateAnnotations(
-      widget.score.id,
-      _currentInstrumentScore!.id,
+      _scoreData.id,
+      _currentInstrument!.id,
       allAnnotations,
     );
   }
@@ -394,7 +580,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   /// Handle share button press - export PDF with annotations and share
   void _handleShare() async {
-    final pdfPath = _currentInstrumentScore?.pdfUrl;
+    final pdfPath = _currentInstrument?.pdfPath;
     if (pdfPath == null || pdfPath.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cannot get PDF file path')),
@@ -411,8 +597,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     }
 
     // Generate title for exported file
-    final instrumentName = _currentInstrumentScore?.instrumentDisplayName ?? '';
-    final exportTitle = '${widget.score.title}_$instrumentName';
+    final instrumentName = _currentInstrument?.instrumentDisplayName ?? '';
+    final exportTitle = '${_scoreData.title}_$instrumentName';
 
     await PdfExportService.exportAndShare(
       pdfPath: pdfPath,
@@ -424,6 +610,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   void _navigateToScore(int index) async {
+    if (_isTeamMode) {
+      _navigateToTeamScore(index);
+      return;
+    }
+    
     if (widget.setlistScores != null && index >= 0 && index < widget.setlistScores!.length) {
       // Record the score index being navigated to in the setlist
       if (widget.setlistScores != null) {
@@ -465,6 +656,36 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           'score': targetScore,
           'instrumentScore': instrumentScore,
           'setlistScores': widget.setlistScores,
+          'currentIndex': index,
+          'setlistName': widget.setlistName,
+        },
+      );
+    }
+  }
+  
+  /// Navigate to team score (team mode)
+  void _navigateToTeamScore(int index) async {
+    if (widget.teamSetlistScores != null && index >= 0 && index < widget.teamSetlistScores!.length) {
+      // Stop and destroy metronome before navigating
+      _metronomeController?.stop();
+      _metronomeController?.removeListener(_onMetronomeChanged);
+      _metronomeController?.dispose();
+      _metronomeController = null;
+
+      await Future.delayed(const Duration(milliseconds: 50));
+      if (!mounted) return;
+
+      final targetScore = widget.teamSetlistScores![index];
+      final instrumentScore = targetScore.instrumentScores.isNotEmpty
+          ? targetScore.instrumentScores.first
+          : null;
+
+      context.replace(
+        AppRoutes.teamScoreViewer,
+        extra: {
+          'teamScore': targetScore,
+          'instrumentScore': instrumentScore,
+          'setlistScores': widget.teamSetlistScores,
           'currentIndex': index,
           'setlistName': widget.setlistName,
         },
@@ -633,8 +854,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Widget _buildPdfViewer() {
-    final pdfPath = _currentInstrumentScore?.pdfUrl ?? '';
-    final hasInstrumentScoreId = _currentInstrumentScore?.id != null;
+    final pdfPath = _currentInstrument?.pdfPath ?? '';
+    final hasInstrumentScoreId = _currentInstrument?.id != null;
 
     // Only show error if we have no instrument score ID at all
     // If pdfPath is empty but we have an ID, we might be downloading
@@ -686,7 +907,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       key: ValueKey('pdf_page_$_currentPage'),
       document: _pdfDocument!,
       pageNumber: _currentPage,
-      isDrawMode: _isDrawMode,
+      isDrawMode: _isDrawMode && !_isTeamMode, // Disable draw mode for team scores
       selectedTool: _selectedTool,
       penColor: _penColor,
       penWidth: _penWidth,
@@ -847,7 +1068,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          widget.score.title,
+                          _scoreData.title,
                           style: const TextStyle(
                             color: AppColors.gray900,
                             fontSize: 16,
@@ -882,10 +1103,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                                 const itemHeight = 48.0;
                                 const listHeight = 168.0;
                                 const listPadding = 12.0;
-                                final currentIndex = widget.score.instrumentScores.indexWhere(
-                                  (s) => s.id == _currentInstrumentScore?.id
+                                final currentIndex = _scoreData.instrumentScores.indexWhere(
+                                  (s) => s.id == _currentInstrument?.id
                                 );
-                                final totalContentHeight = widget.score.instrumentScores.length * itemHeight + listPadding;
+                                final totalContentHeight = _scoreData.instrumentScores.length * itemHeight + listPadding;
                                 final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
                                 final centerOffset = ((currentIndex >= 0 ? currentIndex : 0) * itemHeight - (listHeight - itemHeight) / 2).clamp(0.0, maxScrollOffset);
                                 _instrumentScrollController = ScrollController(initialScrollOffset: centerOffset);
@@ -905,7 +1126,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     children: [
                       Flexible(
                         child: Text(
-                          widget.score.composer,
+                          _scoreData.composer,
                             style: const TextStyle(
                               color: AppColors.gray500,
                               fontSize: 12,
@@ -923,7 +1144,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                         ),
                         Flexible(
                           child: Text(
-                            _currentInstrumentScore?.instrumentDisplayName ?? '',
+                            _currentInstrument?.instrumentDisplayName ?? '',
                             style: const TextStyle(
                               color: AppColors.gray500,
                               fontSize: 12,
@@ -959,8 +1180,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     const itemHeight = 48.0;
                     const listHeight = 168.0;
                     const listPadding = 12.0; // vertical padding 6*2
-                    final scores = widget.setlistScores ?? [widget.score];
-                    final totalContentHeight = scores.length * itemHeight + listPadding;
+                    final int scoreCount = _isTeamMode 
+                        ? (widget.teamSetlistScores?.length ?? 1)
+                        : (widget.setlistScores?.length ?? 1);
+                    final totalContentHeight = scoreCount * itemHeight + listPadding;
                     final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
                     // Center the current item: offset = itemTop - (listHeight - itemHeight) / 2
                     final centerOffset = ((widget.currentIndex ?? 0) * itemHeight - (listHeight - itemHeight) / 2).clamp(0.0, maxScrollOffset);
@@ -1131,7 +1354,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   /// Save all annotations for the current instrument score to the database
   void _saveAnnotations() {
-    if (_currentInstrumentScore == null) return;
+    if (_currentInstrument == null || _isTeamMode) return;
     
     // Collect all annotations from all pages
     final allAnnotations = <Annotation>[];
@@ -1143,8 +1366,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     
     // Save to database via provider
     ref.read(scoresProvider.notifier).updateAnnotations(
-      widget.score.id,
-      _currentInstrumentScore!.id,
+      _scoreData.id,
+      _currentInstrument!.id,
       allAnnotations,
     );
   }
@@ -1465,12 +1688,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   child: ListView.builder(
                     controller: _instrumentScrollController,
                     padding: const EdgeInsets.symmetric(vertical: 6),
-                    itemCount: widget.score.instrumentScores.length,
+                    itemCount: _scoreData.instrumentScores.length,
                     itemBuilder: (context, index) {
-                      final instrumentScore = widget.score.instrumentScores[index];
-                      final isCurrent = instrumentScore.id == _currentInstrumentScore?.id;
+                      final instrumentData = _scoreData.instrumentScores[index];
+                      final isCurrent = instrumentData.id == _currentInstrument?.id;
                       return InkWell(
-                        onTap: () => _switchInstrument(instrumentScore),
+                        onTap: () => _switchInstrument(instrumentData),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           color: isCurrent ? AppColors.blue50 : Colors.transparent,
@@ -1497,7 +1720,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  instrumentScore.instrumentDisplayName,
+                                  instrumentData.instrumentDisplayName,
                                   style: TextStyle(
                                     color: isCurrent ? AppColors.blue600 : AppColors.gray900,
                                     fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
@@ -1527,9 +1750,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   Widget _buildSetlistNavModal() {
-    // Use provided setlist scores or create a single-item list with current score
-    final scores = widget.setlistScores ?? [widget.score];
-    final hasSetlist = widget.setlistScores != null;
+    // Get score count and check if we have a setlist based on mode
+    final int scoreCount;
+    final bool hasSetlist;
+    
+    if (_isTeamMode) {
+      scoreCount = widget.teamSetlistScores?.length ?? 1;
+      hasSetlist = widget.teamSetlistScores != null;
+    } else {
+      scoreCount = widget.setlistScores?.length ?? 1;
+      hasSetlist = widget.setlistScores != null;
+    }
 
     return Positioned(
       top: MediaQuery.of(context).padding.top + 72,
@@ -1589,9 +1820,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 child: ListView.builder(
                   controller: _setlistScrollController,
                   padding: const EdgeInsets.symmetric(vertical: 6),
-                  itemCount: scores.length,
+                  itemCount: scoreCount,
                   itemBuilder: (context, index) {
-                    final score = scores[index];
+                    // Get score title based on mode
+                    final String scoreTitle;
+                    if (_isTeamMode) {
+                      scoreTitle = widget.teamSetlistScores?[index].title ?? _scoreData.title;
+                    } else {
+                      scoreTitle = widget.setlistScores?[index].title ?? _scoreData.title;
+                    }
                     final isCurrent = hasSetlist ? (index == widget.currentIndex) : true;
                     return InkWell(
                       onTap: hasSetlist ? () {
@@ -1626,7 +1863,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                score.title,
+                                scoreTitle,
                                 style: TextStyle(
                                   color: isCurrent ? AppColors.blue600 : AppColors.gray900,
                                   fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,

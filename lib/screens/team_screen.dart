@@ -518,8 +518,12 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
           children: [
             ...sortedSetlists.map((setlist) {
               final scoreCount = setlist.teamScoreIds.length;
-              return SwipeableListItem(
+              return SwipeableSetlistCard(
                 id: setlist.id,
+                name: setlist.name,
+                description: setlist.description ?? '',
+                scoreCount: scoreCount,
+                source: 'Team',
                 swipedItemId: swipedItemId,
                 swipeOffset: swipeOffset,
                 isDragging: isDragging,
@@ -560,21 +564,15 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                     teamServerId: teamServerId,
                   );
                 },
-                child: SetlistItemCard(
-                  name: setlist.name,
-                  description: setlist.description ?? '',
-                  scoreCount: scoreCount,
-                  source: 'Team',
-                  onArrowTap: () {
-                    // Arrow tap: go to detail screen
-                    ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                    AppNavigation.navigateToTeamSetlistDetail(
-                      context,
-                      setlist,
-                      teamServerId: teamServerId,
-                    );
-                  },
-                ),
+                onArrowTap: () {
+                  // Arrow tap: go to detail screen
+                  ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                  AppNavigation.navigateToTeamSetlistDetail(
+                    context,
+                    setlist,
+                    teamServerId: teamServerId,
+                  );
+                },
               );
             }),
           ],
@@ -640,8 +638,11 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
         return Column(
           children: [
             ...sortedScores.map((score) {
-              return SwipeableListItem(
+              return SwipeableScoreCard(
                 id: score.id,
+                title: score.title,
+                subtitle: score.composer,
+                meta: '${score.instrumentScores.length} instrument(s) • Team',
                 swipedItemId: swipedItemId,
                 swipeOffset: swipeOffset,
                 isDragging: isDragging,
@@ -657,20 +658,15 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                     teamScore: score,
                   );
                 },
-                child: ScoreItemCard(
-                  title: score.title,
-                  subtitle: score.composer,
-                  meta: '${score.instrumentScores.length} instrument(s) • Team',
-                  onArrowTap: () {
-                    ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-                    // Arrow tap: go to score detail screen
-                    AppNavigation.navigateToTeamScoreDetail(
-                      context,
-                      score,
-                      teamServerId: teamServerId,
-                    );
-                  },
-                ),
+                onArrowTap: () {
+                  ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                  // Arrow tap: go to score detail screen
+                  AppNavigation.navigateToTeamScoreDetail(
+                    context,
+                    score,
+                    teamServerId: teamServerId,
+                  );
+                },
               );
             }),
           ],

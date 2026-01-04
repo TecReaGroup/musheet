@@ -1,14 +1,19 @@
+import 'base_models.dart';
 import 'instrument_score.dart';
 
 // Re-export InstrumentType and InstrumentScore so existing imports still work
 export 'instrument_score.dart' show InstrumentType, InstrumentScore;
 
-class Score {
+class Score with ScoreBase {
+  @override
   final String id;
   final int? serverId; // Server-assigned ID for sync (per TEAM_SYNC_LOGIC.md)
+  @override
   final String title;
+  @override
   final String composer;
   final DateTime dateAdded;
+  @override
   final int bpm;
   final List<InstrumentScore> instrumentScores;
 
@@ -22,20 +27,19 @@ class Score {
     this.instrumentScores = const [],
   });
 
-  /// Get score key for matching (lowercase title + composer)
-  String get scoreKey => '${title.toLowerCase().trim()}|${composer.toLowerCase().trim()}';
+  // Implement base interface
+  @override
+  DateTime get createdAt => dateAdded;
+
+  // scoreKey is provided by ScoreBase mixin
 
   /// Get all existing instrument keys in this score
   Set<String> get existingInstrumentKeys =>
-      instrumentScores.map((s) => s.instrumentKey).toSet();
+      getExistingInstrumentKeys(instrumentScores);
 
   /// Check if an instrument already exists in this score
-  bool hasInstrument(InstrumentType type, String? customInstrument) {
-    final key = type == InstrumentType.other && customInstrument != null
-        ? customInstrument.toLowerCase().trim()
-        : type.name;
-    return existingInstrumentKeys.contains(key);
-  }
+  bool hasInstrument(InstrumentType type, String? customInstrument) =>
+      hasInstrumentInCollection(instrumentScores, type, customInstrument);
 
   /// Get the first instrument score (for backward compatibility)
   InstrumentScore? get firstInstrumentScore =>

@@ -535,8 +535,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
       itemBuilder: (context, index) {
           final setlist = sortedSetlists[index];
           final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
-          return SwipeableListItem(
+          return SwipeableSetlistCard(
             id: setlist.id,
+            name: setlist.name,
+            description: setlist.description,
+            scoreCount: setlistScores.length,
+            source: 'Personal',
             swipedItemId: swipedItemId,
             swipeOffset: swipeOffset,
             isDragging: isDragging,
@@ -574,17 +578,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 AppNavigation.navigateToSetlistDetail(context, setlist);
               }
             },
-            child: SetlistItemCard(
-              name: setlist.name,
-              description: setlist.description,
-              scoreCount: setlistScores.length,
-              source: 'Personal',
-              onArrowTap: () {
-                // Arrow tap: go to detail screen
-                ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                AppNavigation.navigateToSetlistDetail(context, setlist);
-              },
-            ),
+            onArrowTap: () {
+              // Arrow tap: go to detail screen
+              ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+              AppNavigation.navigateToSetlistDetail(context, setlist);
+            },
           );
         },
       );
@@ -619,8 +617,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
       itemCount: sortedScores.length,
       itemBuilder: (context, index) {
           final score = sortedScores[index];
-          return SwipeableListItem(
+          return SwipeableScoreCard(
             id: score.id,
+            title: score.title,
+            subtitle: score.composer,
+            meta: 'Personal',
             swipedItemId: swipedItemId,
             swipeOffset: swipeOffset,
             isDragging: isDragging,
@@ -643,16 +644,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 instrumentScore: instrumentScore,
               );
             },
-            child: ScoreItemCard(
-              title: score.title,
-              subtitle: score.composer,
-              meta: 'Personal',
-              onArrowTap: () {
-                // Arrow tap: go to detail screen
-                ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-                AppNavigation.navigateToScoreDetail(context, score);
-              },
-            ),
+            onArrowTap: () {
+              // Arrow tap: go to detail screen
+              ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+              AppNavigation.navigateToScoreDetail(context, score);
+            },
           );
         },
       );
