@@ -15,8 +15,10 @@ import '../models/score.dart';
 import '../models/setlist.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/add_score_widget.dart';
 import '../router/app_router.dart';
 import 'library_screen.dart' show SortType, SortState;
+
 
 enum TeamTab { setlists, scores, members }
 
@@ -99,6 +101,42 @@ class ShowTeamSetlistModalNotifier extends Notifier<bool> {
   set state(bool newState) => super.state = newState;
 }
 
+// For "Create New Score" with AddScoreWidget
+class ShowCreateTeamScoreModalNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  @override
+  set state(bool newState) => super.state = newState;
+}
+
+// For "Create New Setlist" modal
+class ShowCreateTeamSetlistDialogNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  @override
+  set state(bool newState) => super.state = newState;
+}
+
+// For "Import Score from Library" modal
+class ShowImportScoreModalNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  @override
+  set state(bool newState) => super.state = newState;
+}
+
+// For "Import Setlist from Library" modal
+class ShowImportSetlistModalNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  @override
+  set state(bool newState) => super.state = newState;
+}
+
 final teamTabProvider = NotifierProvider<TeamTabNotifier, TeamTab>(TeamTabNotifier.new);
 final showTeamSwitcherProvider = NotifierProvider<ShowTeamSwitcherNotifier, bool>(ShowTeamSwitcherNotifier.new);
 final teamSetlistSortProvider = NotifierProvider<TeamSetlistSortNotifier, SortState>(TeamSetlistSortNotifier.new);
@@ -109,6 +147,10 @@ final teamRecentlyOpenedScoresProvider = NotifierProvider<TeamRecentlyOpenedScor
 // Modal state providers (like library_screen.dart)
 final showTeamScoreModalProvider = NotifierProvider<ShowTeamScoreModalNotifier, bool>(ShowTeamScoreModalNotifier.new);
 final showTeamSetlistModalProvider = NotifierProvider<ShowTeamSetlistModalNotifier, bool>(ShowTeamSetlistModalNotifier.new);
+final showCreateTeamScoreModalProvider = NotifierProvider<ShowCreateTeamScoreModalNotifier, bool>(ShowCreateTeamScoreModalNotifier.new);
+final showCreateTeamSetlistDialogProvider = NotifierProvider<ShowCreateTeamSetlistDialogNotifier, bool>(ShowCreateTeamSetlistDialogNotifier.new);
+final showImportScoreModalProvider = NotifierProvider<ShowImportScoreModalNotifier, bool>(ShowImportScoreModalNotifier.new);
+final showImportSetlistModalProvider = NotifierProvider<ShowImportSetlistModalNotifier, bool>(ShowImportSetlistModalNotifier.new);
 
 class TeamScreen extends ConsumerStatefulWidget {
   const TeamScreen({super.key});
@@ -117,10 +159,21 @@ class TeamScreen extends ConsumerStatefulWidget {
   ConsumerState<TeamScreen> createState() => _TeamScreenState();
 }
 
-class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProviderStateMixin {
+class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProviderStateMixin, SwipeHandlerMixin {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+
+  // Create setlist modal controllers
+  final TextEditingController _setlistNameController = TextEditingController();
+  final TextEditingController _setlistDescriptionController = TextEditingController();
+  String? _createSetlistErrorMessage;
+
+  // Import modal search controllers
+  final FocusNode _importScoreSearchFocusNode = FocusNode();
+  final FocusNode _importSetlistSearchFocusNode = FocusNode();
+  String _importScoreSearchQuery = '';
+  String _importSetlistSearchQuery = '';
 
   // Drawer animation state
   bool _isDrawerExpanded = false;
@@ -145,6 +198,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
     _searchController.dispose();
     _searchFocusNode.dispose();
     _drawerController.dispose();
+    _setlistNameController.dispose();
+    _setlistDescriptionController.dispose();
+    _importScoreSearchFocusNode.dispose();
+    _importSetlistSearchFocusNode.dispose();
     super.dispose();
   }
 
@@ -294,7 +351,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             icon: AppIcons.setlistIcon,
                             isActive: activeTab == TeamTab.setlists,
                             activeColor: AppColors.emerald600,
-                            onTap: () => ref.read(teamTabProvider.notifier).state = TeamTab.setlists,
+                            onTap: () {
+                              ref.read(teamTabProvider.notifier).state = TeamTab.setlists;
+                              resetSwipeState();
+                            },
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -304,7 +364,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             icon: AppIcons.musicNote,
                             isActive: activeTab == TeamTab.scores,
                             activeColor: AppColors.blue600,
-                            onTap: () => ref.read(teamTabProvider.notifier).state = TeamTab.scores,
+                            onTap: () {
+                              ref.read(teamTabProvider.notifier).state = TeamTab.scores;
+                              resetSwipeState();
+                            },
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -314,7 +377,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             icon: AppIcons.people,
                             isActive: activeTab == TeamTab.members,
                             activeColor: AppColors.indigo600,
-                            onTap: () => ref.read(teamTabProvider.notifier).state = TeamTab.members,
+                            onTap: () {
+                              ref.read(teamTabProvider.notifier).state = TeamTab.members;
+                              resetSwipeState();
+                            },
                           ),
                         ),
                       ],
@@ -351,6 +417,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   onTap: () {
                     // Dismiss keyboard when tapping outside
                     FocusScope.of(context).unfocus();
+                    // Reset swipe state if swiped
+                    if (swipedItemId != null && swipeOffset < -40) {
+                      resetSwipeState();
+                    }
                   },
                   behavior: HitTestBehavior.translucent,
                   child: ListView(
@@ -389,6 +459,29 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
             _buildTeamScoreModal(currentTeam),
           if (ref.watch(showTeamSetlistModalProvider))
             _buildTeamSetlistModal(currentTeam),
+          // Show AddScoreWidget for creating new score with PDF
+          if (ref.watch(showCreateTeamScoreModalProvider))
+            AddScoreWidget(
+              showTitleComposer: true,
+              isTeamScore: true,
+              teamServerId: currentTeam.serverId,
+              onClose: () {
+                ref.read(showCreateTeamScoreModalProvider.notifier).state = false;
+              },
+              onSuccess: () {
+                ref.read(showCreateTeamScoreModalProvider.notifier).state = false;
+                ref.invalidate(teamScoresProvider(currentTeam.serverId));
+              },
+            ),
+          // Show Create Setlist modal
+          if (ref.watch(showCreateTeamSetlistDialogProvider))
+            _buildCreateSetlistModal(currentTeam),
+          // Show Import Score from Library modal
+          if (ref.watch(showImportScoreModalProvider))
+            _buildImportScoreModal(currentTeam),
+          // Show Import Setlist from Library modal
+          if (ref.watch(showImportSetlistModalProvider))
+            _buildImportSetlistModal(currentTeam),
           if (showTeamSwitcher) _buildTeamSwitcher(teams, currentTeam),
         ],
       ),
@@ -417,70 +510,102 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
             : setlists.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
         final sortedSetlists = _sortTeamSetlists(filteredSetlists, sortState, recentlyOpened);
 
+        if (sortedSetlists.isEmpty && _searchQuery.isNotEmpty) {
+          return EmptyState.noSearchResults();
+        }
+
         return Column(
           children: [
             ...sortedSetlists.map((setlist) {
               final scoreCount = setlist.teamScoreIds.length;
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: () {
-                      ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                      AppNavigation.navigateToTeamSetlistDetail(
+              return SwipeableListItem(
+                id: setlist.id,
+                swipedItemId: swipedItemId,
+                swipeOffset: swipeOffset,
+                isDragging: isDragging,
+                hasSwiped: hasSwiped,
+                onSwipeStart: handleSwipeStart,
+                onSwipeUpdate: handleSwipeUpdate,
+                onSwipeEnd: handleSwipeEnd,
+                onDelete: () => _handleDeleteSetlist(setlist, teamServerId),
+                onTap: () {
+                  ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                  // Card tap: preview first score if setlist has scores
+                  if (setlist.teamScoreIds.isNotEmpty) {
+                    // Get the team scores to find the first score
+                    final teamScores = ref.read(teamScoresProvider(teamServerId)).value ?? [];
+                    // Build the list of scores in setlist order
+                    final setlistScores = <TeamScore>[];
+                    for (final scoreId in setlist.teamScoreIds) {
+                      final score = teamScores.where((s) => s.id == scoreId).firstOrNull;
+                      if (score != null) {
+                        setlistScores.add(score);
+                      }
+                    }
+                    if (setlistScores.isNotEmpty) {
+                      AppNavigation.navigateToTeamScoreViewer(
                         context,
-                        setlist,
-                        teamServerId: teamServerId,
+                        teamScore: setlistScores.first,
+                        setlistScores: setlistScores,
+                        currentIndex: 0,
+                        setlistName: setlist.name,
                       );
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.gray200),
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppColors.emerald50, AppColors.emerald100],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text(setlist.description ?? '', style: const TextStyle(fontSize: 14, color: AppColors.gray600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text(
-                                  '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • Team',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                      return;
+                    }
+                  }
+                  // Empty setlist or no scores found: go to detail screen
+                  AppNavigation.navigateToTeamSetlistDetail(
+                    context,
+                    setlist,
+                    teamServerId: teamServerId,
+                  );
+                },
+                child: SetlistItemCard(
+                  name: setlist.name,
+                  description: setlist.description ?? '',
+                  scoreCount: scoreCount,
+                  source: 'Team',
+                  onArrowTap: () {
+                    // Arrow tap: go to detail screen
+                    ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                    AppNavigation.navigateToTeamSetlistDetail(
+                      context,
+                      setlist,
+                      teamServerId: teamServerId,
+                    );
+                  },
                 ),
               );
             }),
           ],
         );
       },
+    );
+  }
+
+  void _handleDeleteSetlist(TeamSetlist setlist, int teamServerId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Setlist'),
+        content: const Text('Are you sure you want to delete this setlist from the team?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final teamDb = ref.read(teamDatabaseServiceProvider);
+              await teamDb.deleteTeamSetlist(setlist.id);
+              resetSwipeState();
+              ref.invalidate(teamSetlistsProvider(teamServerId));
+            },
+            child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -508,68 +633,75 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                 s.composer.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
         final sortedScores = _sortTeamScores(filteredScores, sortState, recentlyOpened);
 
+        if (sortedScores.isEmpty && _searchQuery.isNotEmpty) {
+          return EmptyState.noSearchResults();
+        }
+
         return Column(
           children: [
             ...sortedScores.map((score) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: () {
-                      ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-                      AppNavigation.navigateToTeamScoreViewer(
-                        context,
-                        teamScore: score,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.gray200),
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppColors.blue50, AppColors.blue100],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue550),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                Text(
-                                  '${score.instrumentScores.length} instrument(s) • Team',
-                                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+              return SwipeableListItem(
+                id: score.id,
+                swipedItemId: swipedItemId,
+                swipeOffset: swipeOffset,
+                isDragging: isDragging,
+                hasSwiped: hasSwiped,
+                onSwipeStart: handleSwipeStart,
+                onSwipeUpdate: handleSwipeUpdate,
+                onSwipeEnd: handleSwipeEnd,
+                onDelete: () => _handleDeleteScore(score, teamServerId),
+                onTap: () {
+                  ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                  AppNavigation.navigateToTeamScoreViewer(
+                    context,
+                    teamScore: score,
+                  );
+                },
+                child: ScoreItemCard(
+                  title: score.title,
+                  subtitle: score.composer,
+                  meta: '${score.instrumentScores.length} instrument(s) • Team',
+                  onArrowTap: () {
+                    ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                    // Arrow tap: go to score detail screen
+                    AppNavigation.navigateToTeamScoreDetail(
+                      context,
+                      score,
+                      teamServerId: teamServerId,
+                    );
+                  },
                 ),
               );
             }),
           ],
         );
       },
+    );
+  }
+
+  void _handleDeleteScore(TeamScore score, int teamServerId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Score'),
+        content: const Text('Are you sure you want to delete this score from the team?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final teamDb = ref.read(teamDatabaseServiceProvider);
+              await teamDb.deleteTeamScore(score.id);
+              resetSwipeState();
+              ref.invalidate(teamScoresProvider(teamServerId));
+            },
+            child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1161,19 +1293,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           subtitle: 'Create a score directly in team',
                           onTap: () {
                             ref.read(showTeamScoreModalProvider.notifier).state = false;
-                            _showCreateScoreDialog(currentTeam);
+                            ref.read(showCreateTeamScoreModalProvider.notifier).state = true;
                           },
                         ),
                         const SizedBox(height: 12),
                         // Import from library option
                         _buildModalOption(
                           icon: AppIcons.copy,
-                          iconGradient: [AppColors.indigo600, AppColors.indigo600],
+                          iconGradient: const [AppColors.blue400, AppColors.blue600],
                           title: 'Import from Library',
                           subtitle: 'Copy a score from your personal library',
                           onTap: () {
                             ref.read(showTeamScoreModalProvider.notifier).state = false;
-                            _showScorePicker(currentTeam);
+                            ref.read(showImportScoreModalProvider.notifier).state = true;
                           },
                         ),
                         const SizedBox(height: 16),
@@ -1310,19 +1442,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           subtitle: 'Create a setlist directly in team',
                           onTap: () {
                             ref.read(showTeamSetlistModalProvider.notifier).state = false;
-                            _showCreateSetlistDialog(currentTeam);
+                            ref.read(showCreateTeamSetlistDialogProvider.notifier).state = true;
                           },
                         ),
                         const SizedBox(height: 12),
                         // Import from library option
                         _buildModalOption(
                           icon: AppIcons.copy,
-                          iconGradient: [AppColors.indigo600, AppColors.indigo600],
+                          iconGradient: const [AppColors.emerald350, AppColors.emerald550],
                           title: 'Import from Library',
                           subtitle: 'Copy a setlist with all its scores',
                           onTap: () {
                             ref.read(showTeamSetlistModalProvider.notifier).state = false;
-                            _showSetlistPicker(currentTeam);
+                            ref.read(showImportSetlistModalProvider.notifier).state = true;
                           },
                         ),
                         const SizedBox(height: 16),
@@ -1412,82 +1544,692 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
     );
   }
 
-  /// Show dialog to create a new score directly in team
-  void _showCreateScoreDialog(Team currentTeam) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: _CreateTeamScoreSheet(
-          team: currentTeam,
-          onCreated: (title, composer, bpm) async {
-            Navigator.pop(context);
-            await _createTeamScoreDirectly(currentTeam, title, composer, bpm);
-          },
+  /// Build create setlist modal (same style as library screen)
+  Widget _buildCreateSetlistModal(Team currentTeam) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            onTap: () {
+              // First unfocus any text field, only close modal if nothing was focused
+              final currentFocus = FocusScope.of(context);
+              if (currentFocus.hasFocus) {
+                currentFocus.unfocus();
+              } else {
+                ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+                _setlistNameController.clear();
+                _setlistDescriptionController.clear();
+                _createSetlistErrorMessage = null;
+              }
+            },
+            child: Container(color: Colors.black.withValues(alpha: 0.1)),
+          ),
         ),
-      ),
+        Center(
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.9,
+              constraints: const BoxConstraints(maxWidth: 400),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 60,
+                    offset: const Offset(0, 20),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.emerald50, Colors.white],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(24),
+                        topRight: Radius.circular(24),
+                      ),
+                      border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.emerald350, AppColors.emerald550],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 14),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('New Setlist', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                              SizedBox(height: 2),
+                              Text('Create a new team setlist', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+                            _setlistNameController.clear();
+                            _setlistDescriptionController.clear();
+                            _createSetlistErrorMessage = null;
+                          },
+                          icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _setlistNameController,
+                          onChanged: (_) {
+                            // Clear error message when user types
+                            if (_createSetlistErrorMessage != null) {
+                              setState(() => _createSetlistErrorMessage = null);
+                            }
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Setlist name',
+                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                            filled: true,
+                            fillColor: AppColors.gray50,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _setlistDescriptionController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            hintText: 'Description (optional)',
+                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                            filled: true,
+                            fillColor: AppColors.gray50,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                        ),
+                        // Error message
+                        if (_createSetlistErrorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Text(
+                              _createSetlistErrorMessage!,
+                              style: const TextStyle(
+                                color: AppColors.red500,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+                                  _setlistNameController.clear();
+                                  _setlistDescriptionController.clear();
+                                  _createSetlistErrorMessage = null;
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: AppColors.gray200),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                child: const Text('Cancel', style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.w500)),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  final name = _setlistNameController.text.trim();
+                                  if (name.isEmpty) return;
+
+                                  // Create the setlist
+                                  await _createTeamSetlistDirectly(
+                                    currentTeam,
+                                    name,
+                                    _setlistDescriptionController.text.trim().isEmpty 
+                                        ? null 
+                                        : _setlistDescriptionController.text.trim(),
+                                    [], // Empty setlist - no scores initially
+                                  );
+                                  
+                                  ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+                                  _setlistNameController.clear();
+                                  _setlistDescriptionController.clear();
+                                  _createSetlistErrorMessage = null;
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.emerald500,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
+                                child: const Text('Create', style: TextStyle(fontWeight: FontWeight.w600)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
-  /// Create a team score directly (no PDF for now, just metadata)
-  Future<void> _createTeamScoreDirectly(Team team, String title, String composer, int bpm) async {
-    final authData = ref.read(authProvider);
-    if (authData.user == null) return;
+  /// Build import score from library modal (same style as setlist_detail_screen add scores modal)
+  Widget _buildImportScoreModal(Team currentTeam) {
+    final scoresAsync = ref.watch(scoresProvider);
+    
+    return scoresAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (allScores) {
+        final filteredScores = _importScoreSearchQuery.isEmpty
+            ? allScores
+            : allScores.where((score) =>
+                score.title.toLowerCase().contains(_importScoreSearchQuery.toLowerCase()) ||
+                score.composer.toLowerCase().contains(_importScoreSearchQuery.toLowerCase())).toList();
 
-    final db = ref.read(databaseProvider);
-    final teamDb = ref.read(teamDatabaseServiceProvider);
-    final personalDb = ref.read(databaseServiceProvider);
-    final copyService = TeamCopyService(db, teamDb, personalDb);
-
-    final result = await copyService.createTeamScore(
-      teamServerId: team.serverId,
-      userId: authData.user!.id,
-      title: title,
-      composer: composer,
-      bpm: bpm,
-      instrumentScores: [], // No instruments for now - user can add PDF later
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  if (_importScoreSearchFocusNode.hasFocus) {
+                    _importScoreSearchFocusNode.unfocus();
+                    return;
+                  }
+                  setState(() {
+                    _importScoreSearchQuery = '';
+                  });
+                  ref.read(showImportScoreModalProvider.notifier).state = false;
+                },
+                child: Container(color: Colors.black.withValues(alpha: 0.1)),
+              ),
+            ),
+            Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 60,
+                      offset: const Offset(0, 20),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _importScoreSearchFocusNode.unfocus(),
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.blue50, Colors.white],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(24),
+                            topRight: Radius.circular(24),
+                          ),
+                          border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [AppColors.blue400, AppColors.blue600],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.blue200.withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(AppIcons.musicNote, color: Colors.white, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Import Score', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+                                  Text('Choose score from library', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                setState(() => _importScoreSearchQuery = '');
+                                ref.read(showImportScoreModalProvider.notifier).state = false;
+                              },
+                              icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Search bar
+                    if (allScores.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                        child: TextField(
+                          focusNode: _importScoreSearchFocusNode,
+                          onChanged: (value) => setState(() => _importScoreSearchQuery = value),
+                          decoration: InputDecoration(
+                            hintText: 'Search scores...',
+                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                            prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400, size: 20),
+                            filled: true,
+                            fillColor: AppColors.gray50,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.blue400, width: 1.5),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            isDense: true,
+                          ),
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                      ),
+                    Flexible(
+                      child: allScores.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(48),
+                              child: Text(
+                                'No scores in your library',
+                                style: TextStyle(color: AppColors.gray500),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : filteredScores.isEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.all(48),
+                                  child: Text(
+                                    'No scores matching "$_importScoreSearchQuery"',
+                                    style: const TextStyle(color: AppColors.gray500),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                )
+                              : GestureDetector(
+                                  onTap: () => FocusScope.of(context).unfocus(),
+                                  child: ListView.builder(
+                                    padding: const EdgeInsets.all(20),
+                                    shrinkWrap: true,
+                                    itemCount: filteredScores.length,
+                                    itemBuilder: (context, index) {
+                                      final score = filteredScores[index];
+                                      return Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        child: Material(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: InkWell(
+                                            onTap: () async {
+                                              setState(() => _importScoreSearchQuery = '');
+                                              ref.read(showImportScoreModalProvider.notifier).state = false;
+                                              await _copyScoreToTeam(score, currentTeam);
+                                            },
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: AppColors.gray100),
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 48,
+                                                    height: 48,
+                                                    decoration: BoxDecoration(
+                                                      gradient: const LinearGradient(
+                                                        colors: [AppColors.blue50, AppColors.blue100],
+                                                      ),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                    child: const Icon(AppIcons.musicNote, size: 20, color: AppColors.blue600),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                        Text('${score.composer} · ${score.instrumentScores.length} instrument(s)', style: const TextStyle(fontSize: 14, color: AppColors.gray500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 32,
+                                                    height: 32,
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.gray50,
+                                                      borderRadius: BorderRadius.circular(16),
+                                                    ),
+                                                    child: const Icon(AppIcons.add, size: 18, color: AppColors.gray600),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
-
-    if (mounted) {
-      ref.invalidate(teamScoresProvider(team.serverId));
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message ?? (result.success ? 'Score created' : 'Failed to create')),
-          backgroundColor: result.success ? AppColors.emerald600 : AppColors.red500,
-        ),
-      );
-    }
   }
 
-  /// Show dialog to create a new setlist directly in team
-  void _showCreateSetlistDialog(Team currentTeam) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => _CreateTeamSetlistSheet(
-          scrollController: scrollController,
-          team: currentTeam,
-          onCreated: (name, description, teamScoreIds) async {
-            Navigator.pop(context);
-            await _createTeamSetlistDirectly(currentTeam, name, description, teamScoreIds);
-          },
-        ),
-      ),
+  /// Build import setlist from library modal (same style as setlist_detail_screen add scores modal)
+  Widget _buildImportSetlistModal(Team currentTeam) {
+    final setlists = ref.watch(setlistsProvider);
+    final scoresAsync = ref.watch(scoresProvider);
+    
+    return scoresAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (allScores) {
+        final filteredSetlists = _importSetlistSearchQuery.isEmpty
+            ? setlists
+            : setlists.where((setlist) =>
+                setlist.name.toLowerCase().contains(_importSetlistSearchQuery.toLowerCase()) ||
+                setlist.description.toLowerCase().contains(_importSetlistSearchQuery.toLowerCase())).toList();
+
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  if (_importSetlistSearchFocusNode.hasFocus) {
+                    _importSetlistSearchFocusNode.unfocus();
+                    return;
+                  }
+                  setState(() {
+                    _importSetlistSearchQuery = '';
+                  });
+                  ref.read(showImportSetlistModalProvider.notifier).state = false;
+                },
+                child: Container(color: Colors.black.withValues(alpha: 0.1)),
+              ),
+            ),
+            Center(
+              child: Container(
+                width: MediaQuery.of(context).size.width * 0.9,
+                constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 60,
+                      offset: const Offset(0, 20),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _importSetlistSearchFocusNode.unfocus(),
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [AppColors.emerald50, Colors.white],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(24),
+                            topRight: Radius.circular(24),
+                          ),
+                          border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [AppColors.emerald350, AppColors.emerald550],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.emerald200.withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Import Setlist', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
+                                  Text('Choose setlist from library', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () {
+                                setState(() => _importSetlistSearchQuery = '');
+                                ref.read(showImportSetlistModalProvider.notifier).state = false;
+                              },
+                              icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Search bar
+                    if (setlists.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                        child: TextField(
+                          focusNode: _importSetlistSearchFocusNode,
+                          onChanged: (value) => setState(() => _importSetlistSearchQuery = value),
+                          decoration: InputDecoration(
+                            hintText: 'Search setlists...',
+                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                            prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400, size: 20),
+                            filled: true,
+                            fillColor: AppColors.gray50,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppColors.emerald400, width: 1.5),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            isDense: true,
+                          ),
+                          style: const TextStyle(fontSize: 15),
+                        ),
+                      ),
+                    Flexible(
+                      child: setlists.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(48),
+                              child: Text(
+                                'No setlists in your library',
+                                style: TextStyle(color: AppColors.gray500),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : filteredSetlists.isEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.all(48),
+                                  child: Text(
+                                    'No setlists matching "$_importSetlistSearchQuery"',
+                                    style: const TextStyle(color: AppColors.gray500),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                )
+                              : GestureDetector(
+                                  onTap: () => FocusScope.of(context).unfocus(),
+                                  child: ListView.builder(
+                                    padding: const EdgeInsets.all(20),
+                                    shrinkWrap: true,
+                                    itemCount: filteredSetlists.length,
+                                    itemBuilder: (context, index) {
+                                      final setlist = filteredSetlists[index];
+                                      // Get scores for this setlist
+                                      final setlistScores = setlist.scoreIds
+                                          .map((id) => allScores.firstWhere((s) => s.id == id, orElse: () => Score(id: '', title: 'Unknown', composer: '', dateAdded: DateTime.now(), instrumentScores: [])))
+                                          .where((s) => s.id.isNotEmpty)
+                                          .toList();
+                                      
+                                      return Container(
+                                        margin: const EdgeInsets.only(bottom: 10),
+                                        child: Material(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: InkWell(
+                                            onTap: () async {
+                                              setState(() => _importSetlistSearchQuery = '');
+                                              ref.read(showImportSetlistModalProvider.notifier).state = false;
+                                              await _copySetlistToTeam(setlist, setlistScores, currentTeam);
+                                            },
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(16),
+                                              decoration: BoxDecoration(
+                                                border: Border.all(color: AppColors.gray100),
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 48,
+                                                    height: 48,
+                                                    decoration: BoxDecoration(
+                                                      gradient: const LinearGradient(
+                                                        colors: [AppColors.emerald50, AppColors.emerald100],
+                                                      ),
+                                                      borderRadius: BorderRadius.circular(12),
+                                                    ),
+                                                    child: const Icon(AppIcons.setlistIcon, size: 20, color: AppColors.emerald600),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                        Text('${setlistScores.length} score(s)${setlist.description.isNotEmpty ? ' · ${setlist.description}' : ''}', style: const TextStyle(fontSize: 14, color: AppColors.gray500), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 32,
+                                                    height: 32,
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.gray50,
+                                                      borderRadius: BorderRadius.circular(16),
+                                                    ),
+                                                    child: const Icon(AppIcons.add, size: 18, color: AppColors.gray600),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1519,58 +2261,6 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
         ),
       );
     }
-  }
-
-  /// Show score picker dialog
-  void _showScorePicker(Team currentTeam) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => _ScorePickerSheet(
-          scrollController: scrollController,
-          team: currentTeam,
-          onScoreSelected: (score) async {
-            Navigator.pop(context);
-            await _copyScoreToTeam(score, currentTeam);
-          },
-        ),
-      ),
-    );
-  }
-
-  /// Show setlist picker dialog
-  void _showSetlistPicker(Team currentTeam) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => _SetlistPickerSheet(
-          scrollController: scrollController,
-          team: currentTeam,
-          onSetlistSelected: (setlist, scores) async {
-            Navigator.pop(context);
-            await _copySetlistToTeam(setlist, scores, currentTeam);
-          },
-        ),
-      ),
-    );
   }
 
   /// Copy a score to the team
@@ -1631,545 +2321,5 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
         ),
       );
     }
-  }
-}
-
-/// Score picker sheet widget
-class _ScorePickerSheet extends ConsumerStatefulWidget {
-  final ScrollController scrollController;
-  final Team team;
-  final void Function(Score) onScoreSelected;
-
-  const _ScorePickerSheet({
-    required this.scrollController,
-    required this.team,
-    required this.onScoreSelected,
-  });
-
-  @override
-  ConsumerState<_ScorePickerSheet> createState() => _ScorePickerSheetState();
-}
-
-class _ScorePickerSheetState extends ConsumerState<_ScorePickerSheet> {
-  String _searchQuery = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final scoresAsync = ref.watch(scoresProvider);
-
-    return Column(
-      children: [
-        // Header
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.gray300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Select Score',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              // Search box
-              TextField(
-                onChanged: (v) => setState(() => _searchQuery = v),
-                decoration: InputDecoration(
-                  hintText: 'Search scores...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  filled: true,
-                  fillColor: AppColors.gray50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        // Score list
-        Expanded(
-          child: scoresAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            data: (scores) {
-              final filtered = _searchQuery.isEmpty
-                  ? scores
-                  : scores.where((s) =>
-                      s.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                      s.composer.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-              if (filtered.isEmpty) {
-                return const Center(
-                  child: Text('No scores found', style: TextStyle(color: AppColors.gray500)),
-                );
-              }
-
-              return ListView.builder(
-                controller: widget.scrollController,
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final score = filtered[index];
-                  return ListTile(
-                    leading: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.blue50, AppColors.blue100],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(AppIcons.musicNote, color: AppColors.blue600, size: 22),
-                    ),
-                    title: Text(score.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                      '${score.composer} · ${score.instrumentScores.length} instrument(s)',
-                      style: const TextStyle(fontSize: 13, color: AppColors.gray500),
-                    ),
-                    onTap: () => widget.onScoreSelected(score),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Setlist picker sheet widget
-class _SetlistPickerSheet extends ConsumerStatefulWidget {
-  final ScrollController scrollController;
-  final Team team;
-  final void Function(Setlist, List<Score>) onSetlistSelected;
-
-  const _SetlistPickerSheet({
-    required this.scrollController,
-    required this.team,
-    required this.onSetlistSelected,
-  });
-
-  @override
-  ConsumerState<_SetlistPickerSheet> createState() => _SetlistPickerSheetState();
-}
-
-class _SetlistPickerSheetState extends ConsumerState<_SetlistPickerSheet> {
-  String _searchQuery = '';
-
-  @override
-  Widget build(BuildContext context) {
-    final setlistsAsync = ref.watch(setlistsAsyncProvider);
-    final scoresAsync = ref.watch(scoresProvider);
-
-    return Column(
-      children: [
-        // Header
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.gray300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Select Setlist',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 12),
-              // Search box
-              TextField(
-                onChanged: (v) => setState(() => _searchQuery = v),
-                decoration: InputDecoration(
-                  hintText: 'Search setlists...',
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  filled: true,
-                  fillColor: AppColors.gray50,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Divider(height: 1),
-        // Setlist list
-        Expanded(
-          child: setlistsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            data: (setlists) {
-              final filtered = _searchQuery.isEmpty
-                  ? setlists
-                  : setlists.where((s) =>
-                      s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-
-              if (filtered.isEmpty) {
-                return const Center(
-                  child: Text('No setlists found', style: TextStyle(color: AppColors.gray500)),
-                );
-              }
-
-              return ListView.builder(
-                controller: widget.scrollController,
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final setlist = filtered[index];
-                  return ListTile(
-                    leading: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.emerald50, AppColors.emerald100],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(AppIcons.setlistIcon, color: AppColors.emerald600, size: 22),
-                    ),
-                    title: Text(setlist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(
-                      '${setlist.scoreIds.length} score(s)',
-                      style: const TextStyle(fontSize: 13, color: AppColors.gray500),
-                    ),
-                    onTap: () {
-                      // Get all scores in this setlist
-                      final allScores = scoresAsync.value ?? [];
-                      final scoresInSetlist = allScores
-                          .where((s) => setlist.scoreIds.contains(s.id))
-                          .toList();
-                      widget.onSetlistSelected(setlist, scoresInSetlist);
-                    },
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Sheet for creating a new team score
-class _CreateTeamScoreSheet extends StatefulWidget {
-  final Team team;
-  final void Function(String title, String composer, int bpm) onCreated;
-
-  const _CreateTeamScoreSheet({
-    required this.team,
-    required this.onCreated,
-  });
-
-  @override
-  State<_CreateTeamScoreSheet> createState() => _CreateTeamScoreSheetState();
-}
-
-class _CreateTeamScoreSheetState extends State<_CreateTeamScoreSheet> {
-  final _titleController = TextEditingController();
-  final _composerController = TextEditingController();
-  int _bpm = 120;
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _composerController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.gray300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Create Score',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                labelText: 'Title',
-                filled: true,
-                fillColor: AppColors.gray50,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _composerController,
-              decoration: InputDecoration(
-                labelText: 'Composer',
-                filled: true,
-                fillColor: AppColors.gray50,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Text('BPM: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                Expanded(
-                  child: Slider(
-                    value: _bpm.toDouble(),
-                    min: 40,
-                    max: 240,
-                    divisions: 200,
-                    label: _bpm.toString(),
-                    onChanged: (value) => setState(() => _bpm = value.round()),
-                  ),
-                ),
-                Text('$_bpm', style: const TextStyle(fontWeight: FontWeight.w600)),
-              ],
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _titleController.text.trim().isEmpty
-                    ? null
-                    : () => widget.onCreated(
-                          _titleController.text.trim(),
-                          _composerController.text.trim().isEmpty
-                              ? 'Unknown'
-                              : _composerController.text.trim(),
-                          _bpm,
-                        ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.blue600,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Create Score', style: TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Sheet for creating a new team setlist
-class _CreateTeamSetlistSheet extends ConsumerStatefulWidget {
-  final ScrollController scrollController;
-  final Team team;
-  final void Function(String name, String? description, List<String> teamScoreIds) onCreated;
-
-  const _CreateTeamSetlistSheet({
-    required this.scrollController,
-    required this.team,
-    required this.onCreated,
-  });
-
-  @override
-  ConsumerState<_CreateTeamSetlistSheet> createState() => _CreateTeamSetlistSheetState();
-}
-
-class _CreateTeamSetlistSheetState extends ConsumerState<_CreateTeamSetlistSheet> {
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  final Set<String> _selectedScoreIds = {};
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final teamScoresAsync = ref.watch(teamScoresProvider(widget.team.serverId));
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.gray300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Create Setlist',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Name',
-                  filled: true,
-                  fillColor: AppColors.gray50,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _descriptionController,
-                decoration: InputDecoration(
-                  labelText: 'Description (optional)',
-                  filled: true,
-                  fillColor: AppColors.gray50,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Select Scores (optional)',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray500),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Divider(height: 1),
-        Expanded(
-          child: teamScoresAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
-            data: (scores) {
-              if (scores.isEmpty) {
-                return const Center(
-                  child: Text('No scores in team yet', style: TextStyle(color: AppColors.gray500)),
-                );
-              }
-
-              return ListView.builder(
-                controller: widget.scrollController,
-                itemCount: scores.length,
-                itemBuilder: (context, index) {
-                  final score = scores[index];
-                  final isSelected = _selectedScoreIds.contains(score.id);
-
-                  return CheckboxListTile(
-                    value: isSelected,
-                    onChanged: (value) {
-                      setState(() {
-                        if (value == true) {
-                          _selectedScoreIds.add(score.id);
-                        } else {
-                          _selectedScoreIds.remove(score.id);
-                        }
-                      });
-                    },
-                    secondary: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.blue50, AppColors.blue100],
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(AppIcons.musicNote, color: AppColors.blue600, size: 20),
-                    ),
-                    title: Text(score.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text(score.composer, style: const TextStyle(fontSize: 12, color: AppColors.gray500)),
-                    activeColor: AppColors.emerald600,
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _nameController.text.trim().isEmpty
-                    ? null
-                    : () => widget.onCreated(
-                          _nameController.text.trim(),
-                          _descriptionController.text.trim().isEmpty
-                              ? null
-                              : _descriptionController.text.trim(),
-                          _selectedScoreIds.toList(),
-                        ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.emerald600,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppColors.gray200,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  _selectedScoreIds.isEmpty
-                      ? 'Create Empty Setlist'
-                      : 'Create Setlist (${_selectedScoreIds.length} scores)',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }

@@ -278,11 +278,37 @@ class TeamScoresOperationsNotifier extends Notifier<void> {
     await teamDb.deleteTeamScore(teamScoreId);
     ref.invalidate(teamScoresProvider(teamServerId));
   }
+
+  /// Reorder instrument scores within a team score
+  Future<void> reorderTeamInstrumentScores(
+    int teamServerId,
+    String teamScoreId,
+    List<String> newInstrumentIds,
+  ) async {
+    final teamDb = ref.read(teamDatabaseServiceProvider);
+    await teamDb.reorderTeamInstrumentScores(teamScoreId, newInstrumentIds);
+    ref.invalidate(teamScoresProvider(teamServerId));
+  }
+
+  /// Delete a team instrument score
+  Future<void> deleteTeamInstrumentScore(
+    int teamServerId,
+    String teamScoreId,
+    String instrumentScoreId,
+  ) async {
+    final teamDb = ref.read(teamDatabaseServiceProvider);
+    await teamDb.deleteTeamInstrumentScore(instrumentScoreId);
+    ref.invalidate(teamScoresProvider(teamServerId));
+  }
 }
 
-final teamScoresOperationsProvider = NotifierProvider<TeamScoresOperationsNotifier, void>(() {
+final teamScoreOperationsProvider = NotifierProvider<TeamScoresOperationsNotifier, void>(() {
   return TeamScoresOperationsNotifier();
 });
+
+// Keep the old name for backward compatibility (deprecated)
+@Deprecated('Use teamScoreOperationsProvider instead')
+final teamScoresOperationsProvider = teamScoreOperationsProvider;
 
 // ============== Team Setlists Provider ==============
 

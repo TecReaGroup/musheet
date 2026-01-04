@@ -99,7 +99,7 @@ class _TeamScoreViewerScreenState extends ConsumerState<TeamScoreViewerScreen> {
     _bpmSaveDebounce?.cancel();
     _bpmSaveDebounce = Timer(const Duration(milliseconds: 500), () async {
       final updatedScore = _teamScore.copyWith(bpm: bpm);
-      await ref.read(teamScoresOperationsProvider.notifier).updateTeamScore(
+      await ref.read(teamScoreOperationsProvider.notifier).updateTeamScore(
         _teamScore.teamId,
         updatedScore,
       );

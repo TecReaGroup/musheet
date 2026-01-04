@@ -875,6 +875,334 @@ class NumberBadge extends StatelessWidget {
 }
 
 // ============================================================================
+// SWIPEABLE LIST ITEM - Swipe to reveal delete button
+// ============================================================================
+
+/// Swipeable list item with delete action (left swipe)
+/// Used in Library and Team screens for scores and setlists
+class SwipeableListItem extends StatelessWidget {
+  final String id;
+  final Widget child;
+  final VoidCallback onDelete;
+  final VoidCallback onTap;
+  final String? swipedItemId;
+  final double swipeOffset;
+  final bool isDragging;
+  final bool hasSwiped;
+  final void Function(String id, Offset position) onSwipeStart;
+  final void Function(Offset position) onSwipeUpdate;
+  final VoidCallback onSwipeEnd;
+  
+  static const double swipeThreshold = 32.0;
+  static const double swipeMaxOffset = 64.0;
+
+  const SwipeableListItem({
+    super.key,
+    required this.id,
+    required this.child,
+    required this.onDelete,
+    required this.onTap,
+    required this.swipedItemId,
+    required this.swipeOffset,
+    required this.isDragging,
+    required this.hasSwiped,
+    required this.onSwipeStart,
+    required this.onSwipeUpdate,
+    required this.onSwipeEnd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isSwipedItem = swipedItemId == id;
+    final offset = isSwipedItem ? swipeOffset : 0.0;
+    final showDeleteButton = offset < -swipeThreshold;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            // Red background + delete button
+            Positioned.fill(
+              child: Container(
+                color: AppColors.red500,
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    // Center trash icon in exposed area (width = -offset)
+                    SizedBox(
+                      width: -offset,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 150),
+                        opacity: showDeleteButton ? 1.0 : 0.0,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: showDeleteButton ? onDelete : null,
+                          child: const SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: Center(
+                              child: Icon(AppIcons.delete, color: Colors.white, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // Card content
+            GestureDetector(
+              onHorizontalDragStart: (details) => onSwipeStart(id, details.globalPosition),
+              onHorizontalDragUpdate: (details) => onSwipeUpdate(details.globalPosition),
+              onHorizontalDragEnd: (_) => onSwipeEnd(),
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: isDragging ? 0 : 200),
+                curve: Curves.easeOutCubic,
+                transform: Matrix4.translationValues(offset, 0, 0),
+                child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    onTap: () {
+                      if (showDeleteButton) {
+                        // Reset swipe state - handled by parent
+                        onSwipeEnd();
+                      } else if (!hasSwiped) {
+                        onTap();
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: child,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Mixin to add swipe handling capabilities to a StatefulWidget
+/// Usage: Add `with SwipeHandlerMixin` to your State class
+mixin SwipeHandlerMixin<T extends StatefulWidget> on State<T> {
+  String? swipedItemId;
+  double swipeOffset = 0;
+  Offset? dragStart;
+  bool isDragging = false;
+  bool hasSwiped = false;
+
+  static const double swipeThreshold = 32.0;
+  static const double swipeMaxOffset = 64.0;
+
+  void handleSwipeStart(String itemId, Offset position) {
+    if (swipedItemId != null && swipedItemId != itemId) {
+      setState(() {
+        swipeOffset = 0;
+        swipedItemId = null;
+      });
+    }
+    setState(() {
+      dragStart = position;
+      swipedItemId = itemId;
+      isDragging = true;
+      hasSwiped = false;
+    });
+  }
+
+  void handleSwipeUpdate(Offset position) {
+    if (dragStart == null || !isDragging) return;
+    
+    final deltaX = position.dx - dragStart!.dx;
+    final newOffset = deltaX.clamp(-swipeMaxOffset, 0.0);
+    setState(() {
+      swipeOffset = newOffset;
+      if (deltaX.abs() > 5) {
+        hasSwiped = true;
+      }
+    });
+  }
+
+  void handleSwipeEnd() {
+    if (!isDragging) return;
+    
+    setState(() {
+      if (swipeOffset < -swipeThreshold) {
+        swipeOffset = -swipeMaxOffset;
+      } else {
+        swipeOffset = 0;
+        swipedItemId = null;
+      }
+      dragStart = null;
+      isDragging = false;
+    });
+    
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() {
+          hasSwiped = false;
+        });
+      }
+    });
+  }
+
+  void resetSwipeState() {
+    setState(() {
+      swipedItemId = null;
+      swipeOffset = 0;
+    });
+  }
+}
+
+// ============================================================================
+// ITEM CARDS - Unified card components for list items
+// ============================================================================
+
+/// Score card with arrow button for detail navigation
+/// Used in Library and Team screens
+class ScoreItemCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String meta;
+  final VoidCallback? onArrowTap;
+
+  const ScoreItemCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.meta,
+    this.onArrowTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+      child: Row(
+        children: [
+          GradientIconBox.score(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  meta,
+                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                ),
+              ],
+            ),
+          ),
+          if (onArrowTap != null)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onArrowTap,
+                borderRadius: BorderRadius.circular(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Setlist card with arrow button for detail navigation
+/// Used in Library and Team screens
+class SetlistItemCard extends StatelessWidget {
+  final String name;
+  final String description;
+  final int scoreCount;
+  final String source; // 'Personal' or 'Team'
+  final VoidCallback? onArrowTap;
+
+  const SetlistItemCard({
+    super.key,
+    required this.name,
+    required this.description,
+    required this.scoreCount,
+    this.source = 'Personal',
+    this.onArrowTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+      child: Row(
+        children: [
+          GradientIconBox.setlist(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  description,
+                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • $source',
+                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                ),
+              ],
+            ),
+          ),
+          if (onArrowTap != null)
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onArrowTap,
+                borderRadius: BorderRadius.circular(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
 // TOOL BUTTONS - Tool button components
 // ============================================================================
 

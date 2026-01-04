@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import '../providers/scores_provider.dart';
+import '../providers/teams_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
+import '../models/team.dart';
 import '../utils/icon_mappings.dart';
 import '../utils/photo_to_pdf.dart';
 import '../screens/library_screen.dart' show preferredInstrumentProvider;
@@ -12,6 +14,7 @@ import '../screens/library_screen.dart' show preferredInstrumentProvider;
 /// 
 /// For library screen (New Score): showTitleComposer = true
 /// For score detail screen (Add Instrument): showTitleComposer = false
+/// For team screen (Team Score): showTitleComposer = true, isTeamScore = true
 class AddScoreWidget extends ConsumerStatefulWidget {
   const AddScoreWidget({
     super.key,
@@ -28,6 +31,8 @@ class AddScoreWidget extends ConsumerStatefulWidget {
     this.headerSubtitle,
     this.confirmButtonText,
     this.presetFilePath,
+    this.isTeamScore = false,
+    this.teamServerId,
   });
 
   /// Callback when modal is closed/cancelled
@@ -72,6 +77,12 @@ class AddScoreWidget extends ConsumerStatefulWidget {
 
   /// Preset file path from sharing intent (PDF or image)
   final String? presetFilePath;
+
+  /// Whether this is creating a team score (instead of personal library score)
+  final bool isTeamScore;
+  
+  /// The team server ID (required when isTeamScore is true)
+  final int? teamServerId;
 
   @override
   ConsumerState<AddScoreWidget> createState() => _AddScoreWidgetState();
@@ -447,7 +458,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     }
   }
 
-  void _handleConfirm() {
+  void _handleConfirm() async {
     // In copy mode, PDF is already set from source instrument
     // In normal mode, user must select a PDF
     if (_selectedPdfPath == null && widget.sourceInstrumentToCopy == null) return;
@@ -465,7 +476,50 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     
     final now = DateTime.now();
     
-    // Create the instrument score
+    // Team score mode
+    if (widget.isTeamScore && widget.teamServerId != null) {
+      final title = _titleController.text.trim();
+      if (title.isEmpty) return;
+      
+      final composer = _composerController.text.trim().isEmpty 
+          ? 'Unknown' 
+          : _composerController.text.trim();
+      
+      // Create the team instrument score
+      final teamInstrumentScore = TeamInstrumentScore(
+        id: '${now.millisecondsSinceEpoch}-tis',
+        teamScoreId: '', // Will be set by the service
+        instrumentType: _selectedInstrument!,
+        customInstrument: _selectedInstrument == InstrumentType.other
+            ? _customInstrumentController.text.trim()
+            : null,
+        pdfPath: pdfPath,
+        createdAt: now,
+      );
+      
+      // Create team score
+      final result = await ref.read(teamScoreOperationsProvider.notifier).createTeamScore(
+        teamServerId: widget.teamServerId!,
+        userId: 0, // Will be set by the service based on current user
+        title: title,
+        composer: composer,
+        bpm: 120, // Default BPM
+        instrumentScores: [teamInstrumentScore],
+      );
+      
+      if (result.success) {
+        widget.onSuccess();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result.message ?? 'Failed to create team score')),
+          );
+        }
+      }
+      return;
+    }
+    
+    // Create the instrument score (for personal library)
     final instrumentScore = InstrumentScore(
       id: '${now.millisecondsSinceEpoch}-is',
       pdfUrl: pdfPath,

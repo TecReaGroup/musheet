@@ -292,6 +292,32 @@ class TeamDatabaseService {
         ));
   }
 
+  /// Reorder team instrument scores within a team score
+  Future<void> reorderTeamInstrumentScores(String teamScoreId, List<String> newInstrumentIds) async {
+    await _db.transaction(() async {
+      final now = DateTime.now();
+      
+      // Update orderIndex for each instrument score
+      for (int i = 0; i < newInstrumentIds.length; i++) {
+        await (_db.update(_db.teamInstrumentScores)
+              ..where((tis) => tis.id.equals(newInstrumentIds[i])))
+            .write(TeamInstrumentScoresCompanion(
+              orderIndex: Value(i),
+              syncStatus: const Value('pending'),
+              updatedAt: Value(now),
+            ));
+      }
+
+      // Mark team score as pending
+      await (_db.update(_db.teamScores)..where((s) => s.id.equals(teamScoreId))).write(
+        TeamScoresCompanion(
+          syncStatus: const Value('pending'),
+          updatedAt: Value(now),
+        ),
+      );
+    });
+  }
+
   /// Delete a team instrument score (soft delete)
   /// Returns the pdfHash if present, so the caller can check reference counts and clean up.
   Future<String?> deleteTeamInstrumentScore(String teamInstrumentScoreId) async {

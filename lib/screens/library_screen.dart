@@ -272,13 +272,7 @@ class LibraryScreen extends ConsumerStatefulWidget {
   ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTickerProviderStateMixin {
-  String? _swipedItemId;
-  double _swipeOffset = 0;
-  Offset? _dragStart;
-  bool _isDragging = false;
-  bool _hasSwiped = false;
-  
+class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTickerProviderStateMixin, SwipeHandlerMixin {
   // Drawer state
   bool _isDrawerExpanded = false;
   late AnimationController _drawerController;
@@ -329,60 +323,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     }
   }
 
-  void _handleSwipeStart(String itemId, Offset position) {
-    if (_swipedItemId != null && _swipedItemId != itemId) {
-      setState(() {
-        _swipeOffset = 0;
-        _swipedItemId = null;
-      });
-    }
-    setState(() {
-      _dragStart = position;
-      _swipedItemId = itemId;
-      _isDragging = true;
-      _hasSwiped = false;
-    });
-  }
-
-  static const double _swipeThreshold = 32.0; // Trigger threshold
-  static const double _swipeMaxOffset = 64.0; // Maximum swipe distance
-
-  void _handleSwipeUpdate(Offset position) {
-    if (_dragStart == null || !_isDragging) return;
-    
-    final deltaX = position.dx - _dragStart!.dx;
-    final newOffset = deltaX.clamp(-_swipeMaxOffset, 0.0);
-    setState(() {
-      _swipeOffset = newOffset;
-      if (deltaX.abs() > 5) {
-        _hasSwiped = true;
-      }
-    });
-  }
-
-  void _handleSwipeEnd() {
-    if (!_isDragging) return;
-    
-    setState(() {
-      if (_swipeOffset < -_swipeThreshold) {
-        _swipeOffset = -_swipeMaxOffset;
-      } else {
-        _swipeOffset = 0;
-        _swipedItemId = null;
-      }
-      _dragStart = null;
-      _isDragging = false;
-    });
-    
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        setState(() {
-          _hasSwiped = false;
-        });
-      }
-    });
-  }
-
   void _handleCreateSetlist() {
     if (_nameController.text.trim().isEmpty) return;
 
@@ -427,10 +367,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               } else {
                 ref.read(setlistsAsyncProvider.notifier).deleteSetlist(id);
               }
-              setState(() {
-                _swipedItemId = null;
-                _swipeOffset = 0;
-              });
+              resetSwipeState();
               Navigator.pop(context);
             },
             child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
@@ -484,10 +421,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                             activeColor: AppColors.emerald600,
                             onTap: () {
                               ref.read(libraryTabProvider.notifier).state = LibraryTab.setlists;
-                              setState(() {
-                                _swipedItemId = null;
-                                _swipeOffset = 0;
-                              });
+                              resetSwipeState();
                             },
                           ),
                         ),
@@ -500,10 +434,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                             activeColor: AppColors.blue600,
                             onTap: () {
                               ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
-                              setState(() {
-                                _swipedItemId = null;
-                                _swipeOffset = 0;
-                              });
+                              resetSwipeState();
                             },
                           ),
                         ),
@@ -526,11 +457,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                   onTap: () {
                     // Dismiss keyboard when tapping outside
                     FocusScope.of(context).unfocus();
-                    if (_swipedItemId != null && _swipeOffset < -40) {
-                      setState(() {
-                        _swipedItemId = null;
-                        _swipeOffset = 0;
-                      });
+                    if (swipedItemId != null && swipeOffset < -40) {
+                      resetSwipeState();
                     }
                   },
                   child: activeTab == LibraryTab.setlists
@@ -594,55 +522,69 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         : setlists.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
     final sortedSetlists = _sortSetlists(filteredSetlists, sortState, recentlyOpened);
 
+    if (sortedSetlists.isEmpty && _searchQuery.isNotEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+        child: EmptyState.noSearchResults(),
+      );
+    }
+
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
       itemCount: sortedSetlists.length,
       itemBuilder: (context, index) {
           final setlist = sortedSetlists[index];
           final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
-          return _buildSwipeableItem(
+          return SwipeableListItem(
             id: setlist.id,
-            child: _LibrarySetlistCard(
-              setlist: setlist,
+            swipedItemId: swipedItemId,
+            swipeOffset: swipeOffset,
+            isDragging: isDragging,
+            hasSwiped: hasSwiped,
+            onSwipeStart: handleSwipeStart,
+            onSwipeUpdate: handleSwipeUpdate,
+            onSwipeEnd: handleSwipeEnd,
+            onDelete: () => _handleDelete(setlist.id, false),
+            onTap: () {
+              // Card tap: preview last opened score or first score
+              ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+              if (setlistScores.isNotEmpty) {
+                // Get last opened score index, default to 0 if not found
+                final lastOpenedIndex = ref.read(lastOpenedScoreInSetlistProvider.notifier).getLastOpened(setlist.id) ?? 0;
+                // Ensure index is valid
+                final validIndex = lastOpenedIndex.clamp(0, setlistScores.length - 1);
+                final selectedScore = setlistScores[validIndex];
+                
+                // Get best instrument using priority: recent > preferred > default
+                final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(selectedScore.id);
+                final preferredInstrument = ref.read(preferredInstrumentProvider);
+                final bestInstrumentIndex = getBestInstrumentIndex(selectedScore, lastOpenedInstrumentIndex, preferredInstrument);
+                final instrumentScore = selectedScore.instrumentScores.isNotEmpty ? selectedScore.instrumentScores[bestInstrumentIndex] : null;
+                
+                AppNavigation.navigateToScoreViewer(
+                  context,
+                  score: selectedScore,
+                  instrumentScore: instrumentScore,
+                  setlistScores: setlistScores,
+                  currentIndex: validIndex,
+                  setlistName: setlist.name,
+                );
+              } else {
+                // Empty setlist: go to detail screen
+                AppNavigation.navigateToSetlistDetail(context, setlist);
+              }
+            },
+            child: SetlistItemCard(
+              name: setlist.name,
+              description: setlist.description,
               scoreCount: setlistScores.length,
+              source: 'Personal',
               onArrowTap: () {
                 // Arrow tap: go to detail screen
                 ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
                 AppNavigation.navigateToSetlistDetail(context, setlist);
               },
             ),
-            onDelete: () => _handleDelete(setlist.id, false),
-            onTap: () {
-              if (!_hasSwiped) {
-                // Card tap: preview last opened score or first score
-                ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-                if (setlistScores.isNotEmpty) {
-                  // Get last opened score index, default to 0 if not found
-                  final lastOpenedIndex = ref.read(lastOpenedScoreInSetlistProvider.notifier).getLastOpened(setlist.id) ?? 0;
-                  // Ensure index is valid
-                  final validIndex = lastOpenedIndex.clamp(0, setlistScores.length - 1);
-                  final selectedScore = setlistScores[validIndex];
-                  
-                  // Get best instrument using priority: recent > preferred > default
-                  final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(selectedScore.id);
-                  final preferredInstrument = ref.read(preferredInstrumentProvider);
-                  final bestInstrumentIndex = getBestInstrumentIndex(selectedScore, lastOpenedInstrumentIndex, preferredInstrument);
-                  final instrumentScore = selectedScore.instrumentScores.isNotEmpty ? selectedScore.instrumentScores[bestInstrumentIndex] : null;
-                  
-                  AppNavigation.navigateToScoreViewer(
-                    context,
-                    score: selectedScore,
-                    instrumentScore: instrumentScore,
-                    setlistScores: setlistScores,
-                    currentIndex: validIndex,
-                    setlistName: setlist.name,
-                  );
-                } else {
-                  // Empty setlist: go to detail screen
-                  AppNavigation.navigateToSetlistDetail(context, setlist);
-                }
-              }
-            },
           );
         },
       );
@@ -665,38 +607,52 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         : scores.where((s) => s.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
     final sortedScores = _sortScores(filteredScores, sortState, recentlyOpened);
 
+    if (sortedScores.isEmpty && _searchQuery.isNotEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+        child: EmptyState.noSearchResults(),
+      );
+    }
+
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
       itemCount: sortedScores.length,
       itemBuilder: (context, index) {
           final score = sortedScores[index];
-          return _buildSwipeableItem(
+          return SwipeableListItem(
             id: score.id,
-            child: _LibraryScoreCard(
-              score: score,
+            swipedItemId: swipedItemId,
+            swipeOffset: swipeOffset,
+            isDragging: isDragging,
+            hasSwiped: hasSwiped,
+            onSwipeStart: handleSwipeStart,
+            onSwipeUpdate: handleSwipeUpdate,
+            onSwipeEnd: handleSwipeEnd,
+            onDelete: () => _handleDelete(score.id, true),
+            onTap: () {
+              ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+              // Get best instrument using priority: recent > preferred > default
+              final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(score.id);
+              final preferredInstrument = ref.read(preferredInstrumentProvider);
+              final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
+              final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
+              
+              AppNavigation.navigateToScoreViewer(
+                context,
+                score: score,
+                instrumentScore: instrumentScore,
+              );
+            },
+            child: ScoreItemCard(
+              title: score.title,
+              subtitle: score.composer,
+              meta: 'Personal',
               onArrowTap: () {
                 // Arrow tap: go to detail screen
                 ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
                 AppNavigation.navigateToScoreDetail(context, score);
               },
             ),
-            onDelete: () => _handleDelete(score.id, true),
-            onTap: () {
-              if (!_hasSwiped) {
-                ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-                // Get best instrument using priority: recent > preferred > default
-                final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(score.id);
-                final preferredInstrument = ref.read(preferredInstrumentProvider);
-                final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
-                final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
-                
-                AppNavigation.navigateToScoreViewer(
-                  context,
-                  score: score,
-                  instrumentScore: instrumentScore,
-                );
-              }
-            },
           );
         },
       );
@@ -728,7 +684,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     }
     return sorted;
   }
-
   List<Score> _sortScores(List<Score> scores, SortState sortState, Map<String, DateTime> recentlyOpened) {
     final sorted = List<Score>.from(scores);
     
@@ -1020,87 +975,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     );
   }
 
-  Widget _buildSwipeableItem({
-    required String id,
-    required Widget child,
-    required VoidCallback onDelete,
-    required VoidCallback onTap,
-  }) {
-    final isSwipedItem = _swipedItemId == id;
-    final offset = isSwipedItem ? _swipeOffset : 0.0;
-    final showDeleteButton = offset < -_swipeThreshold;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          children: [
-            // Red background + delete button
-            Positioned.fill(
-              child: Container(
-                color: AppColors.red500,
-                child: Row(
-                  children: [
-                    const Spacer(),
-                    // Center trash icon in exposed area (width = -offset)
-                    SizedBox(
-                      width: -offset,
-                      child: AnimatedOpacity(
-                        duration: const Duration(milliseconds: 150),
-                        opacity: showDeleteButton ? 1.0 : 0.0,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: showDeleteButton ? onDelete : null,
-                          child: const SizedBox(
-                            width: 56,
-                            height: 56,
-                            child: Center(
-                              child: Icon(AppIcons.delete, color: Colors.white, size: 22),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Card content
-            GestureDetector(
-              onHorizontalDragStart: (details) => _handleSwipeStart(id, details.globalPosition),
-              onHorizontalDragUpdate: (details) => _handleSwipeUpdate(details.globalPosition),
-              onHorizontalDragEnd: (_) => _handleSwipeEnd(),
-              child: AnimatedContainer(
-                duration: Duration(milliseconds: _isDragging ? 0 : 200),
-                curve: Curves.easeOutCubic,
-                transform: Matrix4.translationValues(offset, 0, 0),
-                child: Material(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InkWell(
-                    onTap: () {
-                      if (showDeleteButton) {
-                        setState(() {
-                          _swipedItemId = null;
-                          _swipeOffset = 0;
-                        });
-                      } else {
-                        onTap();
-                      }
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: child,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildCreateSetlistModal() {
     return Stack(
       children: [
@@ -1289,147 +1163,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
         ),
         ),
       ],
-    );
-  }
-}
-
-class _LibrarySetlistCard extends StatelessWidget {
-  final Setlist setlist;
-  final int scoreCount;
-  final VoidCallback? onArrowTap;
-
-  const _LibrarySetlistCard({required this.setlist, this.scoreCount = 0, this.onArrowTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gray200),
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.emerald50, AppColors.emerald100],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  setlist.name,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  setlist.description,
-                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • Personal',
-                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
-                ),
-              ],
-            ),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onArrowTap,
-              borderRadius: BorderRadius.circular(20),
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LibraryScoreCard extends StatelessWidget {
-  final Score score;
-  final VoidCallback? onArrowTap;
-
-  const _LibraryScoreCard({required this.score, this.onArrowTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gray200),
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.blue50, AppColors.blue100],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(AppIcons.musicNote, size: 24, color: AppColors.blue550),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  score.title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  score.composer,
-                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const Text(
-                  'Personal',
-                  style: TextStyle(fontSize: 12, color: AppColors.gray400),
-                ),
-              ],
-            ),
-          ),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onArrowTap,
-              borderRadius: BorderRadius.circular(20),
-              child: const Padding(
-                padding: EdgeInsets.all(8),
-                child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

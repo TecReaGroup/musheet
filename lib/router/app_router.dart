@@ -10,6 +10,7 @@ import '../screens/score_viewer_screen.dart';
 import '../screens/score_detail_screen.dart';
 import '../screens/setlist_detail_screen.dart';
 import '../screens/team_score_viewer_screen.dart';
+import '../screens/team_score_detail_screen.dart';
 import '../screens/team_setlist_detail_screen.dart';
 import '../screens/settings/instrument_preference_screen.dart';
 import '../screens/settings/cloud_sync_screen.dart';
@@ -34,6 +35,7 @@ class AppRoutes {
   static const String scoreDetail = '/score-detail';
   static const String setlistDetail = '/setlist-detail';
   static const String teamScoreViewer = '/team-score-viewer';
+  static const String teamScoreDetail = '/team-score-detail';
   static const String teamSetlistDetail = '/team-setlist-detail';
   static const String instrumentPreference = '/instrument-preference';
   static const String cloudSync = '/cloud-sync';
@@ -243,6 +245,28 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // Team Score Detail Route
+      GoRoute(
+        parentNavigatorKey: _rootNavigatorKey,
+        path: AppRoutes.teamScoreDetail,
+        pageBuilder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>;
+
+          final teamScore = extra['teamScore'] is TeamScore
+              ? extra['teamScore'] as TeamScore
+              : TeamScore.fromJson(extra['teamScore'] as Map<String, dynamic>);
+
+          final teamServerId = extra['teamServerId'] as int;
+
+          return MaterialPage(
+            key: state.pageKey,
+            child: TeamScoreDetailScreen(
+              teamScore: teamScore,
+              teamServerId: teamServerId,
+            ),
+          );
+        },
+      ),
       // Team Setlist Detail Route
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
@@ -332,6 +356,20 @@ class AppNavigation {
         'setlistScores': setlistScores,
         'currentIndex': currentIndex,
         'setlistName': setlistName,
+      },
+    );
+  }
+
+  static void navigateToTeamScoreDetail(
+    BuildContext context,
+    TeamScore teamScore, {
+    required int teamServerId,
+  }) {
+    context.push(
+      AppRoutes.teamScoreDetail,
+      extra: {
+        'teamScore': teamScore,
+        'teamServerId': teamServerId,
       },
     );
   }
