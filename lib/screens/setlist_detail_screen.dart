@@ -3,11 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/setlist.dart';
 import '../models/score.dart';
-import '../providers/setlists_provider.dart';
-import '../providers/scores_provider.dart';
+import '../providers/setlists_state_provider.dart';
+import '../providers/scores_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../router/app_router.dart';
-import 'library_screen.dart' show scoreSortProvider, recentlyOpenedScoresProvider, SortState, SortType, lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider, preferredInstrumentProvider, getBestInstrumentIndex;
+import 'library_screen.dart'
+    show
+        scoreSortProvider,
+        recentlyOpenedScoresProvider,
+        SortState,
+        SortType,
+        lastOpenedScoreInSetlistProvider,
+        lastOpenedInstrumentInScoreProvider,
+        preferredInstrumentProvider,
+        getBestInstrumentIndex;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 
@@ -17,7 +26,8 @@ class SetlistDetailScreen extends ConsumerStatefulWidget {
   const SetlistDetailScreen({super.key, required this.setlist});
 
   @override
-  ConsumerState<SetlistDetailScreen> createState() => _SetlistDetailScreenState();
+  ConsumerState<SetlistDetailScreen> createState() =>
+      _SetlistDetailScreenState();
 }
 
 class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
@@ -26,7 +36,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   String _addScoreSearchQuery = '';
   final FocusNode _addScoreSearchFocusNode = FocusNode();
   final TextEditingController _editNameController = TextEditingController();
-  final TextEditingController _editDescriptionController = TextEditingController();
+  final TextEditingController _editDescriptionController =
+      TextEditingController();
   String? _editErrorMessage;
 
   @override
@@ -50,12 +61,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
 
   // Check if another setlist with the same name exists (excluding current setlist)
   bool _isDuplicateSetlist(String name, String currentSetlistId) {
-    final setlists = ref.read(setlistsProvider);
+    final setlists = ref.read(setlistsListProvider);
     final normalizedName = name.trim().toLowerCase();
 
-    return setlists.any((s) =>
-      s.id != currentSetlistId &&
-      s.name.toLowerCase() == normalizedName
+    return setlists.any(
+      (s) => s.id != currentSetlistId && s.name.toLowerCase() == normalizedName,
     );
   }
 
@@ -63,7 +73,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   Widget build(BuildContext context) {
     // Use scoresListProvider for synchronous access
     final scores = ref.watch(scoresListProvider);
-    final setlists = ref.watch(setlistsProvider);
+    final setlists = ref.watch(setlistsListProvider);
     final currentSetlist = setlists.firstWhere(
       (s) => s.id == widget.setlist.id,
       orElse: () => widget.setlist,
@@ -97,13 +107,20 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           height: 48,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [AppColors.emerald350, AppColors.emerald550],
+                              colors: [
+                                AppColors.emerald350,
+                                AppColors.emerald550,
+                              ],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 24),
+                          child: const Icon(
+                            AppIcons.setlistIcon,
+                            color: Colors.white,
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -113,7 +130,10 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                             children: [
                               Text(
                                 currentSetlist.name,
-                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -121,15 +141,21 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                               if (currentSetlist.description.isNotEmpty) ...[
                                 Text(
                                   currentSetlist.description,
-                                  style: const TextStyle(fontSize: 13, color: AppColors.gray500),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.gray500,
+                                  ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 const SizedBox(height: 2),
                               ],
                               Text(
-                                '${setlistScores.length} ${setlistScores.length == 1 ? "score" : "scores"} · Personal · ${_formatDate(currentSetlist.dateCreated)}',
-                                style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                                '${setlistScores.length} ${setlistScores.length == 1 ? "score" : "scores"} · Personal · ${_formatDate(currentSetlist.createdAt)}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.gray400,
+                                ),
                               ),
                             ],
                           ),
@@ -139,7 +165,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
                             padding: const EdgeInsets.all(8),
-                            child: Icon(AppIcons.edit, color: AppColors.gray400, size: 20),
+                            child: Icon(
+                              AppIcons.edit,
+                              color: AppColors.gray400,
+                              size: 20,
+                            ),
                           ),
                         ),
                         GestureDetector(
@@ -147,7 +177,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
                             padding: const EdgeInsets.all(8),
-                            child: Icon(AppIcons.close, color: AppColors.gray400, size: 22),
+                            child: Icon(
+                              AppIcons.close,
+                              color: AppColors.gray400,
+                              size: 22,
+                            ),
                           ),
                         ),
                       ],
@@ -169,7 +203,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           return AnimatedBuilder(
                             animation: animation,
                             builder: (context, child) {
-                              final elevation = lerpDouble(0, 6, Curves.easeInOut.transform(animation.value))!;
+                              final elevation = lerpDouble(
+                                0,
+                                6,
+                                Curves.easeInOut.transform(animation.value),
+                              )!;
                               return Material(
                                 elevation: elevation,
                                 color: Colors.transparent,
@@ -183,14 +221,24 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         },
                         onReorder: (oldIndex, newIndex) {
                           if (newIndex > oldIndex) newIndex--;
-                          final newScoreIds = List<String>.from(currentSetlist.scoreIds);
+                          final newScoreIds = List<String>.from(
+                            currentSetlist.scoreIds,
+                          );
                           final item = newScoreIds.removeAt(oldIndex);
                           newScoreIds.insert(newIndex, item);
-                          ref.read(setlistsAsyncProvider.notifier).reorderSetlist(currentSetlist.id, newScoreIds);
+                          ref
+                              .read(setlistsStateProvider.notifier)
+                              .reorderScores(currentSetlist.id, newScoreIds);
                         },
                         itemBuilder: (context, index) {
                           final score = setlistScores[index];
-                          return _buildReorderableItem(context, index, score, setlistScores, currentSetlist);
+                          return _buildReorderableItem(
+                            context,
+                            index,
+                            score,
+                            setlistScores,
+                            currentSetlist,
+                          );
                         },
                       ),
               ),
@@ -209,14 +257,19 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.blue500,
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(AppIcons.add, size: 22),
                           SizedBox(width: 8),
-                          Text('Add Scores to Setlist', style: TextStyle(fontSize: 16)),
+                          Text(
+                            'Add Scores to Setlist',
+                            style: TextStyle(fontSize: 16),
+                          ),
                         ],
                       ),
                     ),
@@ -274,7 +327,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       topLeft: Radius.circular(24),
                       topRight: Radius.circular(24),
                     ),
-                    border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                    border: Border(
+                      bottom: BorderSide(color: AppColors.gray100),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -283,28 +338,50 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         height: 44,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [AppColors.emerald350, AppColors.emerald550],
+                            colors: [
+                              AppColors.emerald350,
+                              AppColors.emerald550,
+                            ],
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                           ),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Icon(AppIcons.edit, color: Colors.white, size: 22),
+                        child: const Icon(
+                          AppIcons.edit,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Edit Setlist', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                            Text(
+                              'Edit Setlist',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                             SizedBox(height: 2),
-                            Text('Update name and description', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                            Text(
+                              'Update name and description',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.gray500,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       IconButton(
                         onPressed: () => setState(() => _showEditModal = false),
-                        icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                        icon: const Icon(
+                          AppIcons.close,
+                          color: AppColors.gray400,
+                        ),
                       ),
                     ],
                   ),
@@ -325,14 +402,20 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         },
                         decoration: InputDecoration(
                           hintText: 'Setlist name',
-                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          hintStyle: const TextStyle(
+                            color: AppColors.gray400,
+                            fontSize: 15,
+                          ),
                           filled: true,
                           fillColor: AppColors.gray50,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -341,14 +424,20 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         maxLines: 3,
                         decoration: InputDecoration(
                           hintText: 'Description (optional)',
-                          hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                          hintStyle: const TextStyle(
+                            color: AppColors.gray400,
+                            fontSize: 15,
+                          ),
                           filled: true,
                           fillColor: AppColors.gray50,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide.none,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
                         ),
                       ),
                       // Error message
@@ -368,13 +457,26 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: () => setState(() => _showEditModal = false),
+                              onPressed: () =>
+                                  setState(() => _showEditModal = false),
                               style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppColors.gray200),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side: const BorderSide(
+                                  color: AppColors.gray200,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
-                              child: const Text('Cancel', style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.w500)),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: AppColors.gray600,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -387,26 +489,39 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                                 // Check for duplicate
                                 if (_isDuplicateSetlist(name, setlist.id)) {
                                   setState(() {
-                                    _editErrorMessage = 'A setlist with this name already exists';
+                                    _editErrorMessage =
+                                        'A setlist with this name already exists';
                                   });
                                   return;
                                 }
 
-                                ref.read(setlistsAsyncProvider.notifier).updateSetlist(
-                                  setlist.id,
-                                  name: name,
-                                  description: _editDescriptionController.text.trim(),
-                                );
+                                ref
+                                    .read(setlistsStateProvider.notifier)
+                                    .updateSetlist(
+                                      setlist.copyWith(
+                                        name: name,
+                                        description: _editDescriptionController
+                                            .text
+                                            .trim(),
+                                      ),
+                                    );
                                 setState(() => _showEditModal = false);
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.emerald500,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
                               ),
-                              child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
+                              child: const Text(
+                                'Save',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
                             ),
                           ),
                         ],
@@ -422,7 +537,13 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  Widget _buildReorderableItem(BuildContext context, int index, Score score, List<Score> setlistScores, Setlist currentSetlist) {
+  Widget _buildReorderableItem(
+    BuildContext context,
+    int index,
+    Score score,
+    List<Score> setlistScores,
+    Setlist currentSetlist,
+  ) {
     return Container(
       key: ValueKey(score.id),
       margin: const EdgeInsets.only(bottom: 10),
@@ -436,14 +557,24 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         child: InkWell(
           onTap: () {
             // Record the score index being opened in the setlist
-            ref.read(lastOpenedScoreInSetlistProvider.notifier).recordLastOpened(currentSetlist.id, index);
-            
+            ref
+                .read(lastOpenedScoreInSetlistProvider.notifier)
+                .recordLastOpened(currentSetlist.id, index);
+
             // Get best instrument using priority: recent > preferred > default
-            final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(score.id);
+            final lastOpenedInstrumentIndex = ref
+                .read(lastOpenedInstrumentInScoreProvider.notifier)
+                .getLastOpened(score.id);
             final preferredInstrument = ref.read(preferredInstrumentProvider);
-            final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
-            final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
-            
+            final bestInstrumentIndex = getBestInstrumentIndex(
+              score,
+              lastOpenedInstrumentIndex,
+              preferredInstrument,
+            );
+            final instrumentScore = score.instrumentScores.isNotEmpty
+                ? score.instrumentScores[bestInstrumentIndex]
+                : null;
+
             AppNavigation.navigateToScoreViewer(
               context,
               score: score,
@@ -471,7 +602,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       height: 56,
                       color: Colors.transparent,
                       child: const Center(
-                        child: Icon(AppIcons.dragHandle, size: 20, color: AppColors.gray400),
+                        child: Icon(
+                          AppIcons.dragHandle,
+                          size: 20,
+                          color: AppColors.gray400,
+                        ),
                       ),
                     ),
                   ),
@@ -486,7 +621,11 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                   child: Center(
                     child: Text(
                       '${index + 1}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.gray600),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.gray600,
+                      ),
                     ),
                   ),
                 ),
@@ -503,7 +642,10 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       ),
                       Text(
                         score.composer,
-                        style: const TextStyle(fontSize: 14, color: AppColors.gray500),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.gray500,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -517,7 +659,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       context: context,
                       builder: (context) => AlertDialog(
                         title: const Text('Remove Score'),
-                        content: const Text('Are you sure you want to remove this score from this setlist?'),
+                        content: const Text(
+                          'Are you sure you want to remove this score from this setlist?',
+                        ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
@@ -525,10 +669,18 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           ),
                           TextButton(
                             onPressed: () {
-                              ref.read(setlistsAsyncProvider.notifier).removeScoreFromSetlist(currentSetlist.id, score.id);
+                              ref
+                                  .read(setlistsStateProvider.notifier)
+                                  .removeScoreFromSetlist(
+                                    currentSetlist.id,
+                                    score.id,
+                                  );
                               Navigator.pop(context);
                             },
-                            child: const Text('Remove', style: TextStyle(color: AppColors.red500)),
+                            child: const Text(
+                              'Remove',
+                              style: TextStyle(color: AppColors.red500),
+                            ),
                           ),
                         ],
                       ),
@@ -555,19 +707,27 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  List<Score> _sortScores(List<Score> scores, SortState sortState, Map<String, DateTime> recentlyOpened) {
+  List<Score> _sortScores(
+    List<Score> scores,
+    SortState sortState,
+    Map<String, DateTime> recentlyOpened,
+  ) {
     final sorted = List<Score>.from(scores);
-    
+
     switch (sortState.type) {
       case SortType.recentCreated:
-        sorted.sort((a, b) => sortState.ascending 
-            ? a.dateAdded.compareTo(b.dateAdded)
-            : b.dateAdded.compareTo(a.dateAdded));
+        sorted.sort(
+          (a, b) => sortState.ascending
+              ? a.createdAt.compareTo(b.createdAt)
+              : b.createdAt.compareTo(a.createdAt),
+        );
         break;
       case SortType.alphabetical:
-        sorted.sort((a, b) => sortState.ascending
-            ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-            : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        sorted.sort(
+          (a, b) => sortState.ascending
+              ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+              : b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
         break;
       case SortType.recentOpened:
         sorted.sort((a, b) {
@@ -585,14 +745,28 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   Widget _buildAddScoreModal(List<Score> allScores, Setlist setlist) {
     final sortState = ref.watch(scoreSortProvider);
     final recentlyOpened = ref.watch(recentlyOpenedScoresProvider);
-    
-    final availableScores = allScores.where((score) => !setlist.scoreIds.contains(score.id)).toList();
+
+    final availableScores = allScores
+        .where((score) => !setlist.scoreIds.contains(score.id))
+        .toList();
     final searchedScores = _addScoreSearchQuery.isEmpty
         ? availableScores
-        : availableScores.where((score) =>
-            score.title.toLowerCase().contains(_addScoreSearchQuery.toLowerCase()) ||
-            score.composer.toLowerCase().contains(_addScoreSearchQuery.toLowerCase())).toList();
-    final filteredScores = _sortScores(searchedScores, sortState, recentlyOpened);
+        : availableScores
+              .where(
+                (score) =>
+                    score.title.toLowerCase().contains(
+                      _addScoreSearchQuery.toLowerCase(),
+                    ) ||
+                    score.composer.toLowerCase().contains(
+                      _addScoreSearchQuery.toLowerCase(),
+                    ),
+              )
+              .toList();
+    final filteredScores = _sortScores(
+      searchedScores,
+      sortState,
+      recentlyOpened,
+    );
 
     return Stack(
       children: [
@@ -645,7 +819,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         topLeft: Radius.circular(24),
                         topRight: Radius.circular(24),
                       ),
-                      border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.gray100),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -667,15 +843,31 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                               ),
                             ],
                           ),
-                          child: const Icon(AppIcons.musicNote, color: Colors.white, size: 24),
+                          child: const Icon(
+                            AppIcons.musicNote,
+                            color: Colors.white,
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Add Scores', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-                              Text('Choose scores to add', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                              Text(
+                                'Add Scores',
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                'Choose scores to add',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.gray500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -684,7 +876,10 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                             _showAddModal = false;
                             _addScoreSearchQuery = '';
                           }),
-                          icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                          icon: const Icon(
+                            AppIcons.close,
+                            color: AppColors.gray400,
+                          ),
                         ),
                       ],
                     ),
@@ -696,11 +891,19 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                     child: TextField(
                       focusNode: _addScoreSearchFocusNode,
-                      onChanged: (value) => setState(() => _addScoreSearchQuery = value),
+                      onChanged: (value) =>
+                          setState(() => _addScoreSearchQuery = value),
                       decoration: InputDecoration(
                         hintText: 'Search scores...',
-                        hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
-                        prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400, size: 20),
+                        hintStyle: const TextStyle(
+                          color: AppColors.gray400,
+                          fontSize: 15,
+                        ),
+                        prefixIcon: const Icon(
+                          AppIcons.search,
+                          color: AppColors.gray400,
+                          size: 20,
+                        ),
                         filled: true,
                         fillColor: AppColors.gray50,
                         border: OutlineInputBorder(
@@ -713,9 +916,15 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.blue400, width: 1.5),
+                          borderSide: const BorderSide(
+                            color: AppColors.blue400,
+                            width: 1.5,
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
                         isDense: true,
                       ),
                       style: const TextStyle(fontSize: 15),
@@ -732,83 +941,121 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           ),
                         )
                       : filteredScores.isEmpty
-                          ? Padding(
-                              padding: const EdgeInsets.all(48),
-                              child: Text(
-                                'No scores matching "$_addScoreSearchQuery"',
-                                style: const TextStyle(color: AppColors.gray500),
-                                textAlign: TextAlign.center,
-                              ),
-                            )
-                          : GestureDetector(
-                              onTap: () => FocusScope.of(context).unfocus(),
-                              child: ListView.builder(
-                              padding: const EdgeInsets.all(20),
-                              shrinkWrap: true,
-                              itemCount: filteredScores.length,
-                              itemBuilder: (context, index) {
-                                final score = filteredScores[index];
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              child: Material(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                child: InkWell(
-                                  onTap: () {
-                                    ref.read(setlistsAsyncProvider.notifier).addScoreToSetlist(setlist.id, score);
-                                    setState(() {
-                                      _showAddModal = false;
-                                      _addScoreSearchQuery = '';
-                                    });
-                                  },
+                      ? Padding(
+                          padding: const EdgeInsets.all(48),
+                          child: Text(
+                            'No scores matching "$_addScoreSearchQuery"',
+                            style: const TextStyle(color: AppColors.gray500),
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      : GestureDetector(
+                          onTap: () => FocusScope.of(context).unfocus(),
+                          child: ListView.builder(
+                            padding: const EdgeInsets.all(20),
+                            shrinkWrap: true,
+                            itemCount: filteredScores.length,
+                            itemBuilder: (context, index) {
+                              final score = filteredScores[index];
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                child: Material(
+                                  color: Colors.white,
                                   borderRadius: BorderRadius.circular(16),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(color: AppColors.gray100),
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Container(
-                                          width: 48,
-                                          height: 48,
-                                          decoration: BoxDecoration(
-                                            gradient: const LinearGradient(
-                                              colors: [AppColors.blue50, AppColors.blue100],
+                                  child: InkWell(
+                                    onTap: () {
+                                      ref
+                                          .read(setlistsStateProvider.notifier)
+                                          .addScoreToSetlist(
+                                            setlist.id,
+                                            score.id,
+                                          );
+                                      setState(() {
+                                        _showAddModal = false;
+                                        _addScoreSearchQuery = '';
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: AppColors.gray100,
+                                        ),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 48,
+                                            height: 48,
+                                            decoration: BoxDecoration(
+                                              gradient: const LinearGradient(
+                                                colors: [
+                                                  AppColors.blue50,
+                                                  AppColors.blue100,
+                                                ],
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
-                                            borderRadius: BorderRadius.circular(12),
+                                            child: const Icon(
+                                              AppIcons.musicNote,
+                                              size: 20,
+                                              color: AppColors.blue600,
+                                            ),
                                           ),
-                                          child: const Icon(AppIcons.musicNote, size: 20, color: AppColors.blue600),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                              Text(score.composer, style: const TextStyle(fontSize: 14, color: AppColors.gray500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                            ],
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  score.title,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                                Text(
+                                                  score.composer,
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: AppColors.gray500,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                        Container(
-                                          width: 32,
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color: AppColors.gray50,
-                                            borderRadius: BorderRadius.circular(16),
+                                          Container(
+                                            width: 32,
+                                            height: 32,
+                                            decoration: BoxDecoration(
+                                              color: AppColors.gray50,
+                                              borderRadius:
+                                                  BorderRadius.circular(16),
+                                            ),
+                                            child: const Icon(
+                                              AppIcons.add,
+                                              size: 18,
+                                              color: AppColors.gray400,
+                                            ),
                                           ),
-                                          child: const Icon(AppIcons.add, size: 18, color: AppColors.gray400),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                            ),
                 ),
               ],
             ),

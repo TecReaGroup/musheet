@@ -6,7 +6,7 @@ class Scores extends Table {
   TextColumn get title => text()();
   TextColumn get composer => text()();
   IntColumn get bpm => integer().withDefault(const Constant(120))();
-  DateTimeColumn get dateAdded => dateTime()();
+  DateTimeColumn get createdAt => dateTime()();
 
   // Sync fields (aligned with sync_logic.md)
   // Note: userId is NOT stored on frontend - backend extracts it from session

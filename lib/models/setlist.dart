@@ -9,33 +9,30 @@ class Setlist with SetlistBase {
   final String description; // Non-nullable for personal setlists
   @override
   final List<String> scoreIds; // Store only score IDs as references
-  final DateTime dateCreated;
+  @override
+  final DateTime createdAt;
 
   Setlist({
     required this.id,
     required this.name,
     required this.description,
     required this.scoreIds,
-    required this.dateCreated,
+    required this.createdAt,
   });
-
-  // Implement base interface
-  @override
-  DateTime get createdAt => dateCreated;
 
   Setlist copyWith({
     String? id,
     String? name,
     String? description,
     List<String>? scoreIds,
-    DateTime? dateCreated,
+    DateTime? createdAt,
   }) =>
       Setlist(
         id: id ?? this.id,
         name: name ?? this.name,
         description: description ?? this.description,
         scoreIds: scoreIds ?? this.scoreIds,
-        dateCreated: dateCreated ?? this.dateCreated,
+        createdAt: createdAt ?? this.createdAt,
       );
 
   Map<String, dynamic> toJson() => {
@@ -43,7 +40,7 @@ class Setlist with SetlistBase {
         'name': name,
         'description': description,
         'scoreIds': scoreIds,
-        'dateCreated': dateCreated.toIso8601String(),
+        'createdAt': createdAt.toIso8601String(),
       };
 
   factory Setlist.fromJson(Map<String, dynamic> json) => Setlist(
@@ -51,6 +48,6 @@ class Setlist with SetlistBase {
         name: json['name'],
         description: json['description'],
         scoreIds: (json['scoreIds'] as List).cast<String>(),
-        dateCreated: DateTime.parse(json['dateCreated']),
+        createdAt: DateTime.parse(json['createdAt']),
       );
 }

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
-import '../providers/scores_provider.dart';
-import '../providers/teams_provider.dart';
+import '../core/sync/pdf_sync_service.dart';
+import '../providers/scores_state_provider.dart';
+import '../providers/teams_state_provider.dart';
+import '../screens/library_screen.dart' show preferredInstrumentProvider;
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/team.dart';
 import '../utils/icon_mappings.dart';
+import '../utils/logger.dart';
 import '../utils/photo_to_pdf.dart';
-import '../screens/library_screen.dart' show preferredInstrumentProvider;
 
 /// A reusable widget for adding new scores or instrument sheets.
 /// 
@@ -176,8 +178,8 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
 
     // If in copy mode, auto-set the PDF from source instrument
     if (widget.sourceInstrumentToCopy != null) {
-      _selectedPdfPath = widget.sourceInstrumentToCopy!.pdfUrl;
-      _selectedPdfName = widget.sourceInstrumentToCopy!.pdfUrl.split('/').last;
+      _selectedPdfPath = widget.sourceInstrumentToCopy!.pdfPath;
+      _selectedPdfName = widget.sourceInstrumentToCopy!.pdfPath?.split('/').last;
     }
 
     // If preset file path is provided (from sharing intent)
@@ -294,7 +296,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   }
 
   void _updateTitleSuggestions(String query) {
-    final suggestions = ref.read(scoresProvider.notifier).getSuggestionsByTitle(query);
+    final suggestions = ref.read(scoresStateProvider.notifier).getSuggestionsByTitle(query);
     setState(() {
       _titleSuggestions = suggestions;
       _showTitleSuggestions = suggestions.isNotEmpty && query.isNotEmpty;
@@ -346,7 +348,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     }
     
     final composerToCheck = composer.isEmpty ? 'Unknown' : composer;
-    final matched = ref.read(scoresProvider.notifier).findByTitleAndComposer(title, composerToCheck);
+    final matched = ref.read(scoresStateProvider.notifier).findByTitleAndComposer(title, composerToCheck);
     
     setState(() {
       _matchedScore = matched;
@@ -472,7 +474,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   void _handleConfirm() async {
     // In copy mode, PDF is already set from source instrument
     // In normal mode, user must select a PDF
-    final sourcePdfFromCopy = widget.sourceInstrumentToCopy?.pdfUrl ?? widget.sourceTeamInstrumentToCopy?.pdfPath;
+    final sourcePdfFromCopy = widget.sourceInstrumentToCopy?.pdfPath ?? widget.sourceTeamInstrumentToCopy?.pdfPath;
     if (_selectedPdfPath == null && sourcePdfFromCopy == null) return;
     
     // Use source PDF if in copy mode
@@ -490,8 +492,17 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     
     // Team score mode - adding to existing team score
     if (widget.isTeamScore && widget.teamServerId != null && widget.existingTeamScore != null && !widget.showTitleComposer) {
-      // Create the team instrument score
-      final teamInstrumentScore = TeamInstrumentScore(
+      // Calculate PDF hash for sync
+      String? teamPdfHash;
+      try {
+        teamPdfHash = await PdfSyncService.calculateFileHash(pdfPath);
+        Log.d('ADD_SCORE', 'Team IS pdfHash: $teamPdfHash');
+      } catch (e) {
+        Log.e('ADD_SCORE', 'Failed to calculate team PDF hash', error: e);
+      }
+      
+      // Create team instrument score
+      final teamInstrument = TeamInstrumentScore(
         id: '${now.millisecondsSinceEpoch}-tis',
         teamScoreId: widget.existingTeamScore!.id,
         instrumentType: _selectedInstrument!,
@@ -499,72 +510,94 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
             ? _customInstrumentController.text.trim()
             : null,
         pdfPath: pdfPath,
+        pdfHash: teamPdfHash,
+        orderIndex: widget.existingTeamScore!.instrumentScores.length,
         createdAt: now,
       );
       
-      // Add instrument to existing team score
-      await ref.read(teamScoreOperationsProvider.notifier).addTeamInstrumentScore(
-        widget.teamServerId!,
-        widget.existingTeamScore!.id,
-        teamInstrumentScore,
+      final success = await addTeamInstrumentScore(
+        ref: ref,
+        teamServerId: widget.teamServerId!,
+        scoreId: widget.existingTeamScore!.id,
+        instrument: teamInstrument,
       );
       
-      widget.onSuccess();
+      if (!mounted) return;
+      if (success) {
+        widget.onSuccess();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add instrument')),
+        );
+      }
       return;
     }
     
     // Team score mode - creating new team score
     if (widget.isTeamScore && widget.teamServerId != null) {
-      final title = _titleController.text.trim();
-      if (title.isEmpty) return;
+      // Calculate PDF hash for sync
+      String? newTeamPdfHash;
+      try {
+        newTeamPdfHash = await PdfSyncService.calculateFileHash(pdfPath);
+        Log.d('ADD_SCORE', 'New Team IS pdfHash: $newTeamPdfHash');
+      } catch (e) {
+        Log.e('ADD_SCORE', 'Failed to calculate new team PDF hash', error: e);
+      }
       
-      final composer = _composerController.text.trim().isEmpty 
-          ? 'Unknown' 
-          : _composerController.text.trim();
-      
-      // Create the team instrument score
-      final teamInstrumentScore = TeamInstrumentScore(
+      // Create team instrument score
+      final teamInstrument = TeamInstrumentScore(
         id: '${now.millisecondsSinceEpoch}-tis',
-        teamScoreId: '', // Will be set by the service
+        teamScoreId: '',  // Will be set by createTeamScore
         instrumentType: _selectedInstrument!,
         customInstrument: _selectedInstrument == InstrumentType.other
             ? _customInstrumentController.text.trim()
             : null,
         pdfPath: pdfPath,
+        pdfHash: newTeamPdfHash,
+        orderIndex: 0,
         createdAt: now,
       );
       
-      // Create team score
-      final result = await ref.read(teamScoreOperationsProvider.notifier).createTeamScore(
+      final teamScore = await createTeamScore(
+        ref: ref,
         teamServerId: widget.teamServerId!,
-        userId: 0, // Will be set by the service based on current user
-        title: title,
-        composer: composer,
-        bpm: 120, // Default BPM
-        instrumentScores: [teamInstrumentScore],
+        title: _titleController.text.trim(),
+        composer: _composerController.text.trim().isEmpty 
+            ? 'Unknown' 
+            : _composerController.text.trim(),
+        instrumentScores: [teamInstrument],
       );
       
-      if (result.success) {
+      if (!mounted) return;
+      if (teamScore != null) {
         widget.onSuccess();
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(result.message ?? 'Failed to create team score')),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to create team score')),
+        );
       }
       return;
+    }
+    
+    // Calculate PDF hash for sync
+    String? pdfHash;
+    try {
+      pdfHash = await PdfSyncService.calculateFileHash(pdfPath);
+      Log.d('ADD_SCORE', 'Calculated pdfHash: $pdfHash');
+    } catch (e) {
+      Log.e('ADD_SCORE', 'Failed to calculate PDF hash', error: e);
     }
     
     // Create the instrument score (for personal library)
     final instrumentScore = InstrumentScore(
       id: '${now.millisecondsSinceEpoch}-is',
-      pdfUrl: pdfPath,
+      pdfPath: pdfPath,
+      pdfHash: pdfHash,
       instrumentType: _selectedInstrument!,
       customInstrument: _selectedInstrument == InstrumentType.other
           ? _customInstrumentController.text.trim()
           : null,
-      dateAdded: now,
+      createdAt: now,
     );
     
     if (widget.showTitleComposer) {
@@ -578,22 +611,22 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       
       if (_matchedScore != null) {
         // Add instrument score to existing score
-        ref.read(scoresProvider.notifier).addInstrumentScore(_matchedScore!.id, instrumentScore);
+        ref.read(scoresStateProvider.notifier).addInstrumentScore(_matchedScore!.id, instrumentScore);
       } else {
         // Create new score with instrument score
         final newScore = Score(
           id: now.millisecondsSinceEpoch.toString(),
           title: title,
           composer: composer,
-          dateAdded: now,
+          createdAt: now,
           instrumentScores: [instrumentScore],
         );
-        ref.read(scoresProvider.notifier).addScore(newScore);
+        ref.read(scoresStateProvider.notifier).addScore(newScore);
       }
     } else {
       // Score detail screen mode: add to existing score
       if (widget.existingScore != null) {
-        ref.read(scoresProvider.notifier).addInstrumentScore(
+        ref.read(scoresStateProvider.notifier).addInstrumentScore(
           widget.existingScore!.id, 
           instrumentScore,
         );

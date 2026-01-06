@@ -13,11 +13,11 @@ import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'utils/icon_mappings.dart';
 import 'router/app_router.dart';
-import 'providers/storage_providers.dart';
-import 'providers/scores_provider.dart';
-import 'providers/setlists_provider.dart';
-import 'providers/auth_provider.dart';
-import 'providers/sync_provider.dart';
+import 'providers/core_providers.dart';
+import 'providers/scores_state_provider.dart';
+import 'providers/setlists_state_provider.dart';
+import 'providers/auth_state_provider.dart';
+import 'utils/logger.dart';
 
 enum AppPage { home, library, team, settings }
 
@@ -25,11 +25,14 @@ enum AppPage { home, library, team, settings }
 class ClearSearchRequestNotifier extends Notifier<int> {
   @override
   int build() => 0;
-  
+
   void trigger() => state++;
 }
 
-final clearSearchRequestProvider = NotifierProvider<ClearSearchRequestNotifier, int>(ClearSearchRequestNotifier.new);
+final clearSearchRequestProvider =
+    NotifierProvider<ClearSearchRequestNotifier, int>(
+      ClearSearchRequestNotifier.new,
+    );
 
 // Provider to store shared file path from sharing intent
 class SharedFilePathNotifier extends Notifier<String?> {
@@ -40,7 +43,10 @@ class SharedFilePathNotifier extends Notifier<String?> {
   void clear() => state = null;
 }
 
-final sharedFilePathProvider = NotifierProvider<SharedFilePathNotifier, String?>(SharedFilePathNotifier.new);
+final sharedFilePathProvider =
+    NotifierProvider<SharedFilePathNotifier, String?>(
+      SharedFilePathNotifier.new,
+    );
 
 // Flag to prevent multiple auth initialization attempts
 bool _authInitialized = false;
@@ -63,24 +69,16 @@ class MuSheetApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the storage initializer to trigger initialization
-    final storageInit = ref.watch(storageInitializerProvider);
-
     // Watch the scores provider to trigger initial load
-    final scoresAsync = ref.watch(scoresProvider);
+    final scoresAsync = ref.watch(scoresStateProvider);
 
     // Watch the setlists provider to trigger initial load
-    final setlistsAsync = ref.watch(setlistsAsyncProvider);
-
-    // Activate the sync completion watcher to auto-refresh data after sync
-    ref.watch(syncCompletionWatcherProvider);
+    final setlistsAsync = ref.watch(setlistsStateProvider);
 
     // Show splash until all data is loaded (only during initial app load)
-    final isLoading = storageInit.isLoading ||
-        scoresAsync.isLoading ||
-        setlistsAsync.isLoading;
+    final isLoading = scoresAsync.isLoading || setlistsAsync.isLoading;
 
-    final hasError = storageInit.hasError || scoresAsync.hasError || setlistsAsync.hasError;
+    final hasError = scoresAsync.hasError || setlistsAsync.hasError;
 
     // Only show splash screen during initial app loading
     // After initial load, don't show splash for subsequent provider reloads (login/logout)
@@ -97,7 +95,7 @@ class MuSheetApp extends ConsumerWidget {
     }
 
     if (hasError) {
-      final error = storageInit.error ?? scoresAsync.error ?? setlistsAsync.error;
+      final error = scoresAsync.error ?? setlistsAsync.error;
       return AnnotatedRegion<SystemUiOverlayStyle>(
         value: _systemUiStyle,
         child: MaterialApp(
@@ -121,35 +119,32 @@ class MuSheetApp extends ConsumerWidget {
     if (!_authInitialized) {
       _authInitialized = true;
       Future.microtask(() async {
-        debugPrint('[App] Starting auth initialization microtask (one-time)...');
+        Log.d('App', 'Starting auth initialization microtask (one-time)...');
         try {
-          // First initialize auth from preferences (requires preferences to be loaded)
-          debugPrint('[App] Calling initializeFromPreferences...');
-          await ref.read(authProvider.notifier).initializeFromPreferences();
-          debugPrint('[App] initializeFromPreferences completed');
+          // First initialize auth from stored credentials
+          Log.d('App', 'Calling initialize...');
+          await ref.read(authStateProvider.notifier).initialize();
+          Log.d('App', 'initialize completed');
           // Then restore session with network validation
-          debugPrint('[App] Calling restoreSession...');
-          await ref.read(authProvider.notifier).restoreSession();
-          debugPrint('[App] restoreSession completed');
+          Log.d('App', 'Calling restoreSession...');
+          await ref.read(authStateProvider.notifier).restoreSession();
+          Log.d('App', 'restoreSession completed');
 
-          // Start background sync if logged in - await the FutureProvider
-          // Invalidate sync provider to ensure it re-evaluates with new auth state
-          // This is necessary because the provider may have been built before RpcClient was logged in
-          ref.invalidate(syncServiceProvider);
-          debugPrint('[App] Awaiting syncServiceProvider.future...');
-          final syncService = await ref.read(syncServiceProvider.future);
-          debugPrint('[App] syncServiceProvider resolved: ${syncService != null ? "service available" : "null"}');
-          if (syncService != null) {
-            debugPrint('[App] Calling startBackgroundSync...');
-            await syncService.startBackgroundSync();
-            debugPrint('[App] startBackgroundSync completed');
-            // Note: UI refresh after sync is handled by syncCompletionWatcherProvider
+          // Start background sync if logged in
+          final syncCoordinator = ref.read(syncCoordinatorProvider);
+          Log.d(
+            'App',
+            'syncCoordinatorProvider resolved: ${syncCoordinator != null ? "service available" : "null"}',
+          );
+          if (syncCoordinator != null) {
+            Log.d('App', 'Triggering sync...');
+            await syncCoordinator.syncNow();
+            Log.d('App', 'Sync completed');
           } else {
-            debugPrint('[App] Sync service is null, skipping background sync');
+            Log.d('App', 'Sync coordinator is null, skipping background sync');
           }
         } catch (e, stack) {
-          debugPrint('[App] Auth initialization failed: $e');
-          debugPrint('[App] Stack trace: $stack');
+          Log.e('App', 'Auth initialization failed', error: e, stackTrace: stack);
           // Reset flag to allow retry on next build
           _authInitialized = false;
         }
@@ -171,7 +166,7 @@ class MuSheetApp extends ConsumerWidget {
 
 class MainScaffold extends ConsumerStatefulWidget {
   final Widget child;
-  
+
   const MainScaffold({super.key, required this.child});
 
   @override
@@ -201,26 +196,31 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       if (!mounted) return;
 
       // Handle shared files when app is opened from sharing
-      ReceiveSharingIntent.instance.getInitialMedia().then((List<SharedMediaFile> value) {
-        if (value.isNotEmpty && mounted) {
-          _handleSharedFiles(value);
-        }
-      }).catchError((e) {
-        debugPrint('Error getting initial media: $e');
-      });
+      ReceiveSharingIntent.instance
+          .getInitialMedia()
+          .then((List<SharedMediaFile> value) {
+            if (value.isNotEmpty && mounted) {
+              _handleSharedFiles(value);
+            }
+          })
+          .catchError((e) {
+            debugPrint('Error getting initial media: $e');
+          });
     });
 
     // Handle shared files when app is already running
-    _intentDataStreamSubscription = ReceiveSharingIntent.instance.getMediaStream().listen(
-      (List<SharedMediaFile> value) {
-        if (value.isNotEmpty && mounted) {
-          _handleSharedFiles(value);
-        }
-      },
-      onError: (err) {
-        debugPrint('Error receiving shared files: $err');
-      },
-    );
+    _intentDataStreamSubscription = ReceiveSharingIntent.instance
+        .getMediaStream()
+        .listen(
+          (List<SharedMediaFile> value) {
+            if (value.isNotEmpty && mounted) {
+              _handleSharedFiles(value);
+            }
+          },
+          onError: (err) {
+            debugPrint('Error receiving shared files: $err');
+          },
+        );
   }
 
   Future<void> _handleSharedFiles(List<SharedMediaFile> sharedFiles) async {
@@ -231,7 +231,14 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
     // Check if it's a PDF or image file
     final extension = filePath.split('.').last.toLowerCase();
     final isPdf = extension == 'pdf';
-    final isImage = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].contains(extension);
+    final isImage = [
+      'jpg',
+      'jpeg',
+      'png',
+      'gif',
+      'bmp',
+      'webp',
+    ].contains(extension);
 
     if (isPdf || isImage) {
       try {
@@ -245,7 +252,8 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         final directory = await getApplicationDocumentsDirectory();
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final fileName = filePath.split('/').last.split('\\').last;
-        final destPath = '${directory.path}${Platform.pathSeparator}shared_${timestamp}_$fileName';
+        final destPath =
+            '${directory.path}${Platform.pathSeparator}shared_${timestamp}_$fileName';
 
         // Copy file to app directory
         await sourceFile.copy(destPath);
@@ -273,7 +281,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
   Future<bool> _onWillPop() async {
     final searchQuery = ref.read(searchQueryProvider);
-    
+
     // If search is active, clear search and return to home
     if (searchQuery.isNotEmpty) {
       ref.read(searchQueryProvider.notifier).state = '';
@@ -281,34 +289,39 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       context.go(AppRoutes.home);
       return false;
     }
-    
+
     // Double back to exit - only exit if snackbar is currently visible
     if (_isSnackBarVisible) {
       return true;
     }
-    
+
     // Show snackbar
     _isSnackBarVisible = true;
     ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'Press back again to exit',
-          style: TextStyle(color: Colors.white, fontSize: 14),
-        ),
-        backgroundColor: AppColors.gray700,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        margin: const EdgeInsets.only(
-          bottom: 12,
-          left: 16,
-          right: 16,
-        ),
-        duration: const Duration(seconds: 1),
-      ),
-    ).closed.then((_) {
-      _isSnackBarVisible = false;
-    });
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Press back again to exit',
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
+            backgroundColor: AppColors.gray700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            margin: const EdgeInsets.only(
+              bottom: 12,
+              left: 16,
+              right: 16,
+            ),
+            duration: const Duration(seconds: 1),
+          ),
+        )
+        .closed
+        .then((_) {
+          _isSnackBarVisible = false;
+        });
     return false;
   }
 
@@ -316,7 +329,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
   Widget build(BuildContext context) {
     final teamEnabled = ref.watch(teamEnabledProvider);
     final currentLocation = GoRouterState.of(context).uri.path;
-    
+
     // Determine current page from location
     AppPage currentPage = _getPageFromLocation(currentLocation);
 
@@ -346,59 +359,61 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             extendBodyBehindAppBar: true,
             body: widget.child,
             bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            // Add white background to ensure bottom navigation bar is visible
-            color: Colors.white,
-            border: Border(
-              top: BorderSide(
-                color: Colors.grey.shade200,
-                width: 1,
+              decoration: BoxDecoration(
+                // Add white background to ensure bottom navigation bar is visible
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: Colors.grey.shade200,
+                    width: 1,
+                  ),
+                ),
+              ),
+              // Add bottom safe area padding
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).padding.bottom,
+              ),
+              child: Theme(
+                // Disable ripple effect on bottom navigation bar
+                data: Theme.of(context).copyWith(
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                ),
+                child: BottomNavigationBar(
+                  currentIndex: _getAdjustedIndex(currentPage, teamEnabled),
+                  onTap: (index) {
+                    final page = _getPageFromIndex(index, teamEnabled);
+                    _navigateToPage(context, page);
+                  },
+                  type: BottomNavigationBarType.fixed,
+                  elevation: 0,
+                  items: [
+                    const BottomNavigationBarItem(
+                      icon: Icon(AppIcons.homeOutlined),
+                      activeIcon: Icon(AppIcons.home),
+                      label: 'Home',
+                    ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(AppIcons.libraryMusicOutlined),
+                      activeIcon: Icon(AppIcons.libraryMusic),
+                      label: 'Library',
+                    ),
+                    if (teamEnabled)
+                      const BottomNavigationBarItem(
+                        icon: Icon(AppIcons.peopleOutline),
+                        activeIcon: Icon(AppIcons.people),
+                        label: 'Team',
+                      ),
+                    const BottomNavigationBarItem(
+                      icon: Icon(AppIcons.settingsOutlined),
+                      activeIcon: Icon(AppIcons.settings),
+                      label: 'Settings',
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          // Add bottom safe area padding
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
-          child: Theme(
-            // Disable ripple effect on bottom navigation bar
-            data: Theme.of(context).copyWith(
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-            ),
-            child: BottomNavigationBar(
-              currentIndex: _getAdjustedIndex(currentPage, teamEnabled),
-              onTap: (index) {
-                final page = _getPageFromIndex(index, teamEnabled);
-                _navigateToPage(context, page);
-              },
-              type: BottomNavigationBarType.fixed,
-              elevation: 0,
-              items: [
-                const BottomNavigationBarItem(
-                  icon: Icon(AppIcons.homeOutlined),
-                  activeIcon: Icon(AppIcons.home),
-                  label: 'Home',
-                ),
-                const BottomNavigationBarItem(
-                  icon: Icon(AppIcons.libraryMusicOutlined),
-                  activeIcon: Icon(AppIcons.libraryMusic),
-                  label: 'Library',
-                ),
-                if (teamEnabled)
-                  const BottomNavigationBarItem(
-                    icon: Icon(AppIcons.peopleOutline),
-                    activeIcon: Icon(AppIcons.people),
-                    label: 'Team',
-                  ),
-                const BottomNavigationBarItem(
-                  icon: Icon(AppIcons.settingsOutlined),
-                  activeIcon: Icon(AppIcons.settings),
-                  label: 'Settings',
-                ),
-              ],
-            ),
-          ),
-        ),
-        ),
         ],
       ),
     );

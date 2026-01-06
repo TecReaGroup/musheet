@@ -11,16 +11,22 @@ import '../models/score.dart';
 import '../models/team.dart';
 import '../models/annotation.dart';
 import '../models/viewer_data.dart';
-import '../providers/scores_provider.dart';
-import '../providers/sync_provider.dart';
-import '../providers/teams_provider.dart';
+import '../providers/scores_state_provider.dart';
+import '../providers/teams_state_provider.dart';
+import '../providers/core_providers.dart';
+import '../core/sync/pdf_sync_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/metronome_widget.dart';
 import '../utils/icon_mappings.dart';
 import '../utils/pdf_export_service.dart';
-import '../providers/setlists_provider.dart';
+import '../providers/setlists_state_provider.dart';
 import '../router/app_router.dart';
-import 'library_screen.dart' show lastOpenedScoreInSetlistProvider, lastOpenedInstrumentInScoreProvider, preferredInstrumentProvider, getBestInstrumentIndex;
+import 'library_screen.dart'
+    show
+        lastOpenedScoreInSetlistProvider,
+        lastOpenedInstrumentInScoreProvider,
+        preferredInstrumentProvider,
+        getBestInstrumentIndex;
 
 /// Unified Score Viewer Screen
 /// Supports both personal library scores and team scores
@@ -29,12 +35,12 @@ class ScoreViewerScreen extends ConsumerStatefulWidget {
   final Score? score;
   final InstrumentScore? instrumentScore;
   final List<Score>? setlistScores;
-  
-  // Team mode  
+
+  // Team mode
   final TeamScore? teamScore;
   final TeamInstrumentScore? teamInstrumentScore;
   final List<TeamScore>? teamSetlistScores;
-  
+
   // Common
   final int? currentIndex;
   final String? setlistName;
@@ -47,9 +53,9 @@ class ScoreViewerScreen extends ConsumerStatefulWidget {
     this.setlistScores,
     this.currentIndex,
     this.setlistName,
-  })  : teamScore = null,
-        teamInstrumentScore = null,
-        teamSetlistScores = null;
+  }) : teamScore = null,
+       teamInstrumentScore = null,
+       teamSetlistScores = null;
 
   /// Constructor for team scores
   const ScoreViewerScreen.team({
@@ -59,9 +65,9 @@ class ScoreViewerScreen extends ConsumerStatefulWidget {
     this.teamSetlistScores,
     this.currentIndex,
     this.setlistName,
-  })  : score = null,
-        instrumentScore = null,
-        setlistScores = null;
+  }) : score = null,
+       instrumentScore = null,
+       setlistScores = null;
 
   /// Check if this is a team score viewer
   bool get isTeamMode => teamScore != null;
@@ -95,17 +101,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   ScrollController? _setlistScrollController;
   ScrollController? _instrumentScrollController;
   bool _showUI = false;
-  
+
   // Current instrument score being viewed (unified)
   ViewerInstrumentData? _currentInstrument;
-  
+
   // Team mode state
   late ViewerScoreData _scoreData;
-  
+
   // Page indicator auto-hide
   bool _showPageIndicator = false;
   Timer? _pageIndicatorTimer;
-  
+
   // Metronome controller - persists across modal open/close
   MetronomeController? _metronomeController;
 
@@ -113,8 +119,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   Size _previewSize = Size.zero;
 
   // Cached provider notifier for safe dispose usage
-  ScoresNotifier? _scoresNotifier;
-  
+  ScoresStateNotifier? _scoresNotifier;
+
   // BPM save debounce for team mode
   Timer? _bpmSaveDebounce;
 
@@ -131,14 +137,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   // Track last saved BPM to avoid unnecessary updates
   int _lastSavedBpm = 120;
-  
+
   // Helper getters
   bool get _isTeamMode => widget.isTeamMode;
 
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize unified score data
     if (widget.isTeamMode) {
       _scoreData = ViewerScoreData.fromTeam(widget.teamScore!);
@@ -151,28 +157,28 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           ? ViewerInstrumentData.fromPersonal(widget.instrumentScore!)
           : _scoreData.firstInstrumentScore;
     }
-    
+
     // Initialize metronome with score's saved BPM
     _lastSavedBpm = _scoreData.bpm;
     _metronomeController = MetronomeController(bpm: _scoreData.bpm);
     _metronomeController!.addListener(_onMetronomeChanged);
     _initAnnotations();
     _loadPdfDocument();
-    
+
     // Cache the notifier for safe dispose usage (personal mode only)
     if (!_isTeamMode) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _scoresNotifier = ref.read(scoresProvider.notifier);
+        _scoresNotifier = ref.read(scoresStateProvider.notifier);
       });
     }
   }
-  
+
   void _onMetronomeChanged() {
     // Update UI when metronome state changes
     if (mounted) {
       setState(() {});
-      
+
       // Save BPM to score when it changes
       final currentBpm = _metronomeController?.bpm ?? 120;
       if (currentBpm != _lastSavedBpm) {
@@ -181,25 +187,25 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       }
     }
   }
-  
+
   /// Save BPM - handles both personal and team modes
-  void _saveBpm(int bpm) {
+  void _saveBpm(int bpm) async {
     if (_isTeamMode) {
-      // Team mode: debounce and save via team provider
-      _bpmSaveDebounce?.cancel();
-      _bpmSaveDebounce = Timer(const Duration(milliseconds: 500), () async {
-        final updatedScore = _scoreData.teamScore.copyWith(bpm: bpm);
-        await ref.read(teamScoreOperationsProvider.notifier).updateTeamScore(
-          _scoreData.teamId!,
-          updatedScore,
+      // Team mode: save via team operations
+      if (widget.teamScore != null) {
+        final updatedScore = widget.teamScore!.copyWith(bpm: bpm);
+        await updateTeamScore(
+          ref: ref,
+          teamServerId: widget.teamScore!.teamId,
+          score: updatedScore,
         );
-      });
+      }
     } else {
       // Personal mode: save via scores provider
-      ref.read(scoresProvider.notifier).updateBpm(_scoreData.id, bpm);
+      ref.read(scoresStateProvider.notifier).updateBpm(_scoreData.id, bpm);
     }
   }
-  
+
   void _initAnnotations() {
     // Initialize annotations from current instrument score
     _pageAnnotations.clear();
@@ -210,7 +216,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       _pageAnnotations[page]!.add(annotation);
     }
   }
-  
+
   void _goToPage(int page) {
     if (page >= 1 && page <= _totalPages && page != _currentPage) {
       setState(() {
@@ -220,7 +226,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       _startPageIndicatorTimer();
     }
   }
-  
+
   void _startPageIndicatorTimer() {
     _pageIndicatorTimer?.cancel();
     _pageIndicatorTimer = Timer(const Duration(milliseconds: 700), () {
@@ -239,7 +245,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       await _loadPersonalPdfDocument();
     }
   }
-  
+
   /// Load PDF for personal library mode
   Future<void> _loadPersonalPdfDocument() async {
     final instrumentScoreId = _currentInstrument?.id;
@@ -256,18 +262,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
     // Helper function to try downloading PDF from server
     Future<String?> tryDownloadPdf() async {
-      final syncServiceAsync = ref.read(syncServiceProvider);
-      final syncService = switch (syncServiceAsync) {
-        AsyncData(:final value) => value,
-        _ => null,
-      };
-      if (syncService != null) {
+      final pdfService = ref.read(pdfSyncServiceProvider);
+      if (pdfService != null && _currentInstrument?.pdfHash != null) {
         setState(() {
           _pdfError = null;
           _isDownloadingPdf = true;
         });
 
-        final downloadedPath = await syncService.downloadPdfWithPriority(instrumentScoreId);
+        final downloadedPath = await pdfService.downloadWithPriority(
+          _currentInstrument!.pdfHash!,
+          PdfPriority.high,
+        );
 
         if (!mounted) return null;
 
@@ -343,7 +348,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       });
     }
   }
-  
+
   /// Load PDF for team mode
   Future<void> _loadTeamPdfDocument() async {
     if (_currentInstrument == null) {
@@ -381,15 +386,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           return;
         }
 
-        // Step 3: Download from server using sync service
-        final syncServiceAsync = ref.read(syncServiceProvider);
-        final syncService = switch (syncServiceAsync) {
-          AsyncData(:final value) => value,
-          _ => null,
-        };
+        // Step 3: Download from server using PdfSyncService
+        final pdfService = ref.read(pdfSyncServiceProvider);
 
-        if (syncService != null) {
-          final downloadedPath = await syncService.downloadPdfByHash(pdfHash);
+        if (pdfService != null) {
+          final downloadedPath = await pdfService.downloadWithPriority(
+            pdfHash,
+            PdfPriority.high,
+          );
           if (downloadedPath != null) {
             await _openPdfFile(downloadedPath);
             return;
@@ -422,7 +426,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       }
     }
   }
-  
+
   /// Open PDF file and update state
   Future<void> _openPdfFile(String path) async {
     try {
@@ -453,9 +457,13 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
     // Record the instrument index being switched to (personal mode only)
     if (!_isTeamMode) {
-      final instrumentIndex = _scoreData.instrumentScores.indexWhere((s) => s.id == instrument.id);
+      final instrumentIndex = _scoreData.instrumentScores.indexWhere(
+        (s) => s.id == instrument.id,
+      );
       if (instrumentIndex >= 0) {
-        ref.read(lastOpenedInstrumentInScoreProvider.notifier).recordLastOpened(_scoreData.id, instrumentIndex);
+        ref
+            .read(lastOpenedInstrumentInScoreProvider.notifier)
+            .recordLastOpened(_scoreData.id, instrumentIndex);
       }
     }
 
@@ -483,7 +491,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     if (_isDrawMode && !_isTeamMode) {
       _saveAnnotationsSync();
     }
-    
+
     _pageIndicatorTimer?.cancel();
     _bpmSaveDebounce?.cancel();
     _metronomeController?.removeListener(_onMetronomeChanged);
@@ -494,8 +502,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   /// Synchronous version for dispose - uses cached notifier for safe access (personal mode)
   void _saveAnnotationsSync() {
-    if (_currentInstrument == null || _scoresNotifier == null || _isTeamMode) return;
-    
+    if (_currentInstrument == null || _scoresNotifier == null || _isTeamMode) {
+      return;
+    }
+
     // Collect all annotations from all pages
     final allAnnotations = <Annotation>[];
     for (final entry in _pageAnnotations.entries) {
@@ -503,7 +513,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         allAnnotations.add(annotation);
       }
     }
-    
+
     // Save to database via cached notifier (safe during dispose)
     _scoresNotifier!.updateAnnotations(
       _scoreData.id,
@@ -566,7 +576,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       _saveAnnotations();
     }
   }
-  
+
   void _addAnnotation(Annotation annotation) {
     setState(() {
       _pageAnnotations[_currentPage] ??= [];
@@ -614,20 +624,24 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       _navigateToTeamScore(index);
       return;
     }
-    
-    if (widget.setlistScores != null && index >= 0 && index < widget.setlistScores!.length) {
+
+    if (widget.setlistScores != null &&
+        index >= 0 &&
+        index < widget.setlistScores!.length) {
       // Record the score index being navigated to in the setlist
       if (widget.setlistScores != null) {
         // Find the setlist ID by looking up which setlist contains these scores
         // We need to get the setlist ID from somewhere - we can use the setlistName to find it
         // For now, we'll use a simple approach: store by setlist name or pass setlist ID
         // Since we have setlistName, we can create a composite key or just track by the score order
-        final setlists = ref.read(setlistsProvider);
+        final setlists = ref.read(setlistsListProvider);
         final currentSetlist = setlists.firstWhere(
           (s) => s.name == widget.setlistName,
           orElse: () => setlists.first,
         );
-        ref.read(lastOpenedScoreInSetlistProvider.notifier).recordLastOpened(currentSetlist.id, index);
+        ref
+            .read(lastOpenedScoreInSetlistProvider.notifier)
+            .recordLastOpened(currentSetlist.id, index);
       }
 
       // Stop and destroy metronome before navigating to properly release audio resources
@@ -643,9 +657,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
       // Get the best instrument for the target score
       final targetScore = widget.setlistScores![index];
-      final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(targetScore.id);
+      final lastOpenedInstrumentIndex = ref
+          .read(lastOpenedInstrumentInScoreProvider.notifier)
+          .getLastOpened(targetScore.id);
       final preferredInstrument = ref.read(preferredInstrumentProvider);
-      final bestInstrumentIndex = getBestInstrumentIndex(targetScore, lastOpenedInstrumentIndex, preferredInstrument);
+      final bestInstrumentIndex = getBestInstrumentIndex(
+        targetScore,
+        lastOpenedInstrumentIndex,
+        preferredInstrument,
+      );
       final instrumentScore = targetScore.instrumentScores.isNotEmpty
           ? targetScore.instrumentScores[bestInstrumentIndex]
           : null;
@@ -662,10 +682,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       );
     }
   }
-  
+
   /// Navigate to team score (team mode)
   void _navigateToTeamScore(int index) async {
-    if (widget.teamSetlistScores != null && index >= 0 && index < widget.teamSetlistScores!.length) {
+    if (widget.teamSetlistScores != null &&
+        index >= 0 &&
+        index < widget.teamSetlistScores!.length) {
       // Stop and destroy metronome before navigating
       _metronomeController?.stop();
       _metronomeController?.removeListener(_onMetronomeChanged);
@@ -753,7 +775,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   ignoring: !_showUI || _currentPage >= _totalPages,
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 200),
-                    opacity: (_showUI && _currentPage < _totalPages) ? 1.0 : 0.0,
+                    opacity: (_showUI && _currentPage < _totalPages)
+                        ? 1.0
+                        : 0.0,
                     child: _buildPageNavButton(
                       icon: AppIcons.chevronRight,
                       onPressed: () => _goToPage(_currentPage + 1),
@@ -762,65 +786,68 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 ),
               ),
             ),
-            // Page indicator - shown when UI is visible OR briefly after page change
-            Positioned(
-              bottom: 90,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                ignoring: true,
-                child: AnimatedOpacity(
-                  duration: Duration(milliseconds: (_showUI || _showPageIndicator) ? 150 : 400),
-                  opacity: (_showUI || _showPageIndicator) ? 1.0 : 0.0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        '$_currentPage / $_totalPages',
-                        style: const TextStyle(
-                          color: AppColors.gray600,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
+          // Page indicator - shown when UI is visible OR briefly after page change
+          Positioned(
+            bottom: 90,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              ignoring: true,
+              child: AnimatedOpacity(
+                duration: Duration(
+                  milliseconds: (_showUI || _showPageIndicator) ? 150 : 400,
+                ),
+                opacity: (_showUI || _showPageIndicator) ? 1.0 : 0.0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
+                      ],
+                    ),
+                    child: Text(
+                      '$_currentPage / $_totalPages',
+                      style: const TextStyle(
+                        color: AppColors.gray600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-            // Toolbar - shown when UI is visible
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                ignoring: !_showUI,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: _showUI ? 1.0 : 0.0,
-                  child: _buildToolbar(),
-                ),
+          ),
+          // Toolbar - shown when UI is visible
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              ignoring: !_showUI,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: _showUI ? 1.0 : 0.0,
+                child: _buildToolbar(),
               ),
             ),
-            if (_showPenOptions) _buildPenOptions(),
-            if (_showMetronome) _buildMetronomeModal(),
-            if (_showSetlistNav)
-              _buildSetlistNavModal(),
-            if (_showInstrumentPicker)
-              _buildInstrumentPickerModal(),
-          ],
-        ),
+          ),
+          if (_showPenOptions) _buildPenOptions(),
+          if (_showMetronome) _buildMetronomeModal(),
+          if (_showSetlistNav) _buildSetlistNavModal(),
+          if (_showInstrumentPicker) _buildInstrumentPickerModal(),
+        ],
+      ),
     );
   }
 
@@ -907,7 +934,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       key: ValueKey('pdf_page_$_currentPage'),
       document: _pdfDocument!,
       pageNumber: _currentPage,
-      isDrawMode: _isDrawMode && !_isTeamMode, // Disable draw mode for team scores
+      isDrawMode:
+          _isDrawMode && !_isTeamMode, // Disable draw mode for team scores
       selectedTool: _selectedTool,
       penColor: _penColor,
       penWidth: _penWidth,
@@ -938,7 +966,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         } else {
           setState(() {
             // Check if any modal is open
-            final anyModalOpen = _showMetronome || _showSetlistNav || _showInstrumentPicker;
+            final anyModalOpen =
+                _showMetronome || _showSetlistNav || _showInstrumentPicker;
             // Close any open modals
             _showMetronome = false;
             _showSetlistNav = false;
@@ -1038,7 +1067,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       onTap: closeAllMenus,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: EdgeInsets.fromLTRB(8, MediaQuery.of(context).padding.top + 8, 16, 12),
+        padding: EdgeInsets.fromLTRB(
+          8,
+          MediaQuery.of(context).padding.top + 8,
+          16,
+          12,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -1059,74 +1093,92 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             Expanded(
               child: Center(
                 child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _scoreData.title,
-                          style: const TextStyle(
-                            color: AppColors.gray900,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _scoreData.title,
+                            style: const TextStyle(
+                              color: AppColors.gray900,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const SizedBox(width: 2),
-                      SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: Icon(
-                            _showInstrumentPicker ? AppIcons.chevronUp : AppIcons.chevronDown,
-                            size: 18,
-                            color: AppColors.gray500,
+                        const SizedBox(width: 2),
+                        SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: Icon(
+                              _showInstrumentPicker
+                                  ? AppIcons.chevronUp
+                                  : AppIcons.chevronDown,
+                              size: 18,
+                              color: AppColors.gray500,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _showInstrumentPicker = !_showInstrumentPicker;
+                                if (_showInstrumentPicker) {
+                                  _showMetronome = false;
+                                  _showSetlistNav = false;
+                                  _showPenOptions = false;
+                                  _setlistScrollController?.dispose();
+                                  _setlistScrollController = null;
+                                  // Create scroll controller and scroll to current instrument
+                                  const itemHeight = 48.0;
+                                  const listHeight = 168.0;
+                                  const listPadding = 12.0;
+                                  final currentIndex = _scoreData
+                                      .instrumentScores
+                                      .indexWhere(
+                                        (s) => s.id == _currentInstrument?.id,
+                                      );
+                                  final totalContentHeight =
+                                      _scoreData.instrumentScores.length *
+                                          itemHeight +
+                                      listPadding;
+                                  final maxScrollOffset =
+                                      (totalContentHeight - listHeight).clamp(
+                                        0.0,
+                                        double.infinity,
+                                      );
+                                  final centerOffset =
+                                      ((currentIndex >= 0 ? currentIndex : 0) *
+                                                  itemHeight -
+                                              (listHeight - itemHeight) / 2)
+                                          .clamp(0.0, maxScrollOffset);
+                                  _instrumentScrollController =
+                                      ScrollController(
+                                        initialScrollOffset: centerOffset,
+                                      );
+                                } else {
+                                  _instrumentScrollController?.dispose();
+                                  _instrumentScrollController = null;
+                                }
+                              });
+                            },
                           ),
-                          onPressed: () {
-                            setState(() {
-                              _showInstrumentPicker = !_showInstrumentPicker;
-                              if (_showInstrumentPicker) {
-                                _showMetronome = false;
-                                _showSetlistNav = false;
-                                _showPenOptions = false;
-                                _setlistScrollController?.dispose();
-                                _setlistScrollController = null;
-                                // Create scroll controller and scroll to current instrument
-                                const itemHeight = 48.0;
-                                const listHeight = 168.0;
-                                const listPadding = 12.0;
-                                final currentIndex = _scoreData.instrumentScores.indexWhere(
-                                  (s) => s.id == _currentInstrument?.id
-                                );
-                                final totalContentHeight = _scoreData.instrumentScores.length * itemHeight + listPadding;
-                                final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
-                                final centerOffset = ((currentIndex >= 0 ? currentIndex : 0) * itemHeight - (listHeight - itemHeight) / 2).clamp(0.0, maxScrollOffset);
-                                _instrumentScrollController = ScrollController(initialScrollOffset: centerOffset);
-                              } else {
-                                _instrumentScrollController?.dispose();
-                                _instrumentScrollController = null;
-                              }
-                            });
-                          },
                         ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _scoreData.composer,
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _scoreData.composer,
                             style: const TextStyle(
                               color: AppColors.gray500,
                               fontSize: 12,
@@ -1162,7 +1214,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             // Setlist/Score navigation button - always show
             IconButton(
               icon: Icon(
-                widget.setlistScores != null ? AppIcons.playlistPlay : AppIcons.musicNote,
+                widget.setlistScores != null
+                    ? AppIcons.playlistPlay
+                    : AppIcons.musicNote,
                 color: _showSetlistNav ? AppColors.blue500 : AppColors.gray500,
               ),
               onPressed: () {
@@ -1180,14 +1234,21 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     const itemHeight = 48.0;
                     const listHeight = 168.0;
                     const listPadding = 12.0; // vertical padding 6*2
-                    final int scoreCount = _isTeamMode 
+                    final int scoreCount = _isTeamMode
                         ? (widget.teamSetlistScores?.length ?? 1)
                         : (widget.setlistScores?.length ?? 1);
-                    final totalContentHeight = scoreCount * itemHeight + listPadding;
-                    final maxScrollOffset = (totalContentHeight - listHeight).clamp(0.0, double.infinity);
+                    final totalContentHeight =
+                        scoreCount * itemHeight + listPadding;
+                    final maxScrollOffset = (totalContentHeight - listHeight)
+                        .clamp(0.0, double.infinity);
                     // Center the current item: offset = itemTop - (listHeight - itemHeight) / 2
-                    final centerOffset = ((widget.currentIndex ?? 0) * itemHeight - (listHeight - itemHeight) / 2).clamp(0.0, maxScrollOffset);
-                    _setlistScrollController = ScrollController(initialScrollOffset: centerOffset);
+                    final centerOffset =
+                        ((widget.currentIndex ?? 0) * itemHeight -
+                                (listHeight - itemHeight) / 2)
+                            .clamp(0.0, maxScrollOffset);
+                    _setlistScrollController = ScrollController(
+                      initialScrollOffset: centerOffset,
+                    );
                   } else {
                     _setlistScrollController?.dispose();
                     _setlistScrollController = null;
@@ -1195,8 +1256,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                 });
               },
             ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1214,7 +1275,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       },
       behavior: HitTestBehavior.translucent,
       child: Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          12 + MediaQuery.of(context).padding.bottom,
+        ),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -1224,109 +1290,113 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               offset: const Offset(0, -4),
             ),
           ],
-      ),
-      child: Row(
-        children: [
-          // Left group: Pen/Color and Eraser (eraser only in edit mode)
-          if (_isDrawMode)
-            _buildColorPickerButton()
-          else
-            _buildToolButton(
-              icon: AppIcons.edit,
-              isActive: false,
-              activeColor: AppColors.blue500,
-              onPressed: _enterEditMode,
-            ),
-          const SizedBox(width: 4),
-          // Eraser placeholder (keep space consistent)
-          if (_isDrawMode)
-            _buildToolButton(
-              icon: AppIcons.autoFixHigh,
-              isActive: _selectedTool == 'eraser',
-              activeColor: AppColors.blue500,
-              onPressed: () => _toggleTool('eraser'),
-            )
-          else
-            const SizedBox(width: 44), // Same width as tool button
-          
-          const Spacer(),
-          
-          // Undo and Redo (placeholder when not in edit mode to keep layout stable)
-          if (_isDrawMode) ...[
-            _buildToolButton(
-              icon: AppIcons.undo,
-              isDisabled: (_pageAnnotations[_currentPage]?.isEmpty ?? true),
-              onPressed: (_pageAnnotations[_currentPage]?.isNotEmpty ?? false) ? _undo : null,
-            ),
-            const SizedBox(width: 4),
-            _buildToolButton(
-              icon: AppIcons.redo,
-              isDisabled: (_pageUndoStacks[_currentPage]?.isEmpty ?? true),
-              onPressed: (_pageUndoStacks[_currentPage]?.isNotEmpty ?? false) ? _redo : null,
-            ),
-          ] else ...[
-            const SizedBox(width: 44), // Undo placeholder
-            const SizedBox(width: 4),
-            const SizedBox(width: 44), // Redo placeholder
-          ],
-          
-          // Divider
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            width: 1,
-            height: 24,
-            color: AppColors.gray200,
-          ),
-          
-          // Clear all or Metronome button
-          if (_isDrawMode)
-            _buildToolButton(
-              key: const ValueKey('clear_button'),
-              icon: AppIcons.close,
-              isDisabled: (_pageAnnotations[_currentPage]?.isEmpty ?? true),
-              onPressed: (_pageAnnotations[_currentPage]?.isNotEmpty ?? false)
-                  ? _clearCurrentPageAnnotations
-                  : null,
-            )
-          else
-            _buildToolButtonWithWidget(
-              key: const ValueKey('metronome_button'),
-              iconWidget: AppIcons.metronomeIcon(
-                size: 22,
-                color: _metronomeController?.isPlaying ?? false
-                    ? AppColors.blue500
-                    : AppColors.gray500,
+        ),
+        child: Row(
+          children: [
+            // Left group: Pen/Color and Eraser (eraser only in edit mode)
+            if (_isDrawMode)
+              _buildColorPickerButton()
+            else
+              _buildToolButton(
+                icon: AppIcons.edit,
+                isActive: false,
+                activeColor: AppColors.blue500,
+                onPressed: _enterEditMode,
               ),
-              isActive: _metronomeController?.isPlaying ?? false,
-              activeColor: AppColors.blue500,
-              onPressed: () {
-                setState(() {
-                  _showMetronome = !_showMetronome;
-                  // Close other modals when opening metronome
-                  if (_showMetronome) {
-                    _showSetlistNav = false;
-                    _showInstrumentPicker = false;
-                    _showPenOptions = false;
-                    _instrumentScrollController?.dispose();
-                    _instrumentScrollController = null;
-                    _setlistScrollController?.dispose();
-                    _setlistScrollController = null;
-                  }
-                });
-              },
+            const SizedBox(width: 4),
+            // Eraser placeholder (keep space consistent)
+            if (_isDrawMode)
+              _buildToolButton(
+                icon: AppIcons.autoFixHigh,
+                isActive: _selectedTool == 'eraser',
+                activeColor: AppColors.blue500,
+                onPressed: () => _toggleTool('eraser'),
+              )
+            else
+              const SizedBox(width: 44), // Same width as tool button
+
+            const Spacer(),
+
+            // Undo and Redo (placeholder when not in edit mode to keep layout stable)
+            if (_isDrawMode) ...[
+              _buildToolButton(
+                icon: AppIcons.undo,
+                isDisabled: (_pageAnnotations[_currentPage]?.isEmpty ?? true),
+                onPressed: (_pageAnnotations[_currentPage]?.isNotEmpty ?? false)
+                    ? _undo
+                    : null,
+              ),
+              const SizedBox(width: 4),
+              _buildToolButton(
+                icon: AppIcons.redo,
+                isDisabled: (_pageUndoStacks[_currentPage]?.isEmpty ?? true),
+                onPressed: (_pageUndoStacks[_currentPage]?.isNotEmpty ?? false)
+                    ? _redo
+                    : null,
+              ),
+            ] else ...[
+              const SizedBox(width: 44), // Undo placeholder
+              const SizedBox(width: 4),
+              const SizedBox(width: 44), // Redo placeholder
+            ],
+
+            // Divider
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 12),
+              width: 1,
+              height: 24,
+              color: AppColors.gray200,
             ),
-          
-          const Spacer(),
-          
-          // Confirm button (exit edit mode) - only in draw mode, positioned at right
-          if (_isDrawMode)
-            _buildToolButton(
-              key: const ValueKey('confirm_button'),
-              icon: AppIcons.check,
-              onPressed: _exitEditMode,
-            ),
-        ],
-      ),
+
+            // Clear all or Metronome button
+            if (_isDrawMode)
+              _buildToolButton(
+                key: const ValueKey('clear_button'),
+                icon: AppIcons.close,
+                isDisabled: (_pageAnnotations[_currentPage]?.isEmpty ?? true),
+                onPressed: (_pageAnnotations[_currentPage]?.isNotEmpty ?? false)
+                    ? _clearCurrentPageAnnotations
+                    : null,
+              )
+            else
+              _buildToolButtonWithWidget(
+                key: const ValueKey('metronome_button'),
+                iconWidget: AppIcons.metronomeIcon(
+                  size: 22,
+                  color: _metronomeController?.isPlaying ?? false
+                      ? AppColors.blue500
+                      : AppColors.gray500,
+                ),
+                isActive: _metronomeController?.isPlaying ?? false,
+                activeColor: AppColors.blue500,
+                onPressed: () {
+                  setState(() {
+                    _showMetronome = !_showMetronome;
+                    // Close other modals when opening metronome
+                    if (_showMetronome) {
+                      _showSetlistNav = false;
+                      _showInstrumentPicker = false;
+                      _showPenOptions = false;
+                      _instrumentScrollController?.dispose();
+                      _instrumentScrollController = null;
+                      _setlistScrollController?.dispose();
+                      _setlistScrollController = null;
+                    }
+                  });
+                },
+              ),
+
+            const Spacer(),
+
+            // Confirm button (exit edit mode) - only in draw mode, positioned at right
+            if (_isDrawMode)
+              _buildToolButton(
+                key: const ValueKey('confirm_button'),
+                icon: AppIcons.check,
+                onPressed: _exitEditMode,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1344,7 +1414,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   void _exitEditMode() {
     // Save annotations to database
     _saveAnnotations();
-    
+
     setState(() {
       _isDrawMode = false;
       _selectedTool = 'none';
@@ -1355,7 +1425,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   /// Save all annotations for the current instrument score to the database
   void _saveAnnotations() {
     if (_currentInstrument == null || _isTeamMode) return;
-    
+
     // Collect all annotations from all pages
     final allAnnotations = <Annotation>[];
     for (final entry in _pageAnnotations.entries) {
@@ -1363,19 +1433,21 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         allAnnotations.add(annotation);
       }
     }
-    
+
     // Save to database via provider
-    ref.read(scoresProvider.notifier).updateAnnotations(
-      _scoreData.id,
-      _currentInstrument!.id,
-      allAnnotations,
-    );
+    ref
+        .read(scoresStateProvider.notifier)
+        .updateAnnotations(
+          _scoreData.id,
+          _currentInstrument!.id,
+          allAnnotations,
+        );
   }
 
   void _clearCurrentPageAnnotations() {
     final annotations = _pageAnnotations[_currentPage];
     if (annotations == null || annotations.isEmpty) return;
-    
+
     setState(() {
       // Store all annotations in undo stack for recovery
       _pageUndoStacks[_currentPage] ??= [];
@@ -1418,7 +1490,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: isActive ? _penColor.withValues(alpha: 0.15) : Colors.transparent,
+            color: isActive
+                ? _penColor.withValues(alpha: 0.15)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(22),
           ),
           alignment: Alignment.center,
@@ -1467,8 +1541,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             color: isDisabled
                 ? AppColors.gray300
                 : isActive
-                    ? activeColor
-                    : AppColors.gray500,
+                ? activeColor
+                : AppColors.gray500,
           ),
         ),
       ),
@@ -1534,7 +1608,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: isSelected ? color.withValues(alpha: 0.15) : Colors.transparent,
+                        color: isSelected
+                            ? color.withValues(alpha: 0.15)
+                            : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
@@ -1584,7 +1660,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: isSelected ? _penColor.withValues(alpha: 0.1) : Colors.transparent,
+                        color: isSelected
+                            ? _penColor.withValues(alpha: 0.1)
+                            : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       alignment: Alignment.center,
@@ -1663,7 +1741,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
               children: [
                 // Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
                   decoration: const BoxDecoration(
                     border: Border(bottom: BorderSide(color: AppColors.gray50)),
                   ),
@@ -1691,26 +1772,36 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     itemCount: _scoreData.instrumentScores.length,
                     itemBuilder: (context, index) {
                       final instrumentData = _scoreData.instrumentScores[index];
-                      final isCurrent = instrumentData.id == _currentInstrument?.id;
+                      final isCurrent =
+                          instrumentData.id == _currentInstrument?.id;
                       return InkWell(
                         onTap: () => _switchInstrument(instrumentData),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          color: isCurrent ? AppColors.blue50 : Colors.transparent,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          color: isCurrent
+                              ? AppColors.blue50
+                              : Colors.transparent,
                           child: Row(
                             children: [
                               Container(
                                 width: 28,
                                 height: 28,
                                 decoration: BoxDecoration(
-                                  color: isCurrent ? AppColors.blue500 : AppColors.gray50,
+                                  color: isCurrent
+                                      ? AppColors.blue500
+                                      : AppColors.gray50,
                                   borderRadius: BorderRadius.circular(7),
                                 ),
                                 child: Center(
                                   child: Text(
                                     '${index + 1}',
                                     style: TextStyle(
-                                      color: isCurrent ? Colors.white : AppColors.gray600,
+                                      color: isCurrent
+                                          ? Colors.white
+                                          : AppColors.gray600,
                                       fontWeight: FontWeight.w600,
                                       fontSize: 13,
                                     ),
@@ -1722,8 +1813,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                                 child: Text(
                                   instrumentData.instrumentDisplayName,
                                   style: TextStyle(
-                                    color: isCurrent ? AppColors.blue600 : AppColors.gray900,
-                                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                                    color: isCurrent
+                                        ? AppColors.blue600
+                                        : AppColors.gray900,
+                                    fontWeight: isCurrent
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -1753,7 +1848,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     // Get score count and check if we have a setlist based on mode
     final int scoreCount;
     final bool hasSetlist;
-    
+
     if (_isTeamMode) {
       scoreCount = widget.teamSetlistScores?.length ?? 1;
       hasSetlist = widget.teamSetlistScores != null;
@@ -1785,7 +1880,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
             children: [
               // Header - show different icon and title based on context
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 decoration: const BoxDecoration(
                   border: Border(bottom: BorderSide(color: AppColors.gray50)),
                 ),
@@ -1799,7 +1897,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        hasSetlist && widget.setlistName != null && widget.setlistName!.isNotEmpty
+                        hasSetlist &&
+                                widget.setlistName != null &&
+                                widget.setlistName!.isNotEmpty
                             ? widget.setlistName!
                             : 'Single Score',
                         style: const TextStyle(
@@ -1825,35 +1925,52 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     // Get score title based on mode
                     final String scoreTitle;
                     if (_isTeamMode) {
-                      scoreTitle = widget.teamSetlistScores?[index].title ?? _scoreData.title;
+                      scoreTitle =
+                          widget.teamSetlistScores?[index].title ??
+                          _scoreData.title;
                     } else {
-                      scoreTitle = widget.setlistScores?[index].title ?? _scoreData.title;
+                      scoreTitle =
+                          widget.setlistScores?[index].title ??
+                          _scoreData.title;
                     }
-                    final isCurrent = hasSetlist ? (index == widget.currentIndex) : true;
+                    final isCurrent = hasSetlist
+                        ? (index == widget.currentIndex)
+                        : true;
                     return InkWell(
-                      onTap: hasSetlist ? () {
-                        _setlistScrollController?.dispose();
-                        _setlistScrollController = null;
-                        setState(() => _showSetlistNav = false);
-                        _navigateToScore(index);
-                      } : null,
+                      onTap: hasSetlist
+                          ? () {
+                              _setlistScrollController?.dispose();
+                              _setlistScrollController = null;
+                              setState(() => _showSetlistNav = false);
+                              _navigateToScore(index);
+                            }
+                          : null,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        color: isCurrent ? AppColors.blue50 : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        color: isCurrent
+                            ? AppColors.blue50
+                            : Colors.transparent,
                         child: Row(
                           children: [
                             Container(
                               width: 28,
                               height: 28,
                               decoration: BoxDecoration(
-                                color: isCurrent ? AppColors.blue500 : AppColors.gray50,
+                                color: isCurrent
+                                    ? AppColors.blue500
+                                    : AppColors.gray50,
                                 borderRadius: BorderRadius.circular(7),
                               ),
                               child: Center(
                                 child: Text(
                                   '${index + 1}',
                                   style: TextStyle(
-                                    color: isCurrent ? Colors.white : AppColors.gray600,
+                                    color: isCurrent
+                                        ? Colors.white
+                                        : AppColors.gray600,
                                     fontWeight: FontWeight.w600,
                                     fontSize: 13,
                                   ),
@@ -1865,8 +1982,12 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                               child: Text(
                                 scoreTitle,
                                 style: TextStyle(
-                                  color: isCurrent ? AppColors.blue600 : AppColors.gray900,
-                                  fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+                                  color: isCurrent
+                                      ? AppColors.blue600
+                                      : AppColors.gray900,
+                                  fontWeight: isCurrent
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
                                   fontSize: 14,
                                 ),
                                 maxLines: 1,
@@ -1946,34 +2067,36 @@ class PdfPageWrapper extends StatefulWidget {
   State<PdfPageWrapper> createState() => _PdfPageWrapperState();
 }
 
-class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProviderStateMixin {
+class _PdfPageWrapperState extends State<PdfPageWrapper>
+    with SingleTickerProviderStateMixin {
   // Gesture tracking
   double _swipeStartX = 0;
   bool _swipeHandled = false;
   int _pointerCount = 0;
-  
+
   // Tap detection (for faster response than GestureDetector)
   Offset? _tapDownPosition;
   DateTime? _tapDownTime;
   static const int _tapTimeout = 200; // milliseconds
   static const double _tapSlop = 20.0; // max distance for tap
-  
+
   // Zoom state
-  final TransformationController _transformController = TransformationController();
+  final TransformationController _transformController =
+      TransformationController();
   bool _isZoomed = false;
-  
+
   // Drawing state
   List<Offset> _currentPath = [];
   bool _isDrawing = false;
-  
+
   // Content size for coordinate normalization
   Size _contentSize = Size.zero;
   final GlobalKey _contentKey = GlobalKey();
-  
+
   // Fade-in animation for smooth page transitions
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  
+
   static const double _swipeThreshold = 90.0;
 
   @override
@@ -2005,7 +2128,7 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
       // Track for tap detection
       _tapDownPosition = event.position;
       _tapDownTime = DateTime.now();
-      
+
       if (!_isZoomed && !widget.isDrawMode) {
         _swipeStartX = event.position.dx;
         _swipeHandled = false;
@@ -2020,7 +2143,7 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
   void _handlePointerUp(PointerUpEvent event) {
     final wasMultiTouch = _pointerCount > 1;
     _pointerCount = (_pointerCount - 1).clamp(0, 10);
-    
+
     // Check for tap (quick click without much movement)
     if (_pointerCount == 0 && !wasMultiTouch && !_swipeHandled && !_isDrawing) {
       if (_tapDownPosition != null && _tapDownTime != null) {
@@ -2032,16 +2155,16 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
         }
       }
     }
-    
+
     // Clear tap tracking
     _tapDownPosition = null;
     _tapDownTime = null;
-    
+
     // Handle drawing end when lifting finger
     if (_isDrawing && _pointerCount == 0) {
       _finishDrawing();
     }
-    
+
     if (_pointerCount == 0) {
       _swipeHandled = false;
     } else if (wasMultiTouch && _pointerCount == 1) {
@@ -2059,7 +2182,7 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
   void _handlePointerMove(PointerMoveEvent event) {
     // Skip if multi-touch (for zooming)
     if (_pointerCount > 1) return;
-    
+
     // Handle drawing
     if (widget.isDrawMode && _pointerCount == 1 && !_swipeHandled) {
       if (widget.selectedTool == 'pen') {
@@ -2082,7 +2205,7 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
       }
       return;
     }
-    
+
     // Handle swipe for page navigation (only when not in draw mode)
     if (_pointerCount != 1 || _swipeHandled || _isZoomed || widget.isDrawMode) {
       return;
@@ -2098,41 +2221,48 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
       widget.onSwipeRight();
     }
   }
-  
+
   // Convert screen coordinates to local content coordinates
   Offset? _screenToLocal(Offset screenPos) {
-    final RenderBox? renderBox = _contentKey.currentContext?.findRenderObject() as RenderBox?;
+    final RenderBox? renderBox =
+        _contentKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) return null;
-    
+
     // Get position relative to the Container (which wraps InteractiveViewer)
     final localPos = renderBox.globalToLocal(screenPos);
-    
+
     // When InteractiveViewer is zoomed/panned, it applies a transformation matrix to its child
     // We need to convert the touch position (in InteractiveViewer's viewport coordinates)
     // to content coordinates (in the child's coordinate system)
     final matrix = _transformController.value;
-    
+
     // Use the inverse matrix to transform from viewport to content coordinates
-    final Matrix4 inverseMatrix = Matrix4.tryInvert(matrix) ?? Matrix4.identity();
+    final Matrix4 inverseMatrix =
+        Matrix4.tryInvert(matrix) ?? Matrix4.identity();
     return MatrixUtils.transformPoint(inverseMatrix, localPos);
   }
-  
+
   // Convert local content coordinates to normalized (0-1) coordinates
   List<double> _normalizePoints(List<Offset> points) {
     if (_contentSize == Size.zero) return [];
-    return points.expand((p) => [
-      p.dx / _contentSize.width,
-      p.dy / _contentSize.height,
-    ]).toList();
+    return points
+        .expand(
+          (p) => [
+            p.dx / _contentSize.width,
+            p.dy / _contentSize.height,
+          ],
+        )
+        .toList();
   }
-  
+
   void _finishDrawing() {
     if (_currentPath.length > 1 && widget.selectedTool == 'pen') {
       final normalizedPoints = _normalizePoints(_currentPath);
       final annotation = Annotation(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         type: 'draw',
-        color: '#${widget.penColor.toARGB32().toRadixString(16).substring(2, 8)}',
+        color:
+            '#${widget.penColor.toARGB32().toRadixString(16).substring(2, 8)}',
         width: widget.penWidth,
         points: normalizedPoints,
         page: widget.pageNumber,
@@ -2144,23 +2274,23 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
       _isDrawing = false;
     });
   }
-  
+
   void _eraseAtPoint(Offset point) {
     // Normalize the erase point for comparison
     if (_contentSize == Size.zero) return;
     final normalizedX = point.dx / _contentSize.width;
     final normalizedY = point.dy / _contentSize.height;
     final eraseRadius = 5.0 / _contentSize.width; // Normalize erase radius
-    
+
     for (final annotation in widget.annotations) {
       if (annotation.points == null) continue;
-      
+
       for (int i = 0; i < annotation.points!.length; i += 2) {
         if (i + 1 < annotation.points!.length) {
           final dx = annotation.points![i] - normalizedX;
           final dy = annotation.points![i + 1] - normalizedY;
           final distance = (dx * dx + dy * dy);
-          
+
           if (distance < eraseRadius * eraseRadius) {
             widget.onAnnotationErased(annotation);
             return; // Only erase one at a time per move event
@@ -2268,7 +2398,8 @@ class _PdfPageWrapperState extends State<PdfPageWrapper> with SingleTickerProvid
                               currentPath: _currentPath,
                               currentColor: widget.penColor,
                               currentWidth: widget.penWidth,
-                              contentSize: constraints.biggest, // Use constraints directly
+                              contentSize: constraints
+                                  .biggest, // Use constraints directly
                             ),
                           ),
                         ),
@@ -2304,7 +2435,7 @@ class _IntegratedAnnotationPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (contentSize == Size.zero) return;
-    
+
     // Draw saved annotations (with normalized coordinates)
     for (final annotation in annotations) {
       if (annotation.type == 'draw' && annotation.points != null) {
@@ -2323,12 +2454,12 @@ class _IntegratedAnnotationPainter extends CustomPainter {
             points[0] * contentSize.width,
             points[1] * contentSize.height,
           );
-          
+
           for (int i = 2; i < points.length; i += 2) {
             if (i + 1 < points.length) {
               final x = points[i] * contentSize.width;
               final y = points[i + 1] * contentSize.height;
-              
+
               if (i + 3 < points.length) {
                 final x2 = points[i + 2] * contentSize.width;
                 final y2 = points[i + 3] * contentSize.height;
@@ -2364,7 +2495,12 @@ class _IntegratedAnnotationPainter extends CustomPainter {
             (p1.dx + p2.dx) / 2,
             (p1.dy + p2.dy) / 2,
           );
-          path.quadraticBezierTo(p1.dx, p1.dy, controlPoint.dx, controlPoint.dy);
+          path.quadraticBezierTo(
+            p1.dx,
+            p1.dy,
+            controlPoint.dx,
+            controlPoint.dy,
+          );
         } else {
           path.lineTo(currentPath[i].dx, currentPath[i].dy);
         }

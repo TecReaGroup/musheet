@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../router/app_router.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/sync_provider.dart';
+import '../../providers/auth_state_provider.dart';
+import '../../providers/core_providers.dart';
 
 class CloudSyncScreen extends ConsumerStatefulWidget {
   const CloudSyncScreen({super.key});
@@ -19,22 +19,11 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   String? _syncMessage;
 
   Future<void> _triggerSync() async {
-    final syncServiceAsync = ref.read(syncServiceProvider);
+    final syncCoordinator = ref.read(syncCoordinatorProvider);
 
-    final syncService = switch (syncServiceAsync) {
-      AsyncData(:final value) => value,
-      AsyncLoading() => null,
-      AsyncError() => null,
-    };
-    if (syncService == null) {
-      final reason = switch (syncServiceAsync) {
-        AsyncLoading() => 'Still loading...',
-        AsyncError(:final error) => 'Error: $error',
-        AsyncData(:final value) when value == null => 'Not initialized (check RpcClient)',
-        AsyncData() => 'Unknown state',
-      };
+    if (syncCoordinator == null) {
       setState(() {
-        _syncMessage = 'Sync service not available: $reason';
+        _syncMessage = 'Sync service not available';
       });
       return;
     }
@@ -45,13 +34,14 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     });
 
     try {
-      final result = await syncService.syncNow();
+      final result = await syncCoordinator.syncNow();
       setState(() {
         _isSyncing = false;
         if (result.success) {
-          _syncMessage = 'Synced: ${result.pushedCount} uploaded, ${result.pulledCount} downloaded';
+          _syncMessage =
+              'Synced: ${result.pushedCount} uploaded, ${result.pulledCount} downloaded';
         } else {
-          _syncMessage = result.errorMessage ?? 'Sync failed';
+          _syncMessage = result.error ?? 'Sync failed';
         }
       });
     } catch (e) {
@@ -64,9 +54,10 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authData = ref.watch(authProvider);
-    final isLoggedIn = authData.isAuthenticated;
-    final syncStatus = ref.watch(syncStatusProvider);
+    final authState = ref.watch(authStateProvider);
+    final isLoggedIn = authState.isAuthenticated;
+    // Watch sync state for showing last sync time and status
+    final syncState = ref.watch(currentSyncStateProvider);
 
     return PopScope(
       canPop: false,
@@ -222,7 +213,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
                                 )
                               : const Icon(AppIcons.sync),
@@ -240,10 +233,10 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                           ),
                         ),
                         // Last sync info
-                        if (syncStatus.lastSyncAt != null) ...[
+                        if (syncState.lastSyncAt != null) ...[
                           const SizedBox(height: 16),
                           Text(
-                            'Last synced: ${_formatTime(syncStatus.lastSyncAt!)}',
+                            'Last synced: ${_formatTime(syncState.lastSyncAt!)}',
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.gray500,
@@ -259,7 +252,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color: _syncMessage!.startsWith('Error') || _syncMessage!.startsWith('Sync failed')
+                              color:
+                                  _syncMessage!.startsWith('Error') ||
+                                      _syncMessage!.startsWith('Sync failed')
                                   ? AppColors.red50
                                   : AppColors.blue50,
                               borderRadius: BorderRadius.circular(8),
@@ -268,7 +263,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                               _syncMessage!,
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _syncMessage!.startsWith('Error') || _syncMessage!.startsWith('Sync failed')
+                                color:
+                                    _syncMessage!.startsWith('Error') ||
+                                        _syncMessage!.startsWith('Sync failed')
                                     ? AppColors.red600
                                     : AppColors.blue600,
                               ),

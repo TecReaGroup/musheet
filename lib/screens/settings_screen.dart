@@ -6,7 +6,7 @@ import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/user_avatar.dart';
 import '../models/instrument_score.dart';
-import '../providers/auth_provider.dart';
+import '../providers/auth_state_provider.dart';
 import 'library_screen.dart' show preferredInstrumentProvider, teamEnabledProvider;
 import '../router/app_router.dart';
 
@@ -19,7 +19,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authData = ref.watch(authProvider);
+    final authState = ref.watch(authStateProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -62,7 +62,7 @@ class SettingsScreen extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
                 child: InkWell(
                   onTap: () {
-                    if (authData.isAuthenticated) {
+                    if (authState.isAuthenticated) {
                       // Navigate to profile screen
                       context.go(AppRoutes.profile);
                     } else {
@@ -73,8 +73,8 @@ class SettingsScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: authData.isAuthenticated
-                      ? _buildLoggedInProfile(authData)
+                    child: authState.isAuthenticated
+                      ? _buildLoggedInProfile(authState)
                       : _buildLoginPrompt(),
                   ),
                 ),
@@ -290,8 +290,8 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildLoggedInProfile(AuthData authData) {
-    final user = authData.user;
+  Widget _buildLoggedInProfile(AuthState authState) {
+    final user = authState.user;
     final displayName = user?.displayName ?? 'User';
     final username = user?.username ?? '';
 
@@ -318,16 +318,16 @@ class SettingsScreen extends ConsumerWidget {
                     width: 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: authData.isConnected ? AppColors.emerald500 : AppColors.gray400,
+                      color: authState.isConnected ? AppColors.emerald500 : AppColors.gray400,
                       shape: BoxShape.circle,
                     ),
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    authData.isConnected ? 'Connected' : 'Offline',
+                    authState.isConnected ? 'Connected' : 'Offline',
                     style: TextStyle(
                       fontSize: 12,
-                      color: authData.isConnected ? AppColors.emerald600 : AppColors.gray500,
+                      color: authState.isConnected ? AppColors.emerald600 : AppColors.gray500,
                     ),
                   ),
                 ],

@@ -47,12 +47,12 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, ScoreEntity> {
     requiredDuringInsert: false,
     defaultValue: const Constant(120),
   );
-  static const VerificationMeta _dateAddedMeta = const VerificationMeta(
-    'dateAdded',
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
   );
   @override
-  late final GeneratedColumn<DateTime> dateAdded = GeneratedColumn<DateTime>(
-    'date_added',
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
@@ -121,7 +121,7 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, ScoreEntity> {
     title,
     composer,
     bpm,
-    dateAdded,
+    createdAt,
     version,
     syncStatus,
     serverId,
@@ -167,13 +167,13 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, ScoreEntity> {
         bpm.isAcceptableOrUnknown(data['bpm']!, _bpmMeta),
       );
     }
-    if (data.containsKey('date_added')) {
+    if (data.containsKey('created_at')) {
       context.handle(
-        _dateAddedMeta,
-        dateAdded.isAcceptableOrUnknown(data['date_added']!, _dateAddedMeta),
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     } else if (isInserting) {
-      context.missing(_dateAddedMeta);
+      context.missing(_createdAtMeta);
     }
     if (data.containsKey('version')) {
       context.handle(
@@ -230,9 +230,9 @@ class $ScoresTable extends Scores with TableInfo<$ScoresTable, ScoreEntity> {
         DriftSqlType.int,
         data['${effectivePrefix}bpm'],
       )!,
-      dateAdded: attachedDatabase.typeMapping.read(
+      createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
-        data['${effectivePrefix}date_added'],
+        data['${effectivePrefix}created_at'],
       )!,
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -268,7 +268,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
   final String title;
   final String composer;
   final int bpm;
-  final DateTime dateAdded;
+  final DateTime createdAt;
   final int version;
   final String syncStatus;
   final int? serverId;
@@ -279,7 +279,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
     required this.title,
     required this.composer,
     required this.bpm,
-    required this.dateAdded,
+    required this.createdAt,
     required this.version,
     required this.syncStatus,
     this.serverId,
@@ -293,7 +293,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
     map['title'] = Variable<String>(title);
     map['composer'] = Variable<String>(composer);
     map['bpm'] = Variable<int>(bpm);
-    map['date_added'] = Variable<DateTime>(dateAdded);
+    map['created_at'] = Variable<DateTime>(createdAt);
     map['version'] = Variable<int>(version);
     map['sync_status'] = Variable<String>(syncStatus);
     if (!nullToAbsent || serverId != null) {
@@ -314,7 +314,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       title: Value(title),
       composer: Value(composer),
       bpm: Value(bpm),
-      dateAdded: Value(dateAdded),
+      createdAt: Value(createdAt),
       version: Value(version),
       syncStatus: Value(syncStatus),
       serverId: serverId == null && nullToAbsent
@@ -339,7 +339,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       title: serializer.fromJson<String>(json['title']),
       composer: serializer.fromJson<String>(json['composer']),
       bpm: serializer.fromJson<int>(json['bpm']),
-      dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       version: serializer.fromJson<int>(json['version']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       serverId: serializer.fromJson<int?>(json['serverId']),
@@ -355,7 +355,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       'title': serializer.toJson<String>(title),
       'composer': serializer.toJson<String>(composer),
       'bpm': serializer.toJson<int>(bpm),
-      'dateAdded': serializer.toJson<DateTime>(dateAdded),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
       'version': serializer.toJson<int>(version),
       'syncStatus': serializer.toJson<String>(syncStatus),
       'serverId': serializer.toJson<int?>(serverId),
@@ -369,7 +369,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
     String? title,
     String? composer,
     int? bpm,
-    DateTime? dateAdded,
+    DateTime? createdAt,
     int? version,
     String? syncStatus,
     Value<int?> serverId = const Value.absent(),
@@ -380,7 +380,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
     title: title ?? this.title,
     composer: composer ?? this.composer,
     bpm: bpm ?? this.bpm,
-    dateAdded: dateAdded ?? this.dateAdded,
+    createdAt: createdAt ?? this.createdAt,
     version: version ?? this.version,
     syncStatus: syncStatus ?? this.syncStatus,
     serverId: serverId.present ? serverId.value : this.serverId,
@@ -393,7 +393,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
       title: data.title.present ? data.title.value : this.title,
       composer: data.composer.present ? data.composer.value : this.composer,
       bpm: data.bpm.present ? data.bpm.value : this.bpm,
-      dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       version: data.version.present ? data.version.value : this.version,
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
@@ -411,7 +411,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
           ..write('title: $title, ')
           ..write('composer: $composer, ')
           ..write('bpm: $bpm, ')
-          ..write('dateAdded: $dateAdded, ')
+          ..write('createdAt: $createdAt, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('serverId: $serverId, ')
@@ -427,7 +427,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
     title,
     composer,
     bpm,
-    dateAdded,
+    createdAt,
     version,
     syncStatus,
     serverId,
@@ -442,7 +442,7 @@ class ScoreEntity extends DataClass implements Insertable<ScoreEntity> {
           other.title == this.title &&
           other.composer == this.composer &&
           other.bpm == this.bpm &&
-          other.dateAdded == this.dateAdded &&
+          other.createdAt == this.createdAt &&
           other.version == this.version &&
           other.syncStatus == this.syncStatus &&
           other.serverId == this.serverId &&
@@ -455,7 +455,7 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
   final Value<String> title;
   final Value<String> composer;
   final Value<int> bpm;
-  final Value<DateTime> dateAdded;
+  final Value<DateTime> createdAt;
   final Value<int> version;
   final Value<String> syncStatus;
   final Value<int?> serverId;
@@ -467,7 +467,7 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     this.title = const Value.absent(),
     this.composer = const Value.absent(),
     this.bpm = const Value.absent(),
-    this.dateAdded = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.serverId = const Value.absent(),
@@ -480,7 +480,7 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     required String title,
     required String composer,
     this.bpm = const Value.absent(),
-    required DateTime dateAdded,
+    required DateTime createdAt,
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.serverId = const Value.absent(),
@@ -490,13 +490,13 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
   }) : id = Value(id),
        title = Value(title),
        composer = Value(composer),
-       dateAdded = Value(dateAdded);
+       createdAt = Value(createdAt);
   static Insertable<ScoreEntity> custom({
     Expression<String>? id,
     Expression<String>? title,
     Expression<String>? composer,
     Expression<int>? bpm,
-    Expression<DateTime>? dateAdded,
+    Expression<DateTime>? createdAt,
     Expression<int>? version,
     Expression<String>? syncStatus,
     Expression<int>? serverId,
@@ -509,7 +509,7 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
       if (title != null) 'title': title,
       if (composer != null) 'composer': composer,
       if (bpm != null) 'bpm': bpm,
-      if (dateAdded != null) 'date_added': dateAdded,
+      if (createdAt != null) 'created_at': createdAt,
       if (version != null) 'version': version,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (serverId != null) 'server_id': serverId,
@@ -524,7 +524,7 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     Value<String>? title,
     Value<String>? composer,
     Value<int>? bpm,
-    Value<DateTime>? dateAdded,
+    Value<DateTime>? createdAt,
     Value<int>? version,
     Value<String>? syncStatus,
     Value<int?>? serverId,
@@ -537,7 +537,7 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
       title: title ?? this.title,
       composer: composer ?? this.composer,
       bpm: bpm ?? this.bpm,
-      dateAdded: dateAdded ?? this.dateAdded,
+      createdAt: createdAt ?? this.createdAt,
       version: version ?? this.version,
       syncStatus: syncStatus ?? this.syncStatus,
       serverId: serverId ?? this.serverId,
@@ -562,8 +562,8 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
     if (bpm.present) {
       map['bpm'] = Variable<int>(bpm.value);
     }
-    if (dateAdded.present) {
-      map['date_added'] = Variable<DateTime>(dateAdded.value);
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
     }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
@@ -593,7 +593,7 @@ class ScoresCompanion extends UpdateCompanion<ScoreEntity> {
           ..write('title: $title, ')
           ..write('composer: $composer, ')
           ..write('bpm: $bpm, ')
-          ..write('dateAdded: $dateAdded, ')
+          ..write('createdAt: $createdAt, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('serverId: $serverId, ')
@@ -678,12 +678,12 @@ class $InstrumentScoresTable extends InstrumentScores
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _dateAddedMeta = const VerificationMeta(
-    'dateAdded',
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
   );
   @override
-  late final GeneratedColumn<DateTime> dateAdded = GeneratedColumn<DateTime>(
-    'date_added',
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
@@ -801,7 +801,7 @@ class $InstrumentScoresTable extends InstrumentScores
     customInstrument,
     pdfPath,
     thumbnail,
-    dateAdded,
+    createdAt,
     orderIndex,
     version,
     syncStatus,
@@ -869,13 +869,13 @@ class $InstrumentScoresTable extends InstrumentScores
         thumbnail.isAcceptableOrUnknown(data['thumbnail']!, _thumbnailMeta),
       );
     }
-    if (data.containsKey('date_added')) {
+    if (data.containsKey('created_at')) {
       context.handle(
-        _dateAddedMeta,
-        dateAdded.isAcceptableOrUnknown(data['date_added']!, _dateAddedMeta),
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     } else if (isInserting) {
-      context.missing(_dateAddedMeta);
+      context.missing(_createdAtMeta);
     }
     if (data.containsKey('order_index')) {
       context.handle(
@@ -970,9 +970,9 @@ class $InstrumentScoresTable extends InstrumentScores
         DriftSqlType.string,
         data['${effectivePrefix}thumbnail'],
       ),
-      dateAdded: attachedDatabase.typeMapping.read(
+      createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
-        data['${effectivePrefix}date_added'],
+        data['${effectivePrefix}created_at'],
       )!,
       orderIndex: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -1027,7 +1027,7 @@ class InstrumentScoreEntity extends DataClass
   final String? customInstrument;
   final String? pdfPath;
   final String? thumbnail;
-  final DateTime dateAdded;
+  final DateTime createdAt;
   final int orderIndex;
   final int version;
   final String syncStatus;
@@ -1044,7 +1044,7 @@ class InstrumentScoreEntity extends DataClass
     this.customInstrument,
     this.pdfPath,
     this.thumbnail,
-    required this.dateAdded,
+    required this.createdAt,
     required this.orderIndex,
     required this.version,
     required this.syncStatus,
@@ -1070,7 +1070,7 @@ class InstrumentScoreEntity extends DataClass
     if (!nullToAbsent || thumbnail != null) {
       map['thumbnail'] = Variable<String>(thumbnail);
     }
-    map['date_added'] = Variable<DateTime>(dateAdded);
+    map['created_at'] = Variable<DateTime>(createdAt);
     map['order_index'] = Variable<int>(orderIndex);
     map['version'] = Variable<int>(version);
     map['sync_status'] = Variable<String>(syncStatus);
@@ -1105,7 +1105,7 @@ class InstrumentScoreEntity extends DataClass
       thumbnail: thumbnail == null && nullToAbsent
           ? const Value.absent()
           : Value(thumbnail),
-      dateAdded: Value(dateAdded),
+      createdAt: Value(createdAt),
       orderIndex: Value(orderIndex),
       version: Value(version),
       syncStatus: Value(syncStatus),
@@ -1138,7 +1138,7 @@ class InstrumentScoreEntity extends DataClass
       customInstrument: serializer.fromJson<String?>(json['customInstrument']),
       pdfPath: serializer.fromJson<String?>(json['pdfPath']),
       thumbnail: serializer.fromJson<String?>(json['thumbnail']),
-      dateAdded: serializer.fromJson<DateTime>(json['dateAdded']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       orderIndex: serializer.fromJson<int>(json['orderIndex']),
       version: serializer.fromJson<int>(json['version']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
@@ -1160,7 +1160,7 @@ class InstrumentScoreEntity extends DataClass
       'customInstrument': serializer.toJson<String?>(customInstrument),
       'pdfPath': serializer.toJson<String?>(pdfPath),
       'thumbnail': serializer.toJson<String?>(thumbnail),
-      'dateAdded': serializer.toJson<DateTime>(dateAdded),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
       'orderIndex': serializer.toJson<int>(orderIndex),
       'version': serializer.toJson<int>(version),
       'syncStatus': serializer.toJson<String>(syncStatus),
@@ -1180,7 +1180,7 @@ class InstrumentScoreEntity extends DataClass
     Value<String?> customInstrument = const Value.absent(),
     Value<String?> pdfPath = const Value.absent(),
     Value<String?> thumbnail = const Value.absent(),
-    DateTime? dateAdded,
+    DateTime? createdAt,
     int? orderIndex,
     int? version,
     String? syncStatus,
@@ -1199,7 +1199,7 @@ class InstrumentScoreEntity extends DataClass
         : this.customInstrument,
     pdfPath: pdfPath.present ? pdfPath.value : this.pdfPath,
     thumbnail: thumbnail.present ? thumbnail.value : this.thumbnail,
-    dateAdded: dateAdded ?? this.dateAdded,
+    createdAt: createdAt ?? this.createdAt,
     orderIndex: orderIndex ?? this.orderIndex,
     version: version ?? this.version,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -1222,7 +1222,7 @@ class InstrumentScoreEntity extends DataClass
           : this.customInstrument,
       pdfPath: data.pdfPath.present ? data.pdfPath.value : this.pdfPath,
       thumbnail: data.thumbnail.present ? data.thumbnail.value : this.thumbnail,
-      dateAdded: data.dateAdded.present ? data.dateAdded.value : this.dateAdded,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       orderIndex: data.orderIndex.present
           ? data.orderIndex.value
           : this.orderIndex,
@@ -1252,7 +1252,7 @@ class InstrumentScoreEntity extends DataClass
           ..write('customInstrument: $customInstrument, ')
           ..write('pdfPath: $pdfPath, ')
           ..write('thumbnail: $thumbnail, ')
-          ..write('dateAdded: $dateAdded, ')
+          ..write('createdAt: $createdAt, ')
           ..write('orderIndex: $orderIndex, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
@@ -1274,7 +1274,7 @@ class InstrumentScoreEntity extends DataClass
     customInstrument,
     pdfPath,
     thumbnail,
-    dateAdded,
+    createdAt,
     orderIndex,
     version,
     syncStatus,
@@ -1295,7 +1295,7 @@ class InstrumentScoreEntity extends DataClass
           other.customInstrument == this.customInstrument &&
           other.pdfPath == this.pdfPath &&
           other.thumbnail == this.thumbnail &&
-          other.dateAdded == this.dateAdded &&
+          other.createdAt == this.createdAt &&
           other.orderIndex == this.orderIndex &&
           other.version == this.version &&
           other.syncStatus == this.syncStatus &&
@@ -1314,7 +1314,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
   final Value<String?> customInstrument;
   final Value<String?> pdfPath;
   final Value<String?> thumbnail;
-  final Value<DateTime> dateAdded;
+  final Value<DateTime> createdAt;
   final Value<int> orderIndex;
   final Value<int> version;
   final Value<String> syncStatus;
@@ -1332,7 +1332,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     this.customInstrument = const Value.absent(),
     this.pdfPath = const Value.absent(),
     this.thumbnail = const Value.absent(),
-    this.dateAdded = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.orderIndex = const Value.absent(),
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1351,7 +1351,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     this.customInstrument = const Value.absent(),
     this.pdfPath = const Value.absent(),
     this.thumbnail = const Value.absent(),
-    required DateTime dateAdded,
+    required DateTime createdAt,
     this.orderIndex = const Value.absent(),
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1365,7 +1365,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
   }) : id = Value(id),
        scoreId = Value(scoreId),
        instrumentType = Value(instrumentType),
-       dateAdded = Value(dateAdded);
+       createdAt = Value(createdAt);
   static Insertable<InstrumentScoreEntity> custom({
     Expression<String>? id,
     Expression<String>? scoreId,
@@ -1373,7 +1373,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Expression<String>? customInstrument,
     Expression<String>? pdfPath,
     Expression<String>? thumbnail,
-    Expression<DateTime>? dateAdded,
+    Expression<DateTime>? createdAt,
     Expression<int>? orderIndex,
     Expression<int>? version,
     Expression<String>? syncStatus,
@@ -1392,7 +1392,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       if (customInstrument != null) 'custom_instrument': customInstrument,
       if (pdfPath != null) 'pdf_path': pdfPath,
       if (thumbnail != null) 'thumbnail': thumbnail,
-      if (dateAdded != null) 'date_added': dateAdded,
+      if (createdAt != null) 'created_at': createdAt,
       if (orderIndex != null) 'order_index': orderIndex,
       if (version != null) 'version': version,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -1413,7 +1413,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     Value<String?>? customInstrument,
     Value<String?>? pdfPath,
     Value<String?>? thumbnail,
-    Value<DateTime>? dateAdded,
+    Value<DateTime>? createdAt,
     Value<int>? orderIndex,
     Value<int>? version,
     Value<String>? syncStatus,
@@ -1432,7 +1432,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
       customInstrument: customInstrument ?? this.customInstrument,
       pdfPath: pdfPath ?? this.pdfPath,
       thumbnail: thumbnail ?? this.thumbnail,
-      dateAdded: dateAdded ?? this.dateAdded,
+      createdAt: createdAt ?? this.createdAt,
       orderIndex: orderIndex ?? this.orderIndex,
       version: version ?? this.version,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -1467,8 +1467,8 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
     if (thumbnail.present) {
       map['thumbnail'] = Variable<String>(thumbnail.value);
     }
-    if (dateAdded.present) {
-      map['date_added'] = Variable<DateTime>(dateAdded.value);
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
     }
     if (orderIndex.present) {
       map['order_index'] = Variable<int>(orderIndex.value);
@@ -1512,7 +1512,7 @@ class InstrumentScoresCompanion extends UpdateCompanion<InstrumentScoreEntity> {
           ..write('customInstrument: $customInstrument, ')
           ..write('pdfPath: $pdfPath, ')
           ..write('thumbnail: $thumbnail, ')
-          ..write('dateAdded: $dateAdded, ')
+          ..write('createdAt: $createdAt, ')
           ..write('orderIndex: $orderIndex, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
@@ -2237,12 +2237,12 @@ class $SetlistsTable extends Setlists
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _dateCreatedMeta = const VerificationMeta(
-    'dateCreated',
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
   );
   @override
-  late final GeneratedColumn<DateTime> dateCreated = GeneratedColumn<DateTime>(
-    'date_created',
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
     aliasedName,
     false,
     type: DriftSqlType.dateTime,
@@ -2310,7 +2310,7 @@ class $SetlistsTable extends Setlists
     id,
     name,
     description,
-    dateCreated,
+    createdAt,
     version,
     syncStatus,
     serverId,
@@ -2353,16 +2353,13 @@ class $SetlistsTable extends Setlists
     } else if (isInserting) {
       context.missing(_descriptionMeta);
     }
-    if (data.containsKey('date_created')) {
+    if (data.containsKey('created_at')) {
       context.handle(
-        _dateCreatedMeta,
-        dateCreated.isAcceptableOrUnknown(
-          data['date_created']!,
-          _dateCreatedMeta,
-        ),
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
       );
     } else if (isInserting) {
-      context.missing(_dateCreatedMeta);
+      context.missing(_createdAtMeta);
     }
     if (data.containsKey('version')) {
       context.handle(
@@ -2415,9 +2412,9 @@ class $SetlistsTable extends Setlists
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       )!,
-      dateCreated: attachedDatabase.typeMapping.read(
+      createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
-        data['${effectivePrefix}date_created'],
+        data['${effectivePrefix}created_at'],
       )!,
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
@@ -2452,7 +2449,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
   final String id;
   final String name;
   final String description;
-  final DateTime dateCreated;
+  final DateTime createdAt;
   final int version;
   final String syncStatus;
   final int? serverId;
@@ -2462,7 +2459,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
     required this.id,
     required this.name,
     required this.description,
-    required this.dateCreated,
+    required this.createdAt,
     required this.version,
     required this.syncStatus,
     this.serverId,
@@ -2475,7 +2472,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['description'] = Variable<String>(description);
-    map['date_created'] = Variable<DateTime>(dateCreated);
+    map['created_at'] = Variable<DateTime>(createdAt);
     map['version'] = Variable<int>(version);
     map['sync_status'] = Variable<String>(syncStatus);
     if (!nullToAbsent || serverId != null) {
@@ -2495,7 +2492,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       id: Value(id),
       name: Value(name),
       description: Value(description),
-      dateCreated: Value(dateCreated),
+      createdAt: Value(createdAt),
       version: Value(version),
       syncStatus: Value(syncStatus),
       serverId: serverId == null && nullToAbsent
@@ -2519,7 +2516,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String>(json['description']),
-      dateCreated: serializer.fromJson<DateTime>(json['dateCreated']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       version: serializer.fromJson<int>(json['version']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
       serverId: serializer.fromJson<int?>(json['serverId']),
@@ -2534,7 +2531,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String>(description),
-      'dateCreated': serializer.toJson<DateTime>(dateCreated),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
       'version': serializer.toJson<int>(version),
       'syncStatus': serializer.toJson<String>(syncStatus),
       'serverId': serializer.toJson<int?>(serverId),
@@ -2547,7 +2544,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
     String? id,
     String? name,
     String? description,
-    DateTime? dateCreated,
+    DateTime? createdAt,
     int? version,
     String? syncStatus,
     Value<int?> serverId = const Value.absent(),
@@ -2557,7 +2554,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
     id: id ?? this.id,
     name: name ?? this.name,
     description: description ?? this.description,
-    dateCreated: dateCreated ?? this.dateCreated,
+    createdAt: createdAt ?? this.createdAt,
     version: version ?? this.version,
     syncStatus: syncStatus ?? this.syncStatus,
     serverId: serverId.present ? serverId.value : this.serverId,
@@ -2571,9 +2568,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
       description: data.description.present
           ? data.description.value
           : this.description,
-      dateCreated: data.dateCreated.present
-          ? data.dateCreated.value
-          : this.dateCreated,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       version: data.version.present ? data.version.value : this.version,
       syncStatus: data.syncStatus.present
           ? data.syncStatus.value
@@ -2590,7 +2585,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
-          ..write('dateCreated: $dateCreated, ')
+          ..write('createdAt: $createdAt, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('serverId: $serverId, ')
@@ -2605,7 +2600,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
     id,
     name,
     description,
-    dateCreated,
+    createdAt,
     version,
     syncStatus,
     serverId,
@@ -2619,7 +2614,7 @@ class SetlistEntity extends DataClass implements Insertable<SetlistEntity> {
           other.id == this.id &&
           other.name == this.name &&
           other.description == this.description &&
-          other.dateCreated == this.dateCreated &&
+          other.createdAt == this.createdAt &&
           other.version == this.version &&
           other.syncStatus == this.syncStatus &&
           other.serverId == this.serverId &&
@@ -2631,7 +2626,7 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
   final Value<String> id;
   final Value<String> name;
   final Value<String> description;
-  final Value<DateTime> dateCreated;
+  final Value<DateTime> createdAt;
   final Value<int> version;
   final Value<String> syncStatus;
   final Value<int?> serverId;
@@ -2642,7 +2637,7 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
-    this.dateCreated = const Value.absent(),
+    this.createdAt = const Value.absent(),
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.serverId = const Value.absent(),
@@ -2654,7 +2649,7 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     required String id,
     required String name,
     required String description,
-    required DateTime dateCreated,
+    required DateTime createdAt,
     this.version = const Value.absent(),
     this.syncStatus = const Value.absent(),
     this.serverId = const Value.absent(),
@@ -2664,12 +2659,12 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
   }) : id = Value(id),
        name = Value(name),
        description = Value(description),
-       dateCreated = Value(dateCreated);
+       createdAt = Value(createdAt);
   static Insertable<SetlistEntity> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? description,
-    Expression<DateTime>? dateCreated,
+    Expression<DateTime>? createdAt,
     Expression<int>? version,
     Expression<String>? syncStatus,
     Expression<int>? serverId,
@@ -2681,7 +2676,7 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (description != null) 'description': description,
-      if (dateCreated != null) 'date_created': dateCreated,
+      if (createdAt != null) 'created_at': createdAt,
       if (version != null) 'version': version,
       if (syncStatus != null) 'sync_status': syncStatus,
       if (serverId != null) 'server_id': serverId,
@@ -2695,7 +2690,7 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     Value<String>? id,
     Value<String>? name,
     Value<String>? description,
-    Value<DateTime>? dateCreated,
+    Value<DateTime>? createdAt,
     Value<int>? version,
     Value<String>? syncStatus,
     Value<int?>? serverId,
@@ -2707,7 +2702,7 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      dateCreated: dateCreated ?? this.dateCreated,
+      createdAt: createdAt ?? this.createdAt,
       version: version ?? this.version,
       syncStatus: syncStatus ?? this.syncStatus,
       serverId: serverId ?? this.serverId,
@@ -2729,8 +2724,8 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
-    if (dateCreated.present) {
-      map['date_created'] = Variable<DateTime>(dateCreated.value);
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
     }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
@@ -2759,7 +2754,7 @@ class SetlistsCompanion extends UpdateCompanion<SetlistEntity> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
-          ..write('dateCreated: $dateCreated, ')
+          ..write('createdAt: $createdAt, ')
           ..write('version: $version, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('serverId: $serverId, ')
@@ -8127,7 +8122,7 @@ typedef $$ScoresTableCreateCompanionBuilder =
       required String title,
       required String composer,
       Value<int> bpm,
-      required DateTime dateAdded,
+      required DateTime createdAt,
       Value<int> version,
       Value<String> syncStatus,
       Value<int?> serverId,
@@ -8141,7 +8136,7 @@ typedef $$ScoresTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String> composer,
       Value<int> bpm,
-      Value<DateTime> dateAdded,
+      Value<DateTime> createdAt,
       Value<int> version,
       Value<String> syncStatus,
       Value<int?> serverId,
@@ -8225,8 +8220,8 @@ class $$ScoresTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get dateAdded => $composableBuilder(
-    column: $table.dateAdded,
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8335,8 +8330,8 @@ class $$ScoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get dateAdded => $composableBuilder(
-    column: $table.dateAdded,
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -8387,8 +8382,8 @@ class $$ScoresTableAnnotationComposer
   GeneratedColumn<int> get bpm =>
       $composableBuilder(column: $table.bpm, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get dateAdded =>
-      $composableBuilder(column: $table.dateAdded, builder: (column) => column);
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
@@ -8493,7 +8488,7 @@ class $$ScoresTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> composer = const Value.absent(),
                 Value<int> bpm = const Value.absent(),
-                Value<DateTime> dateAdded = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
@@ -8505,7 +8500,7 @@ class $$ScoresTableTableManager
                 title: title,
                 composer: composer,
                 bpm: bpm,
-                dateAdded: dateAdded,
+                createdAt: createdAt,
                 version: version,
                 syncStatus: syncStatus,
                 serverId: serverId,
@@ -8519,7 +8514,7 @@ class $$ScoresTableTableManager
                 required String title,
                 required String composer,
                 Value<int> bpm = const Value.absent(),
-                required DateTime dateAdded,
+                required DateTime createdAt,
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
@@ -8531,7 +8526,7 @@ class $$ScoresTableTableManager
                 title: title,
                 composer: composer,
                 bpm: bpm,
-                dateAdded: dateAdded,
+                createdAt: createdAt,
                 version: version,
                 syncStatus: syncStatus,
                 serverId: serverId,
@@ -8631,7 +8626,7 @@ typedef $$InstrumentScoresTableCreateCompanionBuilder =
       Value<String?> customInstrument,
       Value<String?> pdfPath,
       Value<String?> thumbnail,
-      required DateTime dateAdded,
+      required DateTime createdAt,
       Value<int> orderIndex,
       Value<int> version,
       Value<String> syncStatus,
@@ -8651,7 +8646,7 @@ typedef $$InstrumentScoresTableUpdateCompanionBuilder =
       Value<String?> customInstrument,
       Value<String?> pdfPath,
       Value<String?> thumbnail,
-      Value<DateTime> dateAdded,
+      Value<DateTime> createdAt,
       Value<int> orderIndex,
       Value<int> version,
       Value<String> syncStatus,
@@ -8751,8 +8746,8 @@ class $$InstrumentScoresTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get dateAdded => $composableBuilder(
-    column: $table.dateAdded,
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8884,8 +8879,8 @@ class $$InstrumentScoresTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get dateAdded => $composableBuilder(
-    column: $table.dateAdded,
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -8986,8 +8981,8 @@ class $$InstrumentScoresTableAnnotationComposer
   GeneratedColumn<String> get thumbnail =>
       $composableBuilder(column: $table.thumbnail, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get dateAdded =>
-      $composableBuilder(column: $table.dateAdded, builder: (column) => column);
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   GeneratedColumn<int> get orderIndex => $composableBuilder(
     column: $table.orderIndex,
@@ -9109,7 +9104,7 @@ class $$InstrumentScoresTableTableManager
                 Value<String?> customInstrument = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
                 Value<String?> thumbnail = const Value.absent(),
-                Value<DateTime> dateAdded = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
                 Value<int> orderIndex = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
@@ -9127,7 +9122,7 @@ class $$InstrumentScoresTableTableManager
                 customInstrument: customInstrument,
                 pdfPath: pdfPath,
                 thumbnail: thumbnail,
-                dateAdded: dateAdded,
+                createdAt: createdAt,
                 orderIndex: orderIndex,
                 version: version,
                 syncStatus: syncStatus,
@@ -9147,7 +9142,7 @@ class $$InstrumentScoresTableTableManager
                 Value<String?> customInstrument = const Value.absent(),
                 Value<String?> pdfPath = const Value.absent(),
                 Value<String?> thumbnail = const Value.absent(),
-                required DateTime dateAdded,
+                required DateTime createdAt,
                 Value<int> orderIndex = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
@@ -9165,7 +9160,7 @@ class $$InstrumentScoresTableTableManager
                 customInstrument: customInstrument,
                 pdfPath: pdfPath,
                 thumbnail: thumbnail,
-                dateAdded: dateAdded,
+                createdAt: createdAt,
                 orderIndex: orderIndex,
                 version: version,
                 syncStatus: syncStatus,
@@ -9717,7 +9712,7 @@ typedef $$SetlistsTableCreateCompanionBuilder =
       required String id,
       required String name,
       required String description,
-      required DateTime dateCreated,
+      required DateTime createdAt,
       Value<int> version,
       Value<String> syncStatus,
       Value<int?> serverId,
@@ -9730,7 +9725,7 @@ typedef $$SetlistsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String> description,
-      Value<DateTime> dateCreated,
+      Value<DateTime> createdAt,
       Value<int> version,
       Value<String> syncStatus,
       Value<int?> serverId,
@@ -9786,8 +9781,8 @@ class $$SetlistsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get dateCreated => $composableBuilder(
-    column: $table.dateCreated,
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9866,8 +9861,8 @@ class $$SetlistsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get dateCreated => $composableBuilder(
-    column: $table.dateCreated,
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -9917,10 +9912,8 @@ class $$SetlistsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<DateTime> get dateCreated => $composableBuilder(
-    column: $table.dateCreated,
-    builder: (column) => column,
-  );
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
@@ -9996,7 +9989,7 @@ class $$SetlistsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> description = const Value.absent(),
-                Value<DateTime> dateCreated = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
@@ -10007,7 +10000,7 @@ class $$SetlistsTableTableManager
                 id: id,
                 name: name,
                 description: description,
-                dateCreated: dateCreated,
+                createdAt: createdAt,
                 version: version,
                 syncStatus: syncStatus,
                 serverId: serverId,
@@ -10020,7 +10013,7 @@ class $$SetlistsTableTableManager
                 required String id,
                 required String name,
                 required String description,
-                required DateTime dateCreated,
+                required DateTime createdAt,
                 Value<int> version = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
                 Value<int?> serverId = const Value.absent(),
@@ -10031,7 +10024,7 @@ class $$SetlistsTableTableManager
                 id: id,
                 name: name,
                 description: description,
-                dateCreated: dateCreated,
+                createdAt: createdAt,
                 version: version,
                 syncStatus: syncStatus,
                 serverId: serverId,

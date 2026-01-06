@@ -123,7 +123,7 @@ class ScoreCard extends StatelessWidget {
         if (showDateAdded) ...[
           const SizedBox(height: 2),
           Text(
-            'Added ${_formatDate(score.dateAdded)}',
+            'Added ${_formatDate(score.createdAt)}',
             style: const TextStyle(
               fontSize: 12,
               color: AppColors.gray400,

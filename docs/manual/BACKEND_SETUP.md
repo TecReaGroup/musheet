@@ -306,7 +306,7 @@ Start-Sleep -Seconds 5
 sleep 5
 
 # 进入 musheet_server 目录
-cd musheet_server
+cd .\server\musheet_server\
 
 # 重新生成代码
 serverpod generate

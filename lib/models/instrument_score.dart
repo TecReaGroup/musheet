@@ -7,7 +7,8 @@ enum InstrumentType { vocal, keyboard, drums, bass, guitar, other }
 class InstrumentScore with InstrumentScoreBase {
   @override
   final String id;
-  final String pdfUrl; // For personal library, this is the local path
+  @override
+  final String? pdfPath;
   @override
   final String? pdfHash; // MD5 hash for PDF deduplication (per TEAM_SYNC_LOGIC.md)
   @override
@@ -18,62 +19,59 @@ class InstrumentScore with InstrumentScoreBase {
   final String? customInstrument;
   @override
   final List<Annotation>? annotations;
-  final DateTime dateAdded;
+  @override
+  final DateTime createdAt;
 
   InstrumentScore({
     required this.id,
-    required this.pdfUrl,
+    required this.pdfPath,
     this.pdfHash,
     this.thumbnail,
     required this.instrumentType,
     this.customInstrument,
     this.annotations,
-    required this.dateAdded,
+    required this.createdAt,
   });
 
   // Implement base interface requirements
   @override
-  String? get pdfPath => pdfUrl;
-  @override
   int get orderIndex => 0; // Personal library doesn't use orderIndex currently
-  @override
-  DateTime get createdAt => dateAdded;
 
   InstrumentScore copyWith({
     String? id,
-    String? pdfUrl,
+    String? pdfPath,
     String? pdfHash,
     String? thumbnail,
     InstrumentType? instrumentType,
     String? customInstrument,
     List<Annotation>? annotations,
-    DateTime? dateAdded,
+    DateTime? createdAt,
   }) =>
       InstrumentScore(
         id: id ?? this.id,
-        pdfUrl: pdfUrl ?? this.pdfUrl,
+        pdfPath: pdfPath ?? this.pdfPath,
         pdfHash: pdfHash ?? this.pdfHash,
         thumbnail: thumbnail ?? this.thumbnail,
         instrumentType: instrumentType ?? this.instrumentType,
         customInstrument: customInstrument ?? this.customInstrument,
         annotations: annotations ?? this.annotations,
-        dateAdded: dateAdded ?? this.dateAdded,
+        createdAt: createdAt ?? this.createdAt,
       );
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'pdfUrl': pdfUrl,
+        'pdfPath': pdfPath,
         'pdfHash': pdfHash,
         'thumbnail': thumbnail,
         'instrumentType': instrumentType.name,
         'customInstrument': customInstrument,
         'annotations': annotations?.map((a) => a.toJson()).toList(),
-        'dateAdded': dateAdded.toIso8601String(),
+        'createdAt': createdAt.toIso8601String(),
       };
 
   factory InstrumentScore.fromJson(Map<String, dynamic> json) => InstrumentScore(
         id: json['id'],
-        pdfUrl: json['pdfUrl'],
+        pdfPath: json['pdfPath'],
         pdfHash: json['pdfHash'],
         thumbnail: json['thumbnail'],
         instrumentType: json['instrumentType'] != null
@@ -86,6 +84,6 @@ class InstrumentScore with InstrumentScoreBase {
         annotations: json['annotations'] != null
             ? (json['annotations'] as List).map((a) => Annotation.fromJson(a)).toList()
             : null,
-        dateAdded: DateTime.parse(json['dateAdded']),
+        createdAt: DateTime.parse(json['createdAt']),
       );
 }

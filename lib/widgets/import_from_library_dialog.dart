@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/score.dart';
 import '../models/team.dart';
-import '../providers/scores_provider.dart';
+import '../providers/scores_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 

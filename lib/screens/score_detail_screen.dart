@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/score.dart';
 import '../models/team.dart';
-import '../providers/scores_provider.dart';
-import '../providers/setlists_provider.dart';
-import '../providers/teams_provider.dart';
+import '../providers/scores_state_provider.dart';
+import '../providers/setlists_state_provider.dart';
+import '../providers/teams_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/add_score_widget.dart';
 import '../widgets/import_from_library_dialog.dart';
@@ -17,23 +17,23 @@ import 'library_screen.dart' show lastOpenedInstrumentInScoreProvider;
 class ScoreDetailScreen extends ConsumerStatefulWidget {
   // Personal mode
   final Score? score;
-  
+
   // Team mode
   final TeamScore? teamScore;
   final int? teamServerId;
-  
+
   /// Constructor for personal score
   const ScoreDetailScreen({super.key, required Score this.score})
-      : teamScore = null,
-        teamServerId = null;
-  
+    : teamScore = null,
+      teamServerId = null;
+
   /// Constructor for team score
   const ScoreDetailScreen.team({
     super.key,
     required TeamScore this.teamScore,
     required int this.teamServerId,
   }) : score = null;
-  
+
   bool get isTeamMode => teamScore != null;
 
   @override
@@ -44,14 +44,15 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   bool _showEditModal = false;
   bool _showAddInstrumentModal = false;
   bool _showCopyInstrumentModal = false;
-  bool _showImportFromLibraryModal = false;  // For Team mode: import from personal library
+  bool _showImportFromLibraryModal =
+      false; // For Team mode: import from personal library
   Set<String> _disabledInstruments = {};
-  
+
   // For personal mode
   InstrumentScore? _instrumentToCopy;
   // For team mode
   TeamInstrumentScore? _teamInstrumentToCopy;
-  
+
   final TextEditingController _editTitleController = TextEditingController();
   final TextEditingController _editComposerController = TextEditingController();
   String? _editErrorMessage;
@@ -72,26 +73,31 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   }
 
   // ========== Personal Mode Methods ==========
-  
+
   void _openAddInstrumentModalPersonal(Score score) {
     _disabledInstruments = score.instrumentScores.map((is_) {
-      if (is_.instrumentType == InstrumentType.other && is_.customInstrument != null) {
+      if (is_.instrumentType == InstrumentType.other &&
+          is_.customInstrument != null) {
         return is_.customInstrument!.toLowerCase().trim();
       }
       return is_.instrumentType.name;
     }).toSet();
-    
+
     setState(() => _showAddInstrumentModal = true);
   }
 
-  void _openCopyInstrumentModalPersonal(Score score, InstrumentScore instrumentScore) {
+  void _openCopyInstrumentModalPersonal(
+    Score score,
+    InstrumentScore instrumentScore,
+  ) {
     _disabledInstruments = score.instrumentScores.map((is_) {
-      if (is_.instrumentType == InstrumentType.other && is_.customInstrument != null) {
+      if (is_.instrumentType == InstrumentType.other &&
+          is_.customInstrument != null) {
         return is_.customInstrument!.toLowerCase().trim();
       }
       return is_.instrumentType.name;
     }).toSet();
-    
+
     setState(() {
       _instrumentToCopy = instrumentScore;
       _showCopyInstrumentModal = true;
@@ -105,15 +111,21 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
     setState(() => _showEditModal = true);
   }
 
-  bool _isDuplicateScorePersonal(String title, String composer, String currentScoreId) {
+  bool _isDuplicateScorePersonal(
+    String title,
+    String composer,
+    String currentScoreId,
+  ) {
     final scores = ref.read(scoresListProvider);
     final normalizedTitle = title.trim().toLowerCase();
-    final normalizedComposer = (composer.trim().isEmpty ? 'Unknown' : composer.trim()).toLowerCase();
+    final normalizedComposer =
+        (composer.trim().isEmpty ? 'Unknown' : composer.trim()).toLowerCase();
 
-    return scores.any((s) =>
-      s.id != currentScoreId &&
-      s.title.toLowerCase() == normalizedTitle &&
-      s.composer.toLowerCase() == normalizedComposer
+    return scores.any(
+      (s) =>
+          s.id != currentScoreId &&
+          s.title.toLowerCase() == normalizedTitle &&
+          s.composer.toLowerCase() == normalizedComposer,
     );
   }
 
@@ -121,23 +133,28 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
 
   void _openAddInstrumentModalTeam(TeamScore score) {
     _disabledInstruments = score.instrumentScores.map((is_) {
-      if (is_.instrumentType == InstrumentType.other && is_.customInstrument != null) {
+      if (is_.instrumentType == InstrumentType.other &&
+          is_.customInstrument != null) {
         return is_.customInstrument!.toLowerCase().trim();
       }
       return is_.instrumentType.name;
     }).toSet();
-    
+
     setState(() => _showAddInstrumentModal = true);
   }
 
-  void _openCopyInstrumentModalTeam(TeamScore score, TeamInstrumentScore instrumentScore) {
+  void _openCopyInstrumentModalTeam(
+    TeamScore score,
+    TeamInstrumentScore instrumentScore,
+  ) {
     _disabledInstruments = score.instrumentScores.map((is_) {
-      if (is_.instrumentType == InstrumentType.other && is_.customInstrument != null) {
+      if (is_.instrumentType == InstrumentType.other &&
+          is_.customInstrument != null) {
         return is_.customInstrument!.toLowerCase().trim();
       }
       return is_.instrumentType.name;
     }).toSet();
-    
+
     setState(() {
       _teamInstrumentToCopy = instrumentScore;
       _showCopyInstrumentModal = true;
@@ -151,14 +168,21 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
     setState(() => _showEditModal = true);
   }
 
-  bool _isDuplicateScoreTeam(String title, String composer, String currentScoreId, List<TeamScore> scores) {
+  bool _isDuplicateScoreTeam(
+    String title,
+    String composer,
+    String currentScoreId,
+    List<TeamScore> scores,
+  ) {
     final normalizedTitle = title.trim().toLowerCase();
-    final normalizedComposer = (composer.trim().isEmpty ? 'Unknown' : composer.trim()).toLowerCase();
+    final normalizedComposer =
+        (composer.trim().isEmpty ? 'Unknown' : composer.trim()).toLowerCase();
 
-    return scores.any((s) =>
-      s.id != currentScoreId &&
-      s.title.toLowerCase() == normalizedTitle &&
-      s.composer.toLowerCase() == normalizedComposer
+    return scores.any(
+      (s) =>
+          s.id != currentScoreId &&
+          s.title.toLowerCase() == normalizedTitle &&
+          s.composer.toLowerCase() == normalizedComposer,
     );
   }
 
@@ -172,10 +196,10 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   }
 
   // ========== Personal Mode Build ==========
-  
+
   Widget _buildPersonalMode() {
     final scores = ref.watch(scoresListProvider);
-    final setlists = ref.watch(setlistsProvider);
+    final setlists = ref.watch(setlistsListProvider);
     final currentScore = scores.firstWhere(
       (s) => s.id == widget.score!.id,
       orElse: () => widget.score!,
@@ -195,7 +219,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                 title: currentScore.title,
                 composer: currentScore.composer,
                 bpm: currentScore.bpm,
-                date: currentScore.dateAdded,
+                date: currentScore.createdAt,
                 modeLabel: 'Personal',
                 onEditTap: () => _openEditModalPersonal(currentScore),
               ),
@@ -208,11 +232,16 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                     else
                       _buildPersonalInstrumentList(currentScore),
                     _buildSetlistSection(
-                      containingSetlists: containingSetlists.map((s) => (
-                        name: s.name,
-                        description: s.description,
-                        onTap: null, // Personal setlists don't navigate on tap here
-                      )).toList(),
+                      containingSetlists: containingSetlists
+                          .map(
+                            (s) => (
+                              name: s.name,
+                              description: s.description,
+                              onTap:
+                                  null, // Personal setlists don't navigate on tap here
+                            ),
+                          )
+                          .toList(),
                       emptyText: 'Not in any setlist',
                       sectionTitle: 'In Setlists',
                     ),
@@ -245,7 +274,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   }
 
   // ========== Team Mode Build ==========
-  
+
   Widget _buildTeamMode() {
     final teamScoresAsync = ref.watch(teamScoresProvider(_teamServerId!));
     final teamSetlistsAsync = ref.watch(teamSetlistsProvider(_teamServerId!));
@@ -291,15 +320,20 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                         else
                           _buildTeamInstrumentList(currentScore),
                         _buildSetlistSection(
-                          containingSetlists: containingSetlists.map((s) => (
-                            name: s.name,
-                            description: s.description,
-                            onTap: () => AppNavigation.navigateToTeamSetlistDetail(
-                              context,
-                              s,
-                              teamServerId: _teamServerId!,
-                            ),
-                          )).toList(),
+                          containingSetlists: containingSetlists
+                              .map(
+                                (s) => (
+                                  name: s.name,
+                                  description: s.description,
+                                  onTap: () =>
+                                      AppNavigation.navigateToTeamSetlistDetail(
+                                        context,
+                                        s,
+                                        teamServerId: _teamServerId!,
+                                      ),
+                                ),
+                              )
+                              .toList(),
                           emptyText: 'Not in any setlist',
                           sectionTitle: 'In Team Setlists',
                         ),
@@ -307,8 +341,10 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                     ),
                   ),
                   _buildTeamBottomButtons(
-                    onAddPressed: () => _openAddInstrumentModalTeam(currentScore),
-                    onImportPressed: () => setState(() => _showImportFromLibraryModal = true),
+                    onAddPressed: () =>
+                        _openAddInstrumentModalTeam(currentScore),
+                    onImportPressed: () =>
+                        setState(() => _showImportFromLibraryModal = true),
                   ),
                 ],
               ),
@@ -324,18 +360,28 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                   headerTitle: 'Add Instrument Sheet',
                   headerSubtitle: 'Select instrument and import PDF',
                   confirmButtonText: 'Add',
-                  onClose: () => setState(() => _showAddInstrumentModal = false),
-                  onSuccess: () => setState(() => _showAddInstrumentModal = false),
+                  onClose: () =>
+                      setState(() => _showAddInstrumentModal = false),
+                  onSuccess: () =>
+                      setState(() => _showAddInstrumentModal = false),
                 ),
               if (_showCopyInstrumentModal && _teamInstrumentToCopy != null)
-                _buildCopyInstrumentModalTeam(currentScore, _teamInstrumentToCopy!),
+                _buildCopyInstrumentModalTeam(
+                  currentScore,
+                  _teamInstrumentToCopy!,
+                ),
               if (_showImportFromLibraryModal)
                 ImportFromLibraryDialog(
                   targetTeamScore: currentScore,
-                  onClose: () => setState(() => _showImportFromLibraryModal = false),
+                  onClose: () =>
+                      setState(() => _showImportFromLibraryModal = false),
                   onImport: (sourceScore, selectedInstruments) async {
                     setState(() => _showImportFromLibraryModal = false);
-                    await _handleImportFromLibrary(currentScore, sourceScore, selectedInstruments);
+                    await _handleImportFromLibrary(
+                      currentScore,
+                      sourceScore,
+                      selectedInstruments,
+                    );
                   },
                 ),
             ],
@@ -525,7 +571,11 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
           return AnimatedBuilder(
             animation: animation,
             builder: (context, child) {
-              final elevation = lerpDouble(0, 6, Curves.easeInOut.transform(animation.value))!;
+              final elevation = lerpDouble(
+                0,
+                6,
+                Curves.easeInOut.transform(animation.value),
+              )!;
               return Material(
                 elevation: elevation,
                 color: Colors.transparent,
@@ -544,7 +594,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
           );
           final item = newIds.removeAt(oldIndex);
           newIds.insert(newIndex, item);
-          ref.read(scoresProvider.notifier).reorderInstrumentScores(currentScore.id, newIds);
+          ref
+              .read(scoresStateProvider.notifier)
+              .reorderInstrumentScores(currentScore.id, newIds);
         },
         itemBuilder: (context, index) {
           final instrumentScore = currentScore.instrumentScores[index];
@@ -568,7 +620,11 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
           return AnimatedBuilder(
             animation: animation,
             builder: (context, child) {
-              final elevation = lerpDouble(0, 6, Curves.easeInOut.transform(animation.value))!;
+              final elevation = lerpDouble(
+                0,
+                6,
+                Curves.easeInOut.transform(animation.value),
+              )!;
               return Material(
                 elevation: elevation,
                 color: Colors.transparent,
@@ -580,18 +636,30 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
             child: child,
           );
         },
-        onReorder: (oldIndex, newIndex) {
+        onReorder: (oldIndex, newIndex) async {
           if (newIndex > oldIndex) newIndex--;
           final newIds = List<String>.from(
             currentScore.instrumentScores.map((is_) => is_.id),
           );
           final item = newIds.removeAt(oldIndex);
           newIds.insert(newIndex, item);
-          ref.read(teamScoreOperationsProvider.notifier).reorderTeamInstrumentScores(
-            _teamServerId!,
-            currentScore.id,
-            newIds,
+
+          // Use new team operations
+          final success = await reorderTeamInstrumentScores(
+            ref: ref,
+            teamServerId: widget.teamServerId!,
+            scoreId: currentScore.id,
+            newOrder: newIds,
           );
+
+          if (!success && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to reorder instruments'),
+                backgroundColor: AppColors.red500,
+              ),
+            );
+          }
         },
         itemBuilder: (context, index) {
           final instrumentScore = currentScore.instrumentScores[index];
@@ -607,7 +675,8 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   }
 
   Widget _buildSetlistSection({
-    required List<({String name, String? description, VoidCallback? onTap})> containingSetlists,
+    required List<({String name, String? description, VoidCallback? onTap})>
+    containingSetlists,
     required String emptyText,
     required String sectionTitle,
   }) {
@@ -708,7 +777,8 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                if (setlist.description != null && setlist.description!.isNotEmpty)
+                                if (setlist.description != null &&
+                                    setlist.description!.isNotEmpty)
                                   Text(
                                     setlist.description!,
                                     style: const TextStyle(
@@ -755,7 +825,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.blue500,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -832,7 +904,13 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                   children: [
                     Icon(AppIcons.add, size: 20),
                     SizedBox(width: 6),
-                    Text('Add New', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    Text(
+                      'Add New',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -849,35 +927,41 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
     Score sourceScore,
     List<InstrumentScore> selectedInstruments,
   ) async {
-    try {
-      final result = await ref.read(teamScoreOperationsProvider.notifier).importInstrumentsFromLibrary(
-        teamServerId: _teamServerId!,
-        existingTeamScore: teamScore,
-        personalInstruments: selectedInstruments,
+    if (!mounted) return;
+
+    // Import each selected instrument to the team score
+    int successCount = 0;
+    for (final instrument in selectedInstruments) {
+      final teamInstrument = TeamInstrumentScore(
+        id: '${DateTime.now().millisecondsSinceEpoch}-tis-$successCount',
+        teamScoreId: teamScore.id,
+        instrumentType: instrument.instrumentType,
+        customInstrument: instrument.customInstrument,
+        pdfPath: instrument.pdfPath,
+        pdfHash: instrument.pdfHash,
+        orderIndex: teamScore.instrumentScores.length + successCount,
+        createdAt: DateTime.now(),
       );
 
-      if (!mounted) return;
+      final success = await addTeamInstrumentScore(
+        ref: ref,
+        teamServerId: widget.teamServerId!,
+        scoreId: teamScore.id,
+        instrument: teamInstrument,
+      );
 
-      if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message ?? 'Imported ${result.instrumentsAdded} instrument(s)'),
-            backgroundColor: AppColors.emerald500,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message ?? 'Import failed'),
-            backgroundColor: AppColors.red500,
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
+      if (success) successCount++;
+    }
+
+    if (!mounted) return;
+    if (successCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$successCount instrument(s) imported')),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Import failed: $e'),
+          content: const Text('Failed to import instruments'),
           backgroundColor: AppColors.red500,
         ),
       );
@@ -893,7 +977,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
     required InstrumentScore instrumentScore,
   }) {
     final annotationCount = instrumentScore.annotations?.length ?? 0;
-    
+
     return Container(
       key: key,
       margin: const EdgeInsets.only(bottom: 8),
@@ -906,7 +990,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            ref.read(lastOpenedInstrumentInScoreProvider.notifier).recordLastOpened(score.id, index);
+            ref
+                .read(lastOpenedInstrumentInScoreProvider.notifier)
+                .recordLastOpened(score.id, index);
             AppNavigation.navigateToScoreViewer(
               context,
               score: score,
@@ -932,7 +1018,11 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                       height: 44,
                       color: Colors.transparent,
                       child: const Center(
-                        child: Icon(AppIcons.dragHandle, size: 18, color: AppColors.gray400),
+                        child: Icon(
+                          AppIcons.dragHandle,
+                          size: 18,
+                          color: AppColors.gray400,
+                        ),
                       ),
                     ),
                   ),
@@ -948,191 +1038,11 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                   child: Center(
                     child: Text(
                       '${index + 1}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.gray600),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        instrumentScore.instrumentDisplayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.gray600,
                       ),
-                      Row(
-                        children: [
-                          Text(
-                            _formatDate(instrumentScore.dateAdded),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.gray500,
-                            ),
-                          ),
-                          if (annotationCount > 0) ...[
-                            const Text(
-                              ' · ',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: AppColors.gray500,
-                              ),
-                            ),
-                            Icon(
-                              AppIcons.edit,
-                              size: 12,
-                              color: AppColors.gray500,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '$annotationCount',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.gray500,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Copy button
-                GestureDetector(
-                  onTap: () => _openCopyInstrumentModalPersonal(score, instrumentScore),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      AppIcons.copy,
-                      size: 18,
-                      color: AppColors.blue500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                // Delete button (disabled when only one instrument)
-                if (score.instrumentScores.length > 1)
-                  GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Delete Instrument Sheet'),
-                          content: const Text('Are you sure you want to delete this instrument sheet? This action cannot be undone.'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                ref.read(scoresProvider.notifier).deleteInstrumentScore(score.id, instrumentScore.id);
-                                Navigator.pop(context);
-                              },
-                              child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        AppIcons.delete,
-                        size: 18,
-                        color: AppColors.red500,
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(width: 32),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ========== Team Instrument Card ==========
-
-  Widget _buildReorderableInstrumentCardTeam({
-    required Key key,
-    required int index,
-    required TeamScore score,
-    required TeamInstrumentScore instrumentScore,
-  }) {
-    final annotationCount = instrumentScore.annotations?.length ?? 0;
-    
-    return Container(
-      key: key,
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gray200),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            AppNavigation.navigateToTeamScoreViewer(
-              context,
-              teamScore: score,
-              instrumentScore: instrumentScore,
-            );
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 10, right: 12),
-            child: Row(
-              children: [
-                // Drag handle
-                ReorderableDragStartListener(
-                  index: index,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () {},
-                    onTapDown: (_) {},
-                    onLongPress: () {},
-                    onDoubleTap: () {},
-                    child: Container(
-                      width: 40,
-                      height: 44,
-                      color: Colors.transparent,
-                      child: const Center(
-                        child: Icon(AppIcons.dragHandle, size: 18, color: AppColors.gray400),
-                      ),
-                    ),
-                  ),
-                ),
-                // Index number
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: AppColors.gray100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${index + 1}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.gray600),
                     ),
                   ),
                 ),
@@ -1190,7 +1100,8 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                 const SizedBox(width: 8),
                 // Copy button
                 GestureDetector(
-                  onTap: () => _openCopyInstrumentModalTeam(score, instrumentScore),
+                  onTap: () =>
+                      _openCopyInstrumentModalPersonal(score, instrumentScore),
                   child: Container(
                     width: 32,
                     height: 32,
@@ -1213,7 +1124,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text('Delete Instrument Sheet'),
-                          content: const Text('Are you sure you want to delete this instrument sheet? This action cannot be undone.'),
+                          content: const Text(
+                            'Are you sure you want to delete this instrument sheet? This action cannot be undone.',
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
@@ -1221,14 +1134,241 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                             ),
                             TextButton(
                               onPressed: () {
-                                ref.read(teamScoreOperationsProvider.notifier).deleteTeamInstrumentScore(
-                                  _teamServerId!,
-                                  score.id,
-                                  instrumentScore.id,
-                                );
+                                ref
+                                    .read(scoresStateProvider.notifier)
+                                    .deleteInstrumentScore(
+                                      score.id,
+                                      instrumentScore.id,
+                                    );
                                 Navigator.pop(context);
                               },
-                              child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
+                              child: const Text(
+                                'Delete',
+                                style: TextStyle(color: AppColors.red500),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        AppIcons.delete,
+                        size: 18,
+                        color: AppColors.red500,
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 32),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ========== Team Instrument Card ==========
+
+  Widget _buildReorderableInstrumentCardTeam({
+    required Key key,
+    required int index,
+    required TeamScore score,
+    required TeamInstrumentScore instrumentScore,
+  }) {
+    final annotationCount = instrumentScore.annotations?.length ?? 0;
+
+    return Container(
+      key: key,
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            AppNavigation.navigateToTeamScoreViewer(
+              context,
+              teamScore: score,
+              instrumentScore: instrumentScore,
+            );
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 10, right: 12),
+            child: Row(
+              children: [
+                // Drag handle
+                ReorderableDragStartListener(
+                  index: index,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {},
+                    onTapDown: (_) {},
+                    onLongPress: () {},
+                    onDoubleTap: () {},
+                    child: Container(
+                      width: 40,
+                      height: 44,
+                      color: Colors.transparent,
+                      child: const Center(
+                        child: Icon(
+                          AppIcons.dragHandle,
+                          size: 18,
+                          color: AppColors.gray400,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                // Index number
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppColors.gray100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.gray600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        instrumentScore.instrumentDisplayName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Row(
+                        children: [
+                          Text(
+                            _formatDate(instrumentScore.createdAt),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.gray500,
+                            ),
+                          ),
+                          if (annotationCount > 0) ...[
+                            const Text(
+                              ' · ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.gray500,
+                              ),
+                            ),
+                            Icon(
+                              AppIcons.edit,
+                              size: 12,
+                              color: AppColors.gray500,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              '$annotationCount',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.gray500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Copy button
+                GestureDetector(
+                  onTap: () =>
+                      _openCopyInstrumentModalTeam(score, instrumentScore),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      AppIcons.copy,
+                      size: 18,
+                      color: AppColors.blue500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // Delete button (disabled when only one instrument)
+                if (score.instrumentScores.length > 1)
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Instrument Sheet'),
+                          content: const Text(
+                            'Are you sure you want to delete this instrument sheet? This action cannot be undone.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                final success = await deleteTeamInstrumentScore(
+                                  ref: ref,
+                                  teamServerId: widget.teamServerId!,
+                                  instrumentId: instrumentScore.id,
+                                );
+                                if (!mounted) return;
+                                if (success) {
+                                  ScaffoldMessenger.of(
+                                    this.context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Instrument deleted'),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(
+                                    this.context,
+                                  ).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Failed to delete instrument',
+                                      ),
+                                      backgroundColor: AppColors.red500,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text(
+                                'Delete',
+                                style: TextStyle(color: AppColors.red500),
+                              ),
                             ),
                           ],
                         ),
@@ -1300,16 +1440,19 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
 
                     if (_isDuplicateScorePersonal(title, composer, score.id)) {
                       setState(() {
-                        _editErrorMessage = 'A score with this title and composer already exists';
+                        _editErrorMessage =
+                            'A score with this title and composer already exists';
                       });
                       return;
                     }
 
-                    ref.read(scoresProvider.notifier).updateScore(
-                      score.id,
+                    final updatedScore = score.copyWith(
                       title: title,
                       composer: composer,
                     );
+                    ref
+                        .read(scoresStateProvider.notifier)
+                        .updateScore(updatedScore);
                     setState(() => _showEditModal = false);
                   },
                 ),
@@ -1352,7 +1495,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
               children: [
                 _buildEditModalHeader(),
                 _buildEditModalForm(
-                  onSave: () {
+                  onSave: () async {
                     final title = _editTitleController.text.trim();
                     if (title.isEmpty) return;
 
@@ -1360,9 +1503,15 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                         ? 'Unknown'
                         : _editComposerController.text.trim();
 
-                    if (_isDuplicateScoreTeam(title, composer, score.id, allScores)) {
+                    if (_isDuplicateScoreTeam(
+                      title,
+                      composer,
+                      score.id,
+                      allScores,
+                    )) {
                       setState(() {
-                        _editErrorMessage = 'A score with this title and composer already exists';
+                        _editErrorMessage =
+                            'A score with this title and composer already exists';
                       });
                       return;
                     }
@@ -1372,10 +1521,25 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                       composer: composer,
                     );
 
-                    ref.read(teamScoreOperationsProvider.notifier).updateTeamScore(
-                      _teamServerId!,
-                      updatedScore,
+                    final success = await updateTeamScore(
+                      ref: ref,
+                      teamServerId: widget.teamServerId!,
+                      score: updatedScore,
                     );
+
+                    if (!mounted) return;
+                    if (success) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Score updated')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Failed to update score'),
+                          backgroundColor: AppColors.red500,
+                        ),
+                      );
+                    }
                     setState(() => _showEditModal = false);
                   },
                 ),
@@ -1582,7 +1746,10 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
 
   // ========== Copy Instrument Modals ==========
 
-  Widget _buildCopyInstrumentModalPersonal(Score score, InstrumentScore sourceInstrument) {
+  Widget _buildCopyInstrumentModalPersonal(
+    Score score,
+    InstrumentScore sourceInstrument,
+  ) {
     return AddScoreWidget(
       showTitleComposer: false,
       existingScore: score,
@@ -1590,14 +1757,18 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
       sourceInstrumentToCopy: sourceInstrument,
       headerIcon: AppIcons.copy,
       headerTitle: 'Copy Instrument Sheet',
-      headerSubtitle: 'Copy "${sourceInstrument.instrumentDisplayName}" to another instrument',
+      headerSubtitle:
+          'Copy "${sourceInstrument.instrumentDisplayName}" to another instrument',
       confirmButtonText: 'Copy',
       onClose: () => setState(() => _showCopyInstrumentModal = false),
       onSuccess: () => setState(() => _showCopyInstrumentModal = false),
     );
   }
 
-  Widget _buildCopyInstrumentModalTeam(TeamScore score, TeamInstrumentScore sourceInstrument) {
+  Widget _buildCopyInstrumentModalTeam(
+    TeamScore score,
+    TeamInstrumentScore sourceInstrument,
+  ) {
     return AddScoreWidget(
       showTitleComposer: false,
       isTeamScore: true,
@@ -1607,7 +1778,8 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
       sourceTeamInstrumentToCopy: sourceInstrument,
       headerIcon: AppIcons.copy,
       headerTitle: 'Copy Instrument Sheet',
-      headerSubtitle: 'Copy "${sourceInstrument.instrumentDisplayName}" to another instrument',
+      headerSubtitle:
+          'Copy "${sourceInstrument.instrumentDisplayName}" to another instrument',
       confirmButtonText: 'Copy',
       onClose: () => setState(() => _showCopyInstrumentModal = false),
       onSuccess: () => setState(() => _showCopyInstrumentModal = false),

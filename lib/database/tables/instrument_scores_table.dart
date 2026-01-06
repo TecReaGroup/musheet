@@ -9,7 +9,7 @@ class InstrumentScores extends Table {
   TextColumn get customInstrument => text().nullable()();
   TextColumn get pdfPath => text().nullable()();
   TextColumn get thumbnail => text().nullable()();
-  DateTimeColumn get dateAdded => dateTime()();
+  DateTimeColumn get createdAt => dateTime()();
 
   // Order index for sorting instrument scores within a score
   IntColumn get orderIndex => integer().withDefault(const Constant(0))();

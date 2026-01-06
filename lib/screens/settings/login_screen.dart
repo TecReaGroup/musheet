@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/storage_providers.dart';
-import '../../providers/sync_provider.dart';
-import '../../services/backend_service.dart';
+import '../../providers/auth_state_provider.dart';
+import '../../providers/core_providers.dart';
+import '../../core/core.dart';
 import '../../router/app_router.dart';
 import 'settings_sub_screen.dart';
 
@@ -38,14 +38,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _loadSavedServerUrl() async {
-    final prefs = ref.read(preferencesProvider);
-    if (prefs != null) {
-      final savedUrl = prefs.getServerUrl();
-      if (savedUrl != null && savedUrl.isNotEmpty) {
-        setState(() {
-          _serverUrlController.text = savedUrl;
-        });
-      }
+    final prefs = await SharedPreferences.getInstance();
+    final savedUrl = prefs.getString('backend_server_url');
+    if (savedUrl != null && savedUrl.isNotEmpty) {
+      setState(() {
+        _serverUrlController.text = savedUrl;
+      });
     }
   }
 
@@ -70,23 +68,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final prefs = ref.read(preferencesProvider);
-      await prefs?.setServerUrl(url);
-      BackendService.initialize(baseUrl: url);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('backend_server_url', url);
+      ApiClient.initialize(baseUrl: url);
 
-      final result = await BackendService.instance.checkStatus();
+      // Test server connectivity using health check endpoint
+      final healthResult = await ApiClient.instance.checkHealth();
+      if (!mounted) return;
 
-      if (mounted) {
-        if (result.isSuccess) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Connected to server!'),
-              backgroundColor: AppColors.emerald500,
+      if (healthResult.isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Server connected successfully'),
+            backgroundColor: AppColors.emerald500,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Server unreachable: ${healthResult.error?.message ?? 'Connection failed'}',
             ),
-          );
-        } else {
-          setState(() => _error = 'Connection failed: ${result.error}');
-        }
+            backgroundColor: AppColors.yellow600,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -104,9 +109,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final serverUrl = _serverUrlController.text.trim();
     if (serverUrl.isNotEmpty) {
-      final prefs = ref.read(preferencesProvider);
-      await prefs?.setServerUrl(serverUrl);
-      BackendService.initialize(baseUrl: serverUrl);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('backend_server_url', serverUrl);
+      ApiClient.initialize(baseUrl: serverUrl);
+      // Invalidate providers to pick up new ApiClient
+      ref.invalidate(apiClientProvider);
+      ref.invalidate(authRepositoryProvider);
     }
 
     setState(() {
@@ -117,17 +125,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       bool success;
       if (_isLogin) {
-        success = await ref.read(authProvider.notifier).login(
-          username: _usernameController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+        success = await ref
+            .read(authStateProvider.notifier)
+            .login(
+              username: _usernameController.text.trim(),
+              password: _passwordController.text.trim(),
+            );
       } else {
         final username = _usernameController.text.trim();
-        success = await ref.read(authProvider.notifier).register(
-          username: username,
-          password: _passwordController.text.trim(),
-          displayName: username,
-        );
+        success = await ref
+            .read(authStateProvider.notifier)
+            .register(
+              username: username,
+              password: _passwordController.text.trim(),
+              displayName: username,
+            );
       }
 
       if (success && mounted) {
@@ -135,29 +147,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go(AppRoutes.settings);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_isLogin ? 'Logged in successfully!' : 'Account created!'),
+            content: Text(
+              _isLogin ? 'Logged in successfully!' : 'Account created!',
+            ),
             backgroundColor: AppColors.emerald500,
           ),
         );
 
         // Trigger sync after successful login
         try {
-          // Invalidate sync service provider to re-initialize with new credentials
-          ref.invalidate(syncServiceProvider);
-
-          // Wait for sync service to initialize
-          final syncService = await ref.read(syncServiceProvider.future);
-          if (syncService != null) {
-            await syncService.startBackgroundSync();
-
-            // Fire and forget - syncCompletionWatcherProvider will refresh UI when done
-            syncService.syncNow();
+          final syncCoordinator = ref.read(syncCoordinatorProvider);
+          if (syncCoordinator != null) {
+            await syncCoordinator.syncNow();
           }
         } catch (_) {
           // Sync trigger failed, ignore
         }
       } else if (mounted) {
-        final authError = ref.read(authProvider).error;
+        final authError = ref.read(authStateProvider).error;
         setState(() => _error = authError ?? 'Authentication failed');
       }
     } catch (e) {
@@ -191,12 +198,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   prefixIcon: const Icon(AppIcons.globe),
                   suffixIcon: IconButton(
                     icon: _isTestingConnection
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(AppIcons.refreshCw, size: 20),
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(AppIcons.refreshCw, size: 20),
                     onPressed: _isTestingConnection ? null : _testConnection,
                     tooltip: 'Test connection',
                   ),
@@ -220,7 +227,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   child: Text(
                     _error!,
-                    style: const TextStyle(color: AppColors.red600, fontSize: 13),
+                    style: const TextStyle(
+                      color: AppColors.red600,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
 
@@ -250,8 +260,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   labelText: 'Password',
                   prefixIcon: const Icon(AppIcons.close),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? AppIcons.close : AppIcons.check),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword ? AppIcons.close : AppIcons.check,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -282,18 +295,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 child: _isLoading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        _isLogin ? 'Sign In' : 'Create Account',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    )
-                  : Text(
-                      _isLogin ? 'Sign In' : 'Create Account',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    ),
               ),
               const SizedBox(height: 12),
 
@@ -307,8 +325,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 },
                 child: Text(
                   _isLogin
-                    ? "Don't have an account? Create one"
-                    : 'Already have an account? Sign in',
+                      ? "Don't have an account? Create one"
+                      : 'Already have an account? Sign in',
                   style: const TextStyle(color: AppColors.blue500),
                 ),
               ),

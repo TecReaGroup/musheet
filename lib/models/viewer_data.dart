@@ -143,7 +143,7 @@ class ViewerInstrumentData with InstrumentScoreBase {
 
   @override
   String? get pdfPath =>
-      _personalInstrument?.pdfUrl ?? _teamInstrument?.pdfPath;
+      _personalInstrument?.pdfPath ?? _teamInstrument?.pdfPath;
 
   @override
   String? get pdfHash =>

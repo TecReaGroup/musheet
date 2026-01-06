@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/scores_provider.dart';
-import '../providers/setlists_provider.dart';
-import '../providers/teams_provider.dart';
+import '../providers/scores_state_provider.dart';
+import '../providers/setlists_state_provider.dart';
+import '../providers/teams_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
@@ -82,7 +82,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     // Use scoresListProvider for synchronous access
     final scores = ref.watch(scoresListProvider);
-    final setlists = ref.watch(setlistsProvider);
+    final setlists = ref.watch(setlistsListProvider);
     final currentTeam = ref.watch(currentTeamProvider);
     final searchQuery = ref.watch(searchQueryProvider);
     final searchScope = ref.watch(searchScopeProvider);
@@ -207,7 +207,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       IconButton(
                         onPressed: () =>
                             ref
-                                    .read(hasUnreadNotificationsProvider.notifier)
+                                    .read(
+                                      hasUnreadNotificationsProvider.notifier,
+                                    )
                                     .state =
                                 false,
                         icon: Stack(
@@ -346,7 +348,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     SearchScope scope,
   ) {
     final teamEnabled = ref.watch(teamEnabledProvider);
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -388,8 +390,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 ...setlists.map((setlist) {
-                  final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
-                  return _buildSetlistCard(setlist, setlistScores.length, setlistScores);
+                  final setlistScores = ref.watch(
+                    setlistScoresProvider(setlist.id),
+                  );
+                  return _buildSetlistCard(
+                    setlist,
+                    setlistScores.length,
+                    setlistScores,
+                  );
                 }),
                 const SizedBox(height: 24),
               ],
@@ -478,7 +486,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(height: 12),
           ...recentSetlists.map((setlist) {
             final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
-            return _buildSetlistCard(setlist, setlistScores.length, setlistScores);
+            return _buildSetlistCard(
+              setlist,
+              setlistScores.length,
+              setlistScores,
+            );
           }),
           const SizedBox(height: 24),
         ],
@@ -558,7 +570,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildSetlistCard(Setlist setlist, int scoreCount, List<Score> setlistScores) {
+  Widget _buildSetlistCard(
+    Setlist setlist,
+    int scoreCount,
+    List<Score> setlistScores,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       child: Material(
@@ -569,17 +585,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             // Card tap: preview last opened score or first score if available
             if (setlistScores.isNotEmpty) {
               // Get last opened score index, default to 0 if not found
-              final lastOpenedIndex = ref.read(lastOpenedScoreInSetlistProvider.notifier).getLastOpened(setlist.id) ?? 0;
+              final lastOpenedIndex =
+                  ref
+                      .read(lastOpenedScoreInSetlistProvider.notifier)
+                      .getLastOpened(setlist.id) ??
+                  0;
               // Ensure index is valid
-              final validIndex = lastOpenedIndex.clamp(0, setlistScores.length - 1);
+              final validIndex = lastOpenedIndex.clamp(
+                0,
+                setlistScores.length - 1,
+              );
               final selectedScore = setlistScores[validIndex];
-              
+
               // Get best instrument using priority: recent > preferred > default
-              final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(selectedScore.id);
+              final lastOpenedInstrumentIndex = ref
+                  .read(lastOpenedInstrumentInScoreProvider.notifier)
+                  .getLastOpened(selectedScore.id);
               final preferredInstrument = ref.read(preferredInstrumentProvider);
-              final bestInstrumentIndex = getBestInstrumentIndex(selectedScore, lastOpenedInstrumentIndex, preferredInstrument);
-              final instrumentScore = selectedScore.instrumentScores.isNotEmpty ? selectedScore.instrumentScores[bestInstrumentIndex] : null;
-              
+              final bestInstrumentIndex = getBestInstrumentIndex(
+                selectedScore,
+                lastOpenedInstrumentIndex,
+                preferredInstrument,
+              );
+              final instrumentScore = selectedScore.instrumentScores.isNotEmpty
+                  ? selectedScore.instrumentScores[bestInstrumentIndex]
+                  : null;
+
               AppNavigation.navigateToScoreViewer(
                 context,
                 score: selectedScore,
@@ -613,7 +644,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(AppIcons.setlistIcon, size: 24, color: AppColors.emerald550),
+                  child: const Icon(
+                    AppIcons.setlistIcon,
+                    size: 24,
+                    color: AppColors.emerald550,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -628,13 +663,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       Text(
                         setlist.description,
-                        style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.gray600,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • Personal',
-                        style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.gray400,
+                        ),
                       ),
                     ],
                   ),
@@ -649,7 +690,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     borderRadius: BorderRadius.circular(20),
                     child: const Padding(
                       padding: EdgeInsets.all(8),
-                      child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+                      child: Icon(
+                        AppIcons.chevronRight,
+                        color: AppColors.gray400,
+                      ),
                     ),
                   ),
                 ),
@@ -670,11 +714,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: InkWell(
           onTap: () {
             // Get best instrument using priority: recent > preferred > default
-            final lastOpenedInstrumentIndex = ref.read(lastOpenedInstrumentInScoreProvider.notifier).getLastOpened(score.id);
+            final lastOpenedInstrumentIndex = ref
+                .read(lastOpenedInstrumentInScoreProvider.notifier)
+                .getLastOpened(score.id);
             final preferredInstrument = ref.read(preferredInstrumentProvider);
-            final bestInstrumentIndex = getBestInstrumentIndex(score, lastOpenedInstrumentIndex, preferredInstrument);
-            final instrumentScore = score.instrumentScores.isNotEmpty ? score.instrumentScores[bestInstrumentIndex] : null;
-            
+            final bestInstrumentIndex = getBestInstrumentIndex(
+              score,
+              lastOpenedInstrumentIndex,
+              preferredInstrument,
+            );
+            final instrumentScore = score.instrumentScores.isNotEmpty
+                ? score.instrumentScores[bestInstrumentIndex]
+                : null;
+
             AppNavigation.navigateToScoreViewer(
               context,
               score: score,
@@ -746,7 +798,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     borderRadius: BorderRadius.circular(20),
                     child: const Padding(
                       padding: EdgeInsets.all(8),
-                      child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+                      child: Icon(
+                        AppIcons.chevronRight,
+                        color: AppColors.gray400,
+                      ),
                     ),
                   ),
                 ),

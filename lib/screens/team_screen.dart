@@ -2,13 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/teams_provider.dart';
-import '../providers/scores_provider.dart';
-import '../providers/setlists_provider.dart';
-import '../providers/auth_provider.dart';
-import '../providers/storage_providers.dart';
-import '../providers/sync_provider.dart';
-import '../services/team_copy_service.dart';
+import '../providers/teams_state_provider.dart';
+import '../providers/scores_state_provider.dart';
+import '../providers/setlists_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/team.dart';
 import '../models/score.dart';
@@ -18,7 +14,6 @@ import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
 import '../router/app_router.dart';
 import 'library_screen.dart' show SortType, SortState;
-
 
 enum TeamTab { setlists, scores, members }
 
@@ -66,7 +61,8 @@ class TeamScoreSortNotifier extends Notifier<SortState> {
 }
 
 // Recently opened records
-class TeamRecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
+class TeamRecentlyOpenedSetlistsNotifier
+    extends Notifier<Map<String, DateTime>> {
   @override
   Map<String, DateTime> build() => {};
 
@@ -137,20 +133,55 @@ class ShowImportSetlistModalNotifier extends Notifier<bool> {
   set state(bool newState) => super.state = newState;
 }
 
-final teamTabProvider = NotifierProvider<TeamTabNotifier, TeamTab>(TeamTabNotifier.new);
-final showTeamSwitcherProvider = NotifierProvider<ShowTeamSwitcherNotifier, bool>(ShowTeamSwitcherNotifier.new);
-final teamSetlistSortProvider = NotifierProvider<TeamSetlistSortNotifier, SortState>(TeamSetlistSortNotifier.new);
-final teamScoreSortProvider = NotifierProvider<TeamScoreSortNotifier, SortState>(TeamScoreSortNotifier.new);
-final teamRecentlyOpenedSetlistsProvider = NotifierProvider<TeamRecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(TeamRecentlyOpenedSetlistsNotifier.new);
-final teamRecentlyOpenedScoresProvider = NotifierProvider<TeamRecentlyOpenedScoresNotifier, Map<String, DateTime>>(TeamRecentlyOpenedScoresNotifier.new);
+final teamTabProvider = NotifierProvider<TeamTabNotifier, TeamTab>(
+  TeamTabNotifier.new,
+);
+final showTeamSwitcherProvider =
+    NotifierProvider<ShowTeamSwitcherNotifier, bool>(
+      ShowTeamSwitcherNotifier.new,
+    );
+final teamSetlistSortProvider =
+    NotifierProvider<TeamSetlistSortNotifier, SortState>(
+      TeamSetlistSortNotifier.new,
+    );
+final teamScoreSortProvider =
+    NotifierProvider<TeamScoreSortNotifier, SortState>(
+      TeamScoreSortNotifier.new,
+    );
+final teamRecentlyOpenedSetlistsProvider =
+    NotifierProvider<TeamRecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(
+      TeamRecentlyOpenedSetlistsNotifier.new,
+    );
+final teamRecentlyOpenedScoresProvider =
+    NotifierProvider<TeamRecentlyOpenedScoresNotifier, Map<String, DateTime>>(
+      TeamRecentlyOpenedScoresNotifier.new,
+    );
 
 // Modal state providers (like library_screen.dart)
-final showTeamScoreModalProvider = NotifierProvider<ShowTeamScoreModalNotifier, bool>(ShowTeamScoreModalNotifier.new);
-final showTeamSetlistModalProvider = NotifierProvider<ShowTeamSetlistModalNotifier, bool>(ShowTeamSetlistModalNotifier.new);
-final showCreateTeamScoreModalProvider = NotifierProvider<ShowCreateTeamScoreModalNotifier, bool>(ShowCreateTeamScoreModalNotifier.new);
-final showCreateTeamSetlistDialogProvider = NotifierProvider<ShowCreateTeamSetlistDialogNotifier, bool>(ShowCreateTeamSetlistDialogNotifier.new);
-final showImportScoreModalProvider = NotifierProvider<ShowImportScoreModalNotifier, bool>(ShowImportScoreModalNotifier.new);
-final showImportSetlistModalProvider = NotifierProvider<ShowImportSetlistModalNotifier, bool>(ShowImportSetlistModalNotifier.new);
+final showTeamScoreModalProvider =
+    NotifierProvider<ShowTeamScoreModalNotifier, bool>(
+      ShowTeamScoreModalNotifier.new,
+    );
+final showTeamSetlistModalProvider =
+    NotifierProvider<ShowTeamSetlistModalNotifier, bool>(
+      ShowTeamSetlistModalNotifier.new,
+    );
+final showCreateTeamScoreModalProvider =
+    NotifierProvider<ShowCreateTeamScoreModalNotifier, bool>(
+      ShowCreateTeamScoreModalNotifier.new,
+    );
+final showCreateTeamSetlistDialogProvider =
+    NotifierProvider<ShowCreateTeamSetlistDialogNotifier, bool>(
+      ShowCreateTeamSetlistDialogNotifier.new,
+    );
+final showImportScoreModalProvider =
+    NotifierProvider<ShowImportScoreModalNotifier, bool>(
+      ShowImportScoreModalNotifier.new,
+    );
+final showImportSetlistModalProvider =
+    NotifierProvider<ShowImportSetlistModalNotifier, bool>(
+      ShowImportSetlistModalNotifier.new,
+    );
 
 class TeamScreen extends ConsumerStatefulWidget {
   const TeamScreen({super.key});
@@ -159,14 +190,16 @@ class TeamScreen extends ConsumerStatefulWidget {
   ConsumerState<TeamScreen> createState() => _TeamScreenState();
 }
 
-class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProviderStateMixin, SwipeHandlerMixin {
+class _TeamScreenState extends ConsumerState<TeamScreen>
+    with SingleTickerProviderStateMixin, SwipeHandlerMixin {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
 
   // Create setlist modal controllers
   final TextEditingController _setlistNameController = TextEditingController();
-  final TextEditingController _setlistDescriptionController = TextEditingController();
+  final TextEditingController _setlistDescriptionController =
+      TextEditingController();
   String? _createSetlistErrorMessage;
 
   // Import modal search controllers
@@ -252,8 +285,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   SizedBox(height: 16),
                   Text('You are not a member of any team'),
                   SizedBox(height: 8),
-                  Text('Contact your admin to be added to a team',
-                      style: TextStyle(color: Colors.grey)),
+                  Text(
+                    'Contact your admin to be added to a team',
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 ],
               ),
             ),
@@ -278,7 +313,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
 
     // Watch team scores and setlists from providers (not from Team model)
     final teamScoresAsync = ref.watch(teamScoresProvider(currentTeam.serverId));
-    final teamSetlistsAsync = ref.watch(teamSetlistsProvider(currentTeam.serverId));
+    final teamSetlistsAsync = ref.watch(
+      teamSetlistsProvider(currentTeam.serverId),
+    );
 
     // Get counts for header
     final scoresCount = teamScoresAsync.when(
@@ -303,12 +340,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   color: Colors.white,
                 ),
                 // Add top safe area padding
-                padding: EdgeInsets.fromLTRB(16, 16 + MediaQuery.of(context).padding.top, 16, 16),
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  16 + MediaQuery.of(context).padding.top,
+                  16,
+                  16,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
-                      onTap: () => ref.read(showTeamSwitcherProvider.notifier).state = !showTeamSwitcher,
+                      onTap: () =>
+                          ref.read(showTeamSwitcherProvider.notifier).state =
+                              !showTeamSwitcher,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -316,11 +360,18 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           ConstrainedBox(
                             constraints: BoxConstraints(
                               // Ensure maxWidth never goes negative on very small screens
-                              maxWidth: math.max(0.0, MediaQuery.of(context).size.width - 150),
+                              maxWidth: math.max(
+                                0.0,
+                                MediaQuery.of(context).size.width - 150,
+                              ),
                             ),
                             child: Text(
                               currentTeam.name,
-                              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w600, color: AppColors.gray700),
+                              style: const TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.gray700,
+                              ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -329,7 +380,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           Padding(
                             padding: const EdgeInsets.only(top: 2),
                             child: Icon(
-                              showTeamSwitcher ? AppIcons.chevronUp : AppIcons.chevronDown,
+                              showTeamSwitcher
+                                  ? AppIcons.chevronUp
+                                  : AppIcons.chevronDown,
                               size: 22,
                               color: AppColors.gray500,
                             ),
@@ -340,7 +393,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                     const SizedBox(height: 4),
                     Text(
                       '$setlistsCount setlists · $scoresCount scores · ${currentTeam.members.length} members',
-                      style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.gray600,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -352,7 +408,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             isActive: activeTab == TeamTab.setlists,
                             activeColor: AppColors.emerald600,
                             onTap: () {
-                              ref.read(teamTabProvider.notifier).state = TeamTab.setlists;
+                              ref.read(teamTabProvider.notifier).state =
+                                  TeamTab.setlists;
                               resetSwipeState();
                             },
                           ),
@@ -365,7 +422,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             isActive: activeTab == TeamTab.scores,
                             activeColor: AppColors.blue600,
                             onTap: () {
-                              ref.read(teamTabProvider.notifier).state = TeamTab.scores;
+                              ref.read(teamTabProvider.notifier).state =
+                                  TeamTab.scores;
                               resetSwipeState();
                             },
                           ),
@@ -378,7 +436,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             isActive: activeTab == TeamTab.members,
                             activeColor: AppColors.indigo600,
                             onTap: () {
-                              ref.read(teamTabProvider.notifier).state = TeamTab.members;
+                              ref.read(teamTabProvider.notifier).state =
+                                  TeamTab.members;
                               resetSwipeState();
                             },
                           ),
@@ -424,11 +483,24 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   },
                   behavior: HitTestBehavior.translucent,
                   child: ListView(
-                    padding: EdgeInsets.fromLTRB(16, 16, 16, 24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      16,
+                      16,
+                      24 +
+                          MediaQuery.of(context).padding.bottom +
+                          kBottomNavigationBarHeight,
+                    ),
                     children: [
-                      if (activeTab == TeamTab.setlists) _buildSetlistsTab(currentTeam.serverId, teamSetlistsAsync),
-                      if (activeTab == TeamTab.scores) _buildScoresTab(currentTeam.serverId, teamScoresAsync),
-                      if (activeTab == TeamTab.members) _buildMembersTab(currentTeam),
+                      if (activeTab == TeamTab.setlists)
+                        _buildSetlistsTab(
+                          currentTeam.serverId,
+                          teamSetlistsAsync,
+                        ),
+                      if (activeTab == TeamTab.scores)
+                        _buildScoresTab(currentTeam.serverId, teamScoresAsync),
+                      if (activeTab == TeamTab.members)
+                        _buildMembersTab(currentTeam),
                     ],
                   ),
                 ),
@@ -438,12 +510,15 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
           // FAB positioned like library screen (only show for setlists and scores tabs)
           if (activeTab == TeamTab.setlists || activeTab == TeamTab.scores)
             Positioned(
-              bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight * 0.75,
+              bottom:
+                  MediaQuery.of(context).padding.bottom +
+                  kBottomNavigationBarHeight * 0.75,
               right: 28,
               child: FloatingActionButton(
                 onPressed: () {
                   if (activeTab == TeamTab.setlists) {
-                    ref.read(showTeamSetlistModalProvider.notifier).state = true;
+                    ref.read(showTeamSetlistModalProvider.notifier).state =
+                        true;
                   } else {
                     ref.read(showTeamScoreModalProvider.notifier).state = true;
                   }
@@ -466,10 +541,12 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
               isTeamScore: true,
               teamServerId: currentTeam.serverId,
               onClose: () {
-                ref.read(showCreateTeamScoreModalProvider.notifier).state = false;
+                ref.read(showCreateTeamScoreModalProvider.notifier).state =
+                    false;
               },
               onSuccess: () {
-                ref.read(showCreateTeamScoreModalProvider.notifier).state = false;
+                ref.read(showCreateTeamScoreModalProvider.notifier).state =
+                    false;
                 ref.invalidate(teamScoresProvider(currentTeam.serverId));
               },
             ),
@@ -488,7 +565,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildSetlistsTab(int teamServerId, AsyncValue<List<TeamSetlist>> setlistsAsync) {
+  Widget _buildSetlistsTab(
+    int teamServerId,
+    AsyncValue<List<TeamSetlist>> setlistsAsync,
+  ) {
     return setlistsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
@@ -507,8 +587,18 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
         // Apply search filter
         final filteredSetlists = _searchQuery.isEmpty
             ? setlists
-            : setlists.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-        final sortedSetlists = _sortTeamSetlists(filteredSetlists, sortState, recentlyOpened);
+            : setlists
+                  .where(
+                    (s) => s.name.toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ),
+                  )
+                  .toList();
+        final sortedSetlists = _sortTeamSetlists(
+          filteredSetlists,
+          sortState,
+          recentlyOpened,
+        );
 
         if (sortedSetlists.isEmpty && _searchQuery.isNotEmpty) {
           return EmptyState.noSearchResults();
@@ -533,15 +623,20 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                 onSwipeEnd: handleSwipeEnd,
                 onDelete: () => _handleDeleteSetlist(setlist, teamServerId),
                 onTap: () {
-                  ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                  ref
+                      .read(teamRecentlyOpenedSetlistsProvider.notifier)
+                      .recordOpen(setlist.id);
                   // Card tap: preview first score if setlist has scores
                   if (setlist.teamScoreIds.isNotEmpty) {
                     // Get the team scores to find the first score
-                    final teamScores = ref.read(teamScoresProvider(teamServerId)).value ?? [];
+                    final teamScores =
+                        ref.read(teamScoresProvider(teamServerId)).value ?? [];
                     // Build the list of scores in setlist order
                     final setlistScores = <TeamScore>[];
                     for (final scoreId in setlist.teamScoreIds) {
-                      final score = teamScores.where((s) => s.id == scoreId).firstOrNull;
+                      final score = teamScores
+                          .where((s) => s.id == scoreId)
+                          .firstOrNull;
                       if (score != null) {
                         setlistScores.add(score);
                       }
@@ -566,7 +661,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                 },
                 onArrowTap: () {
                   // Arrow tap: go to detail screen
-                  ref.read(teamRecentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+                  ref
+                      .read(teamRecentlyOpenedSetlistsProvider.notifier)
+                      .recordOpen(setlist.id);
                   AppNavigation.navigateToTeamSetlistDetail(
                     context,
                     setlist,
@@ -586,7 +683,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Setlist'),
-        content: const Text('Are you sure you want to delete this setlist from the team?'),
+        content: const Text(
+          'Are you sure you want to delete this setlist from the team?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -595,19 +694,37 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final teamDb = ref.read(teamDatabaseServiceProvider);
-              await teamDb.deleteTeamSetlist(setlist.id);
+              final success = await deleteTeamSetlist(
+                ref: ref,
+                teamServerId: teamServerId,
+                setlistId: setlist.id,
+              );
+              if (!mounted) return;
+              if (success) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Setlist deleted')),
+                );
+              } else {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Failed to delete setlist')),
+                );
+              }
               resetSwipeState();
-              ref.invalidate(teamSetlistsProvider(teamServerId));
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.red500),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildScoresTab(int teamServerId, AsyncValue<List<TeamScore>> scoresAsync) {
+  Widget _buildScoresTab(
+    int teamServerId,
+    AsyncValue<List<TeamScore>> scoresAsync,
+  ) {
     return scoresAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
@@ -626,10 +743,22 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
         // Apply search filter - search both title and composer
         final filteredScores = _searchQuery.isEmpty
             ? scores
-            : scores.where((s) =>
-                s.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                s.composer.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-        final sortedScores = _sortTeamScores(filteredScores, sortState, recentlyOpened);
+            : scores
+                  .where(
+                    (s) =>
+                        s.title.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ) ||
+                        s.composer.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        ),
+                  )
+                  .toList();
+        final sortedScores = _sortTeamScores(
+          filteredScores,
+          sortState,
+          recentlyOpened,
+        );
 
         if (sortedScores.isEmpty && _searchQuery.isNotEmpty) {
           return EmptyState.noSearchResults();
@@ -652,14 +781,18 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                 onSwipeEnd: handleSwipeEnd,
                 onDelete: () => _handleDeleteScore(score, teamServerId),
                 onTap: () {
-                  ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                  ref
+                      .read(teamRecentlyOpenedScoresProvider.notifier)
+                      .recordOpen(score.id);
                   AppNavigation.navigateToTeamScoreViewer(
                     context,
                     teamScore: score,
                   );
                 },
                 onArrowTap: () {
-                  ref.read(teamRecentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+                  ref
+                      .read(teamRecentlyOpenedScoresProvider.notifier)
+                      .recordOpen(score.id);
                   // Arrow tap: go to score detail screen
                   AppNavigation.navigateToTeamScoreDetail(
                     context,
@@ -680,7 +813,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Score'),
-        content: const Text('Are you sure you want to delete this score from the team?'),
+        content: const Text(
+          'Are you sure you want to delete this score from the team?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -689,31 +824,54 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final teamDb = ref.read(teamDatabaseServiceProvider);
-              await teamDb.deleteTeamScore(score.id);
+              final success = await deleteTeamScore(
+                ref: ref,
+                teamServerId: teamServerId,
+                scoreId: score.id,
+              );
+              if (!mounted) return;
+              if (success) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Score deleted')),
+                );
+              } else {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('Failed to delete score')),
+                );
+              }
               resetSwipeState();
-              ref.invalidate(teamScoresProvider(teamServerId));
             },
-            child: const Text('Delete', style: TextStyle(color: AppColors.red500)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.red500),
+            ),
           ),
         ],
       ),
     );
   }
 
-  List<TeamSetlist> _sortTeamSetlists(List<TeamSetlist> setlists, SortState sortState, Map<String, DateTime> recentlyOpened) {
+  List<TeamSetlist> _sortTeamSetlists(
+    List<TeamSetlist> setlists,
+    SortState sortState,
+    Map<String, DateTime> recentlyOpened,
+  ) {
     final sorted = List<TeamSetlist>.from(setlists);
 
     switch (sortState.type) {
       case SortType.recentCreated:
-        sorted.sort((a, b) => sortState.ascending
-            ? a.createdAt.compareTo(b.createdAt)
-            : b.createdAt.compareTo(a.createdAt));
+        sorted.sort(
+          (a, b) => sortState.ascending
+              ? a.createdAt.compareTo(b.createdAt)
+              : b.createdAt.compareTo(a.createdAt),
+        );
         break;
       case SortType.alphabetical:
-        sorted.sort((a, b) => sortState.ascending
-            ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
-            : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
+        sorted.sort(
+          (a, b) => sortState.ascending
+              ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
+              : b.name.toLowerCase().compareTo(a.name.toLowerCase()),
+        );
         break;
       case SortType.recentOpened:
         sorted.sort((a, b) {
@@ -728,19 +886,27 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
     return sorted;
   }
 
-  List<TeamScore> _sortTeamScores(List<TeamScore> scores, SortState sortState, Map<String, DateTime> recentlyOpened) {
+  List<TeamScore> _sortTeamScores(
+    List<TeamScore> scores,
+    SortState sortState,
+    Map<String, DateTime> recentlyOpened,
+  ) {
     final sorted = List<TeamScore>.from(scores);
 
     switch (sortState.type) {
       case SortType.recentCreated:
-        sorted.sort((a, b) => sortState.ascending
-            ? a.createdAt.compareTo(b.createdAt)
-            : b.createdAt.compareTo(a.createdAt));
+        sorted.sort(
+          (a, b) => sortState.ascending
+              ? a.createdAt.compareTo(b.createdAt)
+              : b.createdAt.compareTo(a.createdAt),
+        );
         break;
       case SortType.alphabetical:
-        sorted.sort((a, b) => sortState.ascending
-            ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-            : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        sorted.sort(
+          (a, b) => sortState.ascending
+              ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
+              : b.title.toLowerCase().compareTo(a.title.toLowerCase()),
+        );
         break;
       case SortType.recentOpened:
         sorted.sort((a, b) {
@@ -884,8 +1050,15 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                 textAlignVertical: TextAlignVertical.center,
                 decoration: InputDecoration(
                   hintText: 'Search...',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.gray400),
-                  prefixIcon: const Icon(AppIcons.search, size: 16, color: AppColors.gray400),
+                  hintStyle: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.gray400,
+                  ),
+                  prefixIcon: const Icon(
+                    AppIcons.search,
+                    size: 16,
+                    color: AppColors.gray400,
+                  ),
                   prefixIconConstraints: const BoxConstraints(minWidth: 36),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? GestureDetector(
@@ -895,7 +1068,11 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                               _searchQuery = '';
                             });
                           },
-                          child: const Icon(AppIcons.close, size: 14, color: AppColors.gray400),
+                          child: const Icon(
+                            AppIcons.close,
+                            size: 14,
+                            color: AppColors.gray400,
+                          ),
                         )
                       : null,
                   suffixIconConstraints: const BoxConstraints(minWidth: 32),
@@ -922,7 +1099,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
           // Sort button
           PopupMenuButton<SortType>(
             offset: const Offset(0, 40),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             color: Colors.white,
             elevation: 4,
             constraints: const BoxConstraints(minWidth: 130, maxWidth: 130),
@@ -936,9 +1115,24 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
               _searchFocusNode.unfocus();
             },
             itemBuilder: (context) => [
-                _buildSortMenuItem(SortType.recentCreated, 'Added', AppIcons.clock, sortState),
-                _buildSortMenuItem(SortType.alphabetical, 'A-Z', AppIcons.alphabetical, sortState),
-                _buildSortMenuItem(SortType.recentOpened, 'Opened', AppIcons.calendarClock, sortState),
+              _buildSortMenuItem(
+                SortType.recentCreated,
+                'Added',
+                AppIcons.clock,
+                sortState,
+              ),
+              _buildSortMenuItem(
+                SortType.alphabetical,
+                'A-Z',
+                AppIcons.alphabetical,
+                sortState,
+              ),
+              _buildSortMenuItem(
+                SortType.recentOpened,
+                'Opened',
+                AppIcons.calendarClock,
+                sortState,
+              ),
             ],
             child: Material(
               color: AppColors.gray50,
@@ -960,15 +1154,25 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(getSortIcon(sortState.type), size: 16, color: AppColors.gray400),
+                      Icon(
+                        getSortIcon(sortState.type),
+                        size: 16,
+                        color: AppColors.gray400,
+                      ),
                       const SizedBox(width: 6),
                       Text(
                         getSortLabel(sortState.type),
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.gray400),
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.gray400,
+                        ),
                       ),
                       const SizedBox(width: 4),
                       Icon(
-                        sortState.ascending ? AppIcons.arrowUp : AppIcons.arrowDown,
+                        sortState.ascending
+                            ? AppIcons.arrowUp
+                            : AppIcons.arrowDown,
                         size: 14,
                         color: AppColors.gray400,
                       ),
@@ -983,7 +1187,12 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
     );
   }
 
-  PopupMenuItem<SortType> _buildSortMenuItem(SortType type, String label, IconData icon, SortState sortState) {
+  PopupMenuItem<SortType> _buildSortMenuItem(
+    SortType type,
+    String label,
+    IconData icon,
+    SortState sortState,
+  ) {
     final isSelected = sortState.type == type;
     return PopupMenuItem<SortType>(
       value: type,
@@ -995,26 +1204,30 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
           hoverColor: Colors.transparent,
         ),
         child: Row(
-        children: [
-          Icon(icon, size: 18, color: isSelected ? AppColors.blue600 : AppColors.gray500),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? AppColors.blue600 : AppColors.gray700,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? AppColors.blue600 : AppColors.gray500,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected ? AppColors.blue600 : AppColors.gray700,
+                ),
               ),
             ),
-          ),
-          if (isSelected)
-            Icon(
-              sortState.ascending ? AppIcons.arrowUp : AppIcons.arrowDown,
-              size: 16,
-              color: AppColors.blue600,
-            ),
-        ],
-      ),
+            if (isSelected)
+              Icon(
+                sortState.ascending ? AppIcons.arrowUp : AppIcons.arrowDown,
+                size: 16,
+                color: AppColors.blue600,
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1038,13 +1251,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.blue500, Color(0xFF9333EA)]),
+                    gradient: const LinearGradient(
+                      colors: [AppColors.blue500, Color(0xFF9333EA)],
+                    ),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Center(
                     child: Text(
                       member.name[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -1053,8 +1272,17 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(member.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                      Text(member.username, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
+                      Text(
+                        member.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      Text(
+                        member.username,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.gray600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1093,7 +1321,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
       children: [
         Positioned.fill(
           child: GestureDetector(
-            onTap: () => ref.read(showTeamSwitcherProvider.notifier).state = false,
+            onTap: () =>
+                ref.read(showTeamSwitcherProvider.notifier).state = false,
             child: Container(color: Colors.black.withValues(alpha: 0.05)),
           ),
         ),
@@ -1127,15 +1356,23 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                     color: isCurrentTeam ? AppColors.blue50 : Colors.white,
                     child: InkWell(
                       onTap: () {
-                        ref.read(currentTeamIdProvider.notifier).setTeamId(team.id);
-                        ref.read(showTeamSwitcherProvider.notifier).state = false;
+                        ref
+                            .read(currentTeamIdProvider.notifier)
+                            .setTeamId(team.id);
+                        ref.read(showTeamSwitcherProvider.notifier).state =
+                            false;
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
-                          border: isLast ? null : Border(
-                            bottom: BorderSide(color: AppColors.gray100),
-                          ),
+                          border: isLast
+                              ? null
+                              : Border(
+                                  bottom: BorderSide(color: AppColors.gray100),
+                                ),
                         ),
                         child: Row(
                           children: [
@@ -1143,13 +1380,17 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: isCurrentTeam ? AppColors.blue100 : AppColors.gray100,
+                                color: isCurrentTeam
+                                    ? AppColors.blue100
+                                    : AppColors.gray100,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Icon(
                                 AppIcons.people,
                                 size: 18,
-                                color: isCurrentTeam ? AppColors.blue600 : AppColors.gray500,
+                                color: isCurrentTeam
+                                    ? AppColors.blue600
+                                    : AppColors.gray500,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1161,20 +1402,31 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                                     team.name,
                                     style: TextStyle(
                                       fontSize: 15,
-                                      fontWeight: isCurrentTeam ? FontWeight.w600 : FontWeight.w500,
-                                      color: isCurrentTeam ? AppColors.blue600 : AppColors.gray700,
+                                      fontWeight: isCurrentTeam
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: isCurrentTeam
+                                          ? AppColors.blue600
+                                          : AppColors.gray700,
                                     ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
                                     '${team.members.length} ${team.members.length == 1 ? "member" : "members"}',
-                                    style: const TextStyle(fontSize: 12, color: AppColors.gray500),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.gray500,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                             if (isCurrentTeam)
-                              Icon(AppIcons.check, size: 18, color: AppColors.blue600),
+                              Icon(
+                                AppIcons.check,
+                                size: 18,
+                                color: AppColors.blue600,
+                              ),
                           ],
                         ),
                       ),
@@ -1239,7 +1491,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         topLeft: Radius.circular(24),
                         topRight: Radius.circular(24),
                       ),
-                      border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.gray100),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -1254,24 +1508,46 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             ),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(AppIcons.musicNote, color: Colors.white, size: 22),
+                          child: const Icon(
+                            AppIcons.musicNote,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Add Score', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                              Text(
+                                'Add Score',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               SizedBox(height: 2),
-                              Text('Create new or import from library', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                              Text(
+                                'Create new or import from library',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.gray500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         IconButton(
                           onPressed: () {
-                            ref.read(showTeamScoreModalProvider.notifier).state = false;
+                            ref
+                                    .read(showTeamScoreModalProvider.notifier)
+                                    .state =
+                                false;
                           },
-                          icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                          icon: const Icon(
+                            AppIcons.close,
+                            color: AppColors.gray400,
+                          ),
                         ),
                       ],
                     ),
@@ -1284,24 +1560,44 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         // Create new score option
                         _buildModalOption(
                           icon: Icons.add,
-                          iconGradient: const [AppColors.blue400, AppColors.blue600],
+                          iconGradient: const [
+                            AppColors.blue400,
+                            AppColors.blue600,
+                          ],
                           title: 'Create New Score',
                           subtitle: 'Create a score directly in team',
                           onTap: () {
-                            ref.read(showTeamScoreModalProvider.notifier).state = false;
-                            ref.read(showCreateTeamScoreModalProvider.notifier).state = true;
+                            ref
+                                    .read(showTeamScoreModalProvider.notifier)
+                                    .state =
+                                false;
+                            ref
+                                    .read(
+                                      showCreateTeamScoreModalProvider.notifier,
+                                    )
+                                    .state =
+                                true;
                           },
                         ),
                         const SizedBox(height: 12),
                         // Import from library option
                         _buildModalOption(
                           icon: AppIcons.copy,
-                          iconGradient: const [AppColors.blue400, AppColors.blue600],
+                          iconGradient: const [
+                            AppColors.blue400,
+                            AppColors.blue600,
+                          ],
                           title: 'Import from Library',
                           subtitle: 'Copy a score from your personal library',
                           onTap: () {
-                            ref.read(showTeamScoreModalProvider.notifier).state = false;
-                            ref.read(showImportScoreModalProvider.notifier).state = true;
+                            ref
+                                    .read(showTeamScoreModalProvider.notifier)
+                                    .state =
+                                false;
+                            ref
+                                    .read(showImportScoreModalProvider.notifier)
+                                    .state =
+                                true;
                           },
                         ),
                         const SizedBox(height: 16),
@@ -1315,12 +1611,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           ),
                           child: Row(
                             children: [
-                              const Icon(AppIcons.infoOutline, size: 18, color: Color(0xFFF59E0B)),
+                              const Icon(
+                                AppIcons.infoOutline,
+                                size: 18,
+                                color: Color(0xFFF59E0B),
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   'Duplicate scores cannot be imported. To add instruments to existing score, open it first.',
-                                  style: TextStyle(fontSize: 12, color: const Color(0xFFB45309)),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: const Color(0xFFB45309),
+                                  ),
                                 ),
                               ),
                             ],
@@ -1388,7 +1691,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         topLeft: Radius.circular(24),
                         topRight: Radius.circular(24),
                       ),
-                      border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.gray100),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -1397,30 +1702,55 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           height: 44,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [AppColors.emerald350, AppColors.emerald550],
+                              colors: [
+                                AppColors.emerald350,
+                                AppColors.emerald550,
+                              ],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
+                          child: const Icon(
+                            AppIcons.setlistIcon,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Add Setlist', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                              Text(
+                                'Add Setlist',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               SizedBox(height: 2),
-                              Text('Create new or import from library', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                              Text(
+                                'Create new or import from library',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.gray500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         IconButton(
                           onPressed: () {
-                            ref.read(showTeamSetlistModalProvider.notifier).state = false;
+                            ref
+                                    .read(showTeamSetlistModalProvider.notifier)
+                                    .state =
+                                false;
                           },
-                          icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                          icon: const Icon(
+                            AppIcons.close,
+                            color: AppColors.gray400,
+                          ),
                         ),
                       ],
                     ),
@@ -1433,24 +1763,47 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         // Create new setlist option
                         _buildModalOption(
                           icon: Icons.add,
-                          iconGradient: const [AppColors.emerald350, AppColors.emerald550],
+                          iconGradient: const [
+                            AppColors.emerald350,
+                            AppColors.emerald550,
+                          ],
                           title: 'Create New Setlist',
                           subtitle: 'Create a setlist directly in team',
                           onTap: () {
-                            ref.read(showTeamSetlistModalProvider.notifier).state = false;
-                            ref.read(showCreateTeamSetlistDialogProvider.notifier).state = true;
+                            ref
+                                    .read(showTeamSetlistModalProvider.notifier)
+                                    .state =
+                                false;
+                            ref
+                                    .read(
+                                      showCreateTeamSetlistDialogProvider
+                                          .notifier,
+                                    )
+                                    .state =
+                                true;
                           },
                         ),
                         const SizedBox(height: 12),
                         // Import from library option
                         _buildModalOption(
                           icon: AppIcons.copy,
-                          iconGradient: const [AppColors.emerald350, AppColors.emerald550],
+                          iconGradient: const [
+                            AppColors.emerald350,
+                            AppColors.emerald550,
+                          ],
                           title: 'Import from Library',
                           subtitle: 'Copy a setlist with all its scores',
                           onTap: () {
-                            ref.read(showTeamSetlistModalProvider.notifier).state = false;
-                            ref.read(showImportSetlistModalProvider.notifier).state = true;
+                            ref
+                                    .read(showTeamSetlistModalProvider.notifier)
+                                    .state =
+                                false;
+                            ref
+                                    .read(
+                                      showImportSetlistModalProvider.notifier,
+                                    )
+                                    .state =
+                                true;
                           },
                         ),
                         const SizedBox(height: 16),
@@ -1464,12 +1817,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           ),
                           child: Row(
                             children: [
-                              const Icon(AppIcons.infoOutline, size: 18, color: Color(0xFFF59E0B)),
+                              const Icon(
+                                AppIcons.infoOutline,
+                                size: 18,
+                                color: Color(0xFFF59E0B),
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   'Duplicate setlists cannot be imported. Existing scores in team will be reused.',
-                                  style: TextStyle(fontSize: 12, color: const Color(0xFFB45309)),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: const Color(0xFFB45309),
+                                  ),
                                 ),
                               ),
                             ],
@@ -1526,13 +1886,26 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const SizedBox(height: 2),
-                    Text(subtitle, style: const TextStyle(fontSize: 13, color: AppColors.gray500)),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.gray500,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              const Icon(AppIcons.chevronRight, color: AppColors.gray400, size: 20),
+              const Icon(
+                AppIcons.chevronRight,
+                color: AppColors.gray400,
+                size: 20,
+              ),
             ],
           ),
         ),
@@ -1552,7 +1925,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
               if (currentFocus.hasFocus) {
                 currentFocus.unfocus();
               } else {
-                ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+                ref.read(showCreateTeamSetlistDialogProvider.notifier).state =
+                    false;
                 _setlistNameController.clear();
                 _setlistDescriptionController.clear();
                 _createSetlistErrorMessage = null;
@@ -1593,7 +1967,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         topLeft: Radius.circular(24),
                         topRight: Radius.circular(24),
                       ),
-                      border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                      border: Border(
+                        bottom: BorderSide(color: AppColors.gray100),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -1602,33 +1978,61 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           height: 44,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [AppColors.emerald350, AppColors.emerald550],
+                              colors: [
+                                AppColors.emerald350,
+                                AppColors.emerald550,
+                              ],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             borderRadius: BorderRadius.circular(16),
                           ),
-                          child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 22),
+                          child: const Icon(
+                            AppIcons.setlistIcon,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('New Setlist', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                              Text(
+                                'New Setlist',
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               SizedBox(height: 2),
-                              Text('Create a new team setlist', style: TextStyle(fontSize: 13, color: AppColors.gray500)),
+                              Text(
+                                'Create a new team setlist',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.gray500,
+                                ),
+                              ),
                             ],
                           ),
                         ),
                         IconButton(
                           onPressed: () {
-                            ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+                            ref
+                                    .read(
+                                      showCreateTeamSetlistDialogProvider
+                                          .notifier,
+                                    )
+                                    .state =
+                                false;
                             _setlistNameController.clear();
                             _setlistDescriptionController.clear();
                             _createSetlistErrorMessage = null;
                           },
-                          icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                          icon: const Icon(
+                            AppIcons.close,
+                            color: AppColors.gray400,
+                          ),
                         ),
                       ],
                     ),
@@ -1647,14 +2051,20 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           },
                           decoration: InputDecoration(
                             hintText: 'Setlist name',
-                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                            hintStyle: const TextStyle(
+                              color: AppColors.gray400,
+                              fontSize: 15,
+                            ),
                             filled: true,
                             fillColor: AppColors.gray50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -1663,14 +2073,20 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                           maxLines: 3,
                           decoration: InputDecoration(
                             hintText: 'Description (optional)',
-                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
+                            hintStyle: const TextStyle(
+                              color: AppColors.gray400,
+                              fontSize: 15,
+                            ),
                             filled: true,
                             fillColor: AppColors.gray50,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 14,
+                            ),
                           ),
                         ),
                         // Error message
@@ -1691,37 +2107,65 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             Expanded(
                               child: OutlinedButton(
                                 onPressed: () {
-                                  ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+                                  ref
+                                          .read(
+                                            showCreateTeamSetlistDialogProvider
+                                                .notifier,
+                                          )
+                                          .state =
+                                      false;
                                   _setlistNameController.clear();
                                   _setlistDescriptionController.clear();
                                   _createSetlistErrorMessage = null;
                                 },
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: AppColors.gray200),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  side: const BorderSide(
+                                    color: AppColors.gray200,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                 ),
-                                child: const Text('Cancel', style: TextStyle(color: AppColors.gray600, fontWeight: FontWeight.w500)),
+                                child: const Text(
+                                  'Cancel',
+                                  style: TextStyle(
+                                    color: AppColors.gray600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton(
                                 onPressed: () async {
-                                  final name = _setlistNameController.text.trim();
+                                  final name = _setlistNameController.text
+                                      .trim();
                                   if (name.isEmpty) return;
 
                                   // Create the setlist
                                   await _createTeamSetlistDirectly(
                                     currentTeam,
                                     name,
-                                    _setlistDescriptionController.text.trim().isEmpty 
-                                        ? null 
-                                        : _setlistDescriptionController.text.trim(),
+                                    _setlistDescriptionController.text
+                                            .trim()
+                                            .isEmpty
+                                        ? null
+                                        : _setlistDescriptionController.text
+                                              .trim(),
                                     [], // Empty setlist - no scores initially
                                   );
-                                  
-                                  ref.read(showCreateTeamSetlistDialogProvider.notifier).state = false;
+
+                                  ref
+                                          .read(
+                                            showCreateTeamSetlistDialogProvider
+                                                .notifier,
+                                          )
+                                          .state =
+                                      false;
                                   _setlistNameController.clear();
                                   _setlistDescriptionController.clear();
                                   _createSetlistErrorMessage = null;
@@ -1730,10 +2174,17 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                                   backgroundColor: AppColors.emerald500,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                 ),
-                                child: const Text('Create', style: TextStyle(fontWeight: FontWeight.w600)),
+                                child: const Text(
+                                  'Create',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
                               ),
                             ),
                           ],
@@ -1752,17 +2203,25 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
 
   /// Build import score from library modal (same style as setlist_detail_screen add scores modal)
   Widget _buildImportScoreModal(Team currentTeam) {
-    final scoresAsync = ref.watch(scoresProvider);
-    
+    final scoresAsync = ref.watch(scoresStateProvider);
+
     return scoresAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (allScores) {
         final filteredScores = _importScoreSearchQuery.isEmpty
             ? allScores
-            : allScores.where((score) =>
-                score.title.toLowerCase().contains(_importScoreSearchQuery.toLowerCase()) ||
-                score.composer.toLowerCase().contains(_importScoreSearchQuery.toLowerCase())).toList();
+            : allScores
+                  .where(
+                    (score) =>
+                        score.title.toLowerCase().contains(
+                          _importScoreSearchQuery.toLowerCase(),
+                        ) ||
+                        score.composer.toLowerCase().contains(
+                          _importScoreSearchQuery.toLowerCase(),
+                        ),
+                  )
+                  .toList();
 
         return Stack(
           children: [
@@ -1784,7 +2243,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
             Center(
               child: Container(
                 width: MediaQuery.of(context).size.width * 0.9,
-                constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+                constraints: const BoxConstraints(
+                  maxWidth: 500,
+                  maxHeight: 600,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -1813,7 +2275,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             topLeft: Radius.circular(24),
                             topRight: Radius.circular(24),
                           ),
-                          border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                          border: Border(
+                            bottom: BorderSide(color: AppColors.gray100),
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -1822,37 +2286,66 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                               height: 48,
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [AppColors.blue400, AppColors.blue600],
+                                  colors: [
+                                    AppColors.blue400,
+                                    AppColors.blue600,
+                                  ],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.blue200.withValues(alpha: 0.5),
+                                    color: AppColors.blue200.withValues(
+                                      alpha: 0.5,
+                                    ),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-                              child: const Icon(AppIcons.musicNote, color: Colors.white, size: 24),
+                              child: const Icon(
+                                AppIcons.musicNote,
+                                color: Colors.white,
+                                size: 24,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Import Score', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-                                  Text('Choose score from library', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                                  Text(
+                                    'Import Score',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Choose score from library',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.gray500,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                             IconButton(
                               onPressed: () {
                                 setState(() => _importScoreSearchQuery = '');
-                                ref.read(showImportScoreModalProvider.notifier).state = false;
+                                ref
+                                        .read(
+                                          showImportScoreModalProvider.notifier,
+                                        )
+                                        .state =
+                                    false;
                               },
-                              icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                              icon: const Icon(
+                                AppIcons.close,
+                                color: AppColors.gray400,
+                              ),
                             ),
                           ],
                         ),
@@ -1864,11 +2357,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                         child: TextField(
                           focusNode: _importScoreSearchFocusNode,
-                          onChanged: (value) => setState(() => _importScoreSearchQuery = value),
+                          onChanged: (value) =>
+                              setState(() => _importScoreSearchQuery = value),
                           decoration: InputDecoration(
                             hintText: 'Search scores...',
-                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
-                            prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400, size: 20),
+                            hintStyle: const TextStyle(
+                              color: AppColors.gray400,
+                              fontSize: 15,
+                            ),
+                            prefixIcon: const Icon(
+                              AppIcons.search,
+                              color: AppColors.gray400,
+                              size: 20,
+                            ),
                             filled: true,
                             fillColor: AppColors.gray50,
                             border: OutlineInputBorder(
@@ -1881,9 +2382,15 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.blue400, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: AppColors.blue400,
+                                width: 1.5,
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                             isDense: true,
                           ),
                           style: const TextStyle(fontSize: 15),
@@ -1900,81 +2407,132 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                               ),
                             )
                           : filteredScores.isEmpty
-                              ? Padding(
-                                  padding: const EdgeInsets.all(48),
-                                  child: Text(
-                                    'No scores matching "$_importScoreSearchQuery"',
-                                    style: const TextStyle(color: AppColors.gray500),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                )
-                              : GestureDetector(
-                                  onTap: () => FocusScope.of(context).unfocus(),
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.all(20),
-                                    shrinkWrap: true,
-                                    itemCount: filteredScores.length,
-                                    itemBuilder: (context, index) {
-                                      final score = filteredScores[index];
-                                      return Container(
-                                        margin: const EdgeInsets.only(bottom: 10),
-                                        child: Material(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: InkWell(
-                                            onTap: () async {
-                                              setState(() => _importScoreSearchQuery = '');
-                                              ref.read(showImportScoreModalProvider.notifier).state = false;
-                                              await _copyScoreToTeam(score, currentTeam);
-                                            },
-                                            borderRadius: BorderRadius.circular(16),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(16),
-                                              decoration: BoxDecoration(
-                                                border: Border.all(color: AppColors.gray100),
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  Container(
-                                                    width: 48,
-                                                    height: 48,
-                                                    decoration: BoxDecoration(
-                                                      gradient: const LinearGradient(
-                                                        colors: [AppColors.blue50, AppColors.blue100],
-                                                      ),
-                                                      borderRadius: BorderRadius.circular(12),
-                                                    ),
-                                                    child: const Icon(AppIcons.musicNote, size: 20, color: AppColors.blue600),
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(score.title, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                                        Text('${score.composer} · ${score.instrumentScores.length} instrument(s)', style: const TextStyle(fontSize: 14, color: AppColors.gray500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Container(
-                                                    width: 32,
-                                                    height: 32,
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors.gray50,
-                                                      borderRadius: BorderRadius.circular(16),
-                                                    ),
-                                                    child: const Icon(AppIcons.add, size: 18, color: AppColors.gray600),
-                                                  ),
-                                                ],
-                                              ),
+                          ? Padding(
+                              padding: const EdgeInsets.all(48),
+                              child: Text(
+                                'No scores matching "$_importScoreSearchQuery"',
+                                style: const TextStyle(
+                                  color: AppColors.gray500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: () => FocusScope.of(context).unfocus(),
+                              child: ListView.builder(
+                                padding: const EdgeInsets.all(20),
+                                shrinkWrap: true,
+                                itemCount: filteredScores.length,
+                                itemBuilder: (context, index) {
+                                  final score = filteredScores[index];
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    child: Material(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: InkWell(
+                                        onTap: () async {
+                                          setState(
+                                            () => _importScoreSearchQuery = '',
+                                          );
+                                          ref
+                                                  .read(
+                                                    showImportScoreModalProvider
+                                                        .notifier,
+                                                  )
+                                                  .state =
+                                              false;
+                                          await _copyScoreToTeam(
+                                            score,
+                                            currentTeam,
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: AppColors.gray100,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              16,
                                             ),
                                           ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 48,
+                                                height: 48,
+                                                decoration: BoxDecoration(
+                                                  gradient:
+                                                      const LinearGradient(
+                                                        colors: [
+                                                          AppColors.blue50,
+                                                          AppColors.blue100,
+                                                        ],
+                                                      ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: const Icon(
+                                                  AppIcons.musicNote,
+                                                  size: 20,
+                                                  color: AppColors.blue600,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      score.title,
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      '${score.composer} · ${score.instrumentScores.length} instrument(s)',
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        color:
+                                                            AppColors.gray500,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Container(
+                                                width: 32,
+                                                height: 32,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.gray50,
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                                child: const Icon(
+                                                  AppIcons.add,
+                                                  size: 18,
+                                                  color: AppColors.gray600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      );
-                                    },
-                                  ),
-                                ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -1988,18 +2546,26 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
 
   /// Build import setlist from library modal (same style as setlist_detail_screen add scores modal)
   Widget _buildImportSetlistModal(Team currentTeam) {
-    final setlists = ref.watch(setlistsProvider);
-    final scoresAsync = ref.watch(scoresProvider);
-    
+    final setlists = ref.watch(setlistsListProvider);
+    final scoresAsync = ref.watch(scoresStateProvider);
+
     return scoresAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (allScores) {
         final filteredSetlists = _importSetlistSearchQuery.isEmpty
             ? setlists
-            : setlists.where((setlist) =>
-                setlist.name.toLowerCase().contains(_importSetlistSearchQuery.toLowerCase()) ||
-                setlist.description.toLowerCase().contains(_importSetlistSearchQuery.toLowerCase())).toList();
+            : setlists
+                  .where(
+                    (setlist) =>
+                        setlist.name.toLowerCase().contains(
+                          _importSetlistSearchQuery.toLowerCase(),
+                        ) ||
+                        setlist.description.toLowerCase().contains(
+                          _importSetlistSearchQuery.toLowerCase(),
+                        ),
+                  )
+                  .toList();
 
         return Stack(
           children: [
@@ -2013,7 +2579,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                   setState(() {
                     _importSetlistSearchQuery = '';
                   });
-                  ref.read(showImportSetlistModalProvider.notifier).state = false;
+                  ref.read(showImportSetlistModalProvider.notifier).state =
+                      false;
                 },
                 child: Container(color: Colors.black.withValues(alpha: 0.1)),
               ),
@@ -2021,7 +2588,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
             Center(
               child: Container(
                 width: MediaQuery.of(context).size.width * 0.9,
-                constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+                constraints: const BoxConstraints(
+                  maxWidth: 500,
+                  maxHeight: 600,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -2050,7 +2620,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             topLeft: Radius.circular(24),
                             topRight: Radius.circular(24),
                           ),
-                          border: Border(bottom: BorderSide(color: AppColors.gray100)),
+                          border: Border(
+                            bottom: BorderSide(color: AppColors.gray100),
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -2059,37 +2631,67 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                               height: 48,
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
-                                  colors: [AppColors.emerald350, AppColors.emerald550],
+                                  colors: [
+                                    AppColors.emerald350,
+                                    AppColors.emerald550,
+                                  ],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),
                                 borderRadius: BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.emerald200.withValues(alpha: 0.5),
+                                    color: AppColors.emerald200.withValues(
+                                      alpha: 0.5,
+                                    ),
                                     blurRadius: 8,
                                     offset: const Offset(0, 2),
                                   ),
                                 ],
                               ),
-                              child: const Icon(AppIcons.setlistIcon, color: Colors.white, size: 24),
+                              child: const Icon(
+                                AppIcons.setlistIcon,
+                                color: Colors.white,
+                                size: 24,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Import Setlist', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600)),
-                                  Text('Choose setlist from library', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                                  Text(
+                                    'Import Setlist',
+                                    style: TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Choose setlist from library',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.gray500,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                             IconButton(
                               onPressed: () {
                                 setState(() => _importSetlistSearchQuery = '');
-                                ref.read(showImportSetlistModalProvider.notifier).state = false;
+                                ref
+                                        .read(
+                                          showImportSetlistModalProvider
+                                              .notifier,
+                                        )
+                                        .state =
+                                    false;
                               },
-                              icon: const Icon(AppIcons.close, color: AppColors.gray400),
+                              icon: const Icon(
+                                AppIcons.close,
+                                color: AppColors.gray400,
+                              ),
                             ),
                           ],
                         ),
@@ -2101,11 +2703,19 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                         child: TextField(
                           focusNode: _importSetlistSearchFocusNode,
-                          onChanged: (value) => setState(() => _importSetlistSearchQuery = value),
+                          onChanged: (value) =>
+                              setState(() => _importSetlistSearchQuery = value),
                           decoration: InputDecoration(
                             hintText: 'Search setlists...',
-                            hintStyle: const TextStyle(color: AppColors.gray400, fontSize: 15),
-                            prefixIcon: const Icon(AppIcons.search, color: AppColors.gray400, size: 20),
+                            hintStyle: const TextStyle(
+                              color: AppColors.gray400,
+                              fontSize: 15,
+                            ),
+                            prefixIcon: const Icon(
+                              AppIcons.search,
+                              color: AppColors.gray400,
+                              size: 20,
+                            ),
                             filled: true,
                             fillColor: AppColors.gray50,
                             border: OutlineInputBorder(
@@ -2118,9 +2728,15 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.emerald400, width: 1.5),
+                              borderSide: const BorderSide(
+                                color: AppColors.emerald400,
+                                width: 1.5,
+                              ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                             isDense: true,
                           ),
                           style: const TextStyle(fontSize: 15),
@@ -2137,87 +2753,151 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
                               ),
                             )
                           : filteredSetlists.isEmpty
-                              ? Padding(
-                                  padding: const EdgeInsets.all(48),
-                                  child: Text(
-                                    'No setlists matching "$_importSetlistSearchQuery"',
-                                    style: const TextStyle(color: AppColors.gray500),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                )
-                              : GestureDetector(
-                                  onTap: () => FocusScope.of(context).unfocus(),
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.all(20),
-                                    shrinkWrap: true,
-                                    itemCount: filteredSetlists.length,
-                                    itemBuilder: (context, index) {
-                                      final setlist = filteredSetlists[index];
-                                      // Get scores for this setlist
-                                      final setlistScores = setlist.scoreIds
-                                          .map((id) => allScores.firstWhere((s) => s.id == id, orElse: () => Score(id: '', title: 'Unknown', composer: '', dateAdded: DateTime.now(), instrumentScores: [])))
-                                          .where((s) => s.id.isNotEmpty)
-                                          .toList();
-                                      
-                                      return Container(
-                                        margin: const EdgeInsets.only(bottom: 10),
-                                        child: Material(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: InkWell(
-                                            onTap: () async {
-                                              setState(() => _importSetlistSearchQuery = '');
-                                              ref.read(showImportSetlistModalProvider.notifier).state = false;
-                                              await _copySetlistToTeam(setlist, setlistScores, currentTeam);
-                                            },
-                                            borderRadius: BorderRadius.circular(16),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(16),
-                                              decoration: BoxDecoration(
-                                                border: Border.all(color: AppColors.gray100),
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  Container(
-                                                    width: 48,
-                                                    height: 48,
-                                                    decoration: BoxDecoration(
-                                                      gradient: const LinearGradient(
-                                                        colors: [AppColors.emerald50, AppColors.emerald100],
-                                                      ),
-                                                      borderRadius: BorderRadius.circular(12),
-                                                    ),
-                                                    child: const Icon(AppIcons.setlistIcon, size: 20, color: AppColors.emerald600),
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(setlist.name, style: const TextStyle(fontWeight: FontWeight.w600), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                                        Text('${setlistScores.length} score(s)${setlist.description.isNotEmpty ? ' · ${setlist.description}' : ''}', style: const TextStyle(fontSize: 14, color: AppColors.gray500), maxLines: 1, overflow: TextOverflow.ellipsis),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  Container(
-                                                    width: 32,
-                                                    height: 32,
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors.gray50,
-                                                      borderRadius: BorderRadius.circular(16),
-                                                    ),
-                                                    child: const Icon(AppIcons.add, size: 18, color: AppColors.gray600),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
+                          ? Padding(
+                              padding: const EdgeInsets.all(48),
+                              child: Text(
+                                'No setlists matching "$_importSetlistSearchQuery"',
+                                style: const TextStyle(
+                                  color: AppColors.gray500,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: () => FocusScope.of(context).unfocus(),
+                              child: ListView.builder(
+                                padding: const EdgeInsets.all(20),
+                                shrinkWrap: true,
+                                itemCount: filteredSetlists.length,
+                                itemBuilder: (context, index) {
+                                  final setlist = filteredSetlists[index];
+                                  // Get scores for this setlist
+                                  final setlistScores = setlist.scoreIds
+                                      .map(
+                                        (id) => allScores.firstWhere(
+                                          (s) => s.id == id,
+                                          orElse: () => Score(
+                                            id: '',
+                                            title: 'Unknown',
+                                            composer: '',
+                                            createdAt: DateTime.now(),
+                                            instrumentScores: [],
                                           ),
                                         ),
-                                      );
-                                    },
-                                  ),
-                                ),
+                                      )
+                                      .where((s) => s.id.isNotEmpty)
+                                      .toList();
+
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    child: Material(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: InkWell(
+                                        onTap: () async {
+                                          setState(
+                                            () =>
+                                                _importSetlistSearchQuery = '',
+                                          );
+                                          ref
+                                                  .read(
+                                                    showImportSetlistModalProvider
+                                                        .notifier,
+                                                  )
+                                                  .state =
+                                              false;
+                                          await _copySetlistToTeam(
+                                            setlist,
+                                            setlistScores,
+                                            currentTeam,
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: AppColors.gray100,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 48,
+                                                height: 48,
+                                                decoration: BoxDecoration(
+                                                  gradient:
+                                                      const LinearGradient(
+                                                        colors: [
+                                                          AppColors.emerald50,
+                                                          AppColors.emerald100,
+                                                        ],
+                                                      ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: const Icon(
+                                                  AppIcons.setlistIcon,
+                                                  size: 20,
+                                                  color: AppColors.emerald600,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      setlist.name,
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    Text(
+                                                      '${setlistScores.length} score(s)${setlist.description.isNotEmpty ? ' · ${setlist.description}' : ''}',
+                                                      style: const TextStyle(
+                                                        fontSize: 14,
+                                                        color:
+                                                            AppColors.gray500,
+                                                      ),
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Container(
+                                                width: 32,
+                                                height: 32,
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.gray50,
+                                                  borderRadius:
+                                                      BorderRadius.circular(16),
+                                                ),
+                                                child: const Icon(
+                                                  AppIcons.add,
+                                                  size: 18,
+                                                  color: AppColors.gray600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -2230,30 +2910,30 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
   }
 
   /// Create a team setlist directly
-  Future<void> _createTeamSetlistDirectly(Team team, String name, String? description, List<String> teamScoreIds) async {
-    final authData = ref.read(authProvider);
-    if (authData.user == null) return;
-
-    final db = ref.read(databaseProvider);
-    final teamDb = ref.read(teamDatabaseServiceProvider);
-    final personalDb = ref.read(databaseServiceProvider);
-    final copyService = TeamCopyService(db, teamDb, personalDb);
-
-    final result = await copyService.createTeamSetlist(
+  Future<void> _createTeamSetlistDirectly(
+    Team team,
+    String name,
+    String? description,
+    List<String> teamScoreIds,
+  ) async {
+    final result = await createTeamSetlist(
+      ref: ref,
       teamServerId: team.serverId,
-      userId: authData.user!.id,
       name: name,
       description: description,
       teamScoreIds: teamScoreIds,
     );
 
-    if (mounted) {
-      ref.invalidate(teamSetlistsProvider(team.serverId));
-
+    if (!mounted) return;
+    if (result != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Setlist created')),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.message ?? (result.success ? 'Setlist created' : 'Failed to create')),
-          backgroundColor: result.success ? AppColors.emerald600 : AppColors.red500,
+          content: const Text('Failed to create setlist'),
+          backgroundColor: AppColors.red500,
         ),
       );
     }
@@ -2261,59 +2941,50 @@ class _TeamScreenState extends ConsumerState<TeamScreen> with SingleTickerProvid
 
   /// Copy a score to the team
   Future<void> _copyScoreToTeam(Score score, Team team) async {
-    final authData = ref.read(authProvider);
-    if (authData.user == null) return;
-
-    final db = ref.read(databaseProvider);
-    final teamDb = ref.read(teamDatabaseServiceProvider);
-    final personalDb = ref.read(databaseServiceProvider);
-    final copyService = TeamCopyService(db, teamDb, personalDb);
-
-    final result = await copyService.copyScoreToTeam(
+    final result = await copyScoreToTeam(
+      ref: ref,
       personalScore: score,
       teamServerId: team.serverId,
-      userId: authData.user!.id,
     );
 
-    if (mounted) {
-      // Refresh team data
-      ref.invalidate(teamScoresProvider(team.serverId));
-
+    if (!mounted) return;
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message ?? 'Score copied to team')),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.message ?? (result.success ? 'Score copied' : 'Failed to copy')),
-          backgroundColor: result.success ? AppColors.emerald600 : AppColors.red500,
+          content: Text(result.message ?? 'Failed to copy score'),
+          backgroundColor: AppColors.red500,
         ),
       );
     }
   }
 
   /// Copy a setlist to the team
-  Future<void> _copySetlistToTeam(Setlist setlist, List<Score> scores, Team team) async {
-    final authData = ref.read(authProvider);
-    if (authData.user == null) return;
-
-    final db = ref.read(databaseProvider);
-    final teamDb = ref.read(teamDatabaseServiceProvider);
-    final personalDb = ref.read(databaseServiceProvider);
-    final copyService = TeamCopyService(db, teamDb, personalDb);
-
-    final result = await copyService.copySetlistToTeam(
+  Future<void> _copySetlistToTeam(
+    Setlist setlist,
+    List<Score> scores,
+    Team team,
+  ) async {
+    final result = await copySetlistToTeam(
+      ref: ref,
       personalSetlist: setlist,
       scoresInSetlist: scores,
       teamServerId: team.serverId,
-      userId: authData.user!.id,
     );
 
-    if (mounted) {
-      // Refresh team data
-      ref.invalidate(teamScoresProvider(team.serverId));
-      ref.invalidate(teamSetlistsProvider(team.serverId));
-
+    if (!mounted) return;
+    if (result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.message ?? 'Setlist copied to team')),
+      );
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result.message ?? (result.success ? 'Setlist copied' : 'Failed to copy')),
-          backgroundColor: result.success ? AppColors.emerald600 : AppColors.red500,
+          content: Text(result.message ?? 'Failed to copy setlist'),
+          backgroundColor: AppColors.red500,
         ),
       );
     }

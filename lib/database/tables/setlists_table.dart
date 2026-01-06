@@ -5,7 +5,7 @@ class Setlists extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   TextColumn get description => text()();
-  DateTimeColumn get dateCreated => dateTime()();
+  DateTimeColumn get createdAt => dateTime()();
 
   // Sync fields (aligned with sync_logic.md)
   // Note: userId is NOT stored on frontend - backend extracts it from session

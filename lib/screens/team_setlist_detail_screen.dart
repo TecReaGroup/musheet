@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/team.dart';
-import '../providers/teams_provider.dart';
+import '../providers/teams_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../router/app_router.dart';
 import '../utils/icon_mappings.dart';
@@ -38,7 +38,7 @@ class _TeamSetlistDetailScreenState extends ConsumerState<TeamSetlistDetailScree
   }
 
   /// Handle reorder and save to database
-  void _onReorder(int oldIndex, int newIndex) {
+  void _onReorder(int oldIndex, int newIndex) async {
     if (_localScoreIds == null) return;
 
     setState(() {
@@ -49,11 +49,12 @@ class _TeamSetlistDetailScreenState extends ConsumerState<TeamSetlistDetailScree
       _localScoreIds!.insert(newIndex, item);
     });
 
-    // Save to database
+    // Update the setlist with new order
     final updatedSetlist = widget.setlist.copyWith(teamScoreIds: _localScoreIds);
-    ref.read(teamSetlistsOperationsProvider.notifier).updateTeamSetlist(
-      widget.teamServerId,
-      updatedSetlist,
+    await updateTeamSetlist(
+      ref: ref,
+      teamServerId: widget.teamServerId,
+      setlist: updatedSetlist,
     );
   }
 
@@ -148,17 +149,20 @@ class _TeamSetlistDetailScreenState extends ConsumerState<TeamSetlistDetailScree
 
                 // Filter scores that are in this setlist using local order
                 final setlistScores = scoreIds
-                    .map((id) => teamScores.firstWhere(
-                          (s) => s.id == id,
-                          orElse: () => TeamScore(
-                            id: id,
-                            teamId: widget.teamServerId,
-                            title: 'Unknown Score',
-                            composer: '',
-                            createdById: 0,
-                            createdAt: DateTime.now(),
-                          ),
-                        ))
+                    .map((id) {
+                      try {
+                        return teamScores.firstWhere((s) => s.id == id);
+                      } catch (_) {
+                        return TeamScore(
+                          id: id,
+                          teamId: widget.teamServerId,
+                          title: 'Unknown Score',
+                          composer: '',
+                          createdById: 0,
+                          createdAt: DateTime.now(),
+                        );
+                      }
+                    })
                     .toList();
 
                 if (setlistScores.isEmpty) {

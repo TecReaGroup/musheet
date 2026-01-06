@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/scores_provider.dart';
-import '../providers/setlists_provider.dart';
-import '../providers/teams_provider.dart';
-import '../providers/storage_providers.dart';
+import '../providers/scores_state_provider.dart';
+import '../providers/setlists_state_provider.dart';
+import '../providers/teams_state_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
@@ -104,36 +103,26 @@ final showCreateScoreModalProvider = NotifierProvider<ShowCreateScoreModalNotifi
 final setlistSortProvider = NotifierProvider<SetlistSortNotifier, SortState>(SetlistSortNotifier.new);
 final scoreSortProvider = NotifierProvider<ScoreSortNotifier, SortState>(ScoreSortNotifier.new);
 
-// Recently opened records - using Notifier with persistence
+// Recently opened records - using Notifier (in-memory only for now)
 class RecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
   @override
   Map<String, DateTime> build() {
-    // Load from preferences
-    final prefs = ref.watch(preferencesProvider);
-    return prefs?.getRecentlyOpenedSetlists() ?? {};
+    return {};
   }
   
   void recordOpen(String id) {
     state = {...state, id: DateTime.now()};
-    // Save to preferences
-    final prefs = ref.read(preferencesProvider);
-    prefs?.setRecentlyOpenedSetlists(state);
   }
 }
 
 class RecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
   @override
   Map<String, DateTime> build() {
-    // Load from preferences
-    final prefs = ref.watch(preferencesProvider);
-    return prefs?.getRecentlyOpenedScores() ?? {};
+    return {};
   }
   
   void recordOpen(String id) {
     state = {...state, id: DateTime.now()};
-    // Save to preferences
-    final prefs = ref.read(preferencesProvider);
-    prefs?.setRecentlyOpenedScores(state);
   }
 }
 
@@ -141,16 +130,11 @@ class RecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
 class LastOpenedScoreInSetlistNotifier extends Notifier<Map<String, int>> {
   @override
   Map<String, int> build() {
-    // Load from preferences
-    final prefs = ref.watch(preferencesProvider);
-    return prefs?.getLastOpenedScoreInSetlist() ?? {};
+    return {};
   }
   
   void recordLastOpened(String setlistId, int scoreIndex) {
     state = {...state, setlistId: scoreIndex};
-    // Save to preferences
-    final prefs = ref.read(preferencesProvider);
-    prefs?.setLastOpenedScoreInSetlist(state);
   }
   
   int? getLastOpened(String setlistId) => state[setlistId];
@@ -160,25 +144,17 @@ class LastOpenedScoreInSetlistNotifier extends Notifier<Map<String, int>> {
 class LastOpenedInstrumentInScoreNotifier extends Notifier<Map<String, int>> {
   @override
   Map<String, int> build() {
-    // Load from preferences
-    final prefs = ref.watch(preferencesProvider);
-    return prefs?.getLastOpenedInstrumentInScore() ?? {};
+    return {};
   }
   
   void recordLastOpened(String scoreId, int instrumentIndex) {
     state = {...state, scoreId: instrumentIndex};
-    // Save to preferences
-    final prefs = ref.read(preferencesProvider);
-    prefs?.setLastOpenedInstrumentInScore(state);
   }
   
   int? getLastOpened(String scoreId) => state[scoreId];
   
   void clearAll() {
     state = {};
-    // Save to preferences
-    final prefs = ref.read(preferencesProvider);
-    prefs?.setLastOpenedInstrumentInScore(state);
   }
 }
 
@@ -186,18 +162,12 @@ class LastOpenedInstrumentInScoreNotifier extends Notifier<Map<String, int>> {
 class PreferredInstrumentNotifier extends Notifier<String?> {
   @override
   String? build() {
-    // Load from preferences
-    final prefs = ref.watch(preferencesProvider);
-    return prefs?.getPreferredInstrument();
+    return null;
   }
   
   void setPreferredInstrument(String? instrumentKey) {
     state = instrumentKey;
-    // Save to preferences
-    final prefs = ref.read(preferencesProvider);
-    prefs?.setPreferredInstrument(instrumentKey);
     // Clear all last opened instrument records when preference changes
-    // This ensures the new preference takes effect immediately
     ref.read(lastOpenedInstrumentInScoreProvider.notifier).clearAll();
   }
 }
@@ -206,22 +176,17 @@ class PreferredInstrumentNotifier extends Notifier<String?> {
 class TeamEnabledNotifier extends Notifier<bool> {
   @override
   bool build() {
-    // Load from preferences
-    final prefs = ref.watch(preferencesProvider);
-    return prefs?.isTeamEnabled() ?? true;
+    return true;
   }
   
   void setTeamEnabled(bool enabled) {
     state = enabled;
-    // Save to preferences
-    final prefs = ref.read(preferencesProvider);
-    prefs?.setTeamEnabled(enabled);
     // When disabling team, leave all teams and clear their data
     if (!enabled) {
-      ref.read(teamsProvider.notifier).leaveAllTeams();
+      ref.read(teamsStateProvider.notifier).leaveAllTeams();
     } else {
       // When re-enabling team, rejoin teams
-      ref.read(teamsProvider.notifier).rejoinTeams();
+      ref.read(teamsStateProvider.notifier).refresh();
     }
   }
 }
@@ -327,7 +292,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     if (_nameController.text.trim().isEmpty) return;
 
     // Check for duplicate setlist name
-    final setlists = ref.read(setlistsProvider);
+    final setlists = ref.read(setlistsListProvider);
     final normalizedName = _nameController.text.trim().toLowerCase();
     final isDuplicate = setlists.any((s) => s.name.toLowerCase() == normalizedName);
 
@@ -338,7 +303,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
       return;
     }
 
-    ref.read(setlistsAsyncProvider.notifier).createSetlist(
+    ref.read(setlistsStateProvider.notifier).createSetlist(
       _nameController.text.trim(),
       _descriptionController.text.trim(),
     );
@@ -363,9 +328,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           TextButton(
             onPressed: () {
               if (isScore) {
-                ref.read(scoresProvider.notifier).deleteScore(id);
+                ref.read(scoresStateProvider.notifier).deleteScore(id);
               } else {
-                ref.read(setlistsAsyncProvider.notifier).deleteSetlist(id);
+                ref.read(setlistsStateProvider.notifier).deleteSetlist(id);
               }
               resetSwipeState();
               Navigator.pop(context);
@@ -381,7 +346,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
   Widget build(BuildContext context) {
     // Use scoresListProvider for synchronous access
     final scores = ref.watch(scoresListProvider);
-    final setlists = ref.watch(setlistsProvider);
+    final setlists = ref.watch(setlistsListProvider);
     final activeTab = ref.watch(libraryTabProvider);
     final showCreateSetlistModal = ref.watch(showCreateSetlistModalProvider);
     final showCreateScoreModal = ref.watch(showCreateScoreModalProvider);
@@ -660,8 +625,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     switch (sortState.type) {
       case SortType.recentCreated:
         sorted.sort((a, b) => sortState.ascending 
-            ? a.dateCreated.compareTo(b.dateCreated)
-            : b.dateCreated.compareTo(a.dateCreated));
+            ? a.createdAt.compareTo(b.createdAt)
+            : b.createdAt.compareTo(a.createdAt));
         break;
       case SortType.alphabetical:
         sorted.sort((a, b) => sortState.ascending
@@ -686,8 +651,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     switch (sortState.type) {
       case SortType.recentCreated:
         sorted.sort((a, b) => sortState.ascending 
-            ? a.dateAdded.compareTo(b.dateAdded)
-            : b.dateAdded.compareTo(a.dateAdded));
+            ? a.createdAt.compareTo(b.createdAt)
+            : b.createdAt.compareTo(a.createdAt));
         break;
       case SortType.alphabetical:
         sorted.sort((a, b) => sortState.ascending

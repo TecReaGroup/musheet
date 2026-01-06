@@ -1,9 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:custom_image_crop/custom_image_crop.dart';
 import 'package:image/image.dart' as img;
-import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 
 /// Screen for cropping avatar images with custom UI
@@ -27,11 +26,15 @@ class _AvatarCropScreenState extends State<AvatarCropScreen> {
   void initState() {
     super.initState();
     _cropController = CustomImageCropController();
+    // Hide system UI for immersive experience
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
     _cropController.dispose();
+    // Restore system UI
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -90,161 +93,90 @@ class _AvatarCropScreenState extends State<AvatarCropScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
+      extendBody: true,
+      body: Stack(
         children: [
-          // Header - matching settings style
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: AppColors.gray200)),
+          // Full screen crop area
+          Positioned.fill(
+            child: CustomImageCrop(
+              cropController: _cropController,
+              image: FileImage(widget.imageFile),
+              shape: CustomCropShape.Circle,
+              cropPercentage: 0.85,
+              canRotate: false,
+              canScale: true,
+              canMove: true,
+              forceInsideCropArea: true,
+              imageFit: CustomImageFit.fitVisibleSpace,
+              customProgressIndicator: const CircularProgressIndicator(
+                color: Colors.white,
+              ),
+              overlayColor: Colors.black.withValues(alpha: 0.7),
+              pathPaint: Paint()
+                ..color = Colors.white
+                ..strokeWidth = 2
+                ..style = PaintingStyle.stroke,
             ),
+          ),
+
+          // Top bar with back and done buttons
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
             child: SafeArea(
-              bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 16, 16),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    // Cancel button
                     IconButton(
                       onPressed: _isProcessing ? null : () => Navigator.of(context).pop(),
                       icon: const Icon(
-                        AppIcons.chevronLeft,
-                        color: AppColors.gray600,
-                        size: 24,
+                        AppIcons.close,
+                        color: Colors.white,
+                        size: 28,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    const Expanded(
-                      child: Text(
-                        'Crop Avatar',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.gray700,
-                        ),
+                    // Title
+                    const Text(
+                      'Move and Scale',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
                       ),
                     ),
-                    // Confirm button
-                    TextButton(
-                      onPressed: _isProcessing ? null : _cropAndSave,
-                      child: _isProcessing
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Done',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.blue500,
+                    // Done button
+                    _isProcessing
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
                               ),
                             ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Crop area
-          Expanded(
-            child: Container(
-              color: AppColors.gray50,
-              child: CustomImageCrop(
-                cropController: _cropController,
-                image: FileImage(widget.imageFile),
-                shape: CustomCropShape.Circle,
-                cropPercentage: 0.8,
-                canRotate: true,
-                canScale: true,
-                canMove: true,
-                customProgressIndicator: const CircularProgressIndicator(
-                  color: AppColors.blue500,
-                ),
-                overlayColor: Colors.black.withValues(alpha: 0.5),
-                pathPaint: Paint()
-                  ..color = AppColors.blue500
-                  ..strokeWidth = 2
-                  ..style = PaintingStyle.stroke,
-              ),
-            ),
-          ),
-
-          // Bottom controls - white background
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: AppColors.gray200)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // Rotate left
-                    _buildControlButton(
-                      icon: AppIcons.rotateCcw,
-                      label: 'Rotate Left',
-                      onTap: () => _cropController.addTransition(
-                        CropImageData(angle: -90 * 3.14159 / 180),
-                      ),
-                    ),
-                    // Reset
-                    _buildControlButton(
-                      icon: AppIcons.refreshCcw,
-                      label: 'Reset',
-                      onTap: () => _cropController.reset(),
-                    ),
-                    // Rotate right
-                    _buildControlButton(
-                      icon: AppIcons.rotateCw,
-                      label: 'Rotate Right',
-                      onTap: () => _cropController.addTransition(
-                        CropImageData(angle: 90 * 3.14159 / 180),
-                      ),
-                    ),
+                          )
+                        : IconButton(
+                            onPressed: _cropAndSave,
+                            icon: const Icon(
+                              AppIcons.check,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
                   ],
                 ),
               ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: _isProcessing ? null : onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: _isProcessing ? AppColors.gray300 : AppColors.gray600,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: _isProcessing ? AppColors.gray300 : AppColors.gray500,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

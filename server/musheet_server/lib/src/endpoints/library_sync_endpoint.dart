@@ -103,6 +103,7 @@ class LibrarySyncEndpoint extends Endpoint {
     try {
       // Process scores
       if (request.scores != null) {
+        session.log('[LIBSYNC] Processing ${request.scores!.length} scores', level: LogLevel.info);
         for (final change in request.scores!) {
           newVersion++;
           final result = await _processScoreChange(session, validatedUserId, change, newVersion);
@@ -115,14 +116,20 @@ class LibrarySyncEndpoint extends Endpoint {
       
       // Process instrument scores (now includes embedded annotations)
       if (request.instrumentScores != null) {
+        session.log('[LIBSYNC] Processing ${request.instrumentScores!.length} instrumentScores', level: LogLevel.info);
         for (final change in request.instrumentScores!) {
+          session.log('[LIBSYNC] IS change: entityId=${change.entityId}, serverId=${change.serverId}, data=${change.data}', level: LogLevel.debug);
           newVersion++;
-          final result = await _processInstrumentScoreChange(session, validatedUserId, change, newVersion);
+          final result = await _processInstrumentScoreChange(
+            session, validatedUserId, change, newVersion, serverIdMapping);
           acceptedIds.add(change.entityId);
           if (result != null) {
             serverIdMapping[change.entityId] = result;
+            session.log('[LIBSYNC] IS processed: entityId=${change.entityId} -> serverId=$result', level: LogLevel.info);
           }
         }
+      } else {
+        session.log('[LIBSYNC] No instrumentScores in request', level: LogLevel.info);
       }
 
       // NOTE: Per sync_logic.md §2.6, Annotations are embedded in InstrumentScore
@@ -467,40 +474,42 @@ class LibrarySyncEndpoint extends Endpoint {
       }
     }
     
-    // Check for deleted score with same title and composer (restore instead of creating new)
+    // Check for existing score with same title and composer (including deleted ones)
+    // This handles the case where client deletes and recreates a score with same title/composer
     final title = data['title'] as String;
     final composer = data['composer'] as String?;
-    final deletedScores = await Score.db.find(
+    
+    // Find ALL scores with same title (including both deleted and non-deleted)
+    final existingScores = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(userId) &
-                    t.title.equals(title) &
-                    t.deletedAt.notEquals(null),
+      where: (t) => t.userId.equals(userId) & t.title.equals(title),
     );
     
     // Find exact match by composer (null-safe comparison)
-    Score? scoreToRestore;
-    for (final s in deletedScores) {
+    Score? scoreToUpdate;
+    for (final s in existingScores) {
       // Handle null composer comparison properly
       if ((s.composer == null && composer == null) ||
           (s.composer != null && s.composer == composer)) {
-        scoreToRestore = s;
+        scoreToUpdate = s;
         break;
       }
     }
     
-    // If found a deleted score with same title and composer, restore it
-    if (scoreToRestore != null) {
-      scoreToRestore.composer = composer;
-      scoreToRestore.bpm = data['bpm'] as int?;
-      scoreToRestore.version = newVersion;
-      scoreToRestore.updatedAt = DateTime.now();
-      scoreToRestore.deletedAt = null; // Restore
-      scoreToRestore.syncStatus = 'synced';
-      await Score.db.updateRow(session, scoreToRestore);
-      return scoreToRestore.id;
+    // If found an existing score with same title and composer, update it (restore if deleted)
+    if (scoreToUpdate != null) {
+      session.log('[LIBSYNC] Found existing score id=${scoreToUpdate.id}, updating instead of creating new', level: LogLevel.info);
+      scoreToUpdate.composer = composer;
+      scoreToUpdate.bpm = data['bpm'] as int?;
+      scoreToUpdate.version = newVersion;
+      scoreToUpdate.updatedAt = DateTime.now();
+      scoreToUpdate.deletedAt = null; // Restore if it was deleted
+      scoreToUpdate.syncStatus = 'synced';
+      await Score.db.updateRow(session, scoreToUpdate);
+      return scoreToUpdate.id;
     }
     
-    // Create new only if no deleted score found
+    // Create new only if no existing score found
     final score = Score(
       userId: userId,
       title: title,
@@ -520,6 +529,7 @@ class LibrarySyncEndpoint extends Endpoint {
     int userId,
     SyncEntityChange change,
     int newVersion,
+    Map<String, int> serverIdMapping,
   ) async {
     final data = jsonDecode(change.data) as Map<String, dynamic>;
 
@@ -560,7 +570,31 @@ class LibrarySyncEndpoint extends Endpoint {
       return null;
     }
 
-    final scoreId = data['scoreId'] as int;
+    // Get scoreId - can be either server int ID or client local string ID
+    final scoreIdRaw = data['scoreId'];
+    int scoreId;
+    
+    if (scoreIdRaw is int) {
+      // Direct server ID
+      scoreId = scoreIdRaw;
+    } else if (scoreIdRaw is String) {
+      // Client local ID - look up in serverIdMapping
+      final mappedServerId = serverIdMapping[scoreIdRaw];
+      if (mappedServerId != null) {
+        scoreId = mappedServerId;
+      } else {
+        // Try to parse as int (maybe client sent stringified int)
+        final parsed = int.tryParse(scoreIdRaw);
+        if (parsed != null) {
+          scoreId = parsed;
+        } else {
+          throw Exception('Cannot resolve scoreId: $scoreIdRaw - not found in serverIdMapping');
+        }
+      }
+    } else {
+      throw Exception('Invalid scoreId type: ${scoreIdRaw.runtimeType}');
+    }
+    
     final instrumentType = data['instrumentType'] as String;
     final customInstrument = data['customInstrument'] as String?;
 

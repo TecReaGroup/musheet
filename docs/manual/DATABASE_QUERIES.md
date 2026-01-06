@@ -29,7 +29,7 @@ FROM scores;
 
 ```sql
 -- 不显示 annotationsJson（内容过长）
-SELECT id, "scoreId", "instrumentName", "pdfHash", "pdfPath", version, "syncStatus", "createdAt", "updatedAt", "deletedAt"
+SELECT id, "scoreId", "instrumentType", "pdfHash", "pdfPath", version, "syncStatus", "createdAt", "updatedAt", "deletedAt"
 FROM instrument_scores
 ORDER BY id;
 ```

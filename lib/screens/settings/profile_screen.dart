@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
-import '../../providers/auth_provider.dart';
-import '../../services/backend_service.dart';
+import '../../providers/auth_state_provider.dart';
+import '../../core/core.dart';
 import '../../router/app_router.dart';
 import 'settings_sub_screen.dart';
 import 'avatar_crop_screen.dart';
@@ -25,11 +25,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authData = ref.watch(authProvider);
-    final user = authData.user;
+    final authState = ref.watch(authStateProvider);
+    final user = authState.user;
 
     // If not authenticated, redirect to login
-    if (!authData.isAuthenticated) {
+    if (!authState.isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         context.go(AppRoutes.login);
       });
@@ -40,8 +40,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final username = user?.username ?? '';
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
-    // Use cached avatar from AuthProvider
-    final avatarBytes = authData.avatarBytes;
+    // Use cached avatar from AuthState
+    final avatarBytes = authState.avatarBytes;
 
     return SettingsSubScreen(
       title: 'Profile',
@@ -63,7 +63,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           decoration: BoxDecoration(
                             gradient: (avatarBytes == null)
                                 ? const LinearGradient(
-                                    colors: [AppColors.blue500, Color(0xFF9333EA)],
+                                    colors: [
+                                      AppColors.blue500,
+                                      Color(0xFF9333EA),
+                                    ],
                                   )
                                 : null,
                             borderRadius: BorderRadius.circular(48),
@@ -104,7 +107,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                   // Tappable Display name
                   GestureDetector(
-                    onTap: () => _showEditDisplayNameDialog(context, displayName),
+                    onTap: () =>
+                        _showEditDisplayNameDialog(context, displayName),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -147,7 +151,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: authData.isConnected
+                          color: authState.isConnected
                               ? AppColors.emerald500
                               : AppColors.gray400,
                           shape: BoxShape.circle,
@@ -155,10 +159,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        authData.isConnected ? 'Connected' : 'Offline',
+                        authState.isConnected ? 'Connected' : 'Offline',
                         style: TextStyle(
                           fontSize: 14,
-                          color: authData.isConnected
+                          color: authState.isConnected
                               ? AppColors.emerald600
                               : AppColors.gray500,
                         ),
@@ -351,37 +355,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
       if (!mounted) return;
 
-      // Navigate to custom crop screen
-      final Uint8List? croppedBytes = await Navigator.of(context).push<Uint8List>(
-        MaterialPageRoute(
-          builder: (context) => AvatarCropScreen(
-            imageFile: File(pickedFile.path),
-          ),
-        ),
-      );
+      // Navigate to custom crop screen (use root navigator to hide bottom nav)
+      final Uint8List? croppedBytes = await Navigator.of(context, rootNavigator: true)
+          .push<Uint8List>(
+            MaterialPageRoute(
+              fullscreenDialog: true,
+              builder: (context) => AvatarCropScreen(
+                imageFile: File(pickedFile.path),
+              ),
+            ),
+          );
 
       if (croppedBytes == null) return;
 
       setState(() => _isUpdating = true);
 
-      final result = await BackendService.instance.uploadAvatar(
+      // Upload avatar using API client
+      final authState = ref.read(authStateProvider);
+      if (authState.user == null || !ApiClient.isInitialized) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not logged in')),
+        );
+        return;
+      }
+
+      final result = await ApiClient.instance.uploadAvatar(
+        userId: authState.user!.id,
         imageBytes: croppedBytes,
-        fileName: 'avatar.png',
+        fileName: 'avatar.jpg',
       );
 
       if (!mounted) return;
-
       if (result.isSuccess) {
-        // Update cached avatar in AuthProvider
-        ref.read(authProvider.notifier).updateCachedAvatar(croppedBytes);
-        await ref.read(authProvider.notifier).refreshProfile();
+        // Refresh auth state to get new avatar URL
+        await ref.read(authStateProvider.notifier).refreshProfile();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Avatar updated')),
+          const SnackBar(content: Text('Avatar updated!')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload: ${result.error}')),
+          SnackBar(
+            content: Text(
+              'Failed: ${result.error?.message ?? 'Unknown error'}',
+            ),
+            backgroundColor: AppColors.red500,
+          ),
         );
       }
     } catch (e) {
@@ -442,22 +462,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() => _isUpdating = true);
 
     try {
-      final result = await BackendService.instance.updateProfile(
+      final authState = ref.read(authStateProvider);
+      if (authState.user == null || !ApiClient.isInitialized) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Not logged in')),
+        );
+        return;
+      }
+
+      final result = await ApiClient.instance.updateProfile(
+        userId: authState.user!.id,
         displayName: newName,
       );
 
       if (!mounted) return;
-
       if (result.isSuccess) {
-        // Refresh profile to get updated data
-        await ref.read(authProvider.notifier).refreshProfile();
+        await ref.read(authStateProvider.notifier).refreshProfile();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Display name updated')),
+          const SnackBar(content: Text('Profile updated!')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update: ${result.error}')),
+          SnackBar(
+            content: Text(
+              'Failed: ${result.error?.message ?? 'Unknown error'}',
+            ),
+            backgroundColor: AppColors.red500,
+          ),
         );
       }
     } finally {
@@ -473,7 +506,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    bool isLoading = false;
 
     showDialog(
       context: context,
@@ -537,53 +569,47 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: isLoading ? null : () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: isLoading
-                  ? null
-                  : () async {
-                      if (!formKey.currentState!.validate()) return;
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
 
-                      setDialogState(() => isLoading = true);
+                final authState = ref.read(authStateProvider);
+                if (authState.user == null || !ApiClient.isInitialized) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Not logged in')),
+                  );
+                  return;
+                }
 
-                      try {
-                        final result =
-                            await BackendService.instance.changePassword(
-                          oldPassword: oldPasswordController.text,
-                          newPassword: newPasswordController.text,
-                        );
+                Navigator.pop(context);
 
-                        if (!context.mounted) return;
-                        Navigator.pop(context);
+                final result = await ApiClient.instance.changePassword(
+                  userId: authState.user!.id,
+                  oldPassword: oldPasswordController.text,
+                  newPassword: newPasswordController.text,
+                );
 
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(this.context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              result.isSuccess
-                                  ? 'Password changed successfully'
-                                  : 'Failed: ${result.error}',
-                            ),
-                            backgroundColor: result.isSuccess
-                                ? AppColors.emerald500
-                                : AppColors.red500,
-                          ),
-                        );
-                      } finally {
-                        if (context.mounted) {
-                          setDialogState(() => isLoading = false);
-                        }
-                      }
-                    },
-              child: isLoading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Change'),
+                if (!mounted) return;
+                if (result.isSuccess && result.data == true) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(content: Text('Password changed!')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Failed: ${result.error?.message ?? 'Check your current password'}',
+                      ),
+                      backgroundColor: AppColors.red500,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Change'),
             ),
           ],
         ),
@@ -596,9 +622,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     BuildContext context,
     WidgetRef ref,
   ) async {
-    // Check for pending changes
-    final pendingCount =
-        await ref.read(authProvider.notifier).getPendingChangesCount();
+    // Check for pending changes - for now, just assume 0
+    const pendingCount = 0;
 
     if (!context.mounted) return;
 
@@ -654,7 +679,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     // Perform logout
-    await ref.read(authProvider.notifier).logout();
+    await ref.read(authStateProvider.notifier).logout();
 
     if (context.mounted) {
       // Navigate back to settings

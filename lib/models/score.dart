@@ -12,7 +12,8 @@ class Score with ScoreBase {
   final String title;
   @override
   final String composer;
-  final DateTime dateAdded;
+  @override
+  final DateTime createdAt;
   @override
   final int bpm;
   final List<InstrumentScore> instrumentScores;
@@ -22,14 +23,10 @@ class Score with ScoreBase {
     this.serverId,
     required this.title,
     required this.composer,
-    required this.dateAdded,
+    required this.createdAt,
     this.bpm = 120,
     this.instrumentScores = const [],
   });
-
-  // Implement base interface
-  @override
-  DateTime get createdAt => dateAdded;
 
   // scoreKey is provided by ScoreBase mixin
 
@@ -56,7 +53,7 @@ class Score with ScoreBase {
     int? serverId,
     String? title,
     String? composer,
-    DateTime? dateAdded,
+    DateTime? createdAt,
     int? bpm,
     List<InstrumentScore>? instrumentScores,
   }) =>
@@ -65,7 +62,7 @@ class Score with ScoreBase {
         serverId: serverId ?? this.serverId,
         title: title ?? this.title,
         composer: composer ?? this.composer,
-        dateAdded: dateAdded ?? this.dateAdded,
+        createdAt: createdAt ?? this.createdAt,
         bpm: bpm ?? this.bpm,
         instrumentScores: instrumentScores ?? this.instrumentScores,
       );
@@ -75,7 +72,7 @@ class Score with ScoreBase {
         'serverId': serverId,
         'title': title,
         'composer': composer,
-        'dateAdded': dateAdded.toIso8601String(),
+        'createdAt': createdAt.toIso8601String(),
         'bpm': bpm,
         'instrumentScores': instrumentScores.map((s) => s.toJson()).toList(),
       };
@@ -85,7 +82,7 @@ class Score with ScoreBase {
         serverId: json['serverId'],
         title: json['title'],
         composer: json['composer'],
-        dateAdded: DateTime.parse(json['dateAdded']),
+        createdAt: DateTime.parse(json['createdAt']),
         bpm: json['bpm'] ?? 120,
         instrumentScores: json['instrumentScores'] != null
             ? (json['instrumentScores'] as List)

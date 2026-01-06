@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/auth_provider.dart';
-import '../services/backend_service.dart';
+import '../providers/auth_state_provider.dart';
+import '../core/core.dart';
 import '../theme/app_colors.dart';
 
 /// A widget that displays user avatar, using cached avatar from AuthProvider
@@ -23,20 +23,20 @@ class UserAvatar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authData = ref.watch(authProvider);
+    final authState = ref.watch(authStateProvider);
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
     final fontSize = size * 0.4;
 
     // Check if this is the current user - use cached avatar
-    final isCurrentUser = userId != null && userId == authData.user?.id;
+    final isCurrentUser = userId != null && userId == authState.user?.id;
 
-    if (isCurrentUser && authData.avatarBytes != null) {
+    if (isCurrentUser && authState.avatarBytes != null) {
       // Use cached avatar for current user
       return _AvatarContainer(
         size: size,
         hasImage: true,
         child: Image.memory(
-          authData.avatarBytes!,
+          authState.avatarBytes!,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
             return _buildPlaceholder(initial, fontSize);
@@ -157,18 +157,21 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
     });
 
     try {
-      final result = await BackendService.instance.getAvatar(userId: widget.userId);
-      if (mounted) {
-        if (result.isSuccess && result.data != null) {
-          setState(() {
-            _avatarBytes = result.data;
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _isLoading = false;
-          });
+      // Load avatar using API client
+      if (!ApiClient.isInitialized) {
+        if (mounted) {
+          setState(() => _isLoading = false);
         }
+        return;
+      }
+
+      final result = await ApiClient.instance.getAvatar(widget.userId);
+      
+      if (mounted) {
+        setState(() {
+          _avatarBytes = result.isSuccess ? result.data : null;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
