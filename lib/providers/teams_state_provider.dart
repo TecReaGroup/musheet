@@ -1,5 +1,5 @@
 /// Teams State Provider - Team management with Repository pattern
-/// 
+///
 /// This provider wraps the TeamRepository and provides
 /// reactive state management for the UI.
 library;
@@ -11,7 +11,6 @@ import '../models/team.dart';
 import '../utils/logger.dart';
 import 'core_providers.dart';
 import 'auth_state_provider.dart';
-import 'team_operations_provider.dart';
 
 // Re-export team operations for easy access
 export 'team_operations_provider.dart';
@@ -51,28 +50,53 @@ class TeamsState {
 
 /// Notifier for managing teams state
 class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
+  bool _hasInitialSync = false;
+
   @override
   Future<TeamsState> build() async {
-    // Watch auth state
-    final authState = ref.watch(authStateProvider);
+    // Listen to auth state changes (not watch to avoid rebuilds)
+    ref.listen(authStateProvider, (previous, next) {
+      // Skip initial emission - build() already handles initial state
+      if (previous == null) return;
+
+      final wasAuth = previous.status == AuthStatus.authenticated;
+      final isAuth = next.status == AuthStatus.authenticated;
+
+      // Reset sync flag on logout
+      if (wasAuth && !isAuth) {
+        _hasInitialSync = false;
+        ref.invalidateSelf();
+      }
+      // Refresh on login
+      else if (!wasAuth && isAuth) {
+        ref.invalidateSelf();
+      }
+    });
+
+    // Check current auth state
+    final authState = ref.read(authStateProvider);
     if (authState.status != AuthStatus.authenticated) {
+      _hasInitialSync = false;
       return const TeamsState();
     }
 
-    return _loadTeams();
+    return _loadTeams(syncFromServer: !_hasInitialSync);
   }
 
-  Future<TeamsState> _loadTeams() async {
+  Future<TeamsState> _loadTeams({bool syncFromServer = false}) async {
     final teamRepo = ref.read(teamRepositoryProvider);
     if (teamRepo == null) {
       return const TeamsState(error: 'Team service not available');
     }
 
     try {
-      // Sync from server first if online
-      final isOnline = ref.read(isOnlineProvider);
-      if (isOnline) {
-        await teamRepo.syncTeamsFromServer();
+      // Only sync from server if requested and online
+      if (syncFromServer) {
+        final isOnline = ref.read(isOnlineProvider);
+        if (isOnline) {
+          await teamRepo.syncTeamsFromServer();
+          _hasInitialSync = true;
+        }
       }
 
       // Load from local database
@@ -84,10 +108,10 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
     }
   }
 
-  /// Refresh teams
+  /// Refresh teams (force sync from server)
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = AsyncData(await _loadTeams());
+    state = AsyncData(await _loadTeams(syncFromServer: true));
   }
 
   /// Create a new team
@@ -122,9 +146,10 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
 // ============================================================================
 
 /// Main teams provider
-final teamsStateProvider = AsyncNotifierProvider<TeamsStateNotifier, TeamsState>(() {
-  return TeamsStateNotifier();
-});
+final teamsStateProvider =
+    AsyncNotifierProvider<TeamsStateNotifier, TeamsState>(() {
+      return TeamsStateNotifier();
+    });
 
 /// Convenience provider for teams list
 final teamsListProvider = Provider<List<Team>>((ref) {
@@ -143,9 +168,11 @@ class CurrentTeamIdNotifier extends Notifier<String?> {
 }
 
 /// Current team ID provider
-final currentTeamIdProvider = NotifierProvider<CurrentTeamIdNotifier, String?>(() {
-  return CurrentTeamIdNotifier();
-});
+final currentTeamIdProvider = NotifierProvider<CurrentTeamIdNotifier, String?>(
+  () {
+    return CurrentTeamIdNotifier();
+  },
+);
 
 /// Current team provider
 final currentTeamProvider = Provider<Team?>((ref) {
@@ -179,18 +206,6 @@ final teamByIdProvider = Provider.family<Team?, String>((ref, teamId) {
 // Team Data Providers
 // ============================================================================
 
-// Note: teamScoresStateProvider, teamSetlistsStateProvider, etc. are exported 
-// from team_operations_provider.dart via the export directive at the top.
-// The teamScoresProvider and teamSetlistsProvider below provide FutureProvider 
-// wrappers for backward compatibility.
-
-/// Team scores provider (wrapper)
-final teamScoresProvider = FutureProvider.family<List<TeamScore>, int>((ref, teamServerId) async {
-  // Watch the actual provider and await its completion
-  return await ref.watch(teamScoresStateProvider(teamServerId).future);
-});
-
-/// Team setlists provider (wrapper)  
-final teamSetlistsProvider = FutureProvider.family<List<TeamSetlist>, int>((ref, teamServerId) async {
-  return await ref.watch(teamSetlistsStateProvider(teamServerId).future);
-});
+// Note: teamScoresProvider, teamSetlistsProvider, teamScoresListProvider,
+// teamSetlistsListProvider are now defined in team_operations_provider.dart
+// and use the same pattern as Library providers.

@@ -129,8 +129,25 @@ class ScoreRepository {
   Future<void> updateAnnotations(String instrumentScoreId, List<Annotation> annotations) async {
     await _local.updateAnnotations(instrumentScoreId, annotations);
     _notifyDataChanged();
-    
+
     Log.d('SCORE_REPO', 'Updated annotations for: $instrumentScoreId');
+  }
+
+  /// Duplicate a score (create a copy with new ID)
+  Future<Score> duplicateScore(String sourceScoreId) async {
+    final scores = await getAllScores();
+    final sourceScore = scores.firstWhere((s) => s.id == sourceScoreId);
+
+    final newScore = sourceScore.copyWith(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      serverId: null,
+      createdAt: DateTime.now(),
+    );
+
+    await addScore(newScore);
+
+    Log.d('SCORE_REPO', 'Duplicated score: $sourceScoreId -> ${newScore.id}');
+    return newScore;
   }
 
   // ============================================================================

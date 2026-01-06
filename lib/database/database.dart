@@ -11,19 +11,17 @@ import 'tables/setlists_table.dart';
 import 'tables/setlist_scores_table.dart';
 import 'tables/app_state_table.dart';
 import 'tables/sync_state_table.dart';
-// Team tables
+// Team tables (metadata only - scores/setlists use unified tables with scopeType)
 import 'tables/teams_table.dart';
 import 'tables/team_members_table.dart';
-import 'tables/team_scores_table.dart';
-import 'tables/team_instrument_scores_table.dart';
-import 'tables/team_setlists_table.dart';
-import 'tables/team_setlist_scores_table.dart';
 import 'tables/team_sync_state_table.dart';
 
 part 'database.g.dart';
 
+/// Unified database schema per sync_logic.md
+/// Uses scopeType/scopeId to distinguish user vs team data in same tables
 @DriftDatabase(tables: [
-  // Personal library tables
+  // Unified library tables (scopeType: 'user' or 'team')
   Scores,
   InstrumentScores,
   Annotations,
@@ -31,13 +29,9 @@ part 'database.g.dart';
   SetlistScores,
   AppState,
   SyncState,
-  // Team tables
+  // Team metadata tables
   Teams,
   TeamMembers,
-  TeamScores,
-  TeamInstrumentScores,
-  TeamSetlists,
-  TeamSetlistScores,
   TeamSyncState,
 ])
 class AppDatabase extends _$AppDatabase {
@@ -54,7 +48,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase._internal() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2; // Incremented for Team tables
+  int get schemaVersion => 4; // Unified tables with scopeType/scopeId
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -62,16 +56,16 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            // Add Team tables in version 2
-            await m.createTable(teams);
-            await m.createTable(teamMembers);
-            await m.createTable(teamScores);
-            await m.createTable(teamInstrumentScores);
-            await m.createTable(teamSetlists);
-            await m.createTable(teamSetlistScores);
-            await m.createTable(teamSyncState);
+          if (from < 4) {
+            // Version 4: Unified tables with scopeType/scopeId
+            // For simplicity, recreate all tables (data migration not handled)
+            // In production, you would migrate data properly
+            await m.createAll();
           }
+        },
+        beforeOpen: (details) async {
+          // Enable foreign keys
+          await customStatement('PRAGMA foreign_keys = ON');
         },
       );
 
@@ -83,78 +77,90 @@ class AppDatabase extends _$AppDatabase {
   /// Per APP_SYNC_LOGIC.md §1.5.3: On logout, delete all database table contents
   Future<void> clearAllUserData() async {
     // Delete in reverse dependency order to avoid foreign key issues
-    // Personal library
     await delete(annotations).go();
     await delete(setlistScores).go();
     await delete(instrumentScores).go();
     await delete(scores).go();
     await delete(setlists).go();
     await delete(syncState).go();
-    // Team data
-    await delete(teamSetlistScores).go();
-    await delete(teamInstrumentScores).go();
-    await delete(teamScores).go();
-    await delete(teamSetlists).go();
+    // Team metadata
     await delete(teamMembers).go();
     await delete(teams).go();
     await delete(teamSyncState).go();
     // Note: appState is kept for app preferences
   }
 
-  /// Get count of pending (unsynced) changes
-  /// Used to warn user before logout
+  /// Get count of pending (unsynced) changes for user scope
   Future<int> getPendingChangesCount() async {
     var count = 0;
 
+    // Get all user-scoped scores first (to filter related tables)
+    final userScores = await (select(scores)
+      ..where((s) => s.scopeType.equals('user'))).get();
+    final userScoreIds = userScores.map((s) => s.id).toSet();
+
     final pendingScores = await (select(scores)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
+      ..where((s) => s.scopeType.equals('user') & s.syncStatus.equals('pending'))).get();
     count += pendingScores.length;
 
-    final pendingInstrumentScores = await (select(instrumentScores)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
-    count += pendingInstrumentScores.length;
+    // Filter instrument scores by user scope scores
+    if (userScoreIds.isNotEmpty) {
+      final pendingInstrumentScores = await (select(instrumentScores)
+        ..where((is_) => is_.scoreId.isIn(userScoreIds) & is_.syncStatus.equals('pending'))).get();
+      count += pendingInstrumentScores.length;
+    }
 
-    // Note: Annotations don't have syncStatus field - they are embedded in InstrumentScore
-    // A pending InstrumentScore already indicates pending annotation changes
+    // Get all user-scoped setlists first (to filter setlistScores)
+    final userSetlists = await (select(setlists)
+      ..where((s) => s.scopeType.equals('user'))).get();
+    final userSetlistIds = userSetlists.map((s) => s.id).toSet();
 
     final pendingSetlists = await (select(setlists)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
+      ..where((s) => s.scopeType.equals('user') & s.syncStatus.equals('pending'))).get();
     count += pendingSetlists.length;
 
-    final pendingSetlistScores = await (select(setlistScores)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
-    count += pendingSetlistScores.length;
+    // Filter setlist scores by user scope setlists
+    if (userSetlistIds.isNotEmpty) {
+      final pendingSetlistScores = await (select(setlistScores)
+        ..where((ss) => ss.setlistId.isIn(userSetlistIds) & ss.syncStatus.equals('pending'))).get();
+      count += pendingSetlistScores.length;
+    }
 
     return count;
   }
 
-  /// Get count of pending Team changes
-  Future<int> getTeamPendingChangesCount() async {
+  /// Get count of pending Team changes for a specific team
+  Future<int> getTeamPendingChangesCount(int teamId) async {
     var count = 0;
 
-    final pendingTeamScores = await (select(teamScores)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
+    final pendingTeamScores = await (select(scores)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(teamId) & s.syncStatus.equals('pending'))).get();
     count += pendingTeamScores.length;
 
-    final pendingTeamInstrumentScores = await (select(teamInstrumentScores)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
-    count += pendingTeamInstrumentScores.length;
+    // Get instrument scores for these team scores
+    final teamScoreIds = pendingTeamScores.map((s) => s.id).toSet();
+    if (teamScoreIds.isNotEmpty) {
+      final pendingTeamInstrumentScores = await (select(instrumentScores)
+        ..where((is_) => is_.scoreId.isIn(teamScoreIds) & is_.syncStatus.equals('pending'))).get();
+      count += pendingTeamInstrumentScores.length;
+    }
 
-    final pendingTeamSetlists = await (select(teamSetlists)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
+    final pendingTeamSetlists = await (select(setlists)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(teamId) & s.syncStatus.equals('pending'))).get();
     count += pendingTeamSetlists.length;
 
-    final pendingTeamSetlistScores = await (select(teamSetlistScores)
-      ..where((s) => s.syncStatus.equals('pending'))).get();
-    count += pendingTeamSetlistScores.length;
+    final teamSetlistIds = pendingTeamSetlists.map((s) => s.id).toSet();
+    if (teamSetlistIds.isNotEmpty) {
+      final pendingTeamSetlistScores = await (select(setlistScores)
+        ..where((ss) => ss.setlistId.isIn(teamSetlistIds) & ss.syncStatus.equals('pending'))).get();
+      count += pendingTeamSetlistScores.length;
+    }
 
     return count;
   }
 
   /// Delete all local PDF files
-  /// Per APP_SYNC_LOGIC.md §1.5.3: On logout, delete all local PDF files
   Future<void> deleteAllLocalPdfFiles() async {
-    // Personal library PDFs
     final allInstrumentScores = await select(instrumentScores).get();
     for (final is_ in allInstrumentScores) {
       if (is_.pdfPath != null && is_.pdfPath!.isNotEmpty) {
@@ -168,59 +174,50 @@ class AppDatabase extends _$AppDatabase {
         }
       }
     }
-
-    // Team PDFs (shared storage - only delete if no other reference)
-    // Note: Team PDFs use the same /pdfs/{hash}.pdf storage as personal library
-    // The actual cleanup is handled by reference counting in sync service
   }
 
   /// Clear all data for a specific team (when leaving team)
   Future<void> clearTeamData(int teamServerId) async {
-    // Get local team ID
+    // Get team scores
+    final teamScoreList = await (select(scores)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(teamServerId))).get();
+
+    // Delete instrument scores for team scores
+    for (final ts in teamScoreList) {
+      await (delete(instrumentScores)
+        ..where((is_) => is_.scoreId.equals(ts.id))).go();
+    }
+
+    // Get team setlists
+    final teamSetlistList = await (select(setlists)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(teamServerId))).get();
+
+    // Delete setlist scores for team setlists
+    for (final tsl in teamSetlistList) {
+      await (delete(setlistScores)
+        ..where((ss) => ss.setlistId.equals(tsl.id))).go();
+    }
+
+    // Delete team scores
+    await (delete(scores)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(teamServerId))).go();
+
+    // Delete team setlists
+    await (delete(setlists)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(teamServerId))).go();
+
+    // Delete team members
     final teamRecords = await (select(teams)
       ..where((t) => t.serverId.equals(teamServerId))).get();
-    if (teamRecords.isEmpty) return;
-
-    final teamLocalId = teamRecords.first.id;
-
-    // Delete in reverse dependency order
-    // Get all TeamScores for this team first
-    final teamScoreRecords = await (select(teamScores)
-      ..where((ts) => ts.teamId.equals(teamServerId))).get();
-
-    for (final ts in teamScoreRecords) {
-      // Delete TeamInstrumentScores
-      await (delete(teamInstrumentScores)
-        ..where((tis) => tis.teamScoreId.equals(ts.id))).go();
+    if (teamRecords.isNotEmpty) {
+      final teamLocalId = teamRecords.first.id;
+      await (delete(teamMembers)
+        ..where((tm) => tm.teamId.equals(teamLocalId))).go();
+      await (delete(teams)
+        ..where((t) => t.id.equals(teamLocalId))).go();
     }
 
-    // Get all TeamSetlists for this team
-    final teamSetlistRecords = await (select(teamSetlists)
-      ..where((tsl) => tsl.teamId.equals(teamServerId))).get();
-
-    for (final tsl in teamSetlistRecords) {
-      // Delete TeamSetlistScores
-      await (delete(teamSetlistScores)
-        ..where((tss) => tss.teamSetlistId.equals(tsl.id))).go();
-    }
-
-    // Delete TeamScores
-    await (delete(teamScores)
-      ..where((ts) => ts.teamId.equals(teamServerId))).go();
-
-    // Delete TeamSetlists
-    await (delete(teamSetlists)
-      ..where((tsl) => tsl.teamId.equals(teamServerId))).go();
-
-    // Delete TeamMembers
-    await (delete(teamMembers)
-      ..where((tm) => tm.teamId.equals(teamLocalId))).go();
-
-    // Delete Team
-    await (delete(teams)
-      ..where((t) => t.id.equals(teamLocalId))).go();
-
-    // Delete TeamSyncState
+    // Delete team sync state
     await (delete(teamSyncState)
       ..where((tss) => tss.teamId.equals(teamServerId))).go();
   }

@@ -104,7 +104,8 @@ class AvatarIcon extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: gradientColors ?? [AppColors.blue500, const Color(0xFF9333EA)],
+          colors:
+              gradientColors ?? [AppColors.blue500, const Color(0xFF9333EA)],
         ),
         borderRadius: BorderRadius.circular(size / 2),
       ),
@@ -160,7 +161,11 @@ class AppTabButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: iconSize, color: isActive ? Colors.white : AppColors.gray600),
+              Icon(
+                icon,
+                size: iconSize,
+                color: isActive ? Colors.white : AppColors.gray600,
+              ),
               const SizedBox(width: 8),
               Text(
                 label,
@@ -239,7 +244,10 @@ class ListCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           subtitle!,
-                          style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.gray600,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -248,7 +256,10 @@ class ListCard extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           meta!,
-                          style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.gray400,
+                          ),
                         ),
                       ],
                     ],
@@ -319,7 +330,7 @@ class SetlistListCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scoreSuffix = scoreCount == 1 ? 'score' : 'scores';
     final sourceText = source ?? 'Personal';
-    
+
     return ListCard(
       leading: GradientIconBox.setlist(),
       title: name,
@@ -381,7 +392,12 @@ class SettingsListItem extends StatelessWidget {
                   Icon(icon, size: 20, color: AppColors.gray600),
                   const SizedBox(width: 12),
                   Expanded(child: Text(label)),
-                  trailing ?? const Icon(AppIcons.chevronRight, size: 20, color: AppColors.gray400),
+                  trailing ??
+                      const Icon(
+                        AppIcons.chevronRight,
+                        size: 20,
+                        color: AppColors.gray400,
+                      ),
                 ],
               ),
             ),
@@ -682,7 +698,10 @@ class PageHeader extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     subtitle!,
-                    style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.gray600,
+                    ),
                   ),
                 ],
               ],
@@ -892,7 +911,7 @@ class SwipeableListItem extends StatelessWidget {
   final void Function(String id, Offset position) onSwipeStart;
   final void Function(Offset position) onSwipeUpdate;
   final VoidCallback onSwipeEnd;
-  
+
   static const double swipeThreshold = 32.0;
   static const double swipeMaxOffset = 64.0;
 
@@ -943,7 +962,11 @@ class SwipeableListItem extends StatelessWidget {
                             width: 56,
                             height: 56,
                             child: Center(
-                              child: Icon(AppIcons.delete, color: Colors.white, size: 22),
+                              child: Icon(
+                                AppIcons.delete,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                             ),
                           ),
                         ),
@@ -955,8 +978,10 @@ class SwipeableListItem extends StatelessWidget {
             ),
             // Card content
             GestureDetector(
-              onHorizontalDragStart: (details) => onSwipeStart(id, details.globalPosition),
-              onHorizontalDragUpdate: (details) => onSwipeUpdate(details.globalPosition),
+              onHorizontalDragStart: (details) =>
+                  onSwipeStart(id, details.globalPosition),
+              onHorizontalDragUpdate: (details) =>
+                  onSwipeUpdate(details.globalPosition),
               onHorizontalDragEnd: (_) => onSwipeEnd(),
               child: AnimatedContainer(
                 duration: Duration(milliseconds: isDragging ? 0 : 200),
@@ -1016,7 +1041,7 @@ mixin SwipeHandlerMixin<T extends StatefulWidget> on State<T> {
 
   void handleSwipeUpdate(Offset position) {
     if (dragStart == null || !isDragging) return;
-    
+
     final deltaX = position.dx - dragStart!.dx;
     final newOffset = deltaX.clamp(-swipeMaxOffset, 0.0);
     setState(() {
@@ -1029,7 +1054,7 @@ mixin SwipeHandlerMixin<T extends StatefulWidget> on State<T> {
 
   void handleSwipeEnd() {
     if (!isDragging) return;
-    
+
     setState(() {
       if (swipeOffset < -swipeThreshold) {
         swipeOffset = -swipeMaxOffset;
@@ -1040,7 +1065,7 @@ mixin SwipeHandlerMixin<T extends StatefulWidget> on State<T> {
       dragStart = null;
       isDragging = false;
     });
-    
+
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         setState(() {
@@ -1104,13 +1129,19 @@ class ScoreItemCard extends StatelessWidget {
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.gray600,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   meta,
-                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.gray400,
+                  ),
                 ),
               ],
             ),
@@ -1177,13 +1208,19 @@ class SetlistItemCard extends StatelessWidget {
                 ),
                 Text(
                   description,
-                  style: const TextStyle(fontSize: 14, color: AppColors.gray600),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.gray600,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • $source',
-                  style: const TextStyle(fontSize: 12, color: AppColors.gray400),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.gray400,
+                  ),
                 ),
               ],
             ),
@@ -1217,13 +1254,13 @@ class SwipeableScoreCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final String meta;
-  
+
   // Swipe state (from SwipeHandlerMixin)
   final String? swipedItemId;
   final double swipeOffset;
   final bool isDragging;
   final bool hasSwiped;
-  
+
   // Callbacks
   final void Function(String id, Offset position) onSwipeStart;
   final void Function(Offset position) onSwipeUpdate;
@@ -1281,13 +1318,13 @@ class SwipeableSetlistCard extends StatelessWidget {
   final String description;
   final int scoreCount;
   final String source;
-  
+
   // Swipe state (from SwipeHandlerMixin)
   final String? swipedItemId;
   final double swipeOffset;
   final bool isDragging;
   final bool hasSwiped;
-  
+
   // Callbacks
   final void Function(String id, Offset position) onSwipeStart;
   final void Function(Offset position) onSwipeUpdate;
@@ -1380,11 +1417,208 @@ class ToolButton extends StatelessWidget {
             color: isDisabled
                 ? AppColors.gray300
                 : isActive
-                    ? activeColor
-                    : AppColors.gray500,
+                ? activeColor
+                : AppColors.gray500,
           ),
         ),
       ),
+    );
+  }
+}
+
+// ============================================================================
+// TOAST / SNACKBAR - Unified notification components
+// ============================================================================
+
+/// Toast notification type
+enum ToastType {
+  /// Informational message (default)
+  info,
+
+  /// Success message
+  success,
+
+  /// Error/failure message
+  error,
+
+  /// Warning message
+  warning,
+}
+
+/// App-wide toast notification utility
+///
+/// Provides consistent styling for all toast/snackbar notifications
+/// across the app.
+///
+/// Usage example:
+/// ```dart
+/// // Simple info toast
+/// AppToast.show(context, 'Operation completed');
+///
+/// // Success toast
+/// AppToast.success(context, 'Saved successfully');
+///
+/// // Error toast
+/// AppToast.error(context, 'Failed to save');
+///
+/// // Custom duration
+/// AppToast.show(context, 'Message', duration: Duration(seconds: 3));
+/// ```
+class AppToast {
+  AppToast._();
+
+  /// Default toast duration
+  static const Duration defaultDuration = Duration(seconds: 2);
+
+  /// Short toast duration (for quick feedback)
+  static const Duration shortDuration = Duration(seconds: 1);
+
+  /// Long toast duration (for important messages)
+  static const Duration longDuration = Duration(seconds: 4);
+
+  /// Get background color based on toast type
+  static Color _getBackgroundColor(ToastType type) {
+    switch (type) {
+      case ToastType.info:
+        return AppColors.gray700;
+      case ToastType.success:
+        return AppColors.emerald600;
+      case ToastType.error:
+        return AppColors.red500;
+      case ToastType.warning:
+        return AppColors.yellow600;
+    }
+  }
+
+  /// Get icon based on toast type
+  static IconData? _getIcon(ToastType type) {
+    switch (type) {
+      case ToastType.info:
+        return null;
+      case ToastType.success:
+        return Icons.check_circle_outline;
+      case ToastType.error:
+        return Icons.error_outline;
+      case ToastType.warning:
+        return Icons.warning_amber_outlined;
+    }
+  }
+
+  /// Show a toast notification
+  ///
+  /// [context] - BuildContext
+  /// [message] - Message to display
+  /// [type] - Toast type (info, success, error, warning)
+  /// [duration] - How long to show the toast
+  /// [clearPrevious] - Whether to clear previous toasts first
+  static ScaffoldFeatureController<SnackBar, SnackBarClosedReason> show(
+    BuildContext context,
+    String message, {
+    ToastType type = ToastType.info,
+    Duration duration = defaultDuration,
+    bool clearPrevious = true,
+  }) {
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (clearPrevious) {
+      messenger.clearSnackBars();
+    }
+
+    final icon = _getIcon(type);
+
+    return messenger.showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+            ],
+            Flexible(
+              child: Text(
+                message,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: _getBackgroundColor(type),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: const EdgeInsets.only(
+          bottom: 12,
+          left: 16,
+          right: 16,
+        ),
+        duration: duration,
+      ),
+    );
+  }
+
+  /// Show an info toast (default style)
+  static ScaffoldFeatureController<SnackBar, SnackBarClosedReason> info(
+    BuildContext context,
+    String message, {
+    Duration duration = defaultDuration,
+    bool clearPrevious = true,
+  }) {
+    return show(
+      context,
+      message,
+      type: ToastType.info,
+      duration: duration,
+      clearPrevious: clearPrevious,
+    );
+  }
+
+  /// Show a success toast
+  static ScaffoldFeatureController<SnackBar, SnackBarClosedReason> success(
+    BuildContext context,
+    String message, {
+    Duration duration = defaultDuration,
+    bool clearPrevious = true,
+  }) {
+    return show(
+      context,
+      message,
+      type: ToastType.success,
+      duration: duration,
+      clearPrevious: clearPrevious,
+    );
+  }
+
+  /// Show an error toast
+  static ScaffoldFeatureController<SnackBar, SnackBarClosedReason> error(
+    BuildContext context,
+    String message, {
+    Duration duration = defaultDuration,
+    bool clearPrevious = true,
+  }) {
+    return show(
+      context,
+      message,
+      type: ToastType.error,
+      duration: duration,
+      clearPrevious: clearPrevious,
+    );
+  }
+
+  /// Show a warning toast
+  static ScaffoldFeatureController<SnackBar, SnackBarClosedReason> warning(
+    BuildContext context,
+    String message, {
+    Duration duration = defaultDuration,
+    bool clearPrevious = true,
+  }) {
+    return show(
+      context,
+      message,
+      type: ToastType.warning,
+      duration: duration,
+      clearPrevious: clearPrevious,
     );
   }
 }

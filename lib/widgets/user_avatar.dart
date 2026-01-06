@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_state_provider.dart';
-import '../core/core.dart';
+import '../core/services/avatar_cache_service.dart';
 import '../theme/app_colors.dart';
 
 /// A widget that displays user avatar, using cached avatar from AuthProvider
@@ -69,14 +69,16 @@ class UserAvatar extends ConsumerWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.blue500, Color(0xFF9333EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
         ),
       ),
       child: Center(
         child: Text(
           initial,
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.avatarText,
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
           ),
@@ -104,11 +106,6 @@ class _AvatarContainer extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: hasImage
-            ? null
-            : const LinearGradient(
-                colors: [AppColors.blue500, Color(0xFF9333EA)],
-              ),
         borderRadius: BorderRadius.circular(size / 2),
       ),
       clipBehavior: Clip.antiAlias,
@@ -152,24 +149,27 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
   }
 
   Future<void> _loadAvatar() async {
+    // Fast path: Check memory cache synchronously (no loading indicator)
+    final cacheService = AvatarCacheService();
+    if (cacheService.isInMemoryCache(widget.userId)) {
+      setState(() {
+        _avatarBytes = cacheService.getFromMemoryCache(widget.userId);
+      });
+      return;
+    }
+
+    // Slow path: Need to load from disk or network (show loading indicator)
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Load avatar using API client
-      if (!ApiClient.isInitialized) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-        return;
-      }
-
-      final result = await ApiClient.instance.getAvatar(widget.userId);
+      // Load avatar using cache service (disk -> network)
+      final bytes = await cacheService.getAvatar(widget.userId);
       
       if (mounted) {
         setState(() {
-          _avatarBytes = result.isSuccess ? result.data : null;
+          _avatarBytes = bytes;
           _isLoading = false;
         });
       }
@@ -208,8 +208,17 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
     }
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+      return Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
+          ),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.avatarText),
+        ),
       );
     }
 
@@ -220,14 +229,16 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.blue500, Color(0xFF9333EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
         ),
       ),
       child: Center(
         child: Text(
           initial,
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.avatarText,
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
           ),

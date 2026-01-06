@@ -67,7 +67,10 @@ class SetlistRepository {
   /// Add score to setlist
   Future<void> addScoreToSetlist(String setlistId, String scoreId) async {
     final setlist = await _local.getSetlistById(setlistId);
-    if (setlist == null) return;
+    if (setlist == null) {
+      Log.w('SETLIST_REPO', 'Setlist not found: $setlistId');
+      return;
+    }
     
     if (!setlist.scoreIds.contains(scoreId)) {
       final updated = setlist.copyWith(
@@ -75,31 +78,43 @@ class SetlistRepository {
       );
       await _local.updateSetlist(updated, status: LocalSyncStatus.pending);
       _notifyDataChanged();
+      
+      Log.d('SETLIST_REPO', 'Added score to: ${setlist.name}');
     }
   }
 
   /// Remove score from setlist
   Future<void> removeScoreFromSetlist(String setlistId, String scoreId) async {
     final setlist = await _local.getSetlistById(setlistId);
-    if (setlist == null) return;
+    if (setlist == null) {
+      Log.w('SETLIST_REPO', 'Setlist not found: $setlistId');
+      return;
+    }
     
     final updated = setlist.copyWith(
       scoreIds: setlist.scoreIds.where((id) => id != scoreId).toList(),
     );
     await _local.updateSetlist(updated, status: LocalSyncStatus.pending);
     _notifyDataChanged();
+    
+    Log.d('SETLIST_REPO', 'Removed score from: ${setlist.name}');
   }
 
   /// Reorder scores in setlist
   Future<void> reorderScores(String setlistId, List<String> newOrder) async {
     final setlist = await _local.getSetlistById(setlistId);
-    if (setlist == null) return;
+    if (setlist == null) {
+      Log.w('SETLIST_REPO', 'Setlist not found: $setlistId');
+      return;
+    }
     
     final updated = setlist.copyWith(
       scoreIds: newOrder,
     );
     await _local.updateSetlist(updated, status: LocalSyncStatus.pending);
     _notifyDataChanged();
+    
+    Log.d('SETLIST_REPO', 'Reordered scores in: ${setlist.name}');
   }
 
   // ============================================================================

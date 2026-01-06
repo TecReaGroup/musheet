@@ -1,5 +1,5 @@
 /// MuSheet Application Entry Point
-/// 
+///
 /// This file initializes all core services in the correct order
 /// and sets up the application with the Clean Architecture pattern.
 library;
@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'core/core.dart';
+import 'core/services/avatar_cache_service.dart';
 import 'utils/logger.dart';
 
 void main() async {
@@ -45,19 +46,16 @@ Future<void> _initializeCoreServices() async {
   try {
     // 1. Initialize NetworkService first (no dependencies)
     await NetworkService.initialize();
-    Log.i('INIT', 'NetworkService initialized');
 
     // 2. Initialize SessionService (depends on SharedPreferences)
     await SessionService.initialize();
-    Log.i('INIT', 'SessionService initialized');
 
     // 3. Initialize ApiClient if server URL is configured
     final prefs = await SharedPreferences.getInstance();
     final savedUrl = prefs.getString('backend_server_url');
-    
+
     if (savedUrl != null && savedUrl.isNotEmpty) {
       ApiClient.initialize(baseUrl: savedUrl);
-      Log.i('INIT', 'ApiClient initialized with URL: $savedUrl');
 
       // Restore auth credentials if token exists
       if (SessionService.instance.isAuthenticated) {
@@ -65,13 +63,18 @@ Future<void> _initializeCoreServices() async {
         final userId = SessionService.instance.userId;
         if (token != null && userId != null) {
           ApiClient.instance.setAuth(token, userId);
-          Log.i('INIT', 'Auth credentials restored for user: $userId');
+          Log.i('INIT', 'Services ready, user $userId restored');
         }
+      } else {
+        Log.i('INIT', 'Services ready, no session');
       }
     } else {
-      Log.i('INIT', 'No server URL configured. User must set it in Settings.');
+      Log.i('INIT', 'Services ready, no server configured');
     }
 
+    // Clear memory cache on app startup to refresh avatars from network
+    // (disk cache is preserved for offline support)
+    AvatarCacheService().clearMemoryCache();
   } catch (e) {
     Log.e('INIT', 'Error initializing core services', error: e);
   }
@@ -80,16 +83,18 @@ Future<void> _initializeCoreServices() async {
 /// Configure system UI appearance
 void _configureSystemUI() {
   // Set system UI style: transparent status bar and navigation bar
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    // Status bar
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-    statusBarBrightness: Brightness.light,
-    // Navigation bar - force transparent, disable system contrast enforcement
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.dark,
-    systemNavigationBarContrastEnforced: false,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      // Status bar
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+      // Navigation bar - force transparent, disable system contrast enforcement
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
+    ),
+  );
 
   // Enable edge-to-edge mode, extend content to system bar areas
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

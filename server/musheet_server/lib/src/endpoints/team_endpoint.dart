@@ -86,44 +86,44 @@ class TeamEndpoint extends Endpoint {
       where: (t) => t.teamId.equals(teamId),
     );
 
-    // First get all team scores to delete their instrument scores
-    final teamScores = await TeamScore.db.find(
+    // Delete all team scores (scopeType='team', scopeId=teamId)
+    final teamScores = await Score.db.find(
       session,
-      where: (t) => t.teamId.equals(teamId),
+      where: (t) => t.scopeType.equals('team') & t.scopeId.equals(teamId),
     );
 
-    // Delete team instrument scores (child of team scores)
+    // Delete instrument scores (child of scores)
     for (final score in teamScores) {
-      await TeamInstrumentScore.db.deleteWhere(
+      await InstrumentScore.db.deleteWhere(
         session,
-        where: (t) => t.teamScoreId.equals(score.id!),
+        where: (t) => t.scoreId.equals(score.id!),
       );
     }
 
-    // Delete team scores
-    await TeamScore.db.deleteWhere(
+    // Delete scores
+    await Score.db.deleteWhere(
       session,
-      where: (t) => t.teamId.equals(teamId),
+      where: (t) => t.scopeType.equals('team') & t.scopeId.equals(teamId),
     );
 
-    // First get all team setlists to delete their setlist scores
-    final teamSetlists = await TeamSetlist.db.find(
+    // Delete all team setlists (scopeType='team', scopeId=teamId)
+    final teamSetlists = await Setlist.db.find(
       session,
-      where: (t) => t.teamId.equals(teamId),
+      where: (t) => t.scopeType.equals('team') & t.scopeId.equals(teamId),
     );
 
-    // Delete team setlist scores (child of team setlists)
+    // Delete setlist scores (child of setlists)
     for (final setlist in teamSetlists) {
-      await TeamSetlistScore.db.deleteWhere(
+      await SetlistScore.db.deleteWhere(
         session,
-        where: (t) => t.teamSetlistId.equals(setlist.id!),
+        where: (t) => t.setlistId.equals(setlist.id!),
       );
     }
 
-    // Delete team setlists
-    await TeamSetlist.db.deleteWhere(
+    // Delete setlists
+    await Setlist.db.deleteWhere(
       session,
-      where: (t) => t.teamId.equals(teamId),
+      where: (t) => t.scopeType.equals('team') & t.scopeId.equals(teamId),
     );
 
     await Team.db.deleteRow(session, team);
@@ -200,7 +200,8 @@ class TeamEndpoint extends Endpoint {
           userId: user.id!,
           username: user.username,
           displayName: user.displayName,
-          avatarUrl: user.avatarPath,
+          // Use consistent format: avatar:<userId> if user has avatar
+          avatarUrl: user.avatarPath != null ? 'avatar:${user.id}' : null,
           role: m.role,
           joinedAt: m.joinedAt,
         ));
@@ -276,7 +277,8 @@ class TeamEndpoint extends Endpoint {
           userId: user.id!,
           username: user.username,
           displayName: user.displayName,
-          avatarUrl: user.avatarPath,
+          // Use consistent format: avatar:<userId> if user has avatar
+          avatarUrl: user.avatarPath != null ? 'avatar:${user.id}' : null,
           role: m.role,
           joinedAt: m.joinedAt,
         ));

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/teams_state_provider.dart';
+import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
@@ -154,7 +155,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     setlist.name.toLowerCase().contains(
                       searchQuery.toLowerCase(),
                     ) ||
-                    setlist.description.toLowerCase().contains(
+                    (setlist.description ?? '').toLowerCase().contains(
                       searchQuery.toLowerCase(),
                     ),
               )
@@ -613,6 +614,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               AppNavigation.navigateToScoreViewer(
                 context,
+                scope: DataScope.user,
                 score: selectedScore,
                 instrumentScore: instrumentScore,
                 setlistScores: setlistScores,
@@ -621,7 +623,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               );
             } else {
               // Empty setlist: go to detail screen
-              AppNavigation.navigateToSetlistDetail(context, setlist);
+              AppNavigation.navigateToSetlistDetail(
+                context,
+                scope: DataScope.user,
+                setlist: setlist,
+              );
             }
           },
           borderRadius: BorderRadius.circular(12),
@@ -662,7 +668,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        setlist.description,
+                        setlist.description ?? '',
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppColors.gray600,
@@ -685,7 +691,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: InkWell(
                     onTap: () {
                       // Arrow tap: go to detail screen
-                      AppNavigation.navigateToSetlistDetail(context, setlist);
+                      AppNavigation.navigateToSetlistDetail(
+                        context,
+                        scope: DataScope.user,
+                        setlist: setlist,
+                      );
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: const Padding(
@@ -729,6 +739,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
             AppNavigation.navigateToScoreViewer(
               context,
+              scope: DataScope.user,
               score: score,
               instrumentScore: instrumentScore,
             );
@@ -793,7 +804,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () {
-                      AppNavigation.navigateToScoreDetail(context, score);
+                      AppNavigation.navigateToScoreDetail(
+                        context,
+                        scope: DataScope.user,
+                        score: score,
+                      );
                     },
                     borderRadius: BorderRadius.circular(20),
                     child: const Padding(

@@ -354,6 +354,20 @@
         },
         {
           "__className__": "serverpod.ColumnDefinition",
+          "name": "annotationsJson",
+          "columnType": 0,
+          "isNullable": true,
+          "dartType": "String?"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
+          "name": "sourceInstrumentScoreId",
+          "columnType": 6,
+          "isNullable": true,
+          "dartType": "int?"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
           "name": "createdAt",
           "columnType": 4,
           "isNullable": false,
@@ -383,13 +397,6 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "syncStatus",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "annotationsJson",
           "columnType": 0,
           "isNullable": true,
           "dartType": "String?"
@@ -503,7 +510,14 @@
         },
         {
           "__className__": "serverpod.ColumnDefinition",
-          "name": "userId",
+          "name": "scopeType",
+          "columnType": 0,
+          "isNullable": false,
+          "dartType": "String"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
+          "name": "scopeId",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -525,6 +539,20 @@
         {
           "__className__": "serverpod.ColumnDefinition",
           "name": "bpm",
+          "columnType": 6,
+          "isNullable": true,
+          "dartType": "int?"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
+          "name": "createdById",
+          "columnType": 6,
+          "isNullable": true,
+          "dartType": "int?"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
+          "name": "sourceScoreId",
           "columnType": 6,
           "isNullable": true,
           "dartType": "int?"
@@ -565,22 +593,7 @@
           "dartType": "String?"
         }
       ],
-      "foreignKeys": [
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "scores_fk_0",
-          "columns": [
-            "userId"
-          ],
-          "referenceTable": "users",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        }
-      ],
+      "foreignKeys": [],
       "indexes": [
         {
           "__className__": "serverpod.IndexDefinition",
@@ -598,12 +611,17 @@
         },
         {
           "__className__": "serverpod.IndexDefinition",
-          "indexName": "score_user_idx",
+          "indexName": "score_scope_idx",
           "elements": [
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "userId"
+              "definition": "scopeType"
+            },
+            {
+              "__className__": "serverpod.IndexElementDefinition",
+              "type": 0,
+              "definition": "scopeId"
             }
           ],
           "type": "btree",
@@ -612,12 +630,17 @@
         },
         {
           "__className__": "serverpod.IndexDefinition",
-          "indexName": "score_user_updated_idx",
+          "indexName": "score_scope_updated_idx",
           "elements": [
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "userId"
+              "definition": "scopeType"
+            },
+            {
+              "__className__": "serverpod.IndexElementDefinition",
+              "type": 0,
+              "definition": "scopeId"
             },
             {
               "__className__": "serverpod.IndexElementDefinition",
@@ -631,12 +654,17 @@
         },
         {
           "__className__": "serverpod.IndexDefinition",
-          "indexName": "score_user_title_composer_unique",
+          "indexName": "score_scope_title_composer_unique",
           "elements": [
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "userId"
+              "definition": "scopeType"
+            },
+            {
+              "__className__": "serverpod.IndexElementDefinition",
+              "type": 0,
+              "definition": "scopeId"
             },
             {
               "__className__": "serverpod.IndexElementDefinition",
@@ -655,12 +683,17 @@
         },
         {
           "__className__": "serverpod.IndexDefinition",
-          "indexName": "score_user_version_idx",
+          "indexName": "score_scope_version_idx",
           "elements": [
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "userId"
+              "definition": "scopeType"
+            },
+            {
+              "__className__": "serverpod.IndexElementDefinition",
+              "type": 0,
+              "definition": "scopeId"
             },
             {
               "__className__": "serverpod.IndexElementDefinition",
@@ -845,7 +878,14 @@
         },
         {
           "__className__": "serverpod.ColumnDefinition",
-          "name": "userId",
+          "name": "scopeType",
+          "columnType": 0,
+          "isNullable": false,
+          "dartType": "String"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
+          "name": "scopeId",
           "columnType": 6,
           "isNullable": false,
           "dartType": "int"
@@ -866,6 +906,20 @@
         },
         {
           "__className__": "serverpod.ColumnDefinition",
+          "name": "createdById",
+          "columnType": 6,
+          "isNullable": true,
+          "dartType": "int?"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
+          "name": "sourceSetlistId",
+          "columnType": 6,
+          "isNullable": true,
+          "dartType": "int?"
+        },
+        {
+          "__className__": "serverpod.ColumnDefinition",
           "name": "createdAt",
           "columnType": 4,
           "isNullable": false,
@@ -900,22 +954,7 @@
           "dartType": "String?"
         }
       ],
-      "foreignKeys": [
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "setlists_fk_0",
-          "columns": [
-            "userId"
-          ],
-          "referenceTable": "users",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        }
-      ],
+      "foreignKeys": [],
       "indexes": [
         {
           "__className__": "serverpod.IndexDefinition",
@@ -933,12 +972,17 @@
         },
         {
           "__className__": "serverpod.IndexDefinition",
-          "indexName": "setlist_user_idx",
+          "indexName": "setlist_scope_idx",
           "elements": [
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "userId"
+              "definition": "scopeType"
+            },
+            {
+              "__className__": "serverpod.IndexElementDefinition",
+              "type": 0,
+              "definition": "scopeId"
             }
           ],
           "type": "btree",
@@ -947,12 +991,17 @@
         },
         {
           "__className__": "serverpod.IndexDefinition",
-          "indexName": "setlist_user_name_unique",
+          "indexName": "setlist_scope_name_unique",
           "elements": [
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "userId"
+              "definition": "scopeType"
+            },
+            {
+              "__className__": "serverpod.IndexElementDefinition",
+              "type": 0,
+              "definition": "scopeId"
             },
             {
               "__className__": "serverpod.IndexElementDefinition",
@@ -966,203 +1015,17 @@
         },
         {
           "__className__": "serverpod.IndexDefinition",
-          "indexName": "setlist_version_idx",
+          "indexName": "setlist_scope_version_idx",
           "elements": [
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "userId"
+              "definition": "scopeType"
             },
             {
               "__className__": "serverpod.IndexElementDefinition",
               "type": 0,
-              "definition": "version"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        }
-      ],
-      "managed": true
-    },
-    {
-      "__className__": "serverpod.TableDefinition",
-      "name": "team_instrument_scores",
-      "dartName": "TeamInstrumentScore",
-      "module": "musheet",
-      "schema": "public",
-      "columns": [
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "id",
-          "columnType": 6,
-          "isNullable": false,
-          "columnDefault": "nextval('team_instrument_scores_id_seq'::regclass)",
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "teamScoreId",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "instrumentType",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "customInstrument",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "pdfHash",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "orderIndex",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "annotationsJson",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "sourceInstrumentScoreId",
-          "columnType": 6,
-          "isNullable": true,
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "createdAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "updatedAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "deletedAt",
-          "columnType": 4,
-          "isNullable": true,
-          "dartType": "DateTime?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "version",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "syncStatus",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        }
-      ],
-      "foreignKeys": [
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "team_instrument_scores_fk_0",
-          "columns": [
-            "teamScoreId"
-          ],
-          "referenceTable": "team_scores",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        }
-      ],
-      "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_instrument_scores_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_instrument_score_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamScoreId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_instrument_score_unique",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamScoreId"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "instrumentType"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "customInstrument"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_instrument_score_version_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamScoreId"
+              "definition": "scopeId"
             },
             {
               "__className__": "serverpod.IndexElementDefinition",
@@ -1311,557 +1174,6 @@
           ],
           "type": "btree",
           "isUnique": true,
-          "isPrimary": false
-        }
-      ],
-      "managed": true
-    },
-    {
-      "__className__": "serverpod.TableDefinition",
-      "name": "team_scores",
-      "dartName": "TeamScore",
-      "module": "musheet",
-      "schema": "public",
-      "columns": [
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "id",
-          "columnType": 6,
-          "isNullable": false,
-          "columnDefault": "nextval('team_scores_id_seq'::regclass)",
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "teamId",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "title",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "composer",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "bpm",
-          "columnType": 6,
-          "isNullable": true,
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "createdById",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "sourceScoreId",
-          "columnType": 6,
-          "isNullable": true,
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "createdAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "updatedAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "deletedAt",
-          "columnType": 4,
-          "isNullable": true,
-          "dartType": "DateTime?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "version",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "syncStatus",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        }
-      ],
-      "foreignKeys": [
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "team_scores_fk_0",
-          "columns": [
-            "teamId"
-          ],
-          "referenceTable": "teams",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        },
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "team_scores_fk_1",
-          "columns": [
-            "createdById"
-          ],
-          "referenceTable": "users",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        }
-      ],
-      "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_scores_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_score_team_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_score_unique_title_composer",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamId"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "title"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "composer"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_score_version_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamId"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "version"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        }
-      ],
-      "managed": true
-    },
-    {
-      "__className__": "serverpod.TableDefinition",
-      "name": "team_setlist_scores",
-      "dartName": "TeamSetlistScore",
-      "module": "musheet",
-      "schema": "public",
-      "columns": [
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "id",
-          "columnType": 6,
-          "isNullable": false,
-          "columnDefault": "nextval('team_setlist_scores_id_seq'::regclass)",
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "teamSetlistId",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "teamScoreId",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "orderIndex",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "createdAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "updatedAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "deletedAt",
-          "columnType": 4,
-          "isNullable": true,
-          "dartType": "DateTime?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "version",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "syncStatus",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        }
-      ],
-      "foreignKeys": [
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "team_setlist_scores_fk_0",
-          "columns": [
-            "teamSetlistId"
-          ],
-          "referenceTable": "team_setlists",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        },
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "team_setlist_scores_fk_1",
-          "columns": [
-            "teamScoreId"
-          ],
-          "referenceTable": "team_scores",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        }
-      ],
-      "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlist_scores_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlist_score_setlist_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamSetlistId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlist_score_score_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamScoreId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlist_score_unique",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamSetlistId"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamScoreId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": false
-        }
-      ],
-      "managed": true
-    },
-    {
-      "__className__": "serverpod.TableDefinition",
-      "name": "team_setlists",
-      "dartName": "TeamSetlist",
-      "module": "musheet",
-      "schema": "public",
-      "columns": [
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "id",
-          "columnType": 6,
-          "isNullable": false,
-          "columnDefault": "nextval('team_setlists_id_seq'::regclass)",
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "teamId",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "name",
-          "columnType": 0,
-          "isNullable": false,
-          "dartType": "String"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "description",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "createdById",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "sourceSetlistId",
-          "columnType": 6,
-          "isNullable": true,
-          "dartType": "int?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "createdAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "updatedAt",
-          "columnType": 4,
-          "isNullable": false,
-          "dartType": "DateTime"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "deletedAt",
-          "columnType": 4,
-          "isNullable": true,
-          "dartType": "DateTime?"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "version",
-          "columnType": 6,
-          "isNullable": false,
-          "dartType": "int"
-        },
-        {
-          "__className__": "serverpod.ColumnDefinition",
-          "name": "syncStatus",
-          "columnType": 0,
-          "isNullable": true,
-          "dartType": "String?"
-        }
-      ],
-      "foreignKeys": [
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "team_setlists_fk_0",
-          "columns": [
-            "teamId"
-          ],
-          "referenceTable": "teams",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        },
-        {
-          "__className__": "serverpod.ForeignKeyDefinition",
-          "constraintName": "team_setlists_fk_1",
-          "columns": [
-            "createdById"
-          ],
-          "referenceTable": "users",
-          "referenceTableSchema": "public",
-          "referenceColumns": [
-            "id"
-          ],
-          "onUpdate": 3,
-          "onDelete": 3
-        }
-      ],
-      "indexes": [
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlists_pkey",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "id"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": true
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlist_team_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamId"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlist_unique_name",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamId"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "name"
-            }
-          ],
-          "type": "btree",
-          "isUnique": true,
-          "isPrimary": false
-        },
-        {
-          "__className__": "serverpod.IndexDefinition",
-          "indexName": "team_setlist_version_idx",
-          "elements": [
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "teamId"
-            },
-            {
-              "__className__": "serverpod.IndexElementDefinition",
-              "type": 0,
-              "definition": "version"
-            }
-          ],
-          "type": "btree",
-          "isUnique": false,
           "isPrimary": false
         }
       ],
@@ -3730,7 +3042,7 @@
     {
       "__className__": "serverpod.DatabaseMigrationVersion",
       "module": "musheet",
-      "version": "20260106032458406"
+      "version": "20260107162554517"
     },
     {
       "__className__": "serverpod.DatabaseMigrationVersion",

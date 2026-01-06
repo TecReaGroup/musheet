@@ -69,11 +69,31 @@ class FileEndpoint extends Endpoint {
     }
 
     final score = await Score.db.findById(session, instrumentScore.scoreId);
-    if (score == null || score.userId != userId) {
+    if (score == null) {
+      return FileUploadResult(
+        success: false,
+        errorMessage: 'Score not found',
+      );
+    }
+
+    // Check permission - user owns the score or is team member
+    if (score.scopeType == 'user' && score.scopeId != userId) {
       return FileUploadResult(
         success: false,
         errorMessage: 'Permission denied',
       );
+    }
+    if (score.scopeType == 'team') {
+      final members = await TeamMember.db.find(
+        session,
+        where: (t) => t.teamId.equals(score.scopeId) & t.userId.equals(userId),
+      );
+      if (members.isEmpty) {
+        return FileUploadResult(
+          success: false,
+          errorMessage: 'Permission denied',
+        );
+      }
     }
 
     final fileSize = fileData.lengthInBytes;
@@ -164,8 +184,22 @@ class FileEndpoint extends Endpoint {
     if (instrumentScore == null) return false;
 
     final score = await Score.db.findById(session, instrumentScore.scoreId);
-    if (score == null || score.userId != userId) {
+    if (score == null) {
       throw PermissionDeniedException();
+    }
+
+    // Check permission - user owns the score or is team member
+    if (score.scopeType == 'user' && score.scopeId != userId) {
+      throw PermissionDeniedException();
+    }
+    if (score.scopeType == 'team') {
+      final members = await TeamMember.db.find(
+        session,
+        where: (t) => t.teamId.equals(score.scopeId) & t.userId.equals(userId),
+      );
+      if (members.isEmpty) {
+        throw PermissionDeniedException();
+      }
     }
 
     if (instrumentScore.pdfHash != null) {
@@ -216,10 +250,10 @@ class FileEndpoint extends Endpoint {
 
   /// Check if user has access to any InstrumentScore with this hash
   Future<bool> _userHasAccessToHash(Session session, int userId, String hash) async {
-    // Check personal scores
+    // Check personal scores (scopeType='user', scopeId=userId)
     final userScores = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(userId) & t.deletedAt.equals(null),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(userId) & t.deletedAt.equals(null),
     );
 
     for (final score in userScores) {
@@ -230,24 +264,24 @@ class FileEndpoint extends Endpoint {
       if (instrumentScores.isNotEmpty) return true;
     }
 
-    // Check team access - look in TeamInstrumentScore
+    // Check team access - look in team scores (scopeType='team')
     final teamMembers = await TeamMember.db.find(
       session,
       where: (t) => t.userId.equals(userId),
     );
 
     for (final tm in teamMembers) {
-      final teamScores = await TeamScore.db.find(
+      final teamScores = await Score.db.find(
         session,
-        where: (t) => t.teamId.equals(tm.teamId),
+        where: (t) => t.scopeType.equals('team') & t.scopeId.equals(tm.teamId),
       );
 
       for (final ts in teamScores) {
-        final teamInstrumentScores = await TeamInstrumentScore.db.find(
+        final instrumentScores = await InstrumentScore.db.find(
           session,
-          where: (t) => t.teamScoreId.equals(ts.id!) & t.pdfHash.equals(hash),
+          where: (t) => t.scoreId.equals(ts.id!) & t.pdfHash.equals(hash),
         );
-        if (teamInstrumentScores.isNotEmpty) return true;
+        if (instrumentScores.isNotEmpty) return true;
       }
     }
 
@@ -265,12 +299,18 @@ class FileEndpoint extends Endpoint {
     final score = await Score.db.findById(session, instrumentScore.scoreId);
     if (score == null) return false;
 
-    // Check personal ownership
-    if (score.userId == userId) return true;
+    // Check personal ownership (scopeType='user', scopeId=userId)
+    if (score.scopeType == 'user' && score.scopeId == userId) return true;
 
-    // Check team access - Team has its own TeamInstrumentScore, not linked to personal InstrumentScore
-    // For personal InstrumentScore, only the owner has access
-    // Team access is handled through TeamInstrumentScore separately
+    // Check team access (scopeType='team', user must be team member)
+    if (score.scopeType == 'team') {
+      final members = await TeamMember.db.find(
+        session,
+        where: (t) => t.teamId.equals(score.scopeId) & t.userId.equals(userId),
+      );
+      return members.isNotEmpty;
+    }
+
     return false;
   }
 
@@ -333,9 +373,10 @@ class FileEndpoint extends Endpoint {
 
   Future<void> _recalculateStorage(Session session, int userId) async {
     // Calculate total storage used by reading actual file sizes
+    // Only count user's personal scores (scopeType='user', scopeId=userId)
     final scores = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(userId) & t.deletedAt.equals(null),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(userId) & t.deletedAt.equals(null),
     );
 
     int totalBytes = 0;

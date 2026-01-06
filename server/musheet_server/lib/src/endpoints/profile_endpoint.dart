@@ -193,7 +193,7 @@ class ProfileEndpoint extends Endpoint {
     // 1. Get all user scores
     final scores = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(validatedUserId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId),
     );
     session.log('[PROFILE] Found ${scores.length} scores to delete', level: LogLevel.info);
 
@@ -231,14 +231,14 @@ class ProfileEndpoint extends Endpoint {
     // 3. Delete all scores
     final deletedScoresList = await Score.db.deleteWhere(
       session,
-      where: (t) => t.userId.equals(validatedUserId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId),
     );
     deletedScores = deletedScoresList.length;
 
     // 4. Delete setlist scores
     final setlists = await Setlist.db.find(
       session,
-      where: (t) => t.userId.equals(validatedUserId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId),
     );
     
     for (final setlist in setlists) {
@@ -252,7 +252,7 @@ class ProfileEndpoint extends Endpoint {
     // 5. Delete setlists
     final deletedSetlistsList = await Setlist.db.deleteWhere(
       session,
-      where: (t) => t.userId.equals(validatedUserId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId),
     );
     deletedSetlists = deletedSetlistsList.length;
 

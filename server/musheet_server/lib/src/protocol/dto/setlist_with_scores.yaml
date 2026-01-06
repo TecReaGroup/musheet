@@ -1,0 +1,5 @@
+### DTO representing a Setlist with its Scores
+class: SetlistWithScores
+fields:
+  setlist: Setlist
+  scores: List<Score>

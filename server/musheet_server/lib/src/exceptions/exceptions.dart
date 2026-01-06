@@ -188,3 +188,39 @@ class AlreadyInSetlistException extends MuSheetException {
   AlreadyInSetlistException([String message = 'Score is already in this setlist'])
       : super(message, 'ALREADY_IN_SETLIST');
 }
+
+/// Score already exists (same title+composer in scope)
+class ScoreExistsException extends MuSheetException {
+  ScoreExistsException([String message = 'Score with same title and composer already exists'])
+      : super(message, 'SCORE_EXISTS');
+}
+
+/// Score not found
+class ScoreNotFoundException extends MuSheetException {
+  ScoreNotFoundException([String message = 'Score not found'])
+      : super(message, 'SCORE_NOT_FOUND');
+}
+
+/// Instrument score already exists
+class InstrumentScoreExistsException extends MuSheetException {
+  InstrumentScoreExistsException([String message = 'Instrument score already exists'])
+      : super(message, 'INSTRUMENT_SCORE_EXISTS');
+}
+
+/// Instrument score not found
+class InstrumentScoreNotFoundException extends MuSheetException {
+  InstrumentScoreNotFoundException([String message = 'Instrument score not found'])
+      : super(message, 'INSTRUMENT_SCORE_NOT_FOUND');
+}
+
+/// Setlist already exists (same name in scope)
+class SetlistExistsException extends MuSheetException {
+  SetlistExistsException([String message = 'Setlist with same name already exists'])
+      : super(message, 'SETLIST_EXISTS');
+}
+
+/// Setlist not found
+class SetlistNotFoundException extends MuSheetException {
+  SetlistNotFoundException([String message = 'Setlist not found'])
+      : super(message, 'SETLIST_NOT_FOUND');
+}

@@ -36,9 +36,9 @@ class AdminEndpoint extends Endpoint {
         session,
         where: (m) => m.teamId.equals(t.id!),
       );
-      final scoreCount = await TeamScore.db.count(
+      final scoreCount = await Score.db.count(
         session,
-        where: (s) => s.teamId.equals(t.id!),
+        where: (s) => s.scopeType.equals('team') & s.scopeId.equals(t.id!),
       );
       teamSummaries.add(TeamSummary(
         id: t.id!,
@@ -119,9 +119,9 @@ class AdminEndpoint extends Endpoint {
         session,
         where: (m) => m.teamId.equals(t.id!),
       );
-      final scoreCount = await TeamScore.db.count(
+      final scoreCount = await Score.db.count(
         session,
-        where: (s) => s.teamId.equals(t.id!),
+        where: (s) => s.scopeType.equals('team') & s.scopeId.equals(t.id!),
       );
 
       summaries.add(TeamSummary(
@@ -180,10 +180,10 @@ class AdminEndpoint extends Endpoint {
     final target = await User.db.findById(session, targetUserId);
     if (target == null) return false;
 
-    // Delete user's scores
+    // Delete user's scores (scopeType='user', scopeId=targetUserId)
     final scores = await Score.db.find(
       session,
-      where: (s) => s.userId.equals(targetUserId),
+      where: (s) => s.scopeType.equals('user') & s.scopeId.equals(targetUserId),
     );
     for (final score in scores) {
       // Delete instrument scores
@@ -202,10 +202,20 @@ class AdminEndpoint extends Endpoint {
       await Score.db.deleteRow(session, score);
     }
 
-    // Delete user's setlists
+    // Delete user's setlists (scopeType='user', scopeId=targetUserId)
+    final setlists = await Setlist.db.find(
+      session,
+      where: (s) => s.scopeType.equals('user') & s.scopeId.equals(targetUserId),
+    );
+    for (final setlist in setlists) {
+      await SetlistScore.db.deleteWhere(
+        session,
+        where: (ss) => ss.setlistId.equals(setlist.id!),
+      );
+    }
     await Setlist.db.deleteWhere(
       session,
-      where: (s) => s.userId.equals(targetUserId),
+      where: (s) => s.scopeType.equals('user') & s.scopeId.equals(targetUserId),
     );
 
     // Remove from teams
@@ -276,40 +286,40 @@ class AdminEndpoint extends Endpoint {
     final team = await Team.db.findById(session, teamId);
     if (team == null) return false;
 
-    // Delete team instrument scores first (child of team scores)
-    final teamScores = await TeamScore.db.find(
+    // Delete team scores and their instrument scores (scopeType='team', scopeId=teamId)
+    final teamScores = await Score.db.find(
       session,
-      where: (ts) => ts.teamId.equals(teamId),
+      where: (ts) => ts.scopeType.equals('team') & ts.scopeId.equals(teamId),
     );
     for (final ts in teamScores) {
-      await TeamInstrumentScore.db.deleteWhere(
+      await InstrumentScore.db.deleteWhere(
         session,
-        where: (tis) => tis.teamScoreId.equals(ts.id!),
+        where: (is_) => is_.scoreId.equals(ts.id!),
       );
     }
 
     // Delete team scores
-    await TeamScore.db.deleteWhere(
+    await Score.db.deleteWhere(
       session,
-      where: (s) => s.teamId.equals(teamId),
+      where: (s) => s.scopeType.equals('team') & s.scopeId.equals(teamId),
     );
 
-    // Delete team setlist scores first (child of team setlists)
-    final teamSetlists = await TeamSetlist.db.find(
+    // Delete team setlist scores and setlists (scopeType='team', scopeId=teamId)
+    final teamSetlists = await Setlist.db.find(
       session,
-      where: (ts) => ts.teamId.equals(teamId),
+      where: (ts) => ts.scopeType.equals('team') & ts.scopeId.equals(teamId),
     );
     for (final ts in teamSetlists) {
-      await TeamSetlistScore.db.deleteWhere(
+      await SetlistScore.db.deleteWhere(
         session,
-        where: (tss) => tss.teamSetlistId.equals(ts.id!),
+        where: (ss) => ss.setlistId.equals(ts.id!),
       );
     }
 
     // Delete team setlists
-    await TeamSetlist.db.deleteWhere(
+    await Setlist.db.deleteWhere(
       session,
-      where: (s) => s.teamId.equals(teamId),
+      where: (s) => s.scopeType.equals('team') & s.scopeId.equals(teamId),
     );
 
     // Delete team members

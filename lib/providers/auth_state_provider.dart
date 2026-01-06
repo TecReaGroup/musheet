@@ -1,5 +1,5 @@
 /// Auth State Provider - Unified authentication state management
-/// 
+///
 /// This provider wraps the core SessionService and AuthRepository
 /// to provide a clean interface for UI components.
 library;
@@ -8,12 +8,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/core.dart';
-import '../core/sync/pdf_sync_service.dart';
-import '../utils/logger.dart';
+import '../core/services/avatar_cache_service.dart';
 import 'core_providers.dart';
-import 'scores_state_provider.dart';
-import 'setlists_state_provider.dart';
-import 'teams_state_provider.dart';
+import 'team_operations_provider.dart' show clearAllTeamCaches;
 
 // ============================================================================
 // Auth State
@@ -62,7 +59,8 @@ class AuthState {
     avatarBytes: clearAvatar ? null : (avatarBytes ?? this.avatarBytes),
   );
 
-  bool get isAuthenticated => status == AuthStatus.authenticated && user != null;
+  bool get isAuthenticated =>
+      status == AuthStatus.authenticated && user != null;
   bool get isLoading => status == AuthStatus.loading;
   bool get hasError => status == AuthStatus.error;
 }
@@ -141,10 +139,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
     if (isValid) {
       await authRepo.fetchProfile();
       await _loadAvatar();
-      
+
       // Initialize sync services
       await _initializeSync();
-      
+
       // Update connection state
       state = state.copyWith(isConnected: NetworkService.instance.isOnline);
     }
@@ -177,16 +175,15 @@ class AuthStateNotifier extends Notifier<AuthState> {
         user: result.user,
         isConnected: true,
       );
-      
+
       // Load avatar after login
       await _loadAvatar();
-      
+
       // Initialize sync
       await _initializeSync();
-      
-      // Refresh teams
-      await ref.read(teamRepositoryProvider)?.syncTeamsFromServer();
-      
+
+      // Note: Teams will be synced by teamsStateProvider when auth state changes
+
       return true;
     } else {
       state = state.copyWith(
@@ -226,10 +223,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
         user: result.user,
         isConnected: true,
       );
-      
+
       // Initialize sync
       await _initializeSync();
-      
+
       return true;
     } else {
       state = state.copyWith(
@@ -242,50 +239,47 @@ class AuthStateNotifier extends Notifier<AuthState> {
 
   /// Logout
   Future<void> logout() async {
-    Log.i('AUTH', 'Logout started');
-    state = state.copyWith(status: AuthStatus.loading);
-
-    try {
-      // Stop sync coordinators and services
-      if (PdfSyncService.isInitialized) {
-        PdfSyncService.reset();
-      }
-      if (SyncCoordinator.isInitialized) {
-        SyncCoordinator.reset();
-      }
-      if (TeamSyncManager.isInitialized) {
-        TeamSyncManager.reset();
-      }
-
-      // Clear local data (includes all team data)
-      final local = ref.read(localDataSourceProvider);
-      await local.deleteAllPdfFiles();
-      await local.clearAllData();
-
-      // Logout from server and clear session
-      final authRepo = ref.read(authRepositoryProvider);
-      await authRepo?.logout();
-
-      // Invalidate all providers to clear cached state
-      ref.invalidate(pdfSyncServiceProvider);
-      ref.invalidate(syncCoordinatorProvider);
-      ref.invalidate(teamSyncManagerProvider);
-      ref.invalidate(teamsStateProvider);
-      ref.invalidate(currentTeamIdProvider);
-      ref.invalidate(scoresStateProvider);
-      ref.invalidate(setlistsStateProvider);
-
-    } catch (e) {
-      Log.e('AUTH', 'Logout error', error: e);
+    // Stop sync coordinators and services
+    if (PdfSyncService.isInitialized) {
+      PdfSyncService.reset();
+    }
+    if (SyncCoordinator.isInitialized) {
+      SyncCoordinator.reset();
+    }
+    if (TeamSyncManager.isInitialized) {
+      TeamSyncManager.reset();
     }
 
+    // Clear team caches
+    clearAllTeamCaches();
+
+    // Logout from server and clear session first
+    final authRepo = ref.read(authRepositoryProvider);
+    await authRepo?.logout();
+
+    // Clear local data (includes all team data in database)
+    final local = ref.read(localDataSourceProvider);
+    await local.deleteAllPdfFiles();
+    await local.clearAllData();
+
+    // Note: Team data providers (teamScoresNotifierProvider, teamSetlistsNotifierProvider)
+    // will automatically clear when they detect auth state change to unauthenticated
+
+    // Clear avatar cache
+    await AvatarCacheService().clearAllCache();
+
+    // Invalidate repository providers to clear cached data
+    ref.invalidate(scoreRepositoryProvider);
+    ref.invalidate(setlistRepositoryProvider);
+    // Note: teamsStateProvider will be invalidated when it detects auth state change
+
+    // Finally update state to trigger UI navigation
     state = const AuthState(status: AuthStatus.unauthenticated);
-    Log.i('AUTH', 'Logout completed');
   }
 
   /// Check pending changes count
   Future<int> getPendingChangesCount() async {
-    final local = ref.read(localDataSourceProvider);
+    final local = ref.read(syncableDataSourceProvider);
     return local.getPendingChangesCount();
   }
 
@@ -310,7 +304,7 @@ class AuthStateNotifier extends Notifier<AuthState> {
       displayName: displayName,
       preferredInstrument: preferredInstrument,
     );
-    
+
     if (profile != null) {
       state = state.copyWith(user: profile);
       return true;
@@ -324,11 +318,13 @@ class AuthStateNotifier extends Notifier<AuthState> {
     required String fileName,
   }) async {
     final authRepo = ref.read(authRepositoryProvider);
-    final success = await authRepo?.uploadAvatar(
-      imageBytes: imageBytes,
-      fileName: fileName,
-    ) ?? false;
-    
+    final success =
+        await authRepo?.uploadAvatar(
+          imageBytes: imageBytes,
+          fileName: fileName,
+        ) ??
+        false;
+
     if (success) {
       state = state.copyWith(avatarBytes: imageBytes);
     }
@@ -353,7 +349,7 @@ class AuthStateNotifier extends Notifier<AuthState> {
     if (!SessionService.instance.isAuthenticated) return;
 
     final db = ref.read(appDatabaseProvider);
-    final local = ref.read(localDataSourceProvider);
+    final local = ref.read(syncableDataSourceProvider);
 
     // Initialize PdfSyncService first (used by other coordinators)
     if (!PdfSyncService.isInitialized) {
@@ -385,6 +381,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
         network: NetworkService.instance,
       );
     }
+
+    // Re-connect repositories to sync coordinator now that it's initialized
+    ref.invalidate(scoreRepositoryProvider);
+    ref.invalidate(setlistRepositoryProvider);
 
     // Trigger initial sync
     SyncCoordinator.instance.requestSync(immediate: true);

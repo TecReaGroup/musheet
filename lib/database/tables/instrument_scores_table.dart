@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import 'scores_table.dart';
 
+/// Unified InstrumentScore table for both user and team scopes
+/// Inherits scope from parent Score via foreign key
 @DataClassName('InstrumentScoreEntity')
 class InstrumentScores extends Table {
   TextColumn get id => text()();
@@ -13,6 +15,9 @@ class InstrumentScores extends Table {
 
   // Order index for sorting instrument scores within a score
   IntColumn get orderIndex => integer().withDefault(const Constant(0))();
+
+  // Team-specific fields (nullable for user scope)
+  IntColumn get sourceInstrumentScoreId => integer().nullable()(); // Original IS if copied
 
   // Sync fields (aligned with sync_logic.md)
   IntColumn get version => integer().withDefault(const Constant(1))();

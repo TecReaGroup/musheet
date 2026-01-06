@@ -8,7 +8,6 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/core.dart';
-import '../core/sync/pdf_sync_service.dart';
 import '../database/database.dart';
 
 // ============================================================================
@@ -88,10 +87,17 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   return database;
 });
 
-/// Provider for LocalDataSource
-final localDataSourceProvider = Provider<LocalDataSource>((ref) {
+/// Provider for SyncableDataSource (user scope)
+/// This provides full sync capabilities for the personal library
+final syncableDataSourceProvider = Provider<SyncableDataSource>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return DriftLocalDataSource(db);
+});
+
+/// Provider for LocalDataSource (user scope)
+/// Alias for syncableDataSourceProvider for backward compatibility
+final localDataSourceProvider = Provider<LocalDataSource>((ref) {
+  return ref.watch(syncableDataSourceProvider);
 });
 
 /// Provider for ApiClient
@@ -257,7 +263,7 @@ final teamSyncStateProvider = StreamProvider.family<TeamSyncState, int>((ref, te
   final coordinatorAsync = ref.watch(teamSyncCoordinatorProvider(teamId));
   final coordinator = coordinatorAsync.value;
   if (coordinator == null) {
-    yield TeamSyncState(teamId: teamId, phase: TeamSyncPhase.waitingForNetwork);
+    yield TeamSyncState(teamId: teamId, phase: SyncPhase.waitingForNetwork);
     return;
   }
   // Emit current state first

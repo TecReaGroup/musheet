@@ -1,25 +1,35 @@
 class: Score
 table: scores
 fields:
-  userId: int, relation(parent=users)
+  # Unified scope partitioning
+  scopeType: String
+  scopeId: int
+
+  # Business fields
   title: String
   composer: String?
   bpm: int?
+
+  # Team-only business metadata (nullable in user scope)
+  createdById: int?
+  sourceScoreId: int?
+
+  # Sync fields
   createdAt: DateTime
   updatedAt: DateTime
   deletedAt: DateTime?
   version: int
   syncStatus: String?
 indexes:
-  score_user_idx:
-    fields: userId
+  score_scope_idx:
+    fields: scopeType, scopeId
     type: btree
-  score_user_updated_idx:
-    fields: userId, updatedAt
+  score_scope_updated_idx:
+    fields: scopeType, scopeId, updatedAt
     type: btree
-  score_user_title_composer_unique:
-    fields: userId, title, composer
+  score_scope_title_composer_unique:
+    fields: scopeType, scopeId, title, composer
     unique: true
-  score_user_version_idx:
-    fields: userId, version
+  score_scope_version_idx:
+    fields: scopeType, scopeId, version
     type: btree

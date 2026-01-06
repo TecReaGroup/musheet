@@ -55,12 +55,13 @@ CREATE TABLE "instrument_scores" (
     "customInstrument" text,
     "pdfHash" text,
     "orderIndex" bigint NOT NULL,
+    "annotationsJson" text,
+    "sourceInstrumentScoreId" bigint,
     "createdAt" timestamp without time zone NOT NULL,
     "updatedAt" timestamp without time zone NOT NULL,
     "deletedAt" timestamp without time zone,
     "version" bigint NOT NULL,
-    "syncStatus" text,
-    "annotationsJson" text
+    "syncStatus" text
 );
 
 -- Indexes
@@ -73,10 +74,13 @@ CREATE INDEX "instrument_score_version_idx" ON "instrument_scores" USING btree (
 --
 CREATE TABLE "scores" (
     "id" bigserial PRIMARY KEY,
-    "userId" bigint NOT NULL,
+    "scopeType" text NOT NULL,
+    "scopeId" bigint NOT NULL,
     "title" text NOT NULL,
     "composer" text,
     "bpm" bigint,
+    "createdById" bigint,
+    "sourceScoreId" bigint,
     "createdAt" timestamp without time zone NOT NULL,
     "updatedAt" timestamp without time zone NOT NULL,
     "deletedAt" timestamp without time zone,
@@ -85,10 +89,10 @@ CREATE TABLE "scores" (
 );
 
 -- Indexes
-CREATE INDEX "score_user_idx" ON "scores" USING btree ("userId");
-CREATE INDEX "score_user_updated_idx" ON "scores" USING btree ("userId", "updatedAt");
-CREATE UNIQUE INDEX "score_user_title_composer_unique" ON "scores" USING btree ("userId", "title", "composer");
-CREATE INDEX "score_user_version_idx" ON "scores" USING btree ("userId", "version");
+CREATE INDEX "score_scope_idx" ON "scores" USING btree ("scopeType", "scopeId");
+CREATE INDEX "score_scope_updated_idx" ON "scores" USING btree ("scopeType", "scopeId", "updatedAt");
+CREATE UNIQUE INDEX "score_scope_title_composer_unique" ON "scores" USING btree ("scopeType", "scopeId", "title", "composer");
+CREATE INDEX "score_scope_version_idx" ON "scores" USING btree ("scopeType", "scopeId", "version");
 
 --
 -- Class SetlistScore as table setlist_scores
@@ -114,9 +118,12 @@ CREATE UNIQUE INDEX "setlist_score_unique" ON "setlist_scores" USING btree ("set
 --
 CREATE TABLE "setlists" (
     "id" bigserial PRIMARY KEY,
-    "userId" bigint NOT NULL,
+    "scopeType" text NOT NULL,
+    "scopeId" bigint NOT NULL,
     "name" text NOT NULL,
     "description" text,
+    "createdById" bigint,
+    "sourceSetlistId" bigint,
     "createdAt" timestamp without time zone NOT NULL,
     "updatedAt" timestamp without time zone NOT NULL,
     "deletedAt" timestamp without time zone,
@@ -125,33 +132,9 @@ CREATE TABLE "setlists" (
 );
 
 -- Indexes
-CREATE INDEX "setlist_user_idx" ON "setlists" USING btree ("userId");
-CREATE UNIQUE INDEX "setlist_user_name_unique" ON "setlists" USING btree ("userId", "name");
-CREATE INDEX "setlist_version_idx" ON "setlists" USING btree ("userId", "version");
-
---
--- Class TeamInstrumentScore as table team_instrument_scores
---
-CREATE TABLE "team_instrument_scores" (
-    "id" bigserial PRIMARY KEY,
-    "teamScoreId" bigint NOT NULL,
-    "instrumentType" text NOT NULL,
-    "customInstrument" text,
-    "pdfHash" text,
-    "orderIndex" bigint NOT NULL,
-    "annotationsJson" text,
-    "sourceInstrumentScoreId" bigint,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL,
-    "deletedAt" timestamp without time zone,
-    "version" bigint NOT NULL,
-    "syncStatus" text
-);
-
--- Indexes
-CREATE INDEX "team_instrument_score_idx" ON "team_instrument_scores" USING btree ("teamScoreId");
-CREATE UNIQUE INDEX "team_instrument_score_unique" ON "team_instrument_scores" USING btree ("teamScoreId", "instrumentType", "customInstrument");
-CREATE INDEX "team_instrument_score_version_idx" ON "team_instrument_scores" USING btree ("teamScoreId", "version");
+CREATE INDEX "setlist_scope_idx" ON "setlists" USING btree ("scopeType", "scopeId");
+CREATE UNIQUE INDEX "setlist_scope_name_unique" ON "setlists" USING btree ("scopeType", "scopeId", "name");
+CREATE INDEX "setlist_scope_version_idx" ON "setlists" USING btree ("scopeType", "scopeId", "version");
 
 --
 -- Class TeamMember as table team_members
@@ -168,71 +151,6 @@ CREATE TABLE "team_members" (
 CREATE INDEX "team_member_team_idx" ON "team_members" USING btree ("teamId");
 CREATE INDEX "team_member_user_idx" ON "team_members" USING btree ("userId");
 CREATE UNIQUE INDEX "team_member_unique_idx" ON "team_members" USING btree ("teamId", "userId");
-
---
--- Class TeamScore as table team_scores
---
-CREATE TABLE "team_scores" (
-    "id" bigserial PRIMARY KEY,
-    "teamId" bigint NOT NULL,
-    "title" text NOT NULL,
-    "composer" text,
-    "bpm" bigint,
-    "createdById" bigint NOT NULL,
-    "sourceScoreId" bigint,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL,
-    "deletedAt" timestamp without time zone,
-    "version" bigint NOT NULL,
-    "syncStatus" text
-);
-
--- Indexes
-CREATE INDEX "team_score_team_idx" ON "team_scores" USING btree ("teamId");
-CREATE UNIQUE INDEX "team_score_unique_title_composer" ON "team_scores" USING btree ("teamId", "title", "composer");
-CREATE INDEX "team_score_version_idx" ON "team_scores" USING btree ("teamId", "version");
-
---
--- Class TeamSetlistScore as table team_setlist_scores
---
-CREATE TABLE "team_setlist_scores" (
-    "id" bigserial PRIMARY KEY,
-    "teamSetlistId" bigint NOT NULL,
-    "teamScoreId" bigint NOT NULL,
-    "orderIndex" bigint NOT NULL,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL,
-    "deletedAt" timestamp without time zone,
-    "version" bigint NOT NULL,
-    "syncStatus" text
-);
-
--- Indexes
-CREATE INDEX "team_setlist_score_setlist_idx" ON "team_setlist_scores" USING btree ("teamSetlistId");
-CREATE INDEX "team_setlist_score_score_idx" ON "team_setlist_scores" USING btree ("teamScoreId");
-CREATE UNIQUE INDEX "team_setlist_score_unique" ON "team_setlist_scores" USING btree ("teamSetlistId", "teamScoreId");
-
---
--- Class TeamSetlist as table team_setlists
---
-CREATE TABLE "team_setlists" (
-    "id" bigserial PRIMARY KEY,
-    "teamId" bigint NOT NULL,
-    "name" text NOT NULL,
-    "description" text,
-    "createdById" bigint NOT NULL,
-    "sourceSetlistId" bigint,
-    "createdAt" timestamp without time zone NOT NULL,
-    "updatedAt" timestamp without time zone NOT NULL,
-    "deletedAt" timestamp without time zone,
-    "version" bigint NOT NULL,
-    "syncStatus" text
-);
-
--- Indexes
-CREATE INDEX "team_setlist_team_idx" ON "team_setlists" USING btree ("teamId");
-CREATE UNIQUE INDEX "team_setlist_unique_name" ON "team_setlists" USING btree ("teamId", "name");
-CREATE INDEX "team_setlist_version_idx" ON "team_setlists" USING btree ("teamId", "version");
 
 --
 -- Class Team as table teams
@@ -545,16 +463,6 @@ ALTER TABLE ONLY "instrument_scores"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "scores" table
---
-ALTER TABLE ONLY "scores"
-    ADD CONSTRAINT "scores_fk_0"
-    FOREIGN KEY("userId")
-    REFERENCES "users"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-
---
 -- Foreign relations for "setlist_scores" table
 --
 ALTER TABLE ONLY "setlist_scores"
@@ -571,26 +479,6 @@ ALTER TABLE ONLY "setlist_scores"
     ON UPDATE NO ACTION;
 
 --
--- Foreign relations for "setlists" table
---
-ALTER TABLE ONLY "setlists"
-    ADD CONSTRAINT "setlists_fk_0"
-    FOREIGN KEY("userId")
-    REFERENCES "users"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-
---
--- Foreign relations for "team_instrument_scores" table
---
-ALTER TABLE ONLY "team_instrument_scores"
-    ADD CONSTRAINT "team_instrument_scores_fk_0"
-    FOREIGN KEY("teamScoreId")
-    REFERENCES "team_scores"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-
---
 -- Foreign relations for "team_members" table
 --
 ALTER TABLE ONLY "team_members"
@@ -602,54 +490,6 @@ ALTER TABLE ONLY "team_members"
 ALTER TABLE ONLY "team_members"
     ADD CONSTRAINT "team_members_fk_1"
     FOREIGN KEY("userId")
-    REFERENCES "users"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-
---
--- Foreign relations for "team_scores" table
---
-ALTER TABLE ONLY "team_scores"
-    ADD CONSTRAINT "team_scores_fk_0"
-    FOREIGN KEY("teamId")
-    REFERENCES "teams"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-ALTER TABLE ONLY "team_scores"
-    ADD CONSTRAINT "team_scores_fk_1"
-    FOREIGN KEY("createdById")
-    REFERENCES "users"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-
---
--- Foreign relations for "team_setlist_scores" table
---
-ALTER TABLE ONLY "team_setlist_scores"
-    ADD CONSTRAINT "team_setlist_scores_fk_0"
-    FOREIGN KEY("teamSetlistId")
-    REFERENCES "team_setlists"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-ALTER TABLE ONLY "team_setlist_scores"
-    ADD CONSTRAINT "team_setlist_scores_fk_1"
-    FOREIGN KEY("teamScoreId")
-    REFERENCES "team_scores"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-
---
--- Foreign relations for "team_setlists" table
---
-ALTER TABLE ONLY "team_setlists"
-    ADD CONSTRAINT "team_setlists_fk_0"
-    FOREIGN KEY("teamId")
-    REFERENCES "teams"("id")
-    ON DELETE NO ACTION
-    ON UPDATE NO ACTION;
-ALTER TABLE ONLY "team_setlists"
-    ADD CONSTRAINT "team_setlists_fk_1"
-    FOREIGN KEY("createdById")
     REFERENCES "users"("id")
     ON DELETE NO ACTION
     ON UPDATE NO ACTION;
@@ -729,9 +569,9 @@ ALTER TABLE ONLY "serverpod_query_log"
 -- MIGRATION VERSION FOR musheet
 --
 INSERT INTO "serverpod_migrations" ("module", "version", "timestamp")
-    VALUES ('musheet', '20260106032458406', now())
+    VALUES ('musheet', '20260107162554517', now())
     ON CONFLICT ("module")
-    DO UPDATE SET "version" = '20260106032458406', "timestamp" = now();
+    DO UPDATE SET "version" = '20260107162554517', "timestamp" = now();
 
 --
 -- MIGRATION VERSION FOR serverpod

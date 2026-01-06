@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:custom_image_crop/custom_image_crop.dart';
 import 'package:image/image.dart' as img;
 import '../../utils/icon_mappings.dart';
+import '../../widgets/common_widgets.dart';
 
 /// Screen for cropping avatar images with custom UI
 class AvatarCropScreen extends StatefulWidget {
@@ -48,9 +49,7 @@ class _AvatarCropScreenState extends State<AvatarCropScreen> {
       if (croppedImage == null) {
         if (mounted) {
           setState(() => _isProcessing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to crop image')),
-          );
+          AppToast.error(context, 'Failed to crop image');
         }
         return;
       }
@@ -60,9 +59,7 @@ class _AvatarCropScreenState extends State<AvatarCropScreen> {
       if (decodedImage == null) {
         if (mounted) {
           setState(() => _isProcessing = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to decode image')),
-          );
+          AppToast.error(context, 'Failed to decode image');
         }
         return;
       }
@@ -83,9 +80,7 @@ class _AvatarCropScreenState extends State<AvatarCropScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isProcessing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        AppToast.error(context, 'Error: $e');
       }
     }
   }

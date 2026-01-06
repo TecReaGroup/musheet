@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'theme/app_theme.dart';
-import 'theme/app_colors.dart';
 import 'screens/library_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
@@ -18,6 +17,7 @@ import 'providers/scores_state_provider.dart';
 import 'providers/setlists_state_provider.dart';
 import 'providers/auth_state_provider.dart';
 import 'utils/logger.dart';
+import 'widgets/common_widgets.dart';
 
 enum AppPage { home, library, team, settings }
 
@@ -119,32 +119,23 @@ class MuSheetApp extends ConsumerWidget {
     if (!_authInitialized) {
       _authInitialized = true;
       Future.microtask(() async {
-        Log.d('App', 'Starting auth initialization microtask (one-time)...');
         try {
-          // First initialize auth from stored credentials
-          Log.d('App', 'Calling initialize...');
+          // Initialize auth and restore session
           await ref.read(authStateProvider.notifier).initialize();
-          Log.d('App', 'initialize completed');
-          // Then restore session with network validation
-          Log.d('App', 'Calling restoreSession...');
           await ref.read(authStateProvider.notifier).restoreSession();
-          Log.d('App', 'restoreSession completed');
 
           // Start background sync if logged in
           final syncCoordinator = ref.read(syncCoordinatorProvider);
-          Log.d(
-            'App',
-            'syncCoordinatorProvider resolved: ${syncCoordinator != null ? "service available" : "null"}',
-          );
           if (syncCoordinator != null) {
-            Log.d('App', 'Triggering sync...');
             await syncCoordinator.syncNow();
-            Log.d('App', 'Sync completed');
-          } else {
-            Log.d('App', 'Sync coordinator is null, skipping background sync');
           }
         } catch (e, stack) {
-          Log.e('App', 'Auth initialization failed', error: e, stackTrace: stack);
+          Log.e(
+            'App',
+            'Auth initialization failed',
+            error: e,
+            stackTrace: stack,
+          );
           // Reset flag to allow retry on next build
           _authInitialized = false;
         }
@@ -297,31 +288,13 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
     // Show snackbar
     _isSnackBarVisible = true;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Press back again to exit',
-              style: TextStyle(color: Colors.white, fontSize: 14),
-            ),
-            backgroundColor: AppColors.gray700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            margin: const EdgeInsets.only(
-              bottom: 12,
-              left: 16,
-              right: 16,
-            ),
-            duration: const Duration(seconds: 1),
-          ),
-        )
-        .closed
-        .then((_) {
-          _isSnackBarVisible = false;
-        });
+    AppToast.info(
+      context,
+      'Press back again to exit',
+      duration: AppToast.shortDuration,
+    ).closed.then((_) {
+      _isSnackBarVisible = false;
+    });
     return false;
   }
 
