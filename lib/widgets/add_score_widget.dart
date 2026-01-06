@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as path;
 import '../core/sync/pdf_sync_service.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/teams_state_provider.dart';
@@ -177,10 +178,17 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     // Initialize disabled instruments from widget property
     _disabledInstruments = Set.from(widget.disabledInstruments);
 
-    // If in copy mode, auto-set the PDF from source instrument
+    // If in copy mode, auto-set the PDF from source instrument (personal or team)
     if (widget.sourceInstrumentToCopy != null) {
       _selectedPdfPath = widget.sourceInstrumentToCopy!.pdfPath;
-      _selectedPdfName = widget.sourceInstrumentToCopy!.pdfPath?.split('/').last;
+      _selectedPdfName = widget.sourceInstrumentToCopy!.pdfPath != null
+          ? path.basename(widget.sourceInstrumentToCopy!.pdfPath!)
+          : null;
+    } else if (widget.sourceTeamInstrumentToCopy != null) {
+      _selectedPdfPath = widget.sourceTeamInstrumentToCopy!.pdfPath;
+      _selectedPdfName = widget.sourceTeamInstrumentToCopy!.pdfPath != null
+          ? path.basename(widget.sourceTeamInstrumentToCopy!.pdfPath!)
+          : null;
     }
 
     // If preset file path is provided (from sharing intent)
@@ -661,7 +669,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       _customInstrumentController.text,
     );
     // In copy mode, PDF is already set, so we don't need to check _selectedPdfPath
-    final hasPdf = widget.sourceInstrumentToCopy != null || _selectedPdfPath != null;
+    final hasPdf = widget.sourceInstrumentToCopy != null || 
+                   widget.sourceTeamInstrumentToCopy != null || 
+                   _selectedPdfPath != null;
     final canConfirm = widget.showTitleComposer
         ? (hasPdf &&
            _titleController.text.trim().isNotEmpty &&
@@ -866,9 +876,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
             ),
           const SizedBox(height: 12),
           // PDF select button (only show if not in copy mode)
-          if (widget.sourceInstrumentToCopy == null)
+          if (widget.sourceInstrumentToCopy == null && widget.sourceTeamInstrumentToCopy == null)
             _buildPdfSelectButton(),
-          if (widget.sourceInstrumentToCopy != null)
+          if (widget.sourceInstrumentToCopy != null || widget.sourceTeamInstrumentToCopy != null)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

@@ -2,7 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_state_provider.dart';
-import '../core/core.dart';
+import '../core/services/avatar_cache_service.dart';
 import '../theme/app_colors.dart';
 
 /// A widget that displays user avatar, using cached avatar from AuthProvider
@@ -149,24 +149,27 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
   }
 
   Future<void> _loadAvatar() async {
+    // Fast path: Check memory cache synchronously (no loading indicator)
+    final cacheService = AvatarCacheService();
+    if (cacheService.isInMemoryCache(widget.userId)) {
+      setState(() {
+        _avatarBytes = cacheService.getFromMemoryCache(widget.userId);
+      });
+      return;
+    }
+
+    // Slow path: Need to load from disk or network (show loading indicator)
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // Load avatar using API client
-      if (!ApiClient.isInitialized) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
-        return;
-      }
-
-      final result = await ApiClient.instance.getAvatar(widget.userId);
+      // Load avatar using cache service (disk -> network)
+      final bytes = await cacheService.getAvatar(widget.userId);
       
       if (mounted) {
         setState(() {
-          _avatarBytes = result.isSuccess ? result.data : null;
+          _avatarBytes = bytes;
           _isLoading = false;
         });
       }

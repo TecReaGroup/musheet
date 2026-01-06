@@ -368,7 +368,7 @@ class PdfSyncService {
         await (_db.select(_db.instrumentScores)..where((is_) {
               return is_.pdfHash.isNotNull() &
                   is_.deletedAt.isNull() &
-                  (is_.pdfSyncStatus.equals('needs_download') |
+                  (is_.pdfSyncStatus.equals('needsDownload') |
                       is_.pdfPath.isNull() |
                       is_.pdfPath.equals(''));
             }))
@@ -387,7 +387,7 @@ class PdfSyncService {
         await (_db.select(_db.teamInstrumentScores)..where((is_) {
               return is_.pdfHash.isNotNull() &
                   is_.deletedAt.isNull() &
-                  (is_.pdfSyncStatus.equals('needs_download') |
+                  (is_.pdfSyncStatus.equals('needsDownload') |
                       is_.pdfPath.isNull() |
                       is_.pdfPath.equals(''));
             }))

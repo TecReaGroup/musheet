@@ -8,12 +8,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/core.dart';
+import '../core/services/avatar_cache_service.dart';
 import '../core/sync/pdf_sync_service.dart';
-import '../utils/logger.dart';
 import 'core_providers.dart';
-import 'scores_state_provider.dart';
-import 'setlists_state_provider.dart';
-import 'teams_state_provider.dart';
 
 // ============================================================================
 // Auth State
@@ -242,44 +239,31 @@ class AuthStateNotifier extends Notifier<AuthState> {
 
   /// Logout
   Future<void> logout() async {
-    Log.i('AUTH', 'Logout started');
-    state = state.copyWith(status: AuthStatus.loading);
-
-    try {
-      // Stop sync coordinators and services
-      if (PdfSyncService.isInitialized) {
-        PdfSyncService.reset();
-      }
-      if (SyncCoordinator.isInitialized) {
-        SyncCoordinator.reset();
-      }
-      if (TeamSyncManager.isInitialized) {
-        TeamSyncManager.reset();
-      }
-
-      // Clear local data (includes all team data)
-      final local = ref.read(localDataSourceProvider);
-      await local.deleteAllPdfFiles();
-      await local.clearAllData();
-
-      // Logout from server and clear session
-      final authRepo = ref.read(authRepositoryProvider);
-      await authRepo?.logout();
-
-      // Invalidate all providers to clear cached state
-      ref.invalidate(pdfSyncServiceProvider);
-      ref.invalidate(syncCoordinatorProvider);
-      ref.invalidate(teamSyncManagerProvider);
-      ref.invalidate(teamsStateProvider);
-      ref.invalidate(currentTeamIdProvider);
-      ref.invalidate(scoresStateProvider);
-      ref.invalidate(setlistsStateProvider);
-    } catch (e) {
-      Log.e('AUTH', 'Logout error', error: e);
+    // Stop sync coordinators and services
+    if (PdfSyncService.isInitialized) {
+      PdfSyncService.reset();
+    }
+    if (SyncCoordinator.isInitialized) {
+      SyncCoordinator.reset();
+    }
+    if (TeamSyncManager.isInitialized) {
+      TeamSyncManager.reset();
     }
 
+    // Logout from server and clear session first
+    final authRepo = ref.read(authRepositoryProvider);
+    await authRepo?.logout();
+
+    // Clear local data (includes all team data)
+    final local = ref.read(localDataSourceProvider);
+    await local.deleteAllPdfFiles();
+    await local.clearAllData();
+
+    // Clear avatar cache
+    await AvatarCacheService().clearAllCache();
+
+    // Finally update state to trigger UI navigation
     state = const AuthState(status: AuthStatus.unauthenticated);
-    Log.i('AUTH', 'Logout completed');
   }
 
   /// Check pending changes count

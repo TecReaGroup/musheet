@@ -336,7 +336,7 @@ class DriftTeamLocalDataSource implements TeamLocalDataSource {
       
       if (pdfHash != null && pdfHash.isNotEmpty && PdfSyncService.isInitialized) {
         pdfPath = await PdfSyncService.instance.getLocalPath(pdfHash);
-        pdfSyncStatus = pdfPath != null ? 'synced' : 'needs_download';
+        pdfSyncStatus = pdfPath != null ? 'synced' : 'needsDownload';
       }
       
       if (existing != null) {

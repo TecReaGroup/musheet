@@ -64,9 +64,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           decoration: BoxDecoration(
                             gradient: (avatarBytes == null)
                                 ? const LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                     colors: [
-                                      AppColors.blue500,
-                                      Color(0xFF9333EA),
+                                      AppColors.avatarGradientStart,
+                                      AppColors.avatarGradientEnd,
                                     ],
                                   )
                                 : null,
@@ -284,14 +286,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       height: 96,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.blue500, Color(0xFF9333EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
         ),
       ),
       child: Center(
         child: Text(
           initial,
           style: const TextStyle(
-            color: Colors.white,
+            color: AppColors.avatarText,
             fontSize: 40,
             fontWeight: FontWeight.w600,
           ),

@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
 import 'core/core.dart';
+import 'core/services/avatar_cache_service.dart';
 import 'utils/logger.dart';
 
 void main() async {
@@ -70,6 +71,10 @@ Future<void> _initializeCoreServices() async {
     } else {
       Log.i('INIT', 'Services ready, no server configured');
     }
+
+    // Clear memory cache on app startup to refresh avatars from network
+    // (disk cache is preserved for offline support)
+    AvatarCacheService().clearMemoryCache();
   } catch (e) {
     Log.e('INIT', 'Error initializing core services', error: e);
   }

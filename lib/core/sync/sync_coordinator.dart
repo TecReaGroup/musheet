@@ -483,19 +483,21 @@ class SyncCoordinator {
     final pendingScores = await _local.getPendingScores();
     final pendingInstrumentScores = await _local.getPendingInstrumentScores();
     final pendingSetlists = await _local.getPendingSetlists();
+    final pendingSetlistScores = await _local.getPendingSetlistScores();
     final pendingDeletes = await _local.getPendingDeletes();
 
     final totalPending =
         pendingScores.length +
         pendingInstrumentScores.length +
         pendingSetlists.length +
+        pendingSetlistScores.length +
         pendingDeletes.length;
     if (totalPending == 0) {
       return _PushResult(pushed: 0, conflict: false);
     }
 
     _log(
-      'Pushing: ${pendingScores.length} scores, ${pendingInstrumentScores.length} IS, ${pendingSetlists.length} setlists, ${pendingDeletes.length} deletes',
+      'Pushing: ${pendingScores.length} scores, ${pendingInstrumentScores.length} IS, ${pendingSetlists.length} setlists, ${pendingSetlistScores.length} SS, ${pendingDeletes.length} deletes',
     );
 
     // Build push request
@@ -504,6 +506,10 @@ class SyncCoordinator {
       'instrumentScore',
       pendingInstrumentScores,
     );
+    final setlistScoreChanges = _buildEntityChanges(
+      'setlistScore',
+      pendingSetlistScores,
+    );
 
     final request = server.SyncPushRequest(
       clientLibraryVersion: _state.localLibraryVersion,
@@ -511,7 +517,7 @@ class SyncCoordinator {
       instrumentScores: isChanges.isEmpty ? null : isChanges,
       annotations: null,
       setlists: _buildEntityChanges('setlist', pendingSetlists),
-      setlistScores: null,
+      setlistScores: setlistScoreChanges.isEmpty ? null : setlistScoreChanges,
       deletes: pendingDeletes.isEmpty ? null : pendingDeletes,
     );
 
@@ -549,13 +555,18 @@ class SyncCoordinator {
       await _local.updateServerIds(serverIdMapping);
     }
 
-    // Mark as synced (including instrumentScores)
+    // Mark as synced (including instrumentScores and setlistScores)
     final entityIds = [
       ...pendingScores.map((s) => 'score:${s['id']}'),
       ...pendingInstrumentScores.map((s) => 'instrumentScore:${s['id']}'),
       ...pendingSetlists.map((s) => 'setlist:${s['id']}'),
+      ...pendingSetlistScores.map((ss) => 'setlistScore:${ss['id']}'),
     ];
     await _local.markAsSynced(entityIds, newVersion);
+
+    // Per APP_SYNC_LOGIC.md §2.4.2: Physically delete records after Push success
+    // This cleans up records with syncStatus='synced' AND deletedAt IS NOT NULL
+    await _local.cleanupSyncedDeletes();
 
     _updateState(
       _state.copyWith(
@@ -586,6 +597,16 @@ class SyncCoordinator {
         final scoreServerId = e['scoreServerId'] as int?;
         if (scoreServerId != null) {
           // Use server ID directly
+          dataToSend['scoreId'] = scoreServerId;
+        }
+      } else if (type == 'setlistScore') {
+        // Per APP_SYNC_LOGIC.md: SetlistScore references both Setlist and Score via serverId
+        final setlistServerId = e['setlistServerId'] as int?;
+        final scoreServerId = e['scoreServerId'] as int?;
+        if (setlistServerId != null) {
+          dataToSend['setlistId'] = setlistServerId;
+        }
+        if (scoreServerId != null) {
           dataToSend['scoreId'] = scoreServerId;
         }
       }
@@ -716,10 +737,30 @@ class SyncCoordinator {
         }).toList() ??
         [];
 
+    // Parse setlistScores from server response
+    final setlistScores =
+        data.setlistScores?.map((ss) {
+          final entityData = jsonDecode(ss.data) as Map<String, dynamic>;
+          return {
+            'id': entityData['localId'] ?? 'server_${ss.serverId}',
+            'serverId': ss.serverId,
+            'setlistId': entityData['setlistLocalId'] ?? 'server_${entityData['setlistId']}',
+            'scoreId': entityData['scoreLocalId'] ?? 'server_${entityData['scoreId']}',
+            'orderIndex': entityData['orderIndex'],
+            'createdAt': entityData['createdAt'],
+            'isDeleted': ss.isDeleted,
+          };
+        }).toList();
+
+    _log(
+      'Merge: ${scores.length} scores, ${instrumentScores.length} instrumentScores, ${setlists.length} setlists, ${setlistScores?.length ?? 0} setlistScores',
+    );
+
     await _local.applyPulledData(
       scores: scores,
       instrumentScores: instrumentScores,
       setlists: setlists,
+      setlistScores: setlistScores,
       newLibraryVersion: pullResult.newVersion,
     );
 
@@ -753,7 +794,7 @@ class SyncCoordinator {
 
   /// Upload PDFs marked as pending
   Future<void> _uploadPendingPdfs(int userId) async {
-    final pendingPdfs = await _local.getPendingInstrumentScores();
+    final pendingPdfs = await _local.getPendingPdfUploads();
 
     for (final isData in pendingPdfs) {
       final pdfPath = isData['pdfPath'] as String?;
@@ -766,15 +807,16 @@ class SyncCoordinator {
         final bytes = await file.readAsBytes();
         final hash = md5.convert(bytes).toString();
         final existingHash = isData['pdfHash'] as String?;
+        final pdfSyncStatus = isData['pdfSyncStatus'] as String?;
 
         // Skip if already synced with same hash
-        if (existingHash == hash) continue;
+        if (existingHash == hash && pdfSyncStatus == 'synced') continue;
 
-        // Check if server already has this file (instant upload)
+        // Check if server already has this file (instant upload via deduplication)
         final checkResult = await _api.checkPdfHash(userId: userId, hash: hash);
         if (checkResult.isSuccess && checkResult.data == true) {
           _log('PDF already on server (instant upload): $hash');
-          // Just update local database
+          await _local.markPdfAsSynced(isData['id'] as String, hash);
           continue;
         }
 
@@ -788,6 +830,7 @@ class SyncCoordinator {
 
         if (uploadResult.isSuccess) {
           _log('PDF uploaded: $hash');
+          await _local.markPdfAsSynced(isData['id'] as String, hash);
         } else {
           _logError(
             'PDF upload failed',
