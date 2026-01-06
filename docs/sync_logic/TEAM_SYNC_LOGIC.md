@@ -505,7 +505,7 @@ TeamSyncState (本地表)
 | **直接创建 Score** | |
 | → Team 中无同名 | ✅ 创建成功 |
 | → Team 中有同名 | 提示选择：添加分谱到已有 / 取消 |
-| **PDF 处理** | 与本地 Library 共用，基于 pdfHash |
+| **PDF 处理** | 与本地 Library 共用，基于 pdfHash） |
 
 ---
 

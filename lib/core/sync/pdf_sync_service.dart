@@ -23,9 +23,9 @@ import '../services/session_service.dart';
 
 /// PDF download priority
 enum PdfPriority {
-  high,   // User currently opening PDF (blocking)
+  high, // User currently opening PDF (blocking)
   medium, // Preload adjacent scores
-  low,    // Background auto-download
+  low, // Background auto-download
 }
 
 /// PDF download task
@@ -38,8 +38,8 @@ class _PdfDownloadTask {
   _PdfDownloadTask({
     required this.pdfHash,
     required this.priority,
-  })  : completer = Completer<String?>(),
-        createdAt = DateTime.now();
+  }) : completer = Completer<String?>(),
+       createdAt = DateTime.now();
 }
 
 /// PDF Sync Service - Library and Team shared
@@ -60,7 +60,7 @@ class PdfSyncService {
 
   // Currently downloading hashes
   final Set<String> _downloading = {};
-  
+
   // Pending completers for same hash downloads
   final Map<String, List<Completer<String?>>> _pendingCompleters = {};
 
@@ -75,10 +75,10 @@ class PdfSyncService {
     required SessionService session,
     required NetworkService network,
     required AppDatabase db,
-  })  : _api = api,
-        _session = session,
-        _network = network,
-        _db = db;
+  }) : _api = api,
+       _session = session,
+       _network = network,
+       _db = db;
 
   /// Initialize singleton
   static PdfSyncService initialize({
@@ -93,7 +93,6 @@ class PdfSyncService {
       network: network,
       db: db,
     );
-    Log.i('PDF_SYNC', 'PdfSyncService initialized');
     return _instance!;
   }
 
@@ -119,7 +118,7 @@ class PdfSyncService {
     if (!await file.exists()) {
       throw FileSystemException('File not found', filePath);
     }
-    
+
     final bytes = await file.readAsBytes();
     final digest = md5.convert(bytes);
     return digest.toString();
@@ -187,7 +186,7 @@ class PdfSyncService {
 
     // Step 4: Add to priority queue
     final task = _PdfDownloadTask(pdfHash: pdfHash, priority: priority);
-    
+
     // High priority goes to front
     if (priority == PdfPriority.high) {
       _queues[priority]!.addFirst(task);
@@ -223,11 +222,13 @@ class PdfSyncService {
       final allHashes = <String>{...libraryPdfs, ...teamPdfs};
 
       if (allHashes.isEmpty) {
-        Log.d('PDF_SYNC', 'No PDFs need downloading');
         return;
       }
 
-      Log.i('PDF_SYNC', 'Background sync: ${allHashes.length} PDFs to download');
+      Log.i(
+        'PDF_SYNC',
+        'Background sync: ${allHashes.length} PDFs to download',
+      );
 
       for (final hash in allHashes) {
         // Check if already exists
@@ -240,7 +241,7 @@ class PdfSyncService {
 
         // Skip if already in queue or downloading
         if (_downloading.contains(hash)) continue;
-        
+
         bool inQueue = false;
         for (final queue in _queues.values) {
           if (queue.any((t) => t.pdfHash == hash)) {
@@ -272,13 +273,15 @@ class PdfSyncService {
       final queue = _queues[priority]!;
       while (queue.isNotEmpty && _downloading.length < _maxConcurrent) {
         final task = queue.removeFirst();
-        
+
         // Skip if already downloading (race condition)
         if (_downloading.contains(task.pdfHash)) {
-          _pendingCompleters.putIfAbsent(task.pdfHash, () => []).add(task.completer);
+          _pendingCompleters
+              .putIfAbsent(task.pdfHash, () => [])
+              .add(task.completer);
           continue;
         }
-        
+
         _executeDownload(task);
       }
     }
@@ -291,7 +294,7 @@ class PdfSyncService {
     _downloading.add(hash);
 
     String? resultPath;
-    
+
     try {
       final userId = _session.userId;
       if (userId == null) {
@@ -338,12 +341,12 @@ class PdfSyncService {
       Log.e('PDF_SYNC', 'Download error: $hash', error: e, stackTrace: stack);
     } finally {
       _downloading.remove(hash);
-      
+
       // Complete task
       if (!task.completer.isCompleted) {
         task.completer.complete(resultPath);
       }
-      
+
       // Complete pending completers for same hash
       final pendingList = _pendingCompleters.remove(hash);
       if (pendingList != null) {
@@ -353,7 +356,7 @@ class PdfSyncService {
           }
         }
       }
-      
+
       // Continue processing queue
       _processQueue();
     }
@@ -361,14 +364,15 @@ class PdfSyncService {
 
   /// Get library PDFs needing download
   Future<List<String>> _getLibraryPdfsNeedingDownload() async {
-    final records = await (_db.select(_db.instrumentScores)..where((is_) {
-      return is_.pdfHash.isNotNull() &
-          is_.deletedAt.isNull() &
-          (is_.pdfSyncStatus.equals('needs_download') |
-              is_.pdfPath.isNull() |
-              is_.pdfPath.equals(''));
-    }))
-        .get();
+    final records =
+        await (_db.select(_db.instrumentScores)..where((is_) {
+              return is_.pdfHash.isNotNull() &
+                  is_.deletedAt.isNull() &
+                  (is_.pdfSyncStatus.equals('needs_download') |
+                      is_.pdfPath.isNull() |
+                      is_.pdfPath.equals(''));
+            }))
+            .get();
 
     return records
         .where((r) => r.pdfHash != null && r.pdfHash!.isNotEmpty)
@@ -379,14 +383,15 @@ class PdfSyncService {
 
   /// Get team PDFs needing download
   Future<List<String>> _getTeamPdfsNeedingDownload() async {
-    final records = await (_db.select(_db.teamInstrumentScores)..where((is_) {
-      return is_.pdfHash.isNotNull() &
-          is_.deletedAt.isNull() &
-          (is_.pdfSyncStatus.equals('needs_download') |
-              is_.pdfPath.isNull() |
-              is_.pdfPath.equals(''));
-    }))
-        .get();
+    final records =
+        await (_db.select(_db.teamInstrumentScores)..where((is_) {
+              return is_.pdfHash.isNotNull() &
+                  is_.deletedAt.isNull() &
+                  (is_.pdfSyncStatus.equals('needs_download') |
+                      is_.pdfPath.isNull() |
+                      is_.pdfPath.equals(''));
+            }))
+            .get();
 
     return records
         .where((r) => r.pdfHash != null && r.pdfHash!.isNotEmpty)
@@ -404,20 +409,24 @@ class PdfSyncService {
     try {
       await _db.transaction(() async {
         // Update library
-        await (_db.update(_db.instrumentScores)
-              ..where((is_) => is_.pdfHash.equals(pdfHash)))
-            .write(InstrumentScoresCompanion(
-          pdfPath: Value(localPath),
-          pdfSyncStatus: Value(status),
-        ));
+        await (_db.update(
+          _db.instrumentScores,
+        )..where((is_) => is_.pdfHash.equals(pdfHash))).write(
+          InstrumentScoresCompanion(
+            pdfPath: Value(localPath),
+            pdfSyncStatus: Value(status),
+          ),
+        );
 
         // Update all teams
-        await (_db.update(_db.teamInstrumentScores)
-              ..where((is_) => is_.pdfHash.equals(pdfHash)))
-            .write(TeamInstrumentScoresCompanion(
-          pdfPath: Value(localPath),
-          pdfSyncStatus: Value(status),
-        ));
+        await (_db.update(
+          _db.teamInstrumentScores,
+        )..where((is_) => is_.pdfHash.equals(pdfHash))).write(
+          TeamInstrumentScoresCompanion(
+            pdfPath: Value(localPath),
+            pdfSyncStatus: Value(status),
+          ),
+        );
       });
     } catch (e) {
       Log.e('PDF_SYNC', 'Failed to update status for: $pdfHash', error: e);
@@ -433,7 +442,7 @@ class PdfSyncService {
       }
       queue.clear();
     }
-    
+
     for (final list in _pendingCompleters.values) {
       for (final completer in list) {
         if (!completer.isCompleted) {

@@ -417,6 +417,10 @@ class TeamSyncEndpoint extends Endpoint {
     int newVersion,
   ) async {
     final data = jsonDecode(change.data) as Map<String, dynamic>;
+    
+    // Debug logging
+    session.log('[TEAMSYNC] Processing TeamScore change: ${change.entityId}', level: LogLevel.debug);
+    session.log('[TEAMSYNC]   Data types: ${data.map((k, v) => MapEntry(k, v.runtimeType))}', level: LogLevel.debug);
 
     if (change.operation == 'delete') {
       if (change.serverId != null) {

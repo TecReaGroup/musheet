@@ -11,6 +11,7 @@ import 'package:pdfrx/pdfrx.dart' as pdfrx;
 import 'package:share_plus/share_plus.dart';
 
 import '../models/annotation.dart';
+import '../widgets/common_widgets.dart';
 
 /// Helper class to store margin values for all four sides
 class _PageMargins {
@@ -97,9 +98,7 @@ class PdfExportService {
       // Close loading indicator
       if (context.mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Export failed: $e')),
-        );
+        AppToast.error(context, 'Export failed: $e');
       }
     }
   }

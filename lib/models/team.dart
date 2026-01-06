@@ -11,6 +11,7 @@ class TeamMember {
   final int userId;
   final String username;
   final String? displayName;
+  final String? avatarUrl;
   final String role; // Always 'member' per TEAM_SYNC_LOGIC.md
   final DateTime joinedAt;
 
@@ -19,6 +20,7 @@ class TeamMember {
     required this.userId,
     required this.username,
     this.displayName,
+    this.avatarUrl,
     this.role = 'member',
     required this.joinedAt,
   });
@@ -30,6 +32,7 @@ class TeamMember {
     int? userId,
     String? username,
     String? displayName,
+    String? avatarUrl,
     String? role,
     DateTime? joinedAt,
   }) =>
@@ -38,6 +41,7 @@ class TeamMember {
         userId: userId ?? this.userId,
         username: username ?? this.username,
         displayName: displayName ?? this.displayName,
+        avatarUrl: avatarUrl ?? this.avatarUrl,
         role: role ?? this.role,
         joinedAt: joinedAt ?? this.joinedAt,
       );
@@ -47,6 +51,7 @@ class TeamMember {
         'userId': userId,
         'username': username,
         'displayName': displayName,
+        'avatarUrl': avatarUrl,
         'role': role,
         'joinedAt': joinedAt.toIso8601String(),
       };
@@ -56,6 +61,7 @@ class TeamMember {
         userId: json['userId'],
         username: json['username'],
         displayName: json['displayName'],
+        avatarUrl: json['avatarUrl'],
         role: json['role'] ?? 'member',
         joinedAt: DateTime.parse(json['joinedAt']),
       );

@@ -69,14 +69,16 @@ class UserAvatar extends ConsumerWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.blue500, Color(0xFF9333EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
         ),
       ),
       child: Center(
         child: Text(
           initial,
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.avatarText,
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
           ),
@@ -104,11 +106,6 @@ class _AvatarContainer extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: hasImage
-            ? null
-            : const LinearGradient(
-                colors: [AppColors.blue500, Color(0xFF9333EA)],
-              ),
         borderRadius: BorderRadius.circular(size / 2),
       ),
       clipBehavior: Clip.antiAlias,
@@ -208,8 +205,17 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
     }
 
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+      return Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
+          ),
+        ),
+        child: const Center(
+          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.avatarText),
+        ),
       );
     }
 
@@ -220,14 +226,16 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.blue500, Color(0xFF9333EA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
         ),
       ),
       child: Center(
         child: Text(
           initial,
           style: TextStyle(
-            color: Colors.white,
+            color: AppColors.avatarText,
             fontSize: fontSize,
             fontWeight: FontWeight.w600,
           ),

@@ -6,9 +6,11 @@ import '../models/team.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/teams_state_provider.dart';
+import '../providers/team_operations_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/add_score_widget.dart';
 import '../widgets/import_from_library_dialog.dart';
+import '../widgets/common_widgets.dart';
 import '../utils/icon_mappings.dart';
 import '../router/app_router.dart';
 import 'library_screen.dart' show lastOpenedInstrumentInScoreProvider;
@@ -276,118 +278,123 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
   // ========== Team Mode Build ==========
 
   Widget _buildTeamMode() {
-    final teamScoresAsync = ref.watch(teamScoresProvider(_teamServerId!));
-    final teamSetlistsAsync = ref.watch(teamSetlistsProvider(_teamServerId!));
+    // Use synchronous list providers for UI (reads from cache, falls back to async)
+    // Like library's scoresListProvider pattern
+    final scores = ref.watch(teamScoresListProvider(_teamServerId!));
+    final setlists = ref.watch(teamSetlistsListProvider(_teamServerId!));
 
-    return teamScoresAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => Scaffold(
-        body: Center(child: Text('Error: $e')),
-      ),
-      data: (scores) {
-        final currentScore = scores.firstWhere(
-          (s) => s.id == widget.teamScore!.id,
-          orElse: () => widget.teamScore!,
+    // Show loading only on initial load when we have no data yet
+    // (the list provider will internally trigger async loading)
+    if (scores.isEmpty) {
+      // Check if we're still in initial loading state
+      final scoresAsync = ref.read(teamScoresStateProvider(_teamServerId!));
+      if (scoresAsync.isLoading) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
         );
-
-        final setlists = teamSetlistsAsync.value ?? [];
-        final containingSetlists = setlists
-            .where((s) => s.teamScoreIds.contains(currentScore.id))
-            .toList();
-
+      }
+      if (scoresAsync.hasError) {
         return Scaffold(
-          backgroundColor: Colors.white,
-          body: Stack(
+          body: Center(child: Text('Error: ${scoresAsync.error}')),
+        );
+      }
+    }
+
+    final currentScore = scores.firstWhere(
+      (s) => s.id == widget.teamScore!.id,
+      orElse: () => widget.teamScore!,
+    );
+
+    final containingSetlists = setlists
+        .where((s) => s.teamScoreIds.contains(currentScore.id))
+        .toList();
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          Column(
             children: [
-              Column(
-                children: [
-                  _buildHeader(
-                    title: currentScore.title,
-                    composer: currentScore.composer,
-                    bpm: currentScore.bpm,
-                    date: currentScore.createdAt,
-                    modeLabel: 'Team',
-                    onEditTap: () => _openEditModalTeam(currentScore),
-                  ),
-                  Expanded(
-                    child: CustomScrollView(
-                      slivers: [
-                        _buildInstrumentSectionTitle(),
-                        if (currentScore.instrumentScores.isEmpty)
-                          _buildEmptyInstrumentState()
-                        else
-                          _buildTeamInstrumentList(currentScore),
-                        _buildSetlistSection(
-                          containingSetlists: containingSetlists
-                              .map(
-                                (s) => (
-                                  name: s.name,
-                                  description: s.description,
-                                  onTap: () =>
-                                      AppNavigation.navigateToTeamSetlistDetail(
-                                        context,
-                                        s,
-                                        teamServerId: _teamServerId!,
-                                      ),
-                                ),
-                              )
-                              .toList(),
-                          emptyText: 'Not in any setlist',
-                          sectionTitle: 'In Team Setlists',
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildTeamBottomButtons(
-                    onAddPressed: () =>
-                        _openAddInstrumentModalTeam(currentScore),
-                    onImportPressed: () =>
-                        setState(() => _showImportFromLibraryModal = true),
-                  ),
-                ],
+              _buildHeader(
+                title: currentScore.title,
+                composer: currentScore.composer,
+                bpm: currentScore.bpm,
+                date: currentScore.createdAt,
+                modeLabel: 'Team',
+                onEditTap: () => _openEditModalTeam(currentScore),
               ),
-              if (_showEditModal) _buildEditModalTeam(currentScore, scores),
-              if (_showAddInstrumentModal)
-                AddScoreWidget(
-                  showTitleComposer: false,
-                  isTeamScore: true,
-                  teamServerId: _teamServerId,
-                  existingTeamScore: currentScore,
-                  disabledInstruments: _disabledInstruments,
-                  headerIcon: AppIcons.add,
-                  headerTitle: 'Add Instrument Sheet',
-                  headerSubtitle: 'Select instrument and import PDF',
-                  confirmButtonText: 'Add',
-                  onClose: () =>
-                      setState(() => _showAddInstrumentModal = false),
-                  onSuccess: () =>
-                      setState(() => _showAddInstrumentModal = false),
+              Expanded(
+                child: CustomScrollView(
+                  slivers: [
+                    _buildInstrumentSectionTitle(),
+                    if (currentScore.instrumentScores.isEmpty)
+                      _buildEmptyInstrumentState()
+                    else
+                      _buildTeamInstrumentList(currentScore),
+                    _buildSetlistSection(
+                      containingSetlists: containingSetlists
+                          .map(
+                            (s) => (
+                              name: s.name,
+                              description: s.description,
+                              onTap: () =>
+                                  AppNavigation.navigateToTeamSetlistDetail(
+                                    context,
+                                    s,
+                                    teamServerId: _teamServerId!,
+                                  ),
+                            ),
+                          )
+                          .toList(),
+                      emptyText: 'Not in any setlist',
+                      sectionTitle: 'In Team Setlists',
+                    ),
+                  ],
                 ),
-              if (_showCopyInstrumentModal && _teamInstrumentToCopy != null)
-                _buildCopyInstrumentModalTeam(
-                  currentScore,
-                  _teamInstrumentToCopy!,
-                ),
-              if (_showImportFromLibraryModal)
-                ImportFromLibraryDialog(
-                  targetTeamScore: currentScore,
-                  onClose: () =>
-                      setState(() => _showImportFromLibraryModal = false),
-                  onImport: (sourceScore, selectedInstruments) async {
-                    setState(() => _showImportFromLibraryModal = false);
-                    await _handleImportFromLibrary(
-                      currentScore,
-                      sourceScore,
-                      selectedInstruments,
-                    );
-                  },
-                ),
+              ),
+              _buildTeamBottomButtons(
+                onAddPressed: () => _openAddInstrumentModalTeam(currentScore),
+                onImportPressed: () =>
+                    setState(() => _showImportFromLibraryModal = true),
+              ),
             ],
           ),
-        );
-      },
+          if (_showEditModal) _buildEditModalTeam(currentScore, scores),
+          if (_showAddInstrumentModal)
+            AddScoreWidget(
+              showTitleComposer: false,
+              isTeamScore: true,
+              teamServerId: _teamServerId,
+              existingTeamScore: currentScore,
+              disabledInstruments: _disabledInstruments,
+              headerIcon: AppIcons.add,
+              headerTitle: 'Add Instrument Sheet',
+              headerSubtitle: 'Select instrument and import PDF',
+              confirmButtonText: 'Add',
+              onClose: () => setState(() => _showAddInstrumentModal = false),
+              onSuccess: () => setState(() => _showAddInstrumentModal = false),
+            ),
+          if (_showCopyInstrumentModal && _teamInstrumentToCopy != null)
+            _buildCopyInstrumentModalTeam(
+              currentScore,
+              _teamInstrumentToCopy!,
+            ),
+          if (_showImportFromLibraryModal)
+            ImportFromLibraryDialog(
+              targetTeamScore: currentScore,
+              onClose: () =>
+                  setState(() => _showImportFromLibraryModal = false),
+              onImport: (sourceScore, selectedInstruments) async {
+                setState(() => _showImportFromLibraryModal = false);
+                await _handleImportFromLibrary(
+                  currentScore,
+                  sourceScore,
+                  selectedInstruments,
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 
@@ -653,12 +660,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
           );
 
           if (!success && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to reorder instruments'),
-                backgroundColor: AppColors.red500,
-              ),
-            );
+            AppToast.error(context, 'Failed to reorder instruments');
           }
         },
         itemBuilder: (context, index) {
@@ -955,16 +957,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
 
     if (!mounted) return;
     if (successCount > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$successCount instrument(s) imported')),
-      );
+      AppToast.success(context, '$successCount instrument(s) imported');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to import instruments'),
-          backgroundColor: AppColors.red500,
-        ),
-      );
+      AppToast.error(context, 'Failed to import instruments');
     }
   }
 
@@ -1345,23 +1340,14 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                                 );
                                 if (!mounted) return;
                                 if (success) {
-                                  ScaffoldMessenger.of(
+                                  AppToast.success(
                                     this.context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Instrument deleted'),
-                                    ),
+                                    'Instrument deleted',
                                   );
                                 } else {
-                                  ScaffoldMessenger.of(
+                                  AppToast.error(
                                     this.context,
-                                  ).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Failed to delete instrument',
-                                      ),
-                                      backgroundColor: AppColors.red500,
-                                    ),
+                                    'Failed to delete instrument',
                                   );
                                 }
                               },
@@ -1529,16 +1515,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
 
                     if (!mounted) return;
                     if (success) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Score updated')),
-                      );
+                      AppToast.success(context, 'Score updated');
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Failed to update score'),
-                          backgroundColor: AppColors.red500,
-                        ),
-                      );
+                      AppToast.error(context, 'Failed to update score');
                     }
                     setState(() => _showEditModal = false);
                   },

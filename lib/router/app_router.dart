@@ -9,7 +9,6 @@ import '../screens/settings_screen.dart';
 import '../screens/score_viewer_screen.dart';
 import '../screens/score_detail_screen.dart';
 import '../screens/setlist_detail_screen.dart';
-import '../screens/team_setlist_detail_screen.dart';
 import '../screens/settings/instrument_preference_screen.dart';
 import '../screens/settings/cloud_sync_screen.dart';
 import '../screens/settings/bluetooth_devices_screen.dart';
@@ -197,12 +196,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.setlistDetail,
         pageBuilder: (context, state) {
           // Handle potential serialization: convert Map to Setlist if needed
-          final setlist = state.extra is Setlist
-              ? state.extra as Setlist
-              : Setlist.fromJson(state.extra as Map<String, dynamic>);
+          final extra = state.extra;
+          if (extra == null) {
+            return MaterialPage(
+              key: state.pageKey,
+              child: const Scaffold(
+                body: Center(child: Text('Error: No setlist data provided')),
+              ),
+            );
+          }
+          final setlist = extra is Setlist
+              ? extra
+              : Setlist.fromJson(extra as Map<String, dynamic>);
           return MaterialPage(
             key: state.pageKey,
-            child: SetlistDetailScreen(setlist: setlist),
+            child: SetlistDetailScreen.library(setlist: setlist),
           );
         },
       ),
@@ -280,8 +288,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
           return MaterialPage(
             key: state.pageKey,
-            child: TeamSetlistDetailScreen(
-              setlist: setlist,
+            child: SetlistDetailScreen.team(
+              teamSetlist: setlist,
               teamServerId: teamServerId,
             ),
           );

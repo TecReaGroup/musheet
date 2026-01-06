@@ -1,5 +1,5 @@
 /// NetworkService - Unified network monitoring service
-/// 
+///
 /// Provides a single source of truth for network connectivity state
 /// All components that need network awareness should subscribe to this service
 library;
@@ -45,12 +45,16 @@ class NetworkState {
 
   bool get isOnline => status == NetworkStatus.online;
   bool get isOffline => status == NetworkStatus.offline;
-  
+
   String get connectionType {
     if (connectivityResults.isEmpty) return 'none';
     if (connectivityResults.contains(ConnectivityResult.wifi)) return 'wifi';
-    if (connectivityResults.contains(ConnectivityResult.mobile)) return 'mobile';
-    if (connectivityResults.contains(ConnectivityResult.ethernet)) return 'ethernet';
+    if (connectivityResults.contains(ConnectivityResult.mobile)) {
+      return 'mobile';
+    }
+    if (connectivityResults.contains(ConnectivityResult.ethernet)) {
+      return 'ethernet';
+    }
     return 'other';
   }
 }
@@ -58,13 +62,13 @@ class NetworkState {
 /// Singleton network service that monitors connectivity
 class NetworkService {
   static NetworkService? _instance;
-  
+
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _subscription;
-  
+
   final _stateController = StreamController<NetworkState>.broadcast();
   NetworkState _state = const NetworkState();
-  
+
   // Event callbacks
   final List<void Function()> _onOnlineCallbacks = [];
   final List<void Function()> _onOfflineCallbacks = [];
@@ -74,7 +78,7 @@ class NetworkService {
   /// Initialize the singleton instance
   static Future<NetworkService> initialize() async {
     if (_instance != null) return _instance!;
-    
+
     _instance = NetworkService._();
     await _instance!._init();
     return _instance!;
@@ -83,7 +87,9 @@ class NetworkService {
   /// Get the singleton instance
   static NetworkService get instance {
     if (_instance == null) {
-      throw StateError('NetworkService not initialized. Call initialize() first.');
+      throw StateError(
+        'NetworkService not initialized. Call initialize() first.',
+      );
     }
     return _instance!;
   }
@@ -93,10 +99,10 @@ class NetworkService {
 
   /// Current network state
   NetworkState get state => _state;
-  
+
   /// Stream of network state changes
   Stream<NetworkState> get stateStream => _stateController.stream;
-  
+
   /// Quick access to online status
   bool get isOnline => _state.isOnline;
 
@@ -104,28 +110,29 @@ class NetworkService {
     // Get initial connectivity status
     final results = await _connectivity.checkConnectivity();
     _updateState(results);
-    
+
     // Listen for connectivity changes
     _subscription = _connectivity.onConnectivityChanged.listen(_updateState);
-    
-    Log.i('NET', 'NetworkService initialized: ${_state.status}');
   }
 
   void _updateState(List<ConnectivityResult> results) {
     final wasOnline = _state.isOnline;
-    final isNowOnline = results.isNotEmpty && !results.contains(ConnectivityResult.none);
-    
-    final newStatus = isNowOnline ? NetworkStatus.online : NetworkStatus.offline;
-    
+    final isNowOnline =
+        results.isNotEmpty && !results.contains(ConnectivityResult.none);
+
+    final newStatus = isNowOnline
+        ? NetworkStatus.online
+        : NetworkStatus.offline;
+
     _state = _state.copyWith(
       status: newStatus,
       connectivityResults: results,
       lastOnlineAt: isNowOnline ? DateTime.now() : _state.lastOnlineAt,
       lastOfflineAt: !isNowOnline ? DateTime.now() : _state.lastOfflineAt,
     );
-    
+
     _stateController.add(_state);
-    
+
     // Trigger callbacks on state transition
     if (!wasOnline && isNowOnline) {
       Log.i('NET', 'Network restored');

@@ -10,6 +10,7 @@ class TeamMembers extends Table {
   IntColumn get userId => integer()();
   TextColumn get username => text()();
   TextColumn get displayName => text().nullable()();
+  TextColumn get avatarUrl => text().nullable()();
   TextColumn get role => text().withDefault(const Constant('member'))();
   DateTimeColumn get joinedAt => dateTime()();
 

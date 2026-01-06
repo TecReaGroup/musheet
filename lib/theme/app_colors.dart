@@ -5,6 +5,7 @@ class AppColors {
   static const blue50 = Color(0xFFEFF6FF);
   static const blue100 = Color(0xFFDBEAFE);
   static const blue200 = Color(0xFFBFDBFE);
+  static const blue300 = Color(0xFF93C5FD);
   static const blue400 = Color(0xFF60A5FA);
   static const blue500 = Color(0xFF3B82F6);
   static const blue550 = Color(0xFF2F72F0); // Between 500 and 600
@@ -50,4 +51,12 @@ class AppColors {
 
   // Indigo (Team members)
   static const indigo600 = Color(0xFF4F46E5);
+
+  // Violet (Avatar gradient)
+  static const violet200 = Color(0xFFDDD6FE);
+  static const violet300 = Color(0xFFC4B5FD);
+  // Avatar placeholder
+  static const avatarGradientStart = blue300;
+  static const avatarGradientEnd = violet300;
+  static const avatarText = Color.fromARGB(255, 255, 255, 255); 
 }

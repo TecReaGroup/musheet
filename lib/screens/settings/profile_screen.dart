@@ -9,6 +9,7 @@ import '../../utils/icon_mappings.dart';
 import '../../providers/auth_state_provider.dart';
 import '../../core/core.dart';
 import '../../router/app_router.dart';
+import '../../widgets/common_widgets.dart';
 import 'settings_sub_screen.dart';
 import 'avatar_crop_screen.dart';
 
@@ -374,9 +375,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final authState = ref.read(authStateProvider);
       if (authState.user == null || !ApiClient.isInitialized) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Not logged in')),
-        );
+        AppToast.warning(context, 'Not logged in');
         return;
       }
 
@@ -391,24 +390,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         // Refresh auth state to get new avatar URL
         await ref.read(authStateProvider.notifier).refreshProfile();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Avatar updated!')),
-        );
+        AppToast.success(context, 'Avatar updated!');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed: ${result.error?.message ?? 'Unknown error'}',
-            ),
-            backgroundColor: AppColors.red500,
-          ),
+        AppToast.error(
+          context,
+          'Failed: ${result.error?.message ?? 'Unknown error'}',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        AppToast.error(context, 'Error: $e');
       }
     } finally {
       if (mounted) {
@@ -465,9 +456,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final authState = ref.read(authStateProvider);
       if (authState.user == null || !ApiClient.isInitialized) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Not logged in')),
-        );
+        AppToast.warning(context, 'Not logged in');
         return;
       }
 
@@ -480,17 +469,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (result.isSuccess) {
         await ref.read(authStateProvider.notifier).refreshProfile();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated!')),
-        );
+        AppToast.success(context, 'Profile updated!');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed: ${result.error?.message ?? 'Unknown error'}',
-            ),
-            backgroundColor: AppColors.red500,
-          ),
+        AppToast.error(
+          context,
+          'Failed: ${result.error?.message ?? 'Unknown error'}',
         );
       }
     } finally {
@@ -579,9 +562,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 final authState = ref.read(authStateProvider);
                 if (authState.user == null || !ApiClient.isInitialized) {
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Not logged in')),
-                  );
+                  AppToast.warning(context, 'Not logged in');
                   return;
                 }
 
@@ -595,17 +576,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 if (!mounted) return;
                 if (result.isSuccess && result.data == true) {
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(content: Text('Password changed!')),
-                  );
+                  AppToast.success(this.context, 'Password changed!');
                 } else {
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Failed: ${result.error?.message ?? 'Check your current password'}',
-                      ),
-                      backgroundColor: AppColors.red500,
-                    ),
+                  AppToast.error(
+                    this.context,
+                    'Failed: ${result.error?.message ?? 'Check your current password'}',
                   );
                 }
               },
@@ -684,9 +659,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (context.mounted) {
       // Navigate back to settings
       context.go(AppRoutes.settings);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Signed out successfully')),
-      );
+      AppToast.success(context, 'Signed out successfully');
     }
   }
 }

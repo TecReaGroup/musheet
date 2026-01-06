@@ -200,7 +200,8 @@ class TeamEndpoint extends Endpoint {
           userId: user.id!,
           username: user.username,
           displayName: user.displayName,
-          avatarUrl: user.avatarPath,
+          // Use consistent format: avatar:<userId> if user has avatar
+          avatarUrl: user.avatarPath != null ? 'avatar:${user.id}' : null,
           role: m.role,
           joinedAt: m.joinedAt,
         ));
@@ -276,7 +277,8 @@ class TeamEndpoint extends Endpoint {
           userId: user.id!,
           username: user.username,
           displayName: user.displayName,
-          avatarUrl: user.avatarPath,
+          // Use consistent format: avatar:<userId> if user has avatar
+          avatarUrl: user.avatarPath != null ? 'avatar:${user.id}' : null,
           role: m.role,
           joinedAt: m.joinedAt,
         ));

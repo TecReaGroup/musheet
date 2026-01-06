@@ -1,5 +1,5 @@
 /// SyncCoordinator - Unified synchronization orchestrator
-/// 
+///
 /// This is the central coordinator for all sync operations in the app.
 /// It manages:
 /// - Library sync (personal scores, setlists)
@@ -78,12 +78,13 @@ class SyncState {
     progress: progress ?? this.progress,
   );
 
-  bool get isSyncing => phase == SyncPhase.pushing || 
-                        phase == SyncPhase.pulling || 
-                        phase == SyncPhase.merging ||
-                        phase == SyncPhase.uploadingPdfs ||
-                        phase == SyncPhase.downloadingPdfs;
-  
+  bool get isSyncing =>
+      phase == SyncPhase.pushing ||
+      phase == SyncPhase.pulling ||
+      phase == SyncPhase.merging ||
+      phase == SyncPhase.uploadingPdfs ||
+      phase == SyncPhase.downloadingPdfs;
+
   bool get isIdle => phase == SyncPhase.idle;
   bool get hasError => phase == SyncPhase.error;
 
@@ -97,7 +98,9 @@ class SyncState {
           if (ago.inDays < 1) return 'Synced ${ago.inHours}h ago';
           return 'Synced ${ago.inDays}d ago';
         }
-        return pendingChanges > 0 ? '$pendingChanges changes pending' : 'Up to date';
+        return pendingChanges > 0
+            ? '$pendingChanges changes pending'
+            : 'Up to date';
       case SyncPhase.pushing:
         return 'Uploading changes...';
       case SyncPhase.pulling:
@@ -181,7 +184,10 @@ class SyncCoordinator {
     required ApiClient api,
     required SessionService session,
     required NetworkService network,
-  }) : _local = local, _api = api, _session = session, _network = network;
+  }) : _local = local,
+       _api = api,
+       _session = session,
+       _network = network;
 
   /// Initialize the singleton
   static Future<SyncCoordinator> initialize({
@@ -225,23 +231,21 @@ class SyncCoordinator {
   Stream<SyncState> get stateStream => _stateController.stream;
 
   Future<void> _init() async {
-    _log('Initializing SyncCoordinator');
-    
     // Load initial state from database
     await _loadSyncState();
-    
+
     // Set up network monitoring
     _network.onOnline(_onNetworkRestored);
     _network.onOffline(_onNetworkLost);
-    
+
     // Set up session monitoring
     _session.addLoginListener(_onLogin);
     _session.addLogoutListener(_onLogout);
-    
+
     // Set up lifecycle monitoring
     _startLifecycleMonitoring();
-    
-    _log('Initialized: localVersion=${_state.localLibraryVersion}');
+
+    _log('Initialized: v${_state.localLibraryVersion}');
   }
 
   Future<void> _loadSyncState() async {
@@ -249,12 +253,14 @@ class SyncCoordinator {
       final version = await _local.getLibraryVersion();
       final lastSync = await _local.getLastSyncTime();
       final pending = await _local.getPendingChangesCount();
-      
-      _updateState(_state.copyWith(
-        localLibraryVersion: version,
-        lastSyncAt: lastSync,
-        pendingChanges: pending,
-      ));
+
+      _updateState(
+        _state.copyWith(
+          localLibraryVersion: version,
+          lastSyncAt: lastSync,
+          pendingChanges: pending,
+        ),
+      );
     } catch (e) {
       _logError('Failed to load sync state', e);
     }
@@ -263,7 +269,6 @@ class SyncCoordinator {
   void _startLifecycleMonitoring() {
     _lifecycleListener = AppLifecycleListener(
       onResume: () {
-        _log('App resumed - requesting sync with debounce');
         requestSync(immediate: false);
       },
     );
@@ -308,7 +313,7 @@ class SyncCoordinator {
   // ============================================================================
 
   /// Request sync with optional debounce
-  /// 
+  ///
   /// [immediate]: true = sync now, false = debounce for 5 seconds
   Future<SyncResult> requestSync({bool immediate = false}) async {
     if (!_network.isOnline) {
@@ -347,15 +352,21 @@ class SyncCoordinator {
 
   /// Download PDF with priority (for user-initiated requests)
   /// Delegates to PdfSyncService for unified handling
-  Future<String?> downloadPdfWithPriority(String instrumentScoreId, String pdfHash) async {
+  Future<String?> downloadPdfWithPriority(
+    String instrumentScoreId,
+    String pdfHash,
+  ) async {
     _log('Priority download requested: $pdfHash');
-    
+
     if (!PdfSyncService.isInitialized) {
       _logError('PdfSyncService not initialized', null);
       return null;
     }
-    
-    return PdfSyncService.instance.downloadWithPriority(pdfHash, PdfPriority.high);
+
+    return PdfSyncService.instance.downloadWithPriority(
+      pdfHash,
+      PdfPriority.high,
+    );
   }
 
   /// Download PDF by hash
@@ -365,8 +376,11 @@ class SyncCoordinator {
       _logError('PdfSyncService not initialized', null);
       return null;
     }
-    
-    return PdfSyncService.instance.downloadWithPriority(pdfHash, PdfPriority.high);
+
+    return PdfSyncService.instance.downloadWithPriority(
+      pdfHash,
+      PdfPriority.high,
+    );
   }
 
   // ============================================================================
@@ -375,7 +389,6 @@ class SyncCoordinator {
 
   Future<SyncResult> _executeSync() async {
     if (_isSyncing) {
-      _log('Sync already in progress');
       return SyncResult.failure('Sync in progress');
     }
 
@@ -386,7 +399,7 @@ class SyncCoordinator {
       // Phase 1: Push local changes
       _updateState(_state.copyWith(phase: SyncPhase.pushing));
       final pushResult = await _push();
-      
+
       if (pushResult.conflict) {
         // Version conflict - need to pull first
         _log('Push conflict - pulling first');
@@ -412,16 +425,18 @@ class SyncCoordinator {
       await _syncPdfs();
 
       stopwatch.stop();
-      
+
       // Update final state
-      _updateState(_state.copyWith(
-        phase: SyncPhase.idle,
-        lastSyncAt: DateTime.now(),
-        pendingChanges: await _local.getPendingChangesCount(),
-      ));
+      _updateState(
+        _state.copyWith(
+          phase: SyncPhase.idle,
+          lastSyncAt: DateTime.now(),
+          pendingChanges: await _local.getPendingChangesCount(),
+        ),
+      );
 
       _log('Sync completed in ${stopwatch.elapsedMilliseconds}ms');
-      
+
       return SyncResult.success(
         pushed: pushResult.pushed,
         pulled: pullResult.pulledCount,
@@ -431,11 +446,13 @@ class SyncCoordinator {
     } catch (e) {
       stopwatch.stop();
       _logError('Sync failed', e);
-      
-      _updateState(_state.copyWith(
-        phase: SyncPhase.error,
-        errorMessage: e.toString(),
-      ));
+
+      _updateState(
+        _state.copyWith(
+          phase: SyncPhase.error,
+          errorMessage: e.toString(),
+        ),
+      );
 
       // Schedule retry
       _scheduleRetry();
@@ -468,29 +485,26 @@ class SyncCoordinator {
     final pendingSetlists = await _local.getPendingSetlists();
     final pendingDeletes = await _local.getPendingDeletes();
 
-    _log('Pending counts: scores=${pendingScores.length}, IS=${pendingInstrumentScores.length}, setlists=${pendingSetlists.length}, deletes=${pendingDeletes.length}');
-    
-    // Debug: Log each pending instrument score
-    for (final is_ in pendingInstrumentScores) {
-      _log('Pending IS: id=${is_['id']}, scoreId=${is_['scoreId']}, scoreServerId=${is_['scoreServerId']}, type=${is_['instrumentType']}');
-    }
-
-    if (pendingScores.isEmpty && 
-        pendingInstrumentScores.isEmpty && 
-        pendingSetlists.isEmpty && 
-        pendingDeletes.isEmpty) {
-      _log('Nothing to push');
+    final totalPending =
+        pendingScores.length +
+        pendingInstrumentScores.length +
+        pendingSetlists.length +
+        pendingDeletes.length;
+    if (totalPending == 0) {
       return _PushResult(pushed: 0, conflict: false);
     }
 
-    _log('Pushing: ${pendingScores.length} scores, ${pendingInstrumentScores.length} IS, ${pendingSetlists.length} setlists, ${pendingDeletes.length} deletes');
+    _log(
+      'Pushing: ${pendingScores.length} scores, ${pendingInstrumentScores.length} IS, ${pendingSetlists.length} setlists, ${pendingDeletes.length} deletes',
+    );
 
     // Build push request
     final scoreChanges = _buildEntityChanges('score', pendingScores);
-    final isChanges = _buildEntityChanges('instrumentScore', pendingInstrumentScores);
-    
-    _log('Built changes - scores: ${scoreChanges.length}, instrumentScores: ${isChanges.length}');
-    
+    final isChanges = _buildEntityChanges(
+      'instrumentScore',
+      pendingInstrumentScores,
+    );
+
     final request = server.SyncPushRequest(
       clientLibraryVersion: _state.localLibraryVersion,
       scores: scoreChanges.isEmpty ? null : scoreChanges,
@@ -500,25 +514,25 @@ class SyncCoordinator {
       setlistScores: null,
       deletes: pendingDeletes.isEmpty ? null : pendingDeletes,
     );
-    
-    _log('Request built - scores: ${request.scores?.length ?? 0}, instrumentScores: ${request.instrumentScores?.length ?? 0}');
 
     final result = await _api.libraryPush(userId: userId, request: request);
-    
+
     if (result.isFailure) {
       _log('Push API call failed: ${result.error?.message}');
       throw Exception('Push failed: ${result.error?.message}');
     }
 
     final pushResult = result.data!;
-    _log('Push result: success=${pushResult.success}, conflict=${pushResult.conflict}, newVersion=${pushResult.newLibraryVersion}, accepted=${pushResult.accepted?.length ?? 0}, mapping=${pushResult.serverIdMapping}');
-    
+    _log(
+      'Push result: success=${pushResult.success}, conflict=${pushResult.conflict}, newVersion=${pushResult.newLibraryVersion}, accepted=${pushResult.accepted?.length ?? 0}, mapping=${pushResult.serverIdMapping}',
+    );
+
     // Check for conflict first
     if (pushResult.conflict) {
       _log('Push returned conflict');
       return _PushResult(pushed: 0, conflict: true);
     }
-    
+
     // Check for other failures
     if (!pushResult.success) {
       _log('Push failed: ${pushResult.errorMessage}');
@@ -526,7 +540,8 @@ class SyncCoordinator {
     }
 
     // Get new version, fallback to current if not provided
-    final newVersion = pushResult.newLibraryVersion ?? _state.localLibraryVersion;
+    final newVersion =
+        pushResult.newLibraryVersion ?? _state.localLibraryVersion;
 
     // Update serverIds from mapping and mark as synced
     final serverIdMapping = pushResult.serverIdMapping ?? {};
@@ -542,37 +557,39 @@ class SyncCoordinator {
     ];
     await _local.markAsSynced(entityIds, newVersion);
 
-    _updateState(_state.copyWith(
-      localLibraryVersion: newVersion,
-    ));
+    _updateState(
+      _state.copyWith(
+        localLibraryVersion: newVersion,
+      ),
+    );
 
-    return _PushResult(pushed: pushResult.accepted?.length ?? 0, conflict: false);
+    return _PushResult(
+      pushed: pushResult.accepted?.length ?? 0,
+      conflict: false,
+    );
   }
 
-  List<server.SyncEntityChange> _buildEntityChanges(String type, List<Map<String, dynamic>> entities) {
-    _log('Building $type changes: ${entities.length} entities');
-    
+  List<server.SyncEntityChange> _buildEntityChanges(
+    String type,
+    List<Map<String, dynamic>> entities,
+  ) {
     return entities.map((e) {
       // Use unified field names: createdAt for creation time, updatedAt for modification time
       final dateStr = e['updatedAt'] ?? e['createdAt'];
-      final localUpdatedAt = dateStr != null 
+      final localUpdatedAt = dateStr != null
           ? DateTime.parse(dateStr as String)
           : DateTime.now();
-      
+
       // For instrumentScore, use scoreServerId if available (for already-synced Scores)
       Map<String, dynamic> dataToSend = Map<String, dynamic>.from(e);
       if (type == 'instrumentScore') {
         final scoreServerId = e['scoreServerId'] as int?;
-        _log('IS build: id=${e['id']}, scoreId=${e['scoreId']}, scoreServerId=$scoreServerId');
         if (scoreServerId != null) {
           // Use server ID directly
           dataToSend['scoreId'] = scoreServerId;
-          _log('IS using scoreServerId: $scoreServerId');
-        } else {
-          _log('IS keeping local scoreId: ${e['scoreId']}');
         }
       }
-      
+
       final change = server.SyncEntityChange(
         entityType: type,
         entityId: e['id'] as String,
@@ -582,8 +599,7 @@ class SyncCoordinator {
         data: jsonEncode(dataToSend),
         localUpdatedAt: localUpdatedAt,
       );
-      
-      _log('Built $type change: entityId=${change.entityId}, data=${change.data}');
+
       return change;
     }).toList();
   }
@@ -594,7 +610,12 @@ class SyncCoordinator {
 
   Future<_PullResult> _pull() async {
     final userId = _session.userId;
-    if (userId == null) return _PullResult(pulledCount: 0, newVersion: _state.localLibraryVersion);
+    if (userId == null) {
+      return _PullResult(
+        pulledCount: 0,
+        newVersion: _state.localLibraryVersion,
+      );
+    }
 
     final result = await _api.libraryPull(
       userId: userId,
@@ -606,13 +627,16 @@ class SyncCoordinator {
     }
 
     final pullResult = result.data!;
-    
-    _log('Pull returned: version=${pullResult.libraryVersion}, scores=${pullResult.scores?.length ?? 0}');
+
+    _log(
+      'Pull returned: version=${pullResult.libraryVersion}, scores=${pullResult.scores?.length ?? 0}',
+    );
 
     return _PullResult(
-      pulledCount: (pullResult.scores?.length ?? 0) + 
-                   (pullResult.instrumentScores?.length ?? 0) + 
-                   (pullResult.setlists?.length ?? 0),
+      pulledCount:
+          (pullResult.scores?.length ?? 0) +
+          (pullResult.instrumentScores?.length ?? 0) +
+          (pullResult.setlists?.length ?? 0),
       newVersion: pullResult.libraryVersion,
       data: pullResult,
     );
@@ -626,55 +650,71 @@ class SyncCoordinator {
     if (pullResult.data == null) return;
 
     final data = pullResult.data!;
-    
+
     // Convert server SyncEntityData to maps for local storage
     // SyncEntityData contains: entityType, serverId, version, data (JSON string), updatedAt, isDeleted
-    final scores = data.scores?.map((s) {
-      final entityData = jsonDecode(s.data) as Map<String, dynamic>;
-      _log('Score entity: localId=${entityData['localId']}, serverId=${s.serverId}');
-      return {
-        'id': entityData['localId'] ?? 'server_${s.serverId}',
-        'serverId': s.serverId,
-        'title': entityData['title'],
-        'composer': entityData['composer'],
-        'createdAt': entityData['createdAt'],
-        'updatedAt': entityData['updatedAt'] ?? s.updatedAt.toIso8601String(),
-        'isDeleted': s.isDeleted,
-      };
-    }).toList() ?? [];
+    final scores =
+        data.scores?.map((s) {
+          final entityData = jsonDecode(s.data) as Map<String, dynamic>;
+          _log(
+            'Score entity: localId=${entityData['localId']}, serverId=${s.serverId}',
+          );
+          return {
+            'id': entityData['localId'] ?? 'server_${s.serverId}',
+            'serverId': s.serverId,
+            'title': entityData['title'],
+            'composer': entityData['composer'],
+            'createdAt': entityData['createdAt'],
+            'updatedAt':
+                entityData['updatedAt'] ?? s.updatedAt.toIso8601String(),
+            'isDeleted': s.isDeleted,
+          };
+        }).toList() ??
+        [];
 
-    final instrumentScores = data.instrumentScores?.map((is_) {
-      final entityData = jsonDecode(is_.data) as Map<String, dynamic>;
-      _log('InstrumentScore entity: localId=${entityData['localId']}, scoreLocalId=${entityData['scoreLocalId']}, scoreId=${entityData['scoreId']}');
-      return {
-        'id': entityData['localId'] ?? 'server_${is_.serverId}',
-        'serverId': is_.serverId,
-        'scoreId': entityData['scoreLocalId'] ?? 'server_${entityData['scoreId']}',
-        // Server returns 'instrumentType', not 'instrument'
-        'instrumentType': entityData['instrumentType'] ?? entityData['instrument'],
-        'customInstrument': entityData['customInstrument'],
-        'pdfHash': entityData['pdfHash'],
-        'orderIndex': entityData['orderIndex'],
-        'createdAt': entityData['createdAt'],
-        'annotationsJson': entityData['annotationsJson'],
-        'isDeleted': is_.isDeleted,
-      };
-    }).toList() ?? [];
-    
-    _log('Merge: ${scores.length} scores, ${instrumentScores.length} instrumentScores');
+    final instrumentScores =
+        data.instrumentScores?.map((is_) {
+          final entityData = jsonDecode(is_.data) as Map<String, dynamic>;
+          _log(
+            'InstrumentScore entity: localId=${entityData['localId']}, scoreLocalId=${entityData['scoreLocalId']}, scoreId=${entityData['scoreId']}',
+          );
+          return {
+            'id': entityData['localId'] ?? 'server_${is_.serverId}',
+            'serverId': is_.serverId,
+            'scoreId':
+                entityData['scoreLocalId'] ?? 'server_${entityData['scoreId']}',
+            // Server returns 'instrumentType', not 'instrument'
+            'instrumentType':
+                entityData['instrumentType'] ?? entityData['instrument'],
+            'customInstrument': entityData['customInstrument'],
+            'pdfHash': entityData['pdfHash'],
+            'orderIndex': entityData['orderIndex'],
+            'createdAt': entityData['createdAt'],
+            'annotationsJson': entityData['annotationsJson'],
+            'isDeleted': is_.isDeleted,
+          };
+        }).toList() ??
+        [];
 
-    final setlists = data.setlists?.map((s) {
-      final entityData = jsonDecode(s.data) as Map<String, dynamic>;
-      return {
-        'id': entityData['localId'] ?? 'server_${s.serverId}',
-        'serverId': s.serverId,
-        'name': entityData['name'],
-        'description': entityData['description'],
-        'createdAt': entityData['createdAt'],
-        'updatedAt': entityData['updatedAt'] ?? s.updatedAt.toIso8601String(),
-        'isDeleted': s.isDeleted,
-      };
-    }).toList() ?? [];
+    _log(
+      'Merge: ${scores.length} scores, ${instrumentScores.length} instrumentScores',
+    );
+
+    final setlists =
+        data.setlists?.map((s) {
+          final entityData = jsonDecode(s.data) as Map<String, dynamic>;
+          return {
+            'id': entityData['localId'] ?? 'server_${s.serverId}',
+            'serverId': s.serverId,
+            'name': entityData['name'],
+            'description': entityData['description'],
+            'createdAt': entityData['createdAt'],
+            'updatedAt':
+                entityData['updatedAt'] ?? s.updatedAt.toIso8601String(),
+            'isDeleted': s.isDeleted,
+          };
+        }).toList() ??
+        [];
 
     await _local.applyPulledData(
       scores: scores,
@@ -683,9 +723,11 @@ class SyncCoordinator {
       newLibraryVersion: pullResult.newVersion,
     );
 
-    _updateState(_state.copyWith(
-      localLibraryVersion: pullResult.newVersion,
-    ));
+    _updateState(
+      _state.copyWith(
+        localLibraryVersion: pullResult.newVersion,
+      ),
+    );
   }
 
   // ============================================================================
@@ -701,7 +743,7 @@ class SyncCoordinator {
     // Phase 1: Upload PDFs that need uploading
     _updateState(_state.copyWith(phase: SyncPhase.uploadingPdfs));
     await _uploadPendingPdfs(userId);
-    
+
     // Phase 2: Trigger background download via PdfSyncService
     _updateState(_state.copyWith(phase: SyncPhase.downloadingPdfs));
     if (PdfSyncService.isInitialized) {
@@ -712,22 +754,22 @@ class SyncCoordinator {
   /// Upload PDFs marked as pending
   Future<void> _uploadPendingPdfs(int userId) async {
     final pendingPdfs = await _local.getPendingInstrumentScores();
-    
+
     for (final isData in pendingPdfs) {
       final pdfPath = isData['pdfPath'] as String?;
       if (pdfPath == null || pdfPath.isEmpty) continue;
-      
+
       final file = File(pdfPath);
       if (!file.existsSync()) continue;
-      
+
       try {
         final bytes = await file.readAsBytes();
         final hash = md5.convert(bytes).toString();
         final existingHash = isData['pdfHash'] as String?;
-        
+
         // Skip if already synced with same hash
         if (existingHash == hash) continue;
-        
+
         // Check if server already has this file (instant upload)
         final checkResult = await _api.checkPdfHash(userId: userId, hash: hash);
         if (checkResult.isSuccess && checkResult.data == true) {
@@ -735,7 +777,7 @@ class SyncCoordinator {
           // Just update local database
           continue;
         }
-        
+
         // Upload the PDF
         final fileName = p.basename(pdfPath);
         final uploadResult = await _api.uploadPdfByHash(
@@ -743,11 +785,14 @@ class SyncCoordinator {
           fileBytes: bytes,
           fileName: fileName,
         );
-        
+
         if (uploadResult.isSuccess) {
           _log('PDF uploaded: $hash');
         } else {
-          _logError('PDF upload failed', uploadResult.error?.message ?? 'Unknown error');
+          _logError(
+            'PDF upload failed',
+            uploadResult.error?.message ?? 'Unknown error',
+          );
         }
       } catch (e) {
         _logError('PDF upload error', e);

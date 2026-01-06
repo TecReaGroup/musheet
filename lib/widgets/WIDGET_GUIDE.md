@@ -307,7 +307,62 @@ BottomSheetModal(
 )
 ```
 
-### 15. 页面头部 (PageHeader)
+### 15. Toast 通知 (AppToast) ⭐ 新增
+
+统一的应用内通知组件，替代直接使用 `ScaffoldMessenger.showSnackBar`。
+
+```dart
+// 信息提示 (默认样式，灰色背景)
+AppToast.info(context, 'Operation completed');
+
+// 成功提示 (绿色背景，带 ✓ 图标)
+AppToast.success(context, 'Saved successfully');
+
+// 错误提示 (红色背景，带 ✕ 图标)
+AppToast.error(context, 'Failed to save');
+
+// 警告提示 (黄色背景，带 ⚠ 图标)
+AppToast.warning(context, 'This action cannot be undone');
+
+// 自定义持续时间
+AppToast.show(
+  context, 
+  'Custom message',
+  type: ToastType.success,
+  duration: AppToast.longDuration,  // 4秒
+);
+
+// 可用持续时间常量
+AppToast.shortDuration  // 1秒 (快速反馈)
+AppToast.defaultDuration // 2秒 (默认)
+AppToast.longDuration   // 4秒 (重要消息)
+
+// 不清除之前的 Toast (默认会清除)
+AppToast.info(context, 'Message', clearPrevious: false);
+```
+
+**使用场景:**
+- 操作成功/失败反馈
+- 表单验证提示
+- 网络状态变化
+- "再按一次退出" 等交互提示
+
+**之前 (不推荐):**
+```dart
+ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text('Success'),
+    backgroundColor: AppColors.emerald500,
+  ),
+);
+```
+
+**之后 (推荐):**
+```dart
+AppToast.success(context, 'Success');
+```
+
+### 16. 页面头部 (PageHeader)
 
 标准页面头部。
 

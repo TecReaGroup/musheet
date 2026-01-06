@@ -4239,6 +4239,17 @@ class $TeamMembersTable extends TeamMembers
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
+    'avatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> avatarUrl = GeneratedColumn<String>(
+    'avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _roleMeta = const VerificationMeta('role');
   @override
   late final GeneratedColumn<String> role = GeneratedColumn<String>(
@@ -4267,6 +4278,7 @@ class $TeamMembersTable extends TeamMembers
     userId,
     username,
     displayName,
+    avatarUrl,
     role,
     joinedAt,
   ];
@@ -4320,6 +4332,12 @@ class $TeamMembersTable extends TeamMembers
         ),
       );
     }
+    if (data.containsKey('avatar_url')) {
+      context.handle(
+        _avatarUrlMeta,
+        avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
+      );
+    }
     if (data.containsKey('role')) {
       context.handle(
         _roleMeta,
@@ -4363,6 +4381,10 @@ class $TeamMembersTable extends TeamMembers
         DriftSqlType.string,
         data['${effectivePrefix}display_name'],
       ),
+      avatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_url'],
+      ),
       role: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}role'],
@@ -4387,6 +4409,7 @@ class TeamMemberEntity extends DataClass
   final int userId;
   final String username;
   final String? displayName;
+  final String? avatarUrl;
   final String role;
   final DateTime joinedAt;
   const TeamMemberEntity({
@@ -4395,6 +4418,7 @@ class TeamMemberEntity extends DataClass
     required this.userId,
     required this.username,
     this.displayName,
+    this.avatarUrl,
     required this.role,
     required this.joinedAt,
   });
@@ -4407,6 +4431,9 @@ class TeamMemberEntity extends DataClass
     map['username'] = Variable<String>(username);
     if (!nullToAbsent || displayName != null) {
       map['display_name'] = Variable<String>(displayName);
+    }
+    if (!nullToAbsent || avatarUrl != null) {
+      map['avatar_url'] = Variable<String>(avatarUrl);
     }
     map['role'] = Variable<String>(role);
     map['joined_at'] = Variable<DateTime>(joinedAt);
@@ -4422,6 +4449,9 @@ class TeamMemberEntity extends DataClass
       displayName: displayName == null && nullToAbsent
           ? const Value.absent()
           : Value(displayName),
+      avatarUrl: avatarUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatarUrl),
       role: Value(role),
       joinedAt: Value(joinedAt),
     );
@@ -4438,6 +4468,7 @@ class TeamMemberEntity extends DataClass
       userId: serializer.fromJson<int>(json['userId']),
       username: serializer.fromJson<String>(json['username']),
       displayName: serializer.fromJson<String?>(json['displayName']),
+      avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
       role: serializer.fromJson<String>(json['role']),
       joinedAt: serializer.fromJson<DateTime>(json['joinedAt']),
     );
@@ -4451,6 +4482,7 @@ class TeamMemberEntity extends DataClass
       'userId': serializer.toJson<int>(userId),
       'username': serializer.toJson<String>(username),
       'displayName': serializer.toJson<String?>(displayName),
+      'avatarUrl': serializer.toJson<String?>(avatarUrl),
       'role': serializer.toJson<String>(role),
       'joinedAt': serializer.toJson<DateTime>(joinedAt),
     };
@@ -4462,6 +4494,7 @@ class TeamMemberEntity extends DataClass
     int? userId,
     String? username,
     Value<String?> displayName = const Value.absent(),
+    Value<String?> avatarUrl = const Value.absent(),
     String? role,
     DateTime? joinedAt,
   }) => TeamMemberEntity(
@@ -4470,6 +4503,7 @@ class TeamMemberEntity extends DataClass
     userId: userId ?? this.userId,
     username: username ?? this.username,
     displayName: displayName.present ? displayName.value : this.displayName,
+    avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
     role: role ?? this.role,
     joinedAt: joinedAt ?? this.joinedAt,
   );
@@ -4482,6 +4516,7 @@ class TeamMemberEntity extends DataClass
       displayName: data.displayName.present
           ? data.displayName.value
           : this.displayName,
+      avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
       role: data.role.present ? data.role.value : this.role,
       joinedAt: data.joinedAt.present ? data.joinedAt.value : this.joinedAt,
     );
@@ -4495,6 +4530,7 @@ class TeamMemberEntity extends DataClass
           ..write('userId: $userId, ')
           ..write('username: $username, ')
           ..write('displayName: $displayName, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('role: $role, ')
           ..write('joinedAt: $joinedAt')
           ..write(')'))
@@ -4502,8 +4538,16 @@ class TeamMemberEntity extends DataClass
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, teamId, userId, username, displayName, role, joinedAt);
+  int get hashCode => Object.hash(
+    id,
+    teamId,
+    userId,
+    username,
+    displayName,
+    avatarUrl,
+    role,
+    joinedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4513,6 +4557,7 @@ class TeamMemberEntity extends DataClass
           other.userId == this.userId &&
           other.username == this.username &&
           other.displayName == this.displayName &&
+          other.avatarUrl == this.avatarUrl &&
           other.role == this.role &&
           other.joinedAt == this.joinedAt);
 }
@@ -4523,6 +4568,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
   final Value<int> userId;
   final Value<String> username;
   final Value<String?> displayName;
+  final Value<String?> avatarUrl;
   final Value<String> role;
   final Value<DateTime> joinedAt;
   final Value<int> rowid;
@@ -4532,6 +4578,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
     this.userId = const Value.absent(),
     this.username = const Value.absent(),
     this.displayName = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.role = const Value.absent(),
     this.joinedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -4542,6 +4589,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
     required int userId,
     required String username,
     this.displayName = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.role = const Value.absent(),
     required DateTime joinedAt,
     this.rowid = const Value.absent(),
@@ -4556,6 +4604,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
     Expression<int>? userId,
     Expression<String>? username,
     Expression<String>? displayName,
+    Expression<String>? avatarUrl,
     Expression<String>? role,
     Expression<DateTime>? joinedAt,
     Expression<int>? rowid,
@@ -4566,6 +4615,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
       if (userId != null) 'user_id': userId,
       if (username != null) 'username': username,
       if (displayName != null) 'display_name': displayName,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (role != null) 'role': role,
       if (joinedAt != null) 'joined_at': joinedAt,
       if (rowid != null) 'rowid': rowid,
@@ -4578,6 +4628,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
     Value<int>? userId,
     Value<String>? username,
     Value<String?>? displayName,
+    Value<String?>? avatarUrl,
     Value<String>? role,
     Value<DateTime>? joinedAt,
     Value<int>? rowid,
@@ -4588,6 +4639,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
       userId: userId ?? this.userId,
       username: username ?? this.username,
       displayName: displayName ?? this.displayName,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       role: role ?? this.role,
       joinedAt: joinedAt ?? this.joinedAt,
       rowid: rowid ?? this.rowid,
@@ -4612,6 +4664,9 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
     if (displayName.present) {
       map['display_name'] = Variable<String>(displayName.value);
     }
+    if (avatarUrl.present) {
+      map['avatar_url'] = Variable<String>(avatarUrl.value);
+    }
     if (role.present) {
       map['role'] = Variable<String>(role.value);
     }
@@ -4632,6 +4687,7 @@ class TeamMembersCompanion extends UpdateCompanion<TeamMemberEntity> {
           ..write('userId: $userId, ')
           ..write('username: $username, ')
           ..write('displayName: $displayName, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('role: $role, ')
           ..write('joinedAt: $joinedAt, ')
           ..write('rowid: $rowid')
@@ -11184,6 +11240,7 @@ typedef $$TeamMembersTableCreateCompanionBuilder =
       required int userId,
       required String username,
       Value<String?> displayName,
+      Value<String?> avatarUrl,
       Value<String> role,
       required DateTime joinedAt,
       Value<int> rowid,
@@ -11195,6 +11252,7 @@ typedef $$TeamMembersTableUpdateCompanionBuilder =
       Value<int> userId,
       Value<String> username,
       Value<String?> displayName,
+      Value<String?> avatarUrl,
       Value<String> role,
       Value<DateTime> joinedAt,
       Value<int> rowid,
@@ -11249,6 +11307,11 @@ class $$TeamMembersTableFilterComposer
 
   ColumnFilters<String> get displayName => $composableBuilder(
     column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11315,6 +11378,11 @@ class $$TeamMembersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get role => $composableBuilder(
     column: $table.role,
     builder: (column) => ColumnOrderings(column),
@@ -11371,6 +11439,9 @@ class $$TeamMembersTableAnnotationComposer
     column: $table.displayName,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get avatarUrl =>
+      $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
 
   GeneratedColumn<String> get role =>
       $composableBuilder(column: $table.role, builder: (column) => column);
@@ -11435,6 +11506,7 @@ class $$TeamMembersTableTableManager
                 Value<int> userId = const Value.absent(),
                 Value<String> username = const Value.absent(),
                 Value<String?> displayName = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<String> role = const Value.absent(),
                 Value<DateTime> joinedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -11444,6 +11516,7 @@ class $$TeamMembersTableTableManager
                 userId: userId,
                 username: username,
                 displayName: displayName,
+                avatarUrl: avatarUrl,
                 role: role,
                 joinedAt: joinedAt,
                 rowid: rowid,
@@ -11455,6 +11528,7 @@ class $$TeamMembersTableTableManager
                 required int userId,
                 required String username,
                 Value<String?> displayName = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<String> role = const Value.absent(),
                 required DateTime joinedAt,
                 Value<int> rowid = const Value.absent(),
@@ -11464,6 +11538,7 @@ class $$TeamMembersTableTableManager
                 userId: userId,
                 username: username,
                 displayName: displayName,
+                avatarUrl: avatarUrl,
                 role: role,
                 joinedAt: joinedAt,
                 rowid: rowid,

@@ -54,7 +54,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase._internal() : super(_openConnection());
 
   @override
-  int get schemaVersion => 2; // Incremented for Team tables
+  int get schemaVersion => 3; // Added avatarUrl to team_members
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -71,6 +71,10 @@ class AppDatabase extends _$AppDatabase {
             await m.createTable(teamSetlists);
             await m.createTable(teamSetlistScores);
             await m.createTable(teamSyncState);
+          }
+          if (from < 3) {
+            // Add avatarUrl column to team_members in version 3
+            await m.addColumn(teamMembers, teamMembers.avatarUrl);
           }
         },
       );

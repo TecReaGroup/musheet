@@ -8,6 +8,7 @@ import '../../providers/auth_state_provider.dart';
 import '../../providers/core_providers.dart';
 import '../../core/core.dart';
 import '../../router/app_router.dart';
+import '../../widgets/common_widgets.dart';
 import 'settings_sub_screen.dart';
 
 /// Login screen as a sub-screen under settings
@@ -77,20 +78,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
 
       if (healthResult.isSuccess) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Server connected successfully'),
-            backgroundColor: AppColors.emerald500,
-          ),
-        );
+        AppToast.success(context, 'Server connected successfully');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Server unreachable: ${healthResult.error?.message ?? 'Connection failed'}',
-            ),
-            backgroundColor: AppColors.yellow600,
-          ),
+        AppToast.warning(
+          context,
+          'Server unreachable: ${healthResult.error?.message ?? 'Connection failed'}',
         );
       }
     } catch (e) {
@@ -145,13 +137,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (success && mounted) {
         // Navigate back to settings
         context.go(AppRoutes.settings);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _isLogin ? 'Logged in successfully!' : 'Account created!',
-            ),
-            backgroundColor: AppColors.emerald500,
-          ),
+        AppToast.success(
+          context,
+          _isLogin ? 'Logged in successfully!' : 'Account created!',
         );
 
         // Trigger sync after successful login

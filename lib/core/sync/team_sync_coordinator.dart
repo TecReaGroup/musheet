@@ -386,6 +386,8 @@ class TeamSyncCoordinator {
   }
 
   List<server.SyncEntityChange> _buildEntityChanges(String type, List<Map<String, dynamic>> entities) {
+    _log('Building $type changes: ${entities.length} entities');
+    
     return entities.map((e) {
       final dateStr = e['updatedAt'] ?? e['createdAt'];
       final localUpdatedAt = dateStr != null 
@@ -395,20 +397,21 @@ class TeamSyncCoordinator {
       // Build data to send
       Map<String, dynamic> dataToSend = Map<String, dynamic>.from(e);
       
-      // For team instrument scores, resolve teamScoreId
+      // For team instrument scores, use teamScoreServerId if available (for already-synced TeamScores)
+      // Same logic as library sync: only overwrite if server ID exists
       if (type == 'teamInstrumentScore') {
         final teamScoreServerId = e['teamScoreServerId'] as int?;
-        final teamScoreLocalId = e['teamScoreId'] as String;
-        
-        // Use serverId if available (parent already synced), otherwise use localId
-        // Server will resolve localId through serverIdMapping
-        dataToSend['teamScoreId'] = teamScoreServerId ?? teamScoreLocalId;
+        _log('TIS build: id=${e['id']}, teamScoreId=${e['teamScoreId']}, teamScoreServerId=$teamScoreServerId');
+        if (teamScoreServerId != null) {
+          // Use server ID directly
+          dataToSend['teamScoreId'] = teamScoreServerId;
+          _log('TIS using teamScoreServerId: $teamScoreServerId');
+        } else {
+          _log('TIS keeping local teamScoreId: ${e['teamScoreId']}');
+        }
       }
 
-      // Add localId for server to track
-      dataToSend['localId'] = e['id'];
-
-      return server.SyncEntityChange(
+      final change = server.SyncEntityChange(
         entityType: type,
         entityId: e['id'] as String,
         serverId: e['serverId'] as int?,
@@ -417,6 +420,9 @@ class TeamSyncCoordinator {
         data: jsonEncode(dataToSend),
         localUpdatedAt: localUpdatedAt,
       );
+      
+      _log('Built $type change: entityId=${change.entityId}, data=${change.data}');
+      return change;
     }).toList();
   }
 

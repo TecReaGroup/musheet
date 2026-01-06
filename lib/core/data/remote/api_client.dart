@@ -1,5 +1,5 @@
 /// Remote API Client - Unified interface for all server communications
-/// 
+///
 /// This replaces both BackendService and RpcClient with a single, clean API layer.
 /// All server calls go through this class for consistent error handling and auth.
 library;
@@ -7,7 +7,8 @@ library;
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
-import 'package:serverpod_client/serverpod_client.dart' show ClientAuthKeyProvider, wrapAsBearerAuthHeaderValue;
+import 'package:serverpod_client/serverpod_client.dart'
+    show ClientAuthKeyProvider, wrapAsBearerAuthHeaderValue;
 import '../../../utils/logger.dart';
 
 // ============================================================================
@@ -57,9 +58,9 @@ class ApiError {
 
   factory ApiError.fromException(dynamic e) {
     final message = e.toString();
-    
+
     // Categorize common errors
-    if (message.contains('SocketException') || 
+    if (message.contains('SocketException') ||
         message.contains('Connection refused') ||
         message.contains('Network is unreachable')) {
       return ApiError(
@@ -68,17 +69,16 @@ class ApiError {
         originalError: e,
       );
     }
-    
-    if (message.contains('TimeoutException') ||
-        message.contains('timed out')) {
+
+    if (message.contains('TimeoutException') || message.contains('timed out')) {
       return ApiError(
         code: ApiErrorCode.timeout,
         message: 'Request timed out',
         originalError: e,
       );
     }
-    
-    if (message.contains('authorization') || 
+
+    if (message.contains('authorization') ||
         message.contains('Invalid header') ||
         message.contains('401')) {
       return ApiError(
@@ -87,7 +87,7 @@ class ApiError {
         originalError: e,
       );
     }
-    
+
     if (message.contains('404') || message.contains('not found')) {
       return ApiError(
         code: ApiErrorCode.notFound,
@@ -95,7 +95,7 @@ class ApiError {
         originalError: e,
       );
     }
-    
+
     if (message.contains('412') || message.contains('conflict')) {
       return ApiError(
         code: ApiErrorCode.conflict,
@@ -103,7 +103,7 @@ class ApiError {
         originalError: e,
       );
     }
-    
+
     return ApiError(
       code: ApiErrorCode.unknown,
       message: message,
@@ -160,18 +160,16 @@ class ApiClient {
 
   ApiClient._({required this.baseUrl}) {
     _authProvider = _ApiAuthKeyProvider();
-    
-    final url = baseUrl.endsWith('/') 
-      ? baseUrl.substring(0, baseUrl.length - 1) 
-      : baseUrl;
-    
+
+    final url = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+
     _client = server.Client(
       url,
       connectionTimeout: const Duration(seconds: 10),
     );
     _client.authKeyProvider = _authProvider;
-    
-    Log.i('API', 'Initialized: $url');
   }
 
   /// Initialize the singleton
@@ -193,7 +191,6 @@ class ApiClient {
   /// Set authentication credentials
   void setAuth(String token, int userId) {
     _authProvider.setToken(token);
-    Log.i('API', 'Auth set for user: $userId');
   }
 
   /// Clear authentication
@@ -217,19 +214,19 @@ class ApiClient {
     required Future<T> Function() call,
   }) async {
     final stopwatch = Stopwatch()..start();
-    
+
     try {
       final result = await call();
       stopwatch.stop();
-      
+
       Log.d('API', '$operation: OK (${stopwatch.elapsedMilliseconds}ms)');
-      
+
       return ApiResult.success(result, latency: stopwatch.elapsed);
     } catch (e) {
       stopwatch.stop();
-      
+
       Log.w('API', '$operation: FAILED - $e');
-      
+
       return ApiResult.failure(ApiError.fromException(e));
     }
   }
@@ -261,7 +258,8 @@ class ApiClient {
     String? displayName,
   }) => _execute(
     operation: 'register',
-    call: () => _client.auth.register(username, password, displayName: displayName),
+    call: () =>
+        _client.auth.register(username, password, displayName: displayName),
   );
 
   Future<ApiResult<server.AuthResult>> login({
@@ -337,7 +335,9 @@ class ApiClient {
     },
   );
 
-  Future<ApiResult<server.DeleteUserDataResult>> deleteAllUserData(int userId) => _execute(
+  Future<ApiResult<server.DeleteUserDataResult>> deleteAllUserData(
+    int userId,
+  ) => _execute(
     operation: 'deleteAllUserData',
     call: () => _client.profile.deleteAllUserData(userId),
   );
@@ -405,12 +405,16 @@ class ApiClient {
   // Team API
   // ============================================================================
 
-  Future<ApiResult<List<server.TeamWithRole>>> getMyTeams(int userId) => _execute(
-    operation: 'getMyTeams',
-    call: () => _client.team.getMyTeams(userId),
-  );
+  Future<ApiResult<List<server.TeamWithRole>>> getMyTeams(int userId) =>
+      _execute(
+        operation: 'getMyTeams',
+        call: () => _client.team.getMyTeams(userId),
+      );
 
-  Future<ApiResult<List<server.TeamMemberInfo>>> getTeamMembers(int userId, int teamId) => _execute(
+  Future<ApiResult<List<server.TeamMemberInfo>>> getTeamMembers(
+    int userId,
+    int teamId,
+  ) => _execute(
     operation: 'getTeamMembers',
     call: () => _client.team.getMyTeamMembers(userId, teamId),
   );

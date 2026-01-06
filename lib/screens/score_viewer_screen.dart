@@ -17,6 +17,7 @@ import '../providers/core_providers.dart';
 import '../core/sync/pdf_sync_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/metronome_widget.dart';
+import '../widgets/common_widgets.dart';
 import '../utils/icon_mappings.dart';
 import '../utils/pdf_export_service.dart';
 import '../providers/setlists_state_provider.dart';
@@ -592,9 +593,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   void _handleShare() async {
     final pdfPath = _currentInstrument?.pdfPath;
     if (pdfPath == null || pdfPath.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot get PDF file path')),
-      );
+      AppToast.error(context, 'Cannot get PDF file path');
       return;
     }
 

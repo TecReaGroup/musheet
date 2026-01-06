@@ -1,5 +1,5 @@
 /// Auth State Provider - Unified authentication state management
-/// 
+///
 /// This provider wraps the core SessionService and AuthRepository
 /// to provide a clean interface for UI components.
 library;
@@ -62,7 +62,8 @@ class AuthState {
     avatarBytes: clearAvatar ? null : (avatarBytes ?? this.avatarBytes),
   );
 
-  bool get isAuthenticated => status == AuthStatus.authenticated && user != null;
+  bool get isAuthenticated =>
+      status == AuthStatus.authenticated && user != null;
   bool get isLoading => status == AuthStatus.loading;
   bool get hasError => status == AuthStatus.error;
 }
@@ -141,10 +142,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
     if (isValid) {
       await authRepo.fetchProfile();
       await _loadAvatar();
-      
+
       // Initialize sync services
       await _initializeSync();
-      
+
       // Update connection state
       state = state.copyWith(isConnected: NetworkService.instance.isOnline);
     }
@@ -177,16 +178,15 @@ class AuthStateNotifier extends Notifier<AuthState> {
         user: result.user,
         isConnected: true,
       );
-      
+
       // Load avatar after login
       await _loadAvatar();
-      
+
       // Initialize sync
       await _initializeSync();
-      
-      // Refresh teams
-      await ref.read(teamRepositoryProvider)?.syncTeamsFromServer();
-      
+
+      // Note: Teams will be synced by teamsStateProvider when auth state changes
+
       return true;
     } else {
       state = state.copyWith(
@@ -226,10 +226,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
         user: result.user,
         isConnected: true,
       );
-      
+
       // Initialize sync
       await _initializeSync();
-      
+
       return true;
     } else {
       state = state.copyWith(
@@ -274,7 +274,6 @@ class AuthStateNotifier extends Notifier<AuthState> {
       ref.invalidate(currentTeamIdProvider);
       ref.invalidate(scoresStateProvider);
       ref.invalidate(setlistsStateProvider);
-
     } catch (e) {
       Log.e('AUTH', 'Logout error', error: e);
     }
@@ -310,7 +309,7 @@ class AuthStateNotifier extends Notifier<AuthState> {
       displayName: displayName,
       preferredInstrument: preferredInstrument,
     );
-    
+
     if (profile != null) {
       state = state.copyWith(user: profile);
       return true;
@@ -324,11 +323,13 @@ class AuthStateNotifier extends Notifier<AuthState> {
     required String fileName,
   }) async {
     final authRepo = ref.read(authRepositoryProvider);
-    final success = await authRepo?.uploadAvatar(
-      imageBytes: imageBytes,
-      fileName: fileName,
-    ) ?? false;
-    
+    final success =
+        await authRepo?.uploadAvatar(
+          imageBytes: imageBytes,
+          fileName: fileName,
+        ) ??
+        false;
+
     if (success) {
       state = state.copyWith(avatarBytes: imageBytes);
     }

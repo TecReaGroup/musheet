@@ -12,6 +12,7 @@ import '../models/setlist.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
+import '../widgets/user_avatar.dart';
 import '../router/app_router.dart';
 import 'library_screen.dart' show SortType, SortState;
 
@@ -311,23 +312,15 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
       );
     }
 
-    // Watch team scores and setlists from providers (not from Team model)
-    final teamScoresAsync = ref.watch(teamScoresProvider(currentTeam.serverId));
-    final teamSetlistsAsync = ref.watch(
-      teamSetlistsProvider(currentTeam.serverId),
+    // Use synchronous list providers (like library's scoresListProvider pattern)
+    final teamScores = ref.watch(teamScoresListProvider(currentTeam.serverId));
+    final teamSetlists = ref.watch(
+      teamSetlistsListProvider(currentTeam.serverId),
     );
 
     // Get counts for header
-    final scoresCount = teamScoresAsync.when(
-      data: (scores) => scores.length,
-      loading: () => 0,
-      error: (e, s) => 0,
-    );
-    final setlistsCount = teamSetlistsAsync.when(
-      data: (setlists) => setlists.length,
-      loading: () => 0,
-      error: (e, s) => 0,
-    );
+    final scoresCount = teamScores.length;
+    final setlistsCount = teamSetlists.length;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -482,27 +475,14 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                     }
                   },
                   behavior: HitTestBehavior.translucent,
-                  child: ListView(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      16,
-                      16,
-                      24 +
-                          MediaQuery.of(context).padding.bottom +
-                          kBottomNavigationBarHeight,
-                    ),
-                    children: [
-                      if (activeTab == TeamTab.setlists)
-                        _buildSetlistsTab(
+                  child: activeTab == TeamTab.setlists
+                      ? _buildSetlistsTab(
                           currentTeam.serverId,
-                          teamSetlistsAsync,
-                        ),
-                      if (activeTab == TeamTab.scores)
-                        _buildScoresTab(currentTeam.serverId, teamScoresAsync),
-                      if (activeTab == TeamTab.members)
-                        _buildMembersTab(currentTeam),
-                    ],
-                  ),
+                          teamSetlists,
+                        )
+                      : activeTab == TeamTab.scores
+                      ? _buildScoresTab(currentTeam.serverId, teamScores)
+                      : _buildMembersTab(currentTeam),
                 ),
               ),
             ],
@@ -547,7 +527,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               onSuccess: () {
                 ref.read(showCreateTeamScoreModalProvider.notifier).state =
                     false;
-                ref.invalidate(teamScoresProvider(currentTeam.serverId));
+                // No need to invalidate - createTeamScore uses optimistic updates
               },
             ),
           // Show Create Setlist modal
@@ -567,112 +547,125 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
 
   Widget _buildSetlistsTab(
     int teamServerId,
-    AsyncValue<List<TeamSetlist>> setlistsAsync,
+    List<TeamSetlist> setlists,
   ) {
-    return setlistsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (setlists) {
-        if (setlists.isEmpty) {
-          return const EmptyState(
-            icon: AppIcons.setlistIcon,
-            title: 'No shared setlists',
-            subtitle: 'Share setlists from your library to the team',
-          );
-        }
+    if (setlists.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom:
+              MediaQuery.of(context).padding.bottom +
+              kBottomNavigationBarHeight,
+        ),
+        child: const EmptyState(
+          icon: AppIcons.setlistIcon,
+          title: 'No shared setlists',
+          subtitle: 'Share setlists from your library to the team',
+        ),
+      );
+    }
 
-        final sortState = ref.watch(teamSetlistSortProvider);
-        final recentlyOpened = ref.watch(teamRecentlyOpenedSetlistsProvider);
+    final sortState = ref.watch(teamSetlistSortProvider);
+    final recentlyOpened = ref.watch(teamRecentlyOpenedSetlistsProvider);
 
-        // Apply search filter
-        final filteredSetlists = _searchQuery.isEmpty
-            ? setlists
-            : setlists
-                  .where(
-                    (s) => s.name.toLowerCase().contains(
-                      _searchQuery.toLowerCase(),
-                    ),
-                  )
-                  .toList();
-        final sortedSetlists = _sortTeamSetlists(
-          filteredSetlists,
-          sortState,
-          recentlyOpened,
-        );
+    // Apply search filter
+    final filteredSetlists = _searchQuery.isEmpty
+        ? setlists
+        : setlists
+              .where(
+                (s) => s.name.toLowerCase().contains(
+                  _searchQuery.toLowerCase(),
+                ),
+              )
+              .toList();
+    final sortedSetlists = _sortTeamSetlists(
+      filteredSetlists,
+      sortState,
+      recentlyOpened,
+    );
 
-        if (sortedSetlists.isEmpty && _searchQuery.isNotEmpty) {
-          return EmptyState.noSearchResults();
-        }
+    if (sortedSetlists.isEmpty && _searchQuery.isNotEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom:
+              MediaQuery.of(context).padding.bottom +
+              kBottomNavigationBarHeight,
+        ),
+        child: EmptyState.noSearchResults(),
+      );
+    }
 
-        return Column(
-          children: [
-            ...sortedSetlists.map((setlist) {
-              final scoreCount = setlist.teamScoreIds.length;
-              return SwipeableSetlistCard(
-                id: setlist.id,
-                name: setlist.name,
-                description: setlist.description ?? '',
-                scoreCount: scoreCount,
-                source: 'Team',
-                swipedItemId: swipedItemId,
-                swipeOffset: swipeOffset,
-                isDragging: isDragging,
-                hasSwiped: hasSwiped,
-                onSwipeStart: handleSwipeStart,
-                onSwipeUpdate: handleSwipeUpdate,
-                onSwipeEnd: handleSwipeEnd,
-                onDelete: () => _handleDeleteSetlist(setlist, teamServerId),
-                onTap: () {
-                  ref
-                      .read(teamRecentlyOpenedSetlistsProvider.notifier)
-                      .recordOpen(setlist.id);
-                  // Card tap: preview first score if setlist has scores
-                  if (setlist.teamScoreIds.isNotEmpty) {
-                    // Get the team scores to find the first score
-                    final teamScores =
-                        ref.read(teamScoresProvider(teamServerId)).value ?? [];
-                    // Build the list of scores in setlist order
-                    final setlistScores = <TeamScore>[];
-                    for (final scoreId in setlist.teamScoreIds) {
-                      final score = teamScores
-                          .where((s) => s.id == scoreId)
-                          .firstOrNull;
-                      if (score != null) {
-                        setlistScores.add(score);
-                      }
-                    }
-                    if (setlistScores.isNotEmpty) {
-                      AppNavigation.navigateToTeamScoreViewer(
-                        context,
-                        teamScore: setlistScores.first,
-                        setlistScores: setlistScores,
-                        currentIndex: 0,
-                        setlistName: setlist.name,
-                      );
-                      return;
-                    }
-                  }
-                  // Empty setlist or no scores found: go to detail screen
-                  AppNavigation.navigateToTeamSetlistDetail(
-                    context,
-                    setlist,
-                    teamServerId: teamServerId,
-                  );
-                },
-                onArrowTap: () {
-                  // Arrow tap: go to detail screen
-                  ref
-                      .read(teamRecentlyOpenedSetlistsProvider.notifier)
-                      .recordOpen(setlist.id);
-                  AppNavigation.navigateToTeamSetlistDetail(
-                    context,
-                    setlist,
-                    teamServerId: teamServerId,
-                  );
-                },
-              );
-            }),
-          ],
+    return ListView.builder(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight,
+      ),
+      itemCount: sortedSetlists.length,
+      itemBuilder: (context, index) {
+        final setlist = sortedSetlists[index];
+        final scoreCount = setlist.teamScoreIds.length;
+        return SwipeableSetlistCard(
+          id: setlist.id,
+          name: setlist.name,
+          description: setlist.description ?? '',
+          scoreCount: scoreCount,
+          source: 'Team',
+          swipedItemId: swipedItemId,
+          swipeOffset: swipeOffset,
+          isDragging: isDragging,
+          hasSwiped: hasSwiped,
+          onSwipeStart: handleSwipeStart,
+          onSwipeUpdate: handleSwipeUpdate,
+          onSwipeEnd: handleSwipeEnd,
+          onDelete: () => _handleDeleteSetlist(setlist, teamServerId),
+          onTap: () {
+            ref
+                .read(teamRecentlyOpenedSetlistsProvider.notifier)
+                .recordOpen(setlist.id);
+            // Card tap: preview first score if setlist has scores
+            if (setlist.teamScoreIds.isNotEmpty) {
+              // Get the team scores to find the first score
+              final teamScores = ref.read(teamScoresListProvider(teamServerId));
+              // Build the list of scores in setlist order
+              final setlistScores = <TeamScore>[];
+              for (final scoreId in setlist.teamScoreIds) {
+                final score = teamScores
+                    .where((s) => s.id == scoreId)
+                    .firstOrNull;
+                if (score != null) {
+                  setlistScores.add(score);
+                }
+              }
+              if (setlistScores.isNotEmpty) {
+                AppNavigation.navigateToTeamScoreViewer(
+                  context,
+                  teamScore: setlistScores.first,
+                  setlistScores: setlistScores,
+                  currentIndex: 0,
+                  setlistName: setlist.name,
+                );
+                return;
+              }
+            }
+            // Empty setlist or no scores found: go to detail screen
+            AppNavigation.navigateToTeamSetlistDetail(
+              context,
+              setlist,
+              teamServerId: teamServerId,
+            );
+          },
+          onArrowTap: () {
+            // Arrow tap: go to detail screen
+            ref
+                .read(teamRecentlyOpenedSetlistsProvider.notifier)
+                .recordOpen(setlist.id);
+            AppNavigation.navigateToTeamSetlistDetail(
+              context,
+              setlist,
+              teamServerId: teamServerId,
+            );
+          },
         );
       },
     );
@@ -694,21 +687,12 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await deleteTeamSetlist(
+              await deleteTeamSetlist(
                 ref: ref,
                 teamServerId: teamServerId,
                 setlistId: setlist.id,
               );
               if (!mounted) return;
-              if (success) {
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(content: Text('Setlist deleted')),
-                );
-              } else {
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(content: Text('Failed to delete setlist')),
-                );
-              }
               resetSwipeState();
             },
             child: const Text(
@@ -723,86 +707,100 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
 
   Widget _buildScoresTab(
     int teamServerId,
-    AsyncValue<List<TeamScore>> scoresAsync,
+    List<TeamScore> scores,
   ) {
-    return scoresAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (scores) {
-        if (scores.isEmpty) {
-          return const EmptyState(
-            icon: AppIcons.musicNote,
-            title: 'No shared scores',
-            subtitle: 'Share scores from your library to the team',
-          );
-        }
+    if (scores.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom:
+              MediaQuery.of(context).padding.bottom +
+              kBottomNavigationBarHeight,
+        ),
+        child: const EmptyState(
+          icon: AppIcons.musicNote,
+          title: 'No shared scores',
+          subtitle: 'Share scores from your library to the team',
+        ),
+      );
+    }
 
-        final sortState = ref.watch(teamScoreSortProvider);
-        final recentlyOpened = ref.watch(teamRecentlyOpenedScoresProvider);
+    final sortState = ref.watch(teamScoreSortProvider);
+    final recentlyOpened = ref.watch(teamRecentlyOpenedScoresProvider);
 
-        // Apply search filter - search both title and composer
-        final filteredScores = _searchQuery.isEmpty
-            ? scores
-            : scores
-                  .where(
-                    (s) =>
-                        s.title.toLowerCase().contains(
-                          _searchQuery.toLowerCase(),
-                        ) ||
-                        s.composer.toLowerCase().contains(
-                          _searchQuery.toLowerCase(),
-                        ),
-                  )
-                  .toList();
-        final sortedScores = _sortTeamScores(
-          filteredScores,
-          sortState,
-          recentlyOpened,
-        );
+    // Apply search filter - search both title and composer
+    final filteredScores = _searchQuery.isEmpty
+        ? scores
+        : scores
+              .where(
+                (s) =>
+                    s.title.toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ) ||
+                    s.composer.toLowerCase().contains(
+                      _searchQuery.toLowerCase(),
+                    ),
+              )
+              .toList();
+    final sortedScores = _sortTeamScores(
+      filteredScores,
+      sortState,
+      recentlyOpened,
+    );
 
-        if (sortedScores.isEmpty && _searchQuery.isNotEmpty) {
-          return EmptyState.noSearchResults();
-        }
+    if (sortedScores.isEmpty && _searchQuery.isNotEmpty) {
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom:
+              MediaQuery.of(context).padding.bottom +
+              kBottomNavigationBarHeight,
+        ),
+        child: EmptyState.noSearchResults(),
+      );
+    }
 
-        return Column(
-          children: [
-            ...sortedScores.map((score) {
-              return SwipeableScoreCard(
-                id: score.id,
-                title: score.title,
-                subtitle: score.composer,
-                meta: '${score.instrumentScores.length} instrument(s) • Team',
-                swipedItemId: swipedItemId,
-                swipeOffset: swipeOffset,
-                isDragging: isDragging,
-                hasSwiped: hasSwiped,
-                onSwipeStart: handleSwipeStart,
-                onSwipeUpdate: handleSwipeUpdate,
-                onSwipeEnd: handleSwipeEnd,
-                onDelete: () => _handleDeleteScore(score, teamServerId),
-                onTap: () {
-                  ref
-                      .read(teamRecentlyOpenedScoresProvider.notifier)
-                      .recordOpen(score.id);
-                  AppNavigation.navigateToTeamScoreViewer(
-                    context,
-                    teamScore: score,
-                  );
-                },
-                onArrowTap: () {
-                  ref
-                      .read(teamRecentlyOpenedScoresProvider.notifier)
-                      .recordOpen(score.id);
-                  // Arrow tap: go to score detail screen
-                  AppNavigation.navigateToTeamScoreDetail(
-                    context,
-                    score,
-                    teamServerId: teamServerId,
-                  );
-                },
-              );
-            }),
-          ],
+    return ListView.builder(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight,
+      ),
+      itemCount: sortedScores.length,
+      itemBuilder: (context, index) {
+        final score = sortedScores[index];
+        return SwipeableScoreCard(
+          id: score.id,
+          title: score.title,
+          subtitle: score.composer,
+          meta: '${score.instrumentScores.length} instrument(s) • Team',
+          swipedItemId: swipedItemId,
+          swipeOffset: swipeOffset,
+          isDragging: isDragging,
+          hasSwiped: hasSwiped,
+          onSwipeStart: handleSwipeStart,
+          onSwipeUpdate: handleSwipeUpdate,
+          onSwipeEnd: handleSwipeEnd,
+          onDelete: () => _handleDeleteScore(score, teamServerId),
+          onTap: () {
+            ref
+                .read(teamRecentlyOpenedScoresProvider.notifier)
+                .recordOpen(score.id);
+            AppNavigation.navigateToTeamScoreViewer(
+              context,
+              teamScore: score,
+            );
+          },
+          onArrowTap: () {
+            ref
+                .read(teamRecentlyOpenedScoresProvider.notifier)
+                .recordOpen(score.id);
+            // Arrow tap: go to score detail screen
+            AppNavigation.navigateToTeamScoreDetail(
+              context,
+              score,
+              teamServerId: teamServerId,
+            );
+          },
         );
       },
     );
@@ -824,21 +822,12 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await deleteTeamScore(
+              await deleteTeamScore(
                 ref: ref,
                 teamServerId: teamServerId,
                 scoreId: score.id,
               );
               if (!mounted) return;
-              if (success) {
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(content: Text('Score deleted')),
-                );
-              } else {
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  const SnackBar(content: Text('Failed to delete score')),
-                );
-              }
               resetSwipeState();
             },
             child: const Text(
@@ -1234,7 +1223,13 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
 
   /// Members tab - all members are equal (no admin distinction per design doc)
   Widget _buildMembersTab(Team team) {
-    return Column(
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        24 + MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight,
+      ),
       children: [
         ...team.members.map((member) {
           return Container(
@@ -1247,26 +1242,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.blue500, Color(0xFF9333EA)],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Center(
-                    child: Text(
-                      member.name[0].toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
+                _buildMemberAvatar(member),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -1313,6 +1289,16 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           ),
         ),
       ],
+    );
+  }
+
+  /// Build member avatar with image or fallback to initials
+  Widget _buildMemberAvatar(TeamMember member) {
+    return UserAvatar(
+      userId: member.userId,
+      avatarIdentifier: member.avatarUrl,
+      displayName: member.name,
+      size: 48,
     );
   }
 
@@ -2916,50 +2902,22 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
     String? description,
     List<String> teamScoreIds,
   ) async {
-    final result = await createTeamSetlist(
+    await createTeamSetlist(
       ref: ref,
       teamServerId: team.serverId,
       name: name,
       description: description,
       teamScoreIds: teamScoreIds,
     );
-
-    if (!mounted) return;
-    if (result != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Setlist created')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to create setlist'),
-          backgroundColor: AppColors.red500,
-        ),
-      );
-    }
   }
 
   /// Copy a score to the team
   Future<void> _copyScoreToTeam(Score score, Team team) async {
-    final result = await copyScoreToTeam(
+    await copyScoreToTeam(
       ref: ref,
       personalScore: score,
       teamServerId: team.serverId,
     );
-
-    if (!mounted) return;
-    if (result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message ?? 'Score copied to team')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message ?? 'Failed to copy score'),
-          backgroundColor: AppColors.red500,
-        ),
-      );
-    }
   }
 
   /// Copy a setlist to the team
@@ -2968,25 +2926,11 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
     List<Score> scores,
     Team team,
   ) async {
-    final result = await copySetlistToTeam(
+    await copySetlistToTeam(
       ref: ref,
       personalSetlist: setlist,
       scoresInSetlist: scores,
       teamServerId: team.serverId,
     );
-
-    if (!mounted) return;
-    if (result.success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message ?? 'Setlist copied to team')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result.message ?? 'Failed to copy setlist'),
-          backgroundColor: AppColors.red500,
-        ),
-      );
-    }
   }
 }

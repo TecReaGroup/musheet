@@ -11,6 +11,7 @@ import '../models/team.dart';
 import '../utils/icon_mappings.dart';
 import '../utils/logger.dart';
 import '../utils/photo_to_pdf.dart';
+import 'common_widgets.dart';
 
 /// A reusable widget for adding new scores or instrument sheets.
 /// 
@@ -240,9 +241,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
           setState(() {
             _isConverting = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to convert image: $e')),
-          );
+          AppToast.error(context, 'Failed to convert image: $e');
         }
       }
     } else {
@@ -450,9 +449,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
             _isConverting = false;
           });
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Failed to convert image: $e')),
-            );
+            AppToast.error(context, 'Failed to convert image: $e');
           }
         }
       } else {
@@ -482,9 +479,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     
     // Check if instrument is disabled
     if (_isInstrumentDisabled(_selectedInstrument!, _customInstrumentController.text)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This instrument already exists for this score')),
-      );
+      AppToast.warning(context, 'This instrument already exists for this score');
       return;
     }
     
@@ -526,9 +521,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       if (success) {
         widget.onSuccess();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to add instrument')),
-        );
+        AppToast.error(context, 'Failed to add instrument');
       }
       return;
     }
@@ -572,9 +565,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       if (teamScore != null) {
         widget.onSuccess();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to create team score')),
-        );
+        AppToast.error(context, 'Failed to create team score');
       }
       return;
     }

@@ -20,20 +20,41 @@ import 'auth_state_provider.dart';
 class ScoresStateNotifier extends AsyncNotifier<List<Score>> {
   @override
   Future<List<Score>> build() async {
-    // Watch auth state - return empty if not authenticated
-    final authState = ref.watch(authStateProvider);
+    // Listen to auth state changes (not watch to avoid rebuilds)
+    ref.listen(authStateProvider, (previous, next) {
+      // Skip initial emission - build() already handles initial state
+      if (previous == null) return;
+
+      final wasAuth = previous.status == AuthStatus.authenticated;
+      final isAuth = next.status == AuthStatus.authenticated;
+
+      // Clear on logout
+      if (wasAuth && !isAuth) {
+        ref.invalidateSelf();
+      }
+      // Reload on login
+      else if (!wasAuth && isAuth) {
+        ref.invalidateSelf();
+      }
+    });
+
+    // Listen to sync state (not watch) - only refresh when sync completes
+    ref.listen(syncStateProvider, (previous, next) {
+      next.whenData((syncState) {
+        final wasWorking = previous?.value?.phase != SyncPhase.idle;
+        final isNowIdle = syncState.phase == SyncPhase.idle;
+        // Only refresh when sync just completed (was working, now idle)
+        if (wasWorking && isNowIdle && syncState.lastSyncAt != null) {
+          ref.invalidateSelf();
+        }
+      });
+    });
+
+    // Check current auth state
+    final authState = ref.read(authStateProvider);
     if (authState.status == AuthStatus.unauthenticated) {
       return [];
     }
-
-    // Watch sync state to auto-refresh when sync completes
-    final syncStateAsync = ref.watch(syncStateProvider);
-    syncStateAsync.whenData((syncState) {
-      // When sync phase becomes idle after a sync, refresh data
-      if (syncState.phase == SyncPhase.idle && syncState.lastSyncAt != null) {
-        // This will trigger a rebuild automatically via ref.watch
-      }
-    });
 
     // Load from repository
     final scoreRepo = ref.read(scoreRepositoryProvider);
