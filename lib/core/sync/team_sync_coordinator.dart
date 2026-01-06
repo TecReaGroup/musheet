@@ -1,34 +1,45 @@
 /// Team Sync Coordinator - Per-team synchronization
 /// 
 /// Each team has its own sync coordinator with independent versioning.
-/// This works alongside the main SyncCoordinator for personal library.
+/// This mirrors the SyncCoordinator pattern for personal library.
+/// 
+/// Architecture:
+/// - TeamSyncCoordinator handles sync orchestration
+/// - TeamLocalDataSource handles data layer operations
+/// - Both use the same sync protocol as personal library
 library;
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
-import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
 
 import '../services/services.dart';
+import '../data/local/team_local_data_source.dart';
 import '../data/remote/api_client.dart';
 import '../../database/database.dart';
 import '../../utils/logger.dart';
 import 'pdf_sync_service.dart';
 
-/// Team sync state
+// ============================================================================
+// Team Sync State Types
+// ============================================================================
+
+/// Team sync phase
 enum TeamSyncPhase {
   idle,
   pushing,
   pulling,
   merging,
+  uploadingPdfs,
+  downloadingPdfs,
   waitingForNetwork,
   error,
 }
 
-/// Team sync status
+/// Team sync status with full metadata
 @immutable
 class TeamSyncState {
   final TeamSyncPhase phase;
@@ -69,7 +80,12 @@ class TeamSyncState {
 
   bool get isSyncing => phase == TeamSyncPhase.pushing || 
                         phase == TeamSyncPhase.pulling || 
-                        phase == TeamSyncPhase.merging;
+                        phase == TeamSyncPhase.merging ||
+                        phase == TeamSyncPhase.uploadingPdfs ||
+                        phase == TeamSyncPhase.downloadingPdfs;
+
+  bool get isIdle => phase == TeamSyncPhase.idle;
+  bool get hasError => phase == TeamSyncPhase.error;
 
   String get statusMessage {
     switch (phase) {
@@ -78,7 +94,8 @@ class TeamSyncState {
           final ago = DateTime.now().difference(lastSyncAt!);
           if (ago.inMinutes < 1) return 'Team synced just now';
           if (ago.inHours < 1) return 'Team synced ${ago.inMinutes}m ago';
-          return 'Team synced ${ago.inHours}h ago';
+          if (ago.inDays < 1) return 'Team synced ${ago.inHours}h ago';
+          return 'Team synced ${ago.inDays}d ago';
         }
         return pendingChanges > 0 ? '$pendingChanges team changes pending' : 'Team up to date';
       case TeamSyncPhase.pushing:
@@ -87,6 +104,10 @@ class TeamSyncState {
         return 'Downloading team updates...';
       case TeamSyncPhase.merging:
         return 'Merging team data...';
+      case TeamSyncPhase.uploadingPdfs:
+        return 'Uploading team PDF files...';
+      case TeamSyncPhase.downloadingPdfs:
+        return 'Downloading team PDF files...';
       case TeamSyncPhase.waitingForNetwork:
         return 'Waiting for network...';
       case TeamSyncPhase.error:
@@ -95,10 +116,37 @@ class TeamSyncState {
   }
 }
 
+/// Result of a team sync push operation
+@immutable
+class _TeamPushResult {
+  final int pushed;
+  final bool conflict;
+
+  const _TeamPushResult({required this.pushed, required this.conflict});
+}
+
+/// Result of a team sync pull operation
+@immutable
+class _TeamPullResult {
+  final int pulledCount;
+  final int newVersion;
+  final server.TeamSyncPullResponse? data;
+
+  const _TeamPullResult({
+    required this.pulledCount,
+    required this.newVersion,
+    this.data,
+  });
+}
+
+// ============================================================================
+// Team Sync Coordinator
+// ============================================================================
+
 /// Per-team sync coordinator
 class TeamSyncCoordinator {
   final int teamId;
-  final AppDatabase _db;
+  final TeamLocalDataSource _local;
   final ApiClient _api;
   final SessionService _session;
   final NetworkService _network;
@@ -107,15 +155,16 @@ class TeamSyncCoordinator {
   late TeamSyncState _state;
 
   Timer? _debounceTimer;
+  Timer? _retryTimer;
   bool _isSyncing = false;
 
   TeamSyncCoordinator({
     required this.teamId,
-    required AppDatabase db,
+    required TeamLocalDataSource local,
     required ApiClient api,
     required SessionService session,
     required NetworkService network,
-  }) : _db = db, _api = api, _session = session, _network = network {
+  }) : _local = local, _api = api, _session = session, _network = network {
     _state = TeamSyncState(teamId: teamId);
   }
 
@@ -133,19 +182,17 @@ class TeamSyncCoordinator {
     _network.onOnline(_onNetworkRestored);
     _network.onOffline(_onNetworkLost);
     
-    Log.i('TEAM_SYNC:$teamId', 'Initialized: version=${_state.localVersion}');
+    _log('Initialized: version=${_state.localVersion}');
   }
 
   Future<void> _loadSyncState() async {
-    final syncState = await (_db.select(_db.teamSyncState)
-      ..where((s) => s.teamId.equals(teamId))).getSingleOrNull();
+    final version = await _local.getTeamLibraryVersion(teamId);
+    final lastSync = await _local.getLastSyncTime(teamId);
     
-    if (syncState != null) {
-      _updateState(_state.copyWith(
-        localVersion: syncState.teamLibraryVersion,
-        lastSyncAt: syncState.lastSyncAt,
-      ));
-    }
+    _updateState(_state.copyWith(
+      localVersion: version,
+      lastSyncAt: lastSync,
+    ));
   }
 
   void _onNetworkRestored() {
@@ -175,175 +222,119 @@ class TeamSyncCoordinator {
   }
 
   Future<void> _executeSync() async {
-    if (_isSyncing) return;
+    if (_isSyncing) {
+      _log('Sync already in progress');
+      return;
+    }
+
     _isSyncing = true;
+    final stopwatch = Stopwatch()..start();
 
     try {
-      // Push
+      // Phase 1: Push local changes
       _updateState(_state.copyWith(phase: TeamSyncPhase.pushing));
-      await _push();
-      
-      // Upload Team PDFs
-      await _uploadTeamPdfs();
+      final pushResult = await _push();
 
-      // Pull
+      if (pushResult.conflict) {
+        _log('Push conflict - pulling first');
+      }
+
+      // Phase 2: Upload PDFs
+      _updateState(_state.copyWith(phase: TeamSyncPhase.uploadingPdfs));
+      await _uploadPendingPdfs();
+
+      // Phase 3: Pull server changes
       _updateState(_state.copyWith(phase: TeamSyncPhase.pulling));
-      await _pull();
+      final pullResult = await _pull();
 
-      // PDF Sync - trigger background download
+      // Phase 4: Merge if needed
+      if (pullResult.pulledCount > 0) {
+        _updateState(_state.copyWith(phase: TeamSyncPhase.merging));
+        await _merge(pullResult);
+      }
+
+      // Phase 5: Retry push if there was a conflict
+      if (pushResult.conflict) {
+        _updateState(_state.copyWith(phase: TeamSyncPhase.pushing));
+        await _push();
+      }
+
+      // Phase 6: Trigger background PDF download
+      _updateState(_state.copyWith(phase: TeamSyncPhase.downloadingPdfs));
       if (PdfSyncService.isInitialized) {
         await PdfSyncService.instance.triggerBackgroundSync();
       }
 
-      // Done
+      stopwatch.stop();
+
+      // Update final state
       _updateState(_state.copyWith(
         phase: TeamSyncPhase.idle,
         lastSyncAt: DateTime.now(),
       ));
+
+      _log('Sync completed in ${stopwatch.elapsedMilliseconds}ms');
     } catch (e) {
-      Log.e('TEAM_SYNC:$teamId', 'Error', error: e);
+      stopwatch.stop();
+      _logError('Sync failed', e);
+
       _updateState(_state.copyWith(
         phase: TeamSyncPhase.error,
         errorMessage: e.toString(),
       ));
+
+      // Schedule retry
+      _scheduleRetry();
     } finally {
       _isSyncing = false;
     }
   }
 
-  Future<void> _push() async {
+  void _scheduleRetry() {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(const Duration(seconds: 30), () {
+      if (_state.hasError) {
+        requestSync(immediate: true);
+      }
+    });
+  }
+
+  // ============================================================================
+  // Push Operation
+  // ============================================================================
+
+  Future<_TeamPushResult> _push() async {
     final userId = _session.userId;
-    if (userId == null) return;
+    if (userId == null) return const _TeamPushResult(pushed: 0, conflict: false);
 
-    // Get ALL pending team scores (including soft-deleted ones)
-    final allPendingScores = await (_db.select(_db.teamScores)
-      ..where((t) => t.teamId.equals(teamId))
-      ..where((t) => t.syncStatus.equals('pending'))
-    ).get();
-    
-    // Separate: upserts (no deletedAt) vs deletes (has deletedAt)
-    final pendingScores = allPendingScores.where((s) => s.deletedAt == null).toList();
-    final deletedScores = allPendingScores.where((s) => s.deletedAt != null).toList();
+    // Get pending data from local data source
+    final pendingScores = await _local.getPendingTeamScores(teamId);
+    final pendingInstrumentScores = await _local.getPendingTeamInstrumentScores(teamId);
+    final pendingSetlists = await _local.getPendingTeamSetlists(teamId);
+    final pendingDeletes = await _local.getPendingTeamDeletes(teamId);
 
-    // Get ALL pending team instrument scores
-    final allPendingInstrumentScores = await (_db.select(_db.teamInstrumentScores)
-      ..where((t) => t.syncStatus.equals('pending'))
-    ).get();
-    
-    // Get all team score IDs for this team (need to include all, not just pending)
-    final allTeamScores = await (_db.select(_db.teamScores)
-      ..where((t) => t.teamId.equals(teamId))
-    ).get();
-    final allTeamScoreIds = allTeamScores.map((s) => s.id).toSet();
-    
-    // Filter instrument scores that belong to this team
-    final teamInstrumentScores = allPendingInstrumentScores
-        .where((is_) => allTeamScoreIds.contains(is_.teamScoreId))
-        .toList();
-    
-    // Separate: upserts vs deletes for instrument scores
-    final filteredInstrumentScores = teamInstrumentScores.where((is_) => is_.deletedAt == null).toList();
-    final deletedInstrumentScores = teamInstrumentScores.where((is_) => is_.deletedAt != null).toList();
-
-    // Get ALL pending team setlists
-    final allPendingSetlists = await (_db.select(_db.teamSetlists)
-      ..where((t) => t.teamId.equals(teamId))
-      ..where((t) => t.syncStatus.equals('pending'))
-    ).get();
-    
-    // Separate: upserts vs deletes
-    final pendingSetlists = allPendingSetlists.where((s) => s.deletedAt == null).toList();
-    final deletedSetlists = allPendingSetlists.where((s) => s.deletedAt != null).toList();
-
-    // Build delete list - only include items that have serverId (already synced to server)
-    final deletes = <String>[];
-    for (final s in deletedScores) {
-      if (s.serverId != null) {
-        deletes.add('teamScore:${s.serverId}');
-      }
-    }
-    for (final is_ in deletedInstrumentScores) {
-      if (is_.serverId != null) {
-        deletes.add('teamInstrumentScore:${is_.serverId}');
-      }
-    }
-    for (final s in deletedSetlists) {
-      if (s.serverId != null) {
-        deletes.add('teamSetlist:${s.serverId}');
-      }
-    }
+    _log('Pending: scores=${pendingScores.length}, IS=${pendingInstrumentScores.length}, setlists=${pendingSetlists.length}, deletes=${pendingDeletes.length}');
 
     if (pendingScores.isEmpty && 
-        filteredInstrumentScores.isEmpty && 
+        pendingInstrumentScores.isEmpty && 
         pendingSetlists.isEmpty && 
-        deletes.isEmpty) {
-      // Still need to mark local-only deletions as synced
-      await _markLocalDeletesAsSynced(deletedScores, deletedInstrumentScores, deletedSetlists);
-      Log.d('TEAM_SYNC:$teamId', 'No pending changes to push');
-      return;
+        pendingDeletes.isEmpty) {
+      // Mark local-only deletions as synced
+      await (_local as DriftTeamLocalDataSource).markPendingDeletesAsSynced(teamId);
+      _log('Nothing to push');
+      return const _TeamPushResult(pushed: 0, conflict: false);
     }
-
-    Log.i('TEAM_SYNC:$teamId', 'Pushing: ${pendingScores.length} scores, ${filteredInstrumentScores.length} IS, ${pendingSetlists.length} setlists, ${deletes.length} deletes');
 
     // Build push request
     final request = server.TeamSyncPushRequest(
       clientTeamLibraryVersion: _state.localVersion,
-      teamScores: pendingScores.isEmpty ? null : pendingScores.map((s) => server.SyncEntityChange(
-        entityType: 'teamScore',
-        entityId: s.id,
-        serverId: s.serverId,
-        operation: 'upsert',
-        version: s.version,
-        data: jsonEncode({
-          'localId': s.id,
-          'teamId': s.teamId,
-          'title': s.title,
-          'composer': s.composer,
-          'bpm': s.bpm,
-          'createdById': s.createdById,
-          'sourceScoreId': s.sourceScoreId,
-          'createdAt': s.createdAt.toIso8601String(),
-          'updatedAt': s.updatedAt?.toIso8601String(),
-        }),
-        localUpdatedAt: s.updatedAt ?? s.createdAt,
-      )).toList(),
-      teamInstrumentScores: filteredInstrumentScores.isEmpty ? null : filteredInstrumentScores.map((is_) => server.SyncEntityChange(
-        entityType: 'teamInstrumentScore',
-        entityId: is_.id,
-        serverId: is_.serverId,
-        operation: 'upsert',
-        version: 1,
-        data: jsonEncode({
-          'localId': is_.id,
-          'teamScoreId': is_.teamScoreId,
-          'instrumentType': is_.instrumentType,
-          'customInstrument': is_.customInstrument,
-          'pdfHash': is_.pdfHash,
-          'annotationsJson': is_.annotationsJson,
-          'orderIndex': is_.orderIndex,
-          'createdAt': is_.createdAt.toIso8601String(),
-        }),
-        localUpdatedAt: is_.updatedAt ?? is_.createdAt,
-      )).toList(),
-      teamSetlists: pendingSetlists.isEmpty ? null : pendingSetlists.map((s) => server.SyncEntityChange(
-        entityType: 'teamSetlist',
-        entityId: s.id,
-        serverId: s.serverId,
-        operation: 'upsert',
-        version: 1,
-        data: jsonEncode({
-          'localId': s.id,
-          'teamId': s.teamId,
-          'name': s.name,
-          'description': s.description,
-          'createdById': s.createdById,
-          'createdAt': s.createdAt.toIso8601String(),
-          'updatedAt': s.updatedAt?.toIso8601String(),
-        }),
-        localUpdatedAt: s.updatedAt ?? s.createdAt,
-      )).toList(),
-      deletes: deletes.isEmpty ? null : deletes,
+      teamScores: pendingScores.isEmpty ? null : _buildEntityChanges('teamScore', pendingScores),
+      teamInstrumentScores: pendingInstrumentScores.isEmpty ? null : _buildEntityChanges('teamInstrumentScore', pendingInstrumentScores),
+      teamSetlists: pendingSetlists.isEmpty ? null : _buildEntityChanges('teamSetlist', pendingSetlists),
+      deletes: pendingDeletes.isEmpty ? null : pendingDeletes,
     );
+
+    _log('Pushing: ${pendingScores.length} scores, ${pendingInstrumentScores.length} IS, ${pendingSetlists.length} setlists, ${pendingDeletes.length} deletes');
 
     final result = await _api.teamPush(
       userId: userId,
@@ -352,157 +343,90 @@ class TeamSyncCoordinator {
     );
 
     if (result.isFailure) {
-      Log.e('TEAM_SYNC:$teamId', 'Push failed: ${result.error?.message}');
-      return;
+      throw Exception('Push failed: ${result.error?.message}');
     }
 
     final pushResult = result.data!;
+    _log('Push result: success=${pushResult.success}, conflict=${pushResult.conflict}, newVersion=${pushResult.newTeamLibraryVersion}');
 
+    // Check for conflict first
     if (pushResult.conflict) {
-      Log.w('TEAM_SYNC:$teamId', 'Push conflict - will pull and retry');
-      return;
+      _log('Push returned conflict');
+      return const _TeamPushResult(pushed: 0, conflict: true);
     }
 
-    // Mark as synced
+    // Check for other failures
+    if (!pushResult.success) {
+      throw Exception('Push failed: ${pushResult.errorMessage}');
+    }
+
+    // Get new version
     final newVersion = pushResult.newTeamLibraryVersion ?? _state.localVersion;
-    
-    for (final score in pendingScores) {
-      await (_db.update(_db.teamScores)..where((t) => t.id.equals(score.id))).write(
-        const TeamScoresCompanion(syncStatus: Value('synced')),
-      );
-    }
-    
-    for (final is_ in filteredInstrumentScores) {
-      await (_db.update(_db.teamInstrumentScores)..where((t) => t.id.equals(is_.id))).write(
-        const TeamInstrumentScoresCompanion(syncStatus: Value('synced')),
-      );
-    }
-    
-    for (final setlist in pendingSetlists) {
-      await (_db.update(_db.teamSetlists)..where((t) => t.id.equals(setlist.id))).write(
-        const TeamSetlistsCompanion(syncStatus: Value('synced')),
-      );
-    }
-    
-    // Mark deleted items as synced (they were successfully pushed to server)
-    await _markLocalDeletesAsSynced(deletedScores, deletedInstrumentScores, deletedSetlists);
 
-    // Update local version
-    await _saveTeamSyncState(newVersion);
+    // Update serverIds from mapping
+    final serverIdMapping = pushResult.serverIdMapping ?? {};
+    if (serverIdMapping.isNotEmpty) {
+      await _local.updateTeamServerIds(teamId, serverIdMapping);
+    }
+
+    // Mark entities as synced
+    final entityIds = [
+      ...pendingScores.map((s) => 'teamScore:${s['id']}'),
+      ...pendingInstrumentScores.map((s) => 'teamInstrumentScore:${s['id']}'),
+      ...pendingSetlists.map((s) => 'teamSetlist:${s['id']}'),
+    ];
+    await _local.markTeamEntitiesAsSynced(teamId, entityIds, newVersion);
+
+    // Mark deletions as synced
+    await (_local as DriftTeamLocalDataSource).markPendingDeletesAsSynced(teamId);
+
     _updateState(_state.copyWith(localVersion: newVersion));
 
-    Log.i('TEAM_SYNC:$teamId', 'Push complete: ${pushResult.accepted?.length ?? 0} accepted, newVersion=$newVersion');
-  }
-  
-  /// Mark local-only deletions as synced (items that were deleted before ever syncing to server)
-  Future<void> _markLocalDeletesAsSynced(
-    List<TeamScoreEntity> deletedScores,
-    List<TeamInstrumentScoreEntity> deletedInstrumentScores,
-    List<TeamSetlistEntity> deletedSetlists,
-  ) async {
-    // Mark scores without serverId as synced (never made it to server, so delete is complete)
-    for (final s in deletedScores.where((s) => s.serverId == null)) {
-      await (_db.update(_db.teamScores)..where((t) => t.id.equals(s.id))).write(
-        const TeamScoresCompanion(syncStatus: Value('synced')),
-      );
-    }
-    // Mark scores with serverId as synced (deletion was pushed to server)
-    for (final s in deletedScores.where((s) => s.serverId != null)) {
-      await (_db.update(_db.teamScores)..where((t) => t.id.equals(s.id))).write(
-        const TeamScoresCompanion(syncStatus: Value('synced')),
-      );
-    }
-    // Mark instrument scores as synced
-    for (final is_ in deletedInstrumentScores) {
-      await (_db.update(_db.teamInstrumentScores)..where((t) => t.id.equals(is_.id))).write(
-        const TeamInstrumentScoresCompanion(syncStatus: Value('synced')),
-      );
-    }
-    // Mark setlists as synced
-    for (final s in deletedSetlists) {
-      await (_db.update(_db.teamSetlists)..where((t) => t.id.equals(s.id))).write(
-        const TeamSetlistsCompanion(syncStatus: Value('synced')),
-      );
-    }
-  }
-  
-  /// Upload Team PDFs that have local files but need to be synced to server
-  Future<void> _uploadTeamPdfs() async {
-    final userId = _session.userId;
-    if (userId == null) return;
-    
-    // Get all team scores for this team
-    final teamScores = await (_db.select(_db.teamScores)
-      ..where((t) => t.teamId.equals(teamId))
-      ..where((t) => t.deletedAt.isNull())
-    ).get();
-    
-    if (teamScores.isEmpty) return;
-    
-    final teamScoreIds = teamScores.map((s) => s.id).toSet();
-    
-    // Get all instrument scores for these team scores that need PDF upload
-    final instrumentScores = await (_db.select(_db.teamInstrumentScores)
-      ..where((t) => t.teamScoreId.isIn(teamScoreIds))
-      ..where((t) => t.deletedAt.isNull())
-    ).get();
-    
-    for (final is_ in instrumentScores) {
-      final pdfPath = is_.pdfPath;
-      if (pdfPath == null || pdfPath.isEmpty) continue;
-      
-      final file = File(pdfPath);
-      if (!file.existsSync()) continue;
-      
-      try {
-        final bytes = await file.readAsBytes();
-        final hash = md5.convert(bytes).toString();
-        
-        // Skip if already has same hash
-        if (is_.pdfHash == hash && is_.pdfSyncStatus == 'synced') continue;
-        
-        // Check if server already has this file (instant upload / deduplication)
-        final checkResult = await _api.checkPdfHash(userId: userId, hash: hash);
-        if (checkResult.isSuccess && checkResult.data == true) {
-          Log.d('TEAM_SYNC:$teamId', 'PDF already on server: $hash');
-          // Update local record with hash and synced status
-          await (_db.update(_db.teamInstrumentScores)..where((t) => t.id.equals(is_.id))).write(
-            TeamInstrumentScoresCompanion(
-              pdfHash: Value(hash),
-              pdfSyncStatus: const Value('synced'),
-            ),
-          );
-          continue;
-        }
-        
-        // Upload the PDF
-        final uploadResult = await _api.uploadPdfByHash(
-          userId: userId,
-          fileBytes: bytes,
-          fileName: '$hash.pdf',
-        );
-        
-        if (uploadResult.isSuccess) {
-          Log.i('TEAM_SYNC:$teamId', 'PDF uploaded: $hash');
-          // Update local record
-          await (_db.update(_db.teamInstrumentScores)..where((t) => t.id.equals(is_.id))).write(
-            TeamInstrumentScoresCompanion(
-              pdfHash: Value(hash),
-              pdfSyncStatus: const Value('synced'),
-            ),
-          );
-        } else {
-          Log.e('TEAM_SYNC:$teamId', 'PDF upload failed: ${uploadResult.error?.message}');
-        }
-      } catch (e) {
-        Log.e('TEAM_SYNC:$teamId', 'PDF upload error', error: e);
-      }
-    }
+    return _TeamPushResult(pushed: pushResult.accepted?.length ?? 0, conflict: false);
   }
 
-  Future<void> _pull() async {
+  List<server.SyncEntityChange> _buildEntityChanges(String type, List<Map<String, dynamic>> entities) {
+    return entities.map((e) {
+      final dateStr = e['updatedAt'] ?? e['createdAt'];
+      final localUpdatedAt = dateStr != null 
+          ? DateTime.parse(dateStr as String)
+          : DateTime.now();
+
+      // Build data to send
+      Map<String, dynamic> dataToSend = Map<String, dynamic>.from(e);
+      
+      // For team instrument scores, resolve teamScoreId
+      if (type == 'teamInstrumentScore') {
+        final teamScoreServerId = e['teamScoreServerId'] as int?;
+        final teamScoreLocalId = e['teamScoreId'] as String;
+        
+        // Use serverId if available (parent already synced), otherwise use localId
+        // Server will resolve localId through serverIdMapping
+        dataToSend['teamScoreId'] = teamScoreServerId ?? teamScoreLocalId;
+      }
+
+      // Add localId for server to track
+      dataToSend['localId'] = e['id'];
+
+      return server.SyncEntityChange(
+        entityType: type,
+        entityId: e['id'] as String,
+        serverId: e['serverId'] as int?,
+        operation: 'upsert',
+        version: 1,
+        data: jsonEncode(dataToSend),
+        localUpdatedAt: localUpdatedAt,
+      );
+    }).toList();
+  }
+
+  // ============================================================================
+  // Pull Operation
+  // ============================================================================
+
+  Future<_TeamPullResult> _pull() async {
     final userId = _session.userId;
-    if (userId == null) return;
+    if (userId == null) return _TeamPullResult(pulledCount: 0, newVersion: _state.localVersion);
 
     final result = await _api.teamPull(
       userId: userId,
@@ -510,213 +434,188 @@ class TeamSyncCoordinator {
       since: _state.localVersion,
     );
 
-    if (result.isSuccess && result.data != null) {
-      final data = result.data!;
-      
-      Log.i('TEAM_SYNC:$teamId', 'Pull received: teamScores=${data.teamScores?.length ?? 0}, is=${data.teamInstrumentScores?.length ?? 0}, setlists=${data.teamSetlists?.length ?? 0}');
-      
-      // Apply pulled team scores
-      final teamScores = data.teamScores;
-      if (teamScores != null) {
-        for (final scoreData in teamScores) {
-          final entityData = jsonDecode(scoreData.data) as Map<String, dynamic>;
-          final serverId = scoreData.serverId;
-          final isDeleted = scoreData.isDeleted;
-          
-          if (isDeleted) {
-            // Mark as deleted AND synced (from server, not local pending)
-            await (_db.update(_db.teamScores)..where((t) => t.serverId.equals(serverId)))
-              .write(TeamScoresCompanion(
-                deletedAt: Value(DateTime.now()),
-                syncStatus: const Value('synced'),
-              ));
-          } else {
-            final existing = await (_db.select(_db.teamScores)
-              ..where((t) => t.serverId.equals(serverId))).getSingleOrNull();
-            
-            if (existing != null) {
-              await (_db.update(_db.teamScores)..where((t) => t.serverId.equals(serverId))).write(
-                TeamScoresCompanion(
-                  title: Value(entityData['title'] as String? ?? ''),
-                  composer: Value(entityData['composer'] as String? ?? ''),
-                  bpm: Value(entityData['bpm'] as int? ?? 120),
-                  updatedAt: Value(DateTime.now()),
-                ),
-              );
-            } else {
-              final localId = 'team_${teamId}_score_$serverId';
-              await _db.into(_db.teamScores).insert(
-                TeamScoresCompanion.insert(
-                  id: localId,
-                  teamId: teamId,
-                  title: entityData['title'] as String? ?? '',
-                  composer: entityData['composer'] as String? ?? '',
-                  bpm: Value(entityData['bpm'] as int? ?? 120),
-                  createdById: entityData['createdById'] as int? ?? 0,
-                  serverId: Value(serverId),
-                  createdAt: entityData['createdAt'] != null 
-                      ? DateTime.parse(entityData['createdAt'] as String) 
-                      : DateTime.now(),
-                  syncStatus: const Value('synced'),
-                ),
-              );
-            }
-          }
+    if (result.isFailure) {
+      throw Exception('Pull failed: ${result.error?.message}');
+    }
+
+    final pullResult = result.data!;
+
+    _log('Pull returned: version=${pullResult.teamLibraryVersion}, scores=${pullResult.teamScores?.length ?? 0}, IS=${pullResult.teamInstrumentScores?.length ?? 0}');
+
+    return _TeamPullResult(
+      pulledCount: (pullResult.teamScores?.length ?? 0) +
+                   (pullResult.teamInstrumentScores?.length ?? 0) +
+                   (pullResult.teamSetlists?.length ?? 0),
+      newVersion: pullResult.teamLibraryVersion,
+      data: pullResult,
+    );
+  }
+
+  // ============================================================================
+  // Merge Operation
+  // ============================================================================
+
+  Future<void> _merge(_TeamPullResult pullResult) async {
+    if (pullResult.data == null) return;
+
+    final data = pullResult.data!;
+
+    // Convert server SyncEntityData to maps for local storage
+    // Note: Server does NOT return localId, so we generate it from serverId
+    final teamScores = data.teamScores?.map((s) {
+      final entityData = jsonDecode(s.data) as Map<String, dynamic>;
+      return {
+        'serverId': s.serverId,
+        // Generate localId from serverId since server doesn't track it
+        'localId': entityData['localId'] ?? 'team_${teamId}_score_${s.serverId}',
+        'title': entityData['title'],
+        'composer': entityData['composer'],
+        'bpm': entityData['bpm'],
+        'createdById': entityData['createdById'],
+        'sourceScoreId': entityData['sourceScoreId'],
+        'createdAt': entityData['createdAt'],
+        'updatedAt': entityData['updatedAt'] ?? s.updatedAt.toIso8601String(),
+        'isDeleted': s.isDeleted,
+      };
+    }).toList() ?? [];
+
+    final teamInstrumentScores = data.teamInstrumentScores?.map((is_) {
+      final entityData = jsonDecode(is_.data) as Map<String, dynamic>;
+      return {
+        'serverId': is_.serverId,
+        // Generate localId from serverId since server doesn't track it
+        'localId': entityData['localId'] ?? 'team_${teamId}_is_${is_.serverId}',
+        // teamScoreId is server's ID, will be resolved in _applyTeamInstrumentScore
+        'teamScoreId': entityData['teamScoreId'],
+        'teamScoreLocalId': entityData['teamScoreLocalId'],
+        'instrumentType': entityData['instrumentType'],
+        'customInstrument': entityData['customInstrument'],
+        'pdfHash': entityData['pdfHash'],
+        'orderIndex': entityData['orderIndex'],
+        'annotationsJson': entityData['annotationsJson'],
+        'createdAt': entityData['createdAt'],
+        'isDeleted': is_.isDeleted,
+      };
+    }).toList() ?? [];
+
+    final teamSetlists = data.teamSetlists?.map((s) {
+      final entityData = jsonDecode(s.data) as Map<String, dynamic>;
+      return {
+        'serverId': s.serverId,
+        // Generate localId from serverId since server doesn't track it
+        'localId': entityData['localId'] ?? 'team_${teamId}_setlist_${s.serverId}',
+        'name': entityData['name'],
+        'description': entityData['description'],
+        'createdById': entityData['createdById'],
+        'sourceSetlistId': entityData['sourceSetlistId'],
+        'createdAt': entityData['createdAt'],
+        'updatedAt': entityData['updatedAt'] ?? s.updatedAt.toIso8601String(),
+        'isDeleted': s.isDeleted,
+      };
+    }).toList() ?? [];
+
+    _log('Merge: ${teamScores.length} scores, ${teamInstrumentScores.length} IS, ${teamSetlists.length} setlists');
+
+    await _local.applyPulledTeamData(
+      teamId: teamId,
+      teamScores: teamScores,
+      teamInstrumentScores: teamInstrumentScores,
+      teamSetlists: teamSetlists,
+      newVersion: pullResult.newVersion,
+    );
+
+    _updateState(_state.copyWith(localVersion: pullResult.newVersion));
+  }
+
+  // ============================================================================
+  // PDF Sync
+  // ============================================================================
+
+  Future<void> _uploadPendingPdfs() async {
+    final userId = _session.userId;
+    if (userId == null) return;
+
+    final pendingPdfs = await _local.getTeamInstrumentScoresNeedingPdfUpload(teamId);
+
+    for (final isData in pendingPdfs) {
+      final pdfPath = isData['pdfPath'] as String?;
+      if (pdfPath == null || pdfPath.isEmpty) continue;
+
+      final file = File(pdfPath);
+      if (!file.existsSync()) continue;
+
+      try {
+        final bytes = await file.readAsBytes();
+        final hash = md5.convert(bytes).toString();
+        final existingHash = isData['pdfHash'] as String?;
+
+        // Skip if already synced with same hash
+        if (existingHash == hash && isData['pdfSyncStatus'] == 'synced') continue;
+
+        // Check if server already has this file (deduplication)
+        final checkResult = await _api.checkPdfHash(userId: userId, hash: hash);
+        if (checkResult.isSuccess && checkResult.data == true) {
+          _log('PDF already on server (instant upload): $hash');
+          await _local.updateTeamInstrumentScorePdfStatus(isData['id'] as String, hash, 'synced');
+          continue;
         }
-      }
-      
-      // Apply pulled team instrument scores
-      final teamInstrumentScores = data.teamInstrumentScores;
-      if (teamInstrumentScores != null) {
-        for (final isData in teamInstrumentScores) {
-          final entityData = jsonDecode(isData.data) as Map<String, dynamic>;
-          final serverId = isData.serverId;
-          final isDeleted = isData.isDeleted;
-          
-          if (isDeleted) {
-            // Mark as deleted AND synced (from server, not local pending)
-            await (_db.update(_db.teamInstrumentScores)..where((t) => t.serverId.equals(serverId)))
-              .write(TeamInstrumentScoresCompanion(
-                deletedAt: Value(DateTime.now()),
-                syncStatus: const Value('synced'),
-              ));
-          } else {
-            final existing = await (_db.select(_db.teamInstrumentScores)
-              ..where((t) => t.serverId.equals(serverId))).getSingleOrNull();
-            
-            final teamScoreServerId = entityData['teamScoreId'] as int?;
-            final teamScore = teamScoreServerId != null 
-                ? await (_db.select(_db.teamScores)..where((t) => t.serverId.equals(teamScoreServerId))).getSingleOrNull()
-                : null;
-            final teamScoreLocalId = teamScore?.id ?? 'team_${teamId}_score_$teamScoreServerId';
-            
-            // Check if PDF already exists locally (global deduplication)
-            final pdfHash = entityData['pdfHash'] as String?;
-            String pdfSyncStatus = 'pending';
-            String? pdfPath;
-            
-            if (pdfHash != null && pdfHash.isNotEmpty && PdfSyncService.isInitialized) {
-              pdfPath = await PdfSyncService.instance.getLocalPath(pdfHash);
-              pdfSyncStatus = pdfPath != null ? 'synced' : 'needs_download';
-            }
-            
-            if (existing != null) {
-              await (_db.update(_db.teamInstrumentScores)..where((t) => t.serverId.equals(serverId))).write(
-                TeamInstrumentScoresCompanion(
-                  instrumentType: Value(entityData['instrumentType'] as String? ?? 'other'),
-                  pdfHash: Value(pdfHash),
-                  pdfPath: pdfPath != null ? Value(pdfPath) : const Value.absent(),
-                  annotationsJson: Value(entityData['annotationsJson'] as String? ?? '[]'),
-                  updatedAt: Value(DateTime.now()),
-                  pdfSyncStatus: Value(pdfSyncStatus),
-                ),
-              );
-            } else {
-              final localId = 'team_${teamId}_is_$serverId';
-              await _db.into(_db.teamInstrumentScores).insert(
-                TeamInstrumentScoresCompanion.insert(
-                  id: localId,
-                  teamScoreId: teamScoreLocalId,
-                  instrumentType: entityData['instrumentType'] as String? ?? 'other',
-                  createdAt: entityData['createdAt'] != null 
-                      ? DateTime.parse(entityData['createdAt'] as String) 
-                      : DateTime.now(),
-                  pdfHash: Value(pdfHash),
-                  pdfPath: Value(pdfPath),
-                  annotationsJson: Value(entityData['annotationsJson'] as String? ?? '[]'),
-                  serverId: Value(serverId),
-                  syncStatus: const Value('synced'),
-                  pdfSyncStatus: Value(pdfSyncStatus),
-                ),
-              );
-            }
-          }
+
+        // Upload the PDF
+        final uploadResult = await _api.uploadPdfByHash(
+          userId: userId,
+          fileBytes: bytes,
+          fileName: '$hash.pdf',
+        );
+
+        if (uploadResult.isSuccess) {
+          _log('PDF uploaded: $hash');
+          await _local.updateTeamInstrumentScorePdfStatus(isData['id'] as String, hash, 'synced');
+        } else {
+          _logError('PDF upload failed', uploadResult.error?.message ?? 'Unknown error');
         }
+      } catch (e) {
+        _logError('PDF upload error', e);
       }
-      
-      // Apply pulled team setlists
-      final teamSetlists = data.teamSetlists;
-      if (teamSetlists != null) {
-        for (final setlistData in teamSetlists) {
-          final entityData = jsonDecode(setlistData.data) as Map<String, dynamic>;
-          final serverId = setlistData.serverId;
-          final isDeleted = setlistData.isDeleted;
-          
-          if (isDeleted) {
-            // Mark as deleted AND synced (from server, not local pending)
-            await (_db.update(_db.teamSetlists)..where((t) => t.serverId.equals(serverId)))
-              .write(TeamSetlistsCompanion(
-                deletedAt: Value(DateTime.now()),
-                syncStatus: const Value('synced'),
-              ));
-          } else {
-            final existing = await (_db.select(_db.teamSetlists)
-              ..where((t) => t.serverId.equals(serverId))).getSingleOrNull();
-            
-            if (existing != null) {
-              await (_db.update(_db.teamSetlists)..where((t) => t.serverId.equals(serverId))).write(
-                TeamSetlistsCompanion(
-                  name: Value(entityData['name'] as String? ?? ''),
-                  description: Value(entityData['description'] as String? ?? ''),
-                  updatedAt: Value(DateTime.now()),
-                ),
-              );
-            } else {
-              final localId = 'team_${teamId}_setlist_$serverId';
-              await _db.into(_db.teamSetlists).insert(
-                TeamSetlistsCompanion.insert(
-                  id: localId,
-                  teamId: teamId,
-                  name: entityData['name'] as String? ?? '',
-                  description: Value(entityData['description'] as String? ?? ''),
-                  createdById: entityData['createdById'] as int? ?? 0,
-                  serverId: Value(serverId),
-                  createdAt: entityData['createdAt'] != null 
-                      ? DateTime.parse(entityData['createdAt'] as String) 
-                      : DateTime.now(),
-                  syncStatus: const Value('synced'),
-                ),
-              );
-            }
-          }
-        }
-      }
-      
-      // Update local version
-      final teamLibVersion = data.teamLibraryVersion;
-      await _saveTeamSyncState(teamLibVersion);
-      
-      _updateState(_state.copyWith(
-        localVersion: teamLibVersion,
-      ));
-      
-      Log.i('TEAM_SYNC:$teamId', 'Pull complete: scores=${teamScores?.length ?? 0}, is=${teamInstrumentScores?.length ?? 0}, setlists=${teamSetlists?.length ?? 0}');
     }
   }
 
-  Future<void> _saveTeamSyncState(int version) async {
-    await _db.into(_db.teamSyncState).insert(
-      TeamSyncStateCompanion.insert(
-        teamId: Value(teamId),
-        teamLibraryVersion: Value(version),
-        lastSyncAt: Value(DateTime.now()),
-      ),
-      mode: InsertMode.insertOrReplace,
-    );
-  }
+  // ============================================================================
+  // State Management
+  // ============================================================================
 
   void _updateState(TeamSyncState newState) {
     _state = newState;
     _stateController.add(_state);
   }
 
+  // ============================================================================
+  // Logging
+  // ============================================================================
+
+  void _log(String message) {
+    Log.d('TEAM_SYNC:$teamId', message);
+  }
+
+  void _logError(String message, dynamic error) {
+    Log.e('TEAM_SYNC:$teamId', message, error: error);
+  }
+
+  // ============================================================================
+  // Lifecycle
+  // ============================================================================
+
   void dispose() {
     _debounceTimer?.cancel();
+    _retryTimer?.cancel();
     _network.removeOnOnline(_onNetworkRestored);
     _network.removeOnOffline(_onNetworkLost);
     _stateController.close();
   }
 }
+
+// ============================================================================
+// Team Sync Manager
+// ============================================================================
 
 /// Manager for all team sync coordinators
 class TeamSyncManager {
@@ -766,9 +665,10 @@ class TeamSyncManager {
   /// Get or create coordinator for a team
   Future<TeamSyncCoordinator> getCoordinator(int teamId) async {
     if (!_coordinators.containsKey(teamId)) {
+      final local = DriftTeamLocalDataSource(_db);
       final coordinator = TeamSyncCoordinator(
         teamId: teamId,
-        db: _db,
+        local: local,
         api: _api,
         session: _session,
         network: _network,

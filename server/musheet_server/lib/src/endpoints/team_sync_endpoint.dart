@@ -125,7 +125,8 @@ class TeamSyncEndpoint extends Endpoint {
       if (request.teamInstrumentScores != null) {
         for (final change in request.teamInstrumentScores!) {
           newVersion++;
-          final result = await _processTeamInstrumentScoreChange(session, userId, teamId, change, newVersion);
+          final result = await _processTeamInstrumentScoreChange(
+            session, userId, teamId, change, newVersion, serverIdMapping);
           acceptedIds.add(change.entityId);
           if (result != null) {
             serverIdMapping[change.entityId] = result;
@@ -495,6 +496,7 @@ class TeamSyncEndpoint extends Endpoint {
     int teamId,
     SyncEntityChange change,
     int newVersion,
+    Map<String, int> serverIdMapping,
   ) async {
     final data = jsonDecode(change.data) as Map<String, dynamic>;
 
@@ -515,7 +517,31 @@ class TeamSyncEndpoint extends Endpoint {
       return null;
     }
 
-    final teamScoreId = data['teamScoreId'] as int;
+    // Get teamScoreId - can be either server int ID or client local string ID
+    final teamScoreIdRaw = data['teamScoreId'];
+    int teamScoreId;
+    
+    if (teamScoreIdRaw is int) {
+      // Direct server ID
+      teamScoreId = teamScoreIdRaw;
+    } else if (teamScoreIdRaw is String) {
+      // Client local ID - look up in serverIdMapping
+      final mappedServerId = serverIdMapping[teamScoreIdRaw];
+      if (mappedServerId != null) {
+        teamScoreId = mappedServerId;
+      } else {
+        // Try to parse as int (maybe client sent stringified int)
+        final parsed = int.tryParse(teamScoreIdRaw);
+        if (parsed != null) {
+          teamScoreId = parsed;
+        } else {
+          throw Exception('Cannot resolve teamScoreId: $teamScoreIdRaw - not found in serverIdMapping');
+        }
+      }
+    } else {
+      throw Exception('Invalid teamScoreId type: ${teamScoreIdRaw.runtimeType}');
+    }
+
     final instrumentType = data['instrumentType'] as String;
     final customInstrument = data['customInstrument'] as String?;
     final annotationsJson = data['annotationsJson'] as String?;
