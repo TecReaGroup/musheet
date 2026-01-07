@@ -3,6 +3,8 @@
 /// This provider manages team scores and setlists, providing:
 /// - CRUD operations for team scores
 /// - CRUD operations for team setlists
+/// - Auto-cleanup on logout via auth state listener
+/// - Sync state integration for auto-refresh
 library;
 
 import 'package:flutter/foundation.dart';
@@ -13,6 +15,7 @@ import '../models/team.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
 import '../database/database.dart';
+import '../core/sync/sync_coordinator.dart' show SyncPhase;
 import '../utils/logger.dart';
 import 'core_providers.dart';
 import 'auth_state_provider.dart';
@@ -41,11 +44,36 @@ final teamScoresStateProvider = FutureProvider.family<List<TeamScore>, int>((
   ref,
   teamServerId,
 ) async {
+  // Listen to auth state - clear cache and invalidate on logout/login
+  ref.listen(authStateProvider, (previous, next) {
+    if (previous == null) return;
+    final wasAuth = previous.status == AuthStatus.authenticated;
+    final isAuth = next.status == AuthStatus.authenticated;
+    if ((wasAuth && !isAuth) || (!wasAuth && isAuth)) {
+      _teamScoresCache.remove(teamServerId);
+      ref.invalidateSelf();
+    }
+  });
+
+  // Listen to team sync state - refresh when sync completes
+  ref.listen(teamSyncStateProvider(teamServerId), (previous, next) {
+    next.whenData((syncState) {
+      final wasWorking = previous?.value?.phase != SyncPhase.idle;
+      final isNowIdle = syncState.phase == SyncPhase.idle;
+      if (wasWorking && isNowIdle && syncState.lastSyncAt != null) {
+        _teamScoresCache.remove(teamServerId);
+        ref.invalidateSelf();
+      }
+    });
+  });
+
+  // Check auth state
+  final authState = ref.read(authStateProvider);
+  if (authState.status != AuthStatus.authenticated) {
+    return [];
+  }
+
   final db = ref.watch(appDatabaseProvider);
-
-  // Note: We use optimistic updates via cache, so no need to watch sync state
-  // The cache is updated directly when operations complete
-
   final scores = await _loadTeamScores(db, teamServerId);
 
   // Update cache silently (don't trigger version bump here)
@@ -156,11 +184,36 @@ final _teamSetlistsCacheVersionProvider =
 /// Provider for team setlists (per team) - loads from DB, supports optimistic updates
 final teamSetlistsStateProvider = FutureProvider.family<List<TeamSetlist>, int>(
   (ref, teamServerId) async {
+    // Listen to auth state - clear cache and invalidate on logout/login
+    ref.listen(authStateProvider, (previous, next) {
+      if (previous == null) return;
+      final wasAuth = previous.status == AuthStatus.authenticated;
+      final isAuth = next.status == AuthStatus.authenticated;
+      if ((wasAuth && !isAuth) || (!wasAuth && isAuth)) {
+        _teamSetlistsCache.remove(teamServerId);
+        ref.invalidateSelf();
+      }
+    });
+
+    // Listen to team sync state - refresh when sync completes
+    ref.listen(teamSyncStateProvider(teamServerId), (previous, next) {
+      next.whenData((syncState) {
+        final wasWorking = previous?.value?.phase != SyncPhase.idle;
+        final isNowIdle = syncState.phase == SyncPhase.idle;
+        if (wasWorking && isNowIdle && syncState.lastSyncAt != null) {
+          _teamSetlistsCache.remove(teamServerId);
+          ref.invalidateSelf();
+        }
+      });
+    });
+
+    // Check auth state
+    final authState = ref.read(authStateProvider);
+    if (authState.status != AuthStatus.authenticated) {
+      return [];
+    }
+
     final db = ref.watch(appDatabaseProvider);
-
-    // Note: We use optimistic updates via cache, so no need to watch sync state
-    // The cache is updated directly when operations complete
-
     final setlists = await _loadTeamSetlists(db, teamServerId);
 
     // Update cache silently
@@ -951,4 +1004,10 @@ void _triggerTeamSync(WidgetRef ref, int teamServerId) {
   coordinatorAsync.whenData((coordinator) {
     coordinator?.requestSync(immediate: true);
   });
+}
+/// Clear all team caches (called on logout)
+void clearAllTeamCaches() {
+  _teamScoresCache.clear();
+  _teamSetlistsCache.clear();
+  Log.d('TEAM', 'All team caches cleared');
 }

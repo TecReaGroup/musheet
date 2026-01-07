@@ -9,8 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/core.dart';
 import '../core/services/avatar_cache_service.dart';
-import '../core/sync/pdf_sync_service.dart';
 import 'core_providers.dart';
+import 'team_operations_provider.dart' show clearAllTeamCaches;
 
 // ============================================================================
 // Auth State
@@ -250,17 +250,28 @@ class AuthStateNotifier extends Notifier<AuthState> {
       TeamSyncManager.reset();
     }
 
+    // Clear team caches
+    clearAllTeamCaches();
+
     // Logout from server and clear session first
     final authRepo = ref.read(authRepositoryProvider);
     await authRepo?.logout();
 
-    // Clear local data (includes all team data)
+    // Clear local data (includes all team data in database)
     final local = ref.read(localDataSourceProvider);
     await local.deleteAllPdfFiles();
     await local.clearAllData();
 
+    // Note: Team data providers (teamScoresNotifierProvider, teamSetlistsNotifierProvider)
+    // will automatically clear when they detect auth state change to unauthenticated
+
     // Clear avatar cache
     await AvatarCacheService().clearAllCache();
+
+    // Invalidate repository providers to clear cached data
+    ref.invalidate(scoreRepositoryProvider);
+    ref.invalidate(setlistRepositoryProvider);
+    // Note: teamsStateProvider will be invalidated when it detects auth state change
 
     // Finally update state to trigger UI navigation
     state = const AuthState(status: AuthStatus.unauthenticated);
@@ -370,6 +381,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
         network: NetworkService.instance,
       );
     }
+
+    // Re-connect repositories to sync coordinator now that it's initialized
+    ref.invalidate(scoreRepositoryProvider);
+    ref.invalidate(setlistRepositoryProvider);
 
     // Trigger initial sync
     SyncCoordinator.instance.requestSync(immediate: true);

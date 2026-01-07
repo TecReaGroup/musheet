@@ -8,7 +8,6 @@ library;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/core.dart';
-import '../core/sync/pdf_sync_service.dart';
 import '../database/database.dart';
 
 // ============================================================================
@@ -257,7 +256,7 @@ final teamSyncStateProvider = StreamProvider.family<TeamSyncState, int>((ref, te
   final coordinatorAsync = ref.watch(teamSyncCoordinatorProvider(teamId));
   final coordinator = coordinatorAsync.value;
   if (coordinator == null) {
-    yield TeamSyncState(teamId: teamId, phase: TeamSyncPhase.waitingForNetwork);
+    yield TeamSyncState(teamId: teamId, phase: SyncPhase.waitingForNetwork);
     return;
   }
   // Emit current state first

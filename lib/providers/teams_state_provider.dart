@@ -207,24 +207,22 @@ final teamByIdProvider = Provider.family<Team?, String>((ref, teamId) {
 // Team Data Providers
 // ============================================================================
 
-// Note: teamScoresStateProvider, teamSetlistsStateProvider, etc. are exported
-// from team_operations_provider.dart via the export directive at the top.
-// The teamScoresProvider and teamSetlistsProvider below provide FutureProvider
-// wrappers for backward compatibility.
+// Note: teamScoresStateProvider, teamSetlistsStateProvider, teamScoresListProvider,
+// teamSetlistsListProvider are exported from team_operations_provider.dart
+// via the export directive at the top.
 
-/// Team scores provider (wrapper)
+/// Team scores provider (wrapper for backward compatibility)
 final teamScoresProvider = FutureProvider.family<List<TeamScore>, int>((
   ref,
   teamServerId,
 ) async {
-  // Watch the actual provider and await its completion
-  return await ref.watch(teamScoresStateProvider(teamServerId).future);
+  return ref.watch(teamScoresStateProvider(teamServerId).future);
 });
 
-/// Team setlists provider (wrapper)
+/// Team setlists provider (wrapper for backward compatibility)
 final teamSetlistsProvider = FutureProvider.family<List<TeamSetlist>, int>((
   ref,
   teamServerId,
 ) async {
-  return await ref.watch(teamSetlistsStateProvider(teamServerId).future);
+  return ref.watch(teamSetlistsStateProvider(teamServerId).future);
 });

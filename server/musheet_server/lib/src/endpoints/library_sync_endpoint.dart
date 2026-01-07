@@ -152,7 +152,8 @@ class LibrarySyncEndpoint extends Endpoint {
       if (request.setlistScores != null) {
         for (final change in request.setlistScores!) {
           newVersion++;
-          final result = await _processSetlistScoreChange(session, validatedUserId, change, newVersion);
+          final result = await _processSetlistScoreChange(
+            session, validatedUserId, change, newVersion, serverIdMapping);
           acceptedIds.add(change.entityId);
           if (result != null) {
             serverIdMapping[change.entityId] = result;
@@ -843,6 +844,7 @@ class LibrarySyncEndpoint extends Endpoint {
     int userId,
     SyncEntityChange change,
     int newVersion,
+    Map<String, int> serverIdMapping,
   ) async {
     final data = jsonDecode(change.data) as Map<String, dynamic>;
     
@@ -864,8 +866,49 @@ class LibrarySyncEndpoint extends Endpoint {
       return null;
     }
     
-    final setlistId = data['setlistId'] as int;
-    final scoreId = data['scoreId'] as int;
+    // Get setlistId - can be either server int ID or client local string ID
+    final setlistIdRaw = data['setlistId'];
+    int setlistId;
+    
+    if (setlistIdRaw is int) {
+      setlistId = setlistIdRaw;
+    } else if (setlistIdRaw is String) {
+      final mappedServerId = serverIdMapping[setlistIdRaw];
+      if (mappedServerId != null) {
+        setlistId = mappedServerId;
+      } else {
+        final parsed = int.tryParse(setlistIdRaw);
+        if (parsed != null) {
+          setlistId = parsed;
+        } else {
+          throw Exception('Cannot resolve setlistId: $setlistIdRaw - not found in serverIdMapping');
+        }
+      }
+    } else {
+      throw Exception('Invalid setlistId type: ${setlistIdRaw.runtimeType}');
+    }
+    
+    // Get scoreId - can be either server int ID or client local string ID
+    final scoreIdRaw = data['scoreId'];
+    int scoreId;
+    
+    if (scoreIdRaw is int) {
+      scoreId = scoreIdRaw;
+    } else if (scoreIdRaw is String) {
+      final mappedServerId = serverIdMapping[scoreIdRaw];
+      if (mappedServerId != null) {
+        scoreId = mappedServerId;
+      } else {
+        final parsed = int.tryParse(scoreIdRaw);
+        if (parsed != null) {
+          scoreId = parsed;
+        } else {
+          throw Exception('Cannot resolve scoreId: $scoreIdRaw - not found in serverIdMapping');
+        }
+      }
+    } else {
+      throw Exception('Invalid scoreId type: ${scoreIdRaw.runtimeType}');
+    }
     
     // Verify ownership
     final setlist = await Setlist.db.findById(session, setlistId);

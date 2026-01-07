@@ -109,6 +109,10 @@ abstract class LocalDataSource {
   /// Per APP_SYNC_LOGIC.md §2.2.4: After Push success, physically delete synced deletes
   Future<void> cleanupSyncedDeletes();
 
+  /// Mark pending delete records as synced after Push success
+  /// Per sync_logic.md §6.2: After Push success, mark deletes as synced for cleanup
+  Future<void> markPendingDeletesAsSynced();
+
   // ============================================================================
   // Cleanup Operations
   // ============================================================================
@@ -442,18 +446,22 @@ class DriftLocalDataSource implements LocalDataSource {
   @override
   Future<List<Setlist>> getAllSetlists() async {
     final records =
-        await (_db.select(_db.setlists)..where(
-              (s) =>
-                  s.syncStatus.equals('synced') |
-                  s.syncStatus.equals('pending'),
-            ))
+        await (_db.select(_db.setlists)
+              ..where(
+                (s) =>
+                    s.syncStatus.equals('synced') |
+                    s.syncStatus.equals('pending'),
+              )
+              ..where((s) => s.deletedAt.isNull()))
             .get();
 
     final setlists = <Setlist>[];
     for (final record in records) {
+      // Only get non-deleted setlist scores
       final itemRecords =
           await (_db.select(_db.setlistScores)
                 ..where((ss) => ss.setlistId.equals(record.id))
+                ..where((ss) => ss.deletedAt.isNull())
                 ..orderBy([(t) => OrderingTerm.asc(t.orderIndex)]))
               .get();
 
@@ -504,7 +512,7 @@ class DriftLocalDataSource implements LocalDataSource {
           mode: InsertMode.insertOrReplace,
         );
 
-    // Insert setlist items
+    // Insert setlist items with syncStatus
     for (int i = 0; i < setlist.scoreIds.length; i++) {
       await _db
           .into(_db.setlistScores)
@@ -513,6 +521,7 @@ class DriftLocalDataSource implements LocalDataSource {
               setlistId: setlist.id,
               scoreId: setlist.scoreIds[i],
               orderIndex: i,
+              syncStatus: Value(status.name), // Ensure syncStatus is set
             ),
             mode: InsertMode.insertOrReplace,
           );
@@ -521,32 +530,82 @@ class DriftLocalDataSource implements LocalDataSource {
 
   @override
   Future<void> updateSetlist(Setlist setlist, {LocalSyncStatus? status}) async {
-    await (_db.update(
-      _db.setlists,
-    )..where((s) => s.id.equals(setlist.id))).write(
-      SetlistsCompanion(
-        name: Value(setlist.name),
-        description: Value(setlist.description),
-        updatedAt: Value(DateTime.now()),
-        syncStatus: status != null ? Value(status.name) : const Value.absent(),
-      ),
-    );
+    await _db.transaction(() async {
+      // Update setlist metadata
+      await (_db.update(_db.setlists)
+        ..where((s) => s.id.equals(setlist.id))).write(
+        SetlistsCompanion(
+          name: Value(setlist.name),
+          description: Value(setlist.description),
+          updatedAt: Value(DateTime.now()),
+          syncStatus: status != null ? Value(status.name) : const Value('pending'),
+        ),
+      );
 
-    // Update items - delete all and reinsert
-    await (_db.delete(
-      _db.setlistScores,
-    )..where((ss) => ss.setlistId.equals(setlist.id))).go();
-    for (int i = 0; i < setlist.scoreIds.length; i++) {
-      await _db
-          .into(_db.setlistScores)
-          .insert(
-            SetlistScoresCompanion.insert(
-              setlistId: setlist.id,
-              scoreId: setlist.scoreIds[i],
-              orderIndex: i,
-            ),
-          );
-    }
+      // Get existing SetlistScores (excluding already deleted ones)
+      final existingScores = await (_db.select(_db.setlistScores)
+        ..where((ss) => ss.setlistId.equals(setlist.id))
+        ..where((ss) => ss.deletedAt.isNull())).get();
+
+      final existingScoreIds = existingScores.map((ss) => ss.scoreId).toSet();
+      final newScoreIds = setlist.scoreIds.toSet();
+
+      // Find SetlistScores to delete (exist in DB but not in new list)
+      final toDelete = existingScores.where((ss) => !newScoreIds.contains(ss.scoreId)).toList();
+
+      // Find scores to add (in new list but not in DB)
+      final toAdd = setlist.scoreIds.where((id) => !existingScoreIds.contains(id)).toList();
+
+      // Find scores to update (exist in both)
+      final toUpdate = existingScores.where((ss) => newScoreIds.contains(ss.scoreId)).toList();
+
+      final now = DateTime.now();
+
+      // Process deletions with soft delete logic
+      for (final ss in toDelete) {
+        if (ss.serverId != null) {
+          // Has serverId -> soft delete for sync
+          await (_db.update(_db.setlistScores)
+            ..where((t) => t.setlistId.equals(ss.setlistId) & t.scoreId.equals(ss.scoreId)))
+            .write(SetlistScoresCompanion(
+              syncStatus: const Value('pending'),
+              deletedAt: Value(now),
+            ));
+        } else {
+          // No serverId -> physically delete (never synced)
+          await (_db.delete(_db.setlistScores)
+            ..where((t) => t.setlistId.equals(ss.setlistId) & t.scoreId.equals(ss.scoreId)))
+            .go();
+        }
+      }
+
+      // Update orderIndex for existing scores
+      for (final ss in toUpdate) {
+        final newIndex = setlist.scoreIds.indexOf(ss.scoreId);
+        if (newIndex != ss.orderIndex) {
+          await (_db.update(_db.setlistScores)
+            ..where((t) => t.setlistId.equals(ss.setlistId) & t.scoreId.equals(ss.scoreId)))
+            .write(SetlistScoresCompanion(
+              orderIndex: Value(newIndex),
+              syncStatus: const Value('pending'),
+              updatedAt: Value(now),
+            ));
+        }
+      }
+
+      // Insert new scores
+      for (final scoreId in toAdd) {
+        final orderIndex = setlist.scoreIds.indexOf(scoreId);
+        await _db.into(_db.setlistScores).insert(
+          SetlistScoresCompanion.insert(
+            setlistId: setlist.id,
+            scoreId: scoreId,
+            orderIndex: orderIndex,
+            syncStatus: const Value('pending'),
+          ),
+        );
+      }
+    });
   }
 
   @override
@@ -1177,12 +1236,15 @@ class DriftLocalDataSource implements LocalDataSource {
 
   @override
   Future<void> markPdfAsSynced(String instrumentScoreId, String pdfHash) async {
+    // Per sync_logic.md §7.4: PDF hash change should trigger metadata sync
     await (_db.update(_db.instrumentScores)
       ..where((is_) => is_.id.equals(instrumentScoreId)))
       .write(
         InstrumentScoresCompanion(
           pdfHash: Value(pdfHash),
           pdfSyncStatus: const Value('synced'),
+          syncStatus: const Value('pending'), // Mark as pending so pdfHash syncs to server
+          updatedAt: Value(DateTime.now()),
         ),
       );
   }
@@ -1271,14 +1333,82 @@ class DriftLocalDataSource implements LocalDataSource {
     });
   }
 
+  @override
+  Future<void> markPendingDeletesAsSynced() async {
+    // Per sync_logic.md §6.2: After Push success, mark deleted records as synced
+    // so that cleanupSyncedDeletes can physically delete them
+    await _db.transaction(() async {
+      // Mark deleted scores without serverId as synced (local-only deletes, no server action needed)
+      await (_db.update(_db.scores)
+        ..where((s) => s.syncStatus.equals('pending'))
+        ..where((s) => s.deletedAt.isNotNull())
+        ..where((s) => s.serverId.isNull())
+      ).write(const ScoresCompanion(syncStatus: Value('synced')));
+
+      // Mark deleted instrument scores without serverId as synced
+      await (_db.update(_db.instrumentScores)
+        ..where((is_) => is_.syncStatus.equals('pending'))
+        ..where((is_) => is_.deletedAt.isNotNull())
+        ..where((is_) => is_.serverId.isNull())
+      ).write(const InstrumentScoresCompanion(syncStatus: Value('synced')));
+
+      // Mark deleted setlists without serverId as synced
+      await (_db.update(_db.setlists)
+        ..where((s) => s.syncStatus.equals('pending'))
+        ..where((s) => s.deletedAt.isNotNull())
+        ..where((s) => s.serverId.isNull())
+      ).write(const SetlistsCompanion(syncStatus: Value('synced')));
+
+      // Mark deleted setlist scores without serverId as synced
+      await (_db.update(_db.setlistScores)
+        ..where((ss) => ss.syncStatus.equals('pending'))
+        ..where((ss) => ss.deletedAt.isNotNull())
+        ..where((ss) => ss.serverId.isNull())
+      ).write(const SetlistScoresCompanion(syncStatus: Value('synced')));
+
+      // Mark deleted records WITH serverId as synced (server has been notified)
+      await (_db.update(_db.scores)
+        ..where((s) => s.syncStatus.equals('pending'))
+        ..where((s) => s.deletedAt.isNotNull())
+        ..where((s) => s.serverId.isNotNull())
+      ).write(const ScoresCompanion(syncStatus: Value('synced')));
+
+      await (_db.update(_db.instrumentScores)
+        ..where((is_) => is_.syncStatus.equals('pending'))
+        ..where((is_) => is_.deletedAt.isNotNull())
+        ..where((is_) => is_.serverId.isNotNull())
+      ).write(const InstrumentScoresCompanion(syncStatus: Value('synced')));
+
+      await (_db.update(_db.setlists)
+        ..where((s) => s.syncStatus.equals('pending'))
+        ..where((s) => s.deletedAt.isNotNull())
+        ..where((s) => s.serverId.isNotNull())
+      ).write(const SetlistsCompanion(syncStatus: Value('synced')));
+
+      await (_db.update(_db.setlistScores)
+        ..where((ss) => ss.syncStatus.equals('pending'))
+        ..where((ss) => ss.deletedAt.isNotNull())
+        ..where((ss) => ss.serverId.isNotNull())
+      ).write(const SetlistScoresCompanion(syncStatus: Value('synced')));
+    });
+  }
+
   /// Delete local PDF file if no active references remain
+  /// Per sync_logic.md §8.2.8: Check both Library and Team references
   Future<void> _cleanupPdfIfUnreferenced(String pdfHash) async {
-    // Count references (exclude deleted records)
-    final refCount = await (_db.select(_db.instrumentScores)
+    // Count references from Library InstrumentScores (exclude deleted records)
+    final libraryRefCount = await (_db.select(_db.instrumentScores)
       ..where((is_) => is_.pdfHash.equals(pdfHash) & is_.deletedAt.isNull()))
       .get();
-    
-    if (refCount.isEmpty) {
+
+    // Count references from Team InstrumentScores (exclude deleted records)
+    final teamRefCount = await (_db.select(_db.teamInstrumentScores)
+      ..where((is_) => is_.pdfHash.equals(pdfHash) & is_.deletedAt.isNull()))
+      .get();
+
+    final totalRefCount = libraryRefCount.length + teamRefCount.length;
+
+    if (totalRefCount == 0) {
       // No references, delete the PDF file
       try {
         final appDir = await getApplicationDocumentsDirectory();
