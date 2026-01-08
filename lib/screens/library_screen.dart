@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/teams_state_provider.dart';
+import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
@@ -503,7 +504,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           return SwipeableSetlistCard(
             id: setlist.id,
             name: setlist.name,
-            description: setlist.description,
+            description: setlist.description ?? '',
             scoreCount: setlistScores.length,
             source: 'Personal',
             swipedItemId: swipedItemId,
@@ -532,6 +533,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 
                 AppNavigation.navigateToScoreViewer(
                   context,
+                  scope: DataScope.user,
                   score: selectedScore,
                   instrumentScore: instrumentScore,
                   setlistScores: setlistScores,
@@ -540,13 +542,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                 );
               } else {
                 // Empty setlist: go to detail screen
-                AppNavigation.navigateToSetlistDetail(context, setlist);
+                AppNavigation.navigateToSetlistDetail(
+                  context,
+                  scope: DataScope.user,
+                  setlist: setlist,
+                );
               }
             },
             onArrowTap: () {
               // Arrow tap: go to detail screen
               ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-              AppNavigation.navigateToSetlistDetail(context, setlist);
+              AppNavigation.navigateToSetlistDetail(
+                context,
+                scope: DataScope.user,
+                setlist: setlist,
+              );
             },
           );
         },
@@ -605,6 +615,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               
               AppNavigation.navigateToScoreViewer(
                 context,
+                scope: DataScope.user,
                 score: score,
                 instrumentScore: instrumentScore,
               );
@@ -612,7 +623,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             onArrowTap: () {
               // Arrow tap: go to detail screen
               ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-              AppNavigation.navigateToScoreDetail(context, score);
+              AppNavigation.navigateToScoreDetail(
+                context,
+                scope: DataScope.user,
+                score: score,
+              );
             },
           );
         },

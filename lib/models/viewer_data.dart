@@ -2,207 +2,171 @@ import 'annotation.dart';
 import 'base_models.dart';
 import 'score.dart';
 import 'setlist.dart';
-import 'team.dart';
 
 /// Source type for viewer - personal library or team
 enum ViewerSource { library, team }
 
 /// Unified data wrapper for ScoreViewerScreen
-/// Supports both personal library scores and team scores
+/// Now directly uses the unified Score model (which has scopeType field)
 class ViewerScoreData with ScoreBase {
-  final ViewerSource source;
+  /// The underlying unified score (works for both personal and team)
+  final Score score;
 
-  // Underlying data - one of these will be non-null
-  final Score? _personalScore;
-  final TeamScore? _teamScore;
+  ViewerScoreData(this.score);
 
-  ViewerScoreData.fromPersonal(Score score)
-      : source = ViewerSource.library,
-        _personalScore = score,
-        _teamScore = null;
+  /// Create from a score (auto-detects source from scopeType)
+  factory ViewerScoreData.from(Score score) => ViewerScoreData(score);
 
-  ViewerScoreData.fromTeam(TeamScore score)
-      : source = ViewerSource.team,
-        _personalScore = null,
-        _teamScore = score;
+  /// Legacy factory for backward compatibility
+  factory ViewerScoreData.fromPersonal(Score score) => ViewerScoreData(score);
+
+  /// Legacy factory for backward compatibility
+  factory ViewerScoreData.fromTeam(Score score) => ViewerScoreData(score);
+
+  /// Get source type based on scopeType
+  ViewerSource get source =>
+      score.isTeamScore ? ViewerSource.team : ViewerSource.library;
 
   bool get isPersonal => source == ViewerSource.library;
   bool get isTeam => source == ViewerSource.team;
 
-  /// Get personal score (throws if this is a team score)
-  Score get personalScore {
-    if (_personalScore == null) {
-      throw StateError('This is a team score, not a personal score');
-    }
-    return _personalScore;
-  }
+  /// Get the score (works for both personal and team)
+  Score get personalScore => score;
 
-  /// Get team score (throws if this is a personal score)
-  TeamScore get teamScore {
-    if (_teamScore == null) {
-      throw StateError('This is a personal score, not a team score');
-    }
-    return _teamScore;
-  }
+  /// Alias for backward compatibility (TeamScore is just Score)
+  Score get teamScore => score;
 
-  // ScoreBase implementation
+  // ScoreBase implementation - delegate to underlying score
   @override
-  String get id => _personalScore?.id ?? _teamScore!.id;
+  String get id => score.id;
 
   @override
-  String get title => _personalScore?.title ?? _teamScore!.title;
+  String get title => score.title;
 
   @override
-  String get composer => _personalScore?.composer ?? _teamScore!.composer;
+  String get composer => score.composer;
 
   @override
-  int get bpm => _personalScore?.bpm ?? _teamScore!.bpm;
+  int get bpm => score.bpm;
 
   @override
-  DateTime get createdAt => _personalScore?.createdAt ?? _teamScore!.createdAt;
+  DateTime get createdAt => score.createdAt;
 
   /// Get instrument scores as unified list
-  List<ViewerInstrumentData> get instrumentScores {
-    if (_personalScore != null) {
-      return _personalScore.instrumentScores
-          .map((i) => ViewerInstrumentData.fromPersonal(i))
-          .toList();
-    }
-    return _teamScore!.instrumentScores
-        .map((i) => ViewerInstrumentData.fromTeam(i))
-        .toList();
-  }
+  List<ViewerInstrumentData> get instrumentScores =>
+      score.instrumentScores.map((i) => ViewerInstrumentData(i)).toList();
 
   /// Get the first instrument score
   ViewerInstrumentData? get firstInstrumentScore =>
       instrumentScores.isNotEmpty ? instrumentScores.first : null;
 
   /// Get team ID (only for team scores)
-  int? get teamId => _teamScore?.teamId;
+  int? get teamId => score.isTeamScore ? score.scopeId : null;
 
   /// Get creator ID (only for team scores)
-  int? get createdById => _teamScore?.createdById;
+  int? get createdById => score.createdById;
 
   /// Copy with new BPM
-  ViewerScoreData copyWithBpm(int newBpm) {
-    if (_personalScore != null) {
-      return ViewerScoreData.fromPersonal(_personalScore.copyWith(bpm: newBpm));
-    }
-    return ViewerScoreData.fromTeam(_teamScore!.copyWith(bpm: newBpm));
-  }
+  ViewerScoreData copyWithBpm(int newBpm) =>
+      ViewerScoreData(score.copyWith(bpm: newBpm));
 }
 
 /// Unified data wrapper for InstrumentScore
-/// Supports both personal library and team instrument scores
+/// Now directly uses the unified InstrumentScore model
 class ViewerInstrumentData with InstrumentScoreBase {
-  final ViewerSource source;
+  /// The underlying unified instrument score
+  final InstrumentScore instrument;
 
-  final InstrumentScore? _personalInstrument;
-  final TeamInstrumentScore? _teamInstrument;
+  ViewerInstrumentData(this.instrument);
 
-  ViewerInstrumentData.fromPersonal(InstrumentScore instrument)
-      : source = ViewerSource.library,
-        _personalInstrument = instrument,
-        _teamInstrument = null;
+  /// Legacy factory for backward compatibility
+  factory ViewerInstrumentData.fromPersonal(InstrumentScore instrument) =>
+      ViewerInstrumentData(instrument);
 
-  ViewerInstrumentData.fromTeam(TeamInstrumentScore instrument)
-      : source = ViewerSource.team,
-        _personalInstrument = null,
-        _teamInstrument = instrument;
+  /// Legacy factory for backward compatibility
+  factory ViewerInstrumentData.fromTeam(InstrumentScore instrument) =>
+      ViewerInstrumentData(instrument);
 
-  bool get isPersonal => source == ViewerSource.library;
-  bool get isTeam => source == ViewerSource.team;
+  /// Source is determined by parent score context (not stored here)
+  /// For most use cases, this is not needed since we use unified model
+  ViewerSource get source => ViewerSource.library; // Default to library
 
-  /// Get personal instrument score (throws if this is a team score)
-  InstrumentScore get personalInstrument {
-    if (_personalInstrument == null) {
-      throw StateError('This is a team instrument, not a personal instrument');
-    }
-    return _personalInstrument;
-  }
+  bool get isPersonal => true;
+  bool get isTeam => false;
 
-  /// Get team instrument score (throws if this is a personal score)
-  TeamInstrumentScore get teamInstrument {
-    if (_teamInstrument == null) {
-      throw StateError('This is a personal instrument, not a team instrument');
-    }
-    return _teamInstrument;
-  }
+  /// Get the instrument (works for both personal and team)
+  InstrumentScore get personalInstrument => instrument;
 
-  // InstrumentScoreBase implementation
+  /// Alias for backward compatibility
+  InstrumentScore get teamInstrument => instrument;
+
+  // InstrumentScoreBase implementation - delegate to underlying instrument
   @override
-  String get id => _personalInstrument?.id ?? _teamInstrument!.id;
+  String get id => instrument.id;
 
   @override
-  InstrumentType get instrumentType =>
-      _personalInstrument?.instrumentType ?? _teamInstrument!.instrumentType;
+  InstrumentType get instrumentType => instrument.instrumentType;
 
   @override
-  String? get customInstrument =>
-      _personalInstrument?.customInstrument ?? _teamInstrument?.customInstrument;
+  String? get customInstrument => instrument.customInstrument;
 
   @override
-  String? get pdfPath =>
-      _personalInstrument?.pdfPath ?? _teamInstrument?.pdfPath;
+  String? get pdfPath => instrument.pdfPath;
 
   @override
-  String? get pdfHash =>
-      _personalInstrument?.pdfHash ?? _teamInstrument?.pdfHash;
+  String? get pdfHash => instrument.pdfHash;
 
   @override
-  String? get thumbnail =>
-      _personalInstrument?.thumbnail ?? _teamInstrument?.thumbnail;
+  String? get thumbnail => instrument.thumbnail;
 
   @override
-  int get orderIndex => _personalInstrument?.orderIndex ?? _teamInstrument?.orderIndex ?? 0;
+  int get orderIndex => instrument.orderIndex;
 
   @override
-  List<Annotation>? get annotations =>
-      _personalInstrument?.annotations ?? _teamInstrument?.annotations;
+  List<Annotation>? get annotations => instrument.annotations;
 
   @override
-  DateTime get createdAt =>
-      _personalInstrument?.createdAt ?? _teamInstrument!.createdAt;
+  DateTime get createdAt => instrument.createdAt;
 
-  /// Get team score ID (only for team instruments)
-  String? get teamScoreId => _teamInstrument?.teamScoreId;
+  /// Get parent score ID
+  String? get teamScoreId => instrument.scoreId;
 }
 
 /// Unified setlist data wrapper
+/// Now directly uses the unified Setlist model
 class ViewerSetlistData with SetlistBase {
-  final ViewerSource source;
+  /// The underlying unified setlist
+  final Setlist setlist;
 
-  final Setlist? _personalSetlist;
-  final TeamSetlist? _teamSetlist;
+  ViewerSetlistData(this.setlist);
 
-  ViewerSetlistData.fromPersonal(Setlist setlist)
-      : source = ViewerSource.library,
-        _personalSetlist = setlist,
-        _teamSetlist = null;
+  /// Legacy factory for backward compatibility
+  factory ViewerSetlistData.fromPersonal(Setlist setlist) =>
+      ViewerSetlistData(setlist);
 
-  ViewerSetlistData.fromTeam(TeamSetlist setlist)
-      : source = ViewerSource.team,
-        _personalSetlist = null,
-        _teamSetlist = setlist;
+  /// Legacy factory for backward compatibility
+  factory ViewerSetlistData.fromTeam(Setlist setlist) =>
+      ViewerSetlistData(setlist);
+
+  /// Get source type based on scopeType
+  ViewerSource get source =>
+      setlist.isTeamSetlist ? ViewerSource.team : ViewerSource.library;
 
   bool get isPersonal => source == ViewerSource.library;
   bool get isTeam => source == ViewerSource.team;
 
   @override
-  String get id => _personalSetlist?.id ?? _teamSetlist!.id;
+  String get id => setlist.id;
 
   @override
-  String get name => _personalSetlist?.name ?? _teamSetlist!.name;
+  String get name => setlist.name;
 
   @override
-  String? get description =>
-      _personalSetlist?.description ?? _teamSetlist?.description;
+  String? get description => setlist.description;
 
   @override
-  DateTime get createdAt =>
-      _personalSetlist?.createdAt ?? _teamSetlist!.createdAt;
+  DateTime get createdAt => setlist.createdAt;
 
   @override
-  List<String> get scoreIds =>
-      _personalSetlist?.scoreIds ?? _teamSetlist!.teamScoreIds;
+  List<String> get scoreIds => setlist.scoreIds;
 }

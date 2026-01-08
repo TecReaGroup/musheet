@@ -1,0 +1,5 @@
+### DTO representing a Score with its InstrumentScores
+class: ScoreWithInstruments
+fields:
+  score: Score
+  instrumentScores: List<InstrumentScore>

@@ -12,7 +12,7 @@ class SetlistEndpoint extends Endpoint {
     
     return await Setlist.db.find(
       session,
-      where: (t) => t.userId.equals(validatedUserId) & t.deletedAt.equals(null),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId) & t.deletedAt.equals(null),
     );
   }
 
@@ -22,7 +22,7 @@ class SetlistEndpoint extends Endpoint {
     
     final setlist = await Setlist.db.findById(session, setlistId);
     if (setlist == null) return null;
-    if (setlist.userId != validatedUserId) throw PermissionDeniedException('Not your setlist');
+    if (setlist.scopeType != 'user' || setlist.scopeId != validatedUserId) throw PermissionDeniedException('Not your setlist');
 
     return setlist;
   }
@@ -39,7 +39,7 @@ class SetlistEndpoint extends Endpoint {
     // Check for existing setlist with same (name, userId)
     final existingList = await Setlist.db.find(
       session,
-      where: (t) => t.userId.equals(validatedUserId) &
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId) &
                     t.name.equals(name) &
                     t.deletedAt.equals(null),
     );
@@ -56,7 +56,8 @@ class SetlistEndpoint extends Endpoint {
     // Create new
     session.log('[SETLIST] Creating new setlist: $name', level: LogLevel.debug);
     final setlist = Setlist(
-      userId: validatedUserId,
+      scopeType: 'user',
+      scopeId: validatedUserId,
       name: name,
       description: description,
       version: 1,
@@ -90,7 +91,7 @@ class SetlistEndpoint extends Endpoint {
     
     final setlist = await Setlist.db.findById(session, setlistId);
     if (setlist == null) throw NotFoundException('Setlist not found');
-    if (setlist.userId != validatedUserId) throw PermissionDeniedException('Not your setlist');
+    if (setlist.scopeType != 'user' || setlist.scopeId != validatedUserId) throw PermissionDeniedException('Not your setlist');
 
     if (name != null) setlist.name = name;
     if (description != null) setlist.description = description;
@@ -105,7 +106,7 @@ class SetlistEndpoint extends Endpoint {
     
     final setlist = await Setlist.db.findById(session, setlistId);
     if (setlist == null) return false;
-    if (setlist.userId != validatedUserId) throw PermissionDeniedException('Not your setlist');
+    if (setlist.scopeType != 'user' || setlist.scopeId != validatedUserId) throw PermissionDeniedException('Not your setlist');
 
     setlist.deletedAt = DateTime.now();
     setlist.updatedAt = DateTime.now();
@@ -120,7 +121,7 @@ class SetlistEndpoint extends Endpoint {
     
     final setlist = await Setlist.db.findById(session, setlistId);
     if (setlist == null) throw NotFoundException('Setlist not found');
-    if (setlist.userId != validatedUserId) throw PermissionDeniedException('Not your setlist');
+    if (setlist.scopeType != 'user' || setlist.scopeId != validatedUserId) throw PermissionDeniedException('Not your setlist');
 
     final setlistScores = await SetlistScore.db.find(
       session,
@@ -152,12 +153,12 @@ class SetlistEndpoint extends Endpoint {
     // Verify setlist ownership
     final setlist = await Setlist.db.findById(session, setlistId);
     if (setlist == null) throw NotFoundException('Setlist not found');
-    if (setlist.userId != validatedUserId) throw PermissionDeniedException('Not your setlist');
+    if (setlist.scopeType != 'user' || setlist.scopeId != validatedUserId) throw PermissionDeniedException('Not your setlist');
 
     // Verify score ownership
     final score = await Score.db.findById(session, scoreId);
     if (score == null) throw NotFoundException('Score not found');
-    if (score.userId != validatedUserId) throw PermissionDeniedException('Not your score');
+    if (score.scopeType != 'user' || score.scopeId != validatedUserId) throw PermissionDeniedException('Not your score');
 
     // Check if already in setlist
     final existing = await SetlistScore.db.find(
@@ -203,7 +204,7 @@ class SetlistEndpoint extends Endpoint {
     // Verify setlist ownership
     final setlist = await Setlist.db.findById(session, setlistId);
     if (setlist == null) return false;
-    if (setlist.userId != validatedUserId) throw PermissionDeniedException('Not your setlist');
+    if (setlist.scopeType != 'user' || setlist.scopeId != validatedUserId) throw PermissionDeniedException('Not your setlist');
 
     final setlistScores = await SetlistScore.db.find(
       session,
@@ -227,7 +228,7 @@ class SetlistEndpoint extends Endpoint {
     // Verify setlist ownership
     final setlist = await Setlist.db.findById(session, setlistId);
     if (setlist == null) return false;
-    if (setlist.userId != validatedUserId) throw PermissionDeniedException('Not your setlist');
+    if (setlist.scopeType != 'user' || setlist.scopeId != validatedUserId) throw PermissionDeniedException('Not your setlist');
 
     // Update orderIndex for each score
     for (int i = 0; i < scoreIds.length; i++) {

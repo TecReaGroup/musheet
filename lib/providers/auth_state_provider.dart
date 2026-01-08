@@ -279,7 +279,7 @@ class AuthStateNotifier extends Notifier<AuthState> {
 
   /// Check pending changes count
   Future<int> getPendingChangesCount() async {
-    final local = ref.read(localDataSourceProvider);
+    final local = ref.read(syncableDataSourceProvider);
     return local.getPendingChangesCount();
   }
 
@@ -349,7 +349,7 @@ class AuthStateNotifier extends Notifier<AuthState> {
     if (!SessionService.instance.isAuthenticated) return;
 
     final db = ref.read(appDatabaseProvider);
-    final local = ref.read(localDataSourceProvider);
+    final local = ref.read(syncableDataSourceProvider);
 
     // Initialize PdfSyncService first (used by other coordinators)
     if (!PdfSyncService.isInitialized) {

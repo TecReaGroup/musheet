@@ -2,27 +2,32 @@ class: InstrumentScore
 table: instrument_scores
 fields:
   scoreId: int, relation(parent=scores)
-  # Unified with frontend: instrumentType + customInstrument
+
+  # Business fields
   instrumentType: String
   customInstrument: String?
+
   # pdfPath removed per APP_SYNC_LOGIC.md - server derives path from pdfHash
   # Client stores local path separately, not synced to server
   pdfHash: String?
   orderIndex: int
+
+  # Embedded annotations (shared within same scope)
+  annotationsJson: String?
+
+  # Team-only business metadata (nullable in user scope)
+  sourceInstrumentScoreId: int?
+
+  # Sync fields
   createdAt: DateTime
   updatedAt: DateTime
   deletedAt: DateTime?
   version: int
   syncStatus: String?
-  # Per sync_logic.md §2.6: Annotations are embedded in InstrumentScore as JSON
-  # This field stores all annotations for this instrument score
-  # Format: [{"id": "uuid", "pageNumber": 1, "type": "draw", "color": "#FF0000", ...}, ...]
-  annotationsJson: String?
 indexes:
   instrument_score_idx:
     fields: scoreId
     type: btree
-  # Unique constraint: same score cannot have duplicate instrument type+custom
   instrument_score_unique:
     fields: scoreId, instrumentType, customInstrument
     unique: true

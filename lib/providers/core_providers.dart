@@ -87,10 +87,17 @@ final appDatabaseProvider = Provider<AppDatabase>((ref) {
   return database;
 });
 
-/// Provider for LocalDataSource
-final localDataSourceProvider = Provider<LocalDataSource>((ref) {
+/// Provider for SyncableDataSource (user scope)
+/// This provides full sync capabilities for the personal library
+final syncableDataSourceProvider = Provider<SyncableDataSource>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return DriftLocalDataSource(db);
+});
+
+/// Provider for LocalDataSource (user scope)
+/// Alias for syncableDataSourceProvider for backward compatibility
+final localDataSourceProvider = Provider<LocalDataSource>((ref) {
+  return ref.watch(syncableDataSourceProvider);
 });
 
 /// Provider for ApiClient

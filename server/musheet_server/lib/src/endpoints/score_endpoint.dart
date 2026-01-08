@@ -18,7 +18,7 @@ class ScoreEndpoint extends Endpoint {
       // Incremental sync: get scores updated after 'since'
       final scores = await Score.db.find(
         session,
-        where: (t) => t.userId.equals(validatedUserId) & t.updatedAt.notEquals(null),
+        where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId) & t.updatedAt.notEquals(null),
       );
       session.log('[SCORE] Found ${scores.length} scores (incremental sync)', level: LogLevel.debug);
       return scores;
@@ -27,7 +27,7 @@ class ScoreEndpoint extends Endpoint {
     // Full sync: get all non-deleted scores
     final scores = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(validatedUserId) & t.deletedAt.equals(null),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId) & t.deletedAt.equals(null),
     );
     session.log('[SCORE] Found ${scores.length} scores (full sync)', level: LogLevel.debug);
     return scores;
@@ -41,7 +41,7 @@ class ScoreEndpoint extends Endpoint {
     if (score == null) return null;
 
     // Verify ownership
-    if (score.userId != validatedUserId) {
+    if (score.scopeType != 'user' || score.scopeId != validatedUserId) {
       throw PermissionDeniedException('Not your score');
     }
 
@@ -60,7 +60,7 @@ class ScoreEndpoint extends Endpoint {
 
       if (existing != null) {
         // Verify ownership
-        if (existing.userId != validatedUserId) {
+        if (existing.scopeType != 'user' || existing.scopeId != validatedUserId) {
           session.log('[SCORE] Permission denied: user $validatedUserId does not own score ${score.id}', level: LogLevel.warning);
           throw PermissionDeniedException('Not your score');
         }
@@ -88,7 +88,7 @@ class ScoreEndpoint extends Endpoint {
     session.log('[SCORE] Checking for existing score with title="${score.title}", composer="${score.composer}"', level: LogLevel.debug);
     final existingByUnique = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(validatedUserId) &
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId) &
                     t.title.equals(score.title) &
                     t.deletedAt.equals(null),
     );
@@ -126,7 +126,8 @@ class ScoreEndpoint extends Endpoint {
 
     // Create new score
     session.log('[SCORE] Creating new score: ${score.title}', level: LogLevel.debug);
-    score.userId = validatedUserId;
+    score.scopeType = 'user';
+    score.scopeId = validatedUserId;
     score.version = 1;
     score.createdAt = DateTime.now();
     score.updatedAt = DateTime.now();
@@ -147,7 +148,8 @@ class ScoreEndpoint extends Endpoint {
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
     
     final score = Score(
-      userId: validatedUserId,
+      scopeType: 'user',
+      scopeId: validatedUserId,
       title: title,
       composer: composer,
       bpm: bpm,
@@ -173,7 +175,7 @@ class ScoreEndpoint extends Endpoint {
     
     final score = await Score.db.findById(session, scoreId);
     if (score == null) throw NotFoundException('Score not found');
-    if (score.userId != validatedUserId) throw PermissionDeniedException('Not your score');
+    if (score.scopeType != 'user' || score.scopeId != validatedUserId) throw PermissionDeniedException('Not your score');
 
     if (title != null) score.title = title;
     if (composer != null) score.composer = composer;
@@ -197,7 +199,7 @@ class ScoreEndpoint extends Endpoint {
       session.log('[SCORE] Score $scoreId not found', level: LogLevel.warning);
       return false;
     }
-    if (score.userId != validatedUserId) {
+    if (score.scopeType != 'user' || score.scopeId != validatedUserId) {
       session.log('[SCORE] Permission denied: user $validatedUserId does not own score $scoreId', level: LogLevel.warning);
       throw PermissionDeniedException('Not your score');
     }
@@ -219,7 +221,7 @@ class ScoreEndpoint extends Endpoint {
     
     final score = await Score.db.findById(session, scoreId);
     if (score == null) return false;
-    if (score.userId != validatedUserId) throw PermissionDeniedException('Not your score');
+    if (score.scopeType != 'user' || score.scopeId != validatedUserId) throw PermissionDeniedException('Not your score');
 
     // Delete related data
     final instrumentScores = await InstrumentScore.db.find(
@@ -254,7 +256,7 @@ class ScoreEndpoint extends Endpoint {
     // Verify ownership
     final score = await Score.db.findById(session, scoreId);
     if (score == null) throw NotFoundException('Score not found');
-    if (score.userId != validatedUserId) throw PermissionDeniedException('Not your score');
+    if (score.scopeType != 'user' || score.scopeId != validatedUserId) throw PermissionDeniedException('Not your score');
 
     return await InstrumentScore.db.find(
       session,
@@ -279,7 +281,7 @@ class ScoreEndpoint extends Endpoint {
     // Verify ownership
     final score = await Score.db.findById(session, scoreId);
     if (score == null) throw NotFoundException('Score not found');
-    if (score.userId != validatedUserId) throw PermissionDeniedException('Not your score');
+    if (score.scopeType != 'user' || score.scopeId != validatedUserId) throw PermissionDeniedException('Not your score');
 
     // Check for existing instrument score with same (scoreId, instrumentType, customInstrument)
     final existingList = await InstrumentScore.db.find(
@@ -337,7 +339,7 @@ class ScoreEndpoint extends Endpoint {
 
     // Verify ownership through score
     final score = await Score.db.findById(session, instrumentScore.scoreId);
-    if (score == null || score.userId != validatedUserId) {
+    if (score == null || score.scopeType != 'user' || score.scopeId != validatedUserId) {
       throw PermissionDeniedException('Not your score');
     }
 
@@ -364,7 +366,7 @@ class ScoreEndpoint extends Endpoint {
     if (instrumentScore == null) throw NotFoundException('Instrument score not found');
 
     final score = await Score.db.findById(session, instrumentScore.scoreId);
-    if (score == null || score.userId != validatedUserId) {
+    if (score == null || score.scopeType != 'user' || score.scopeId != validatedUserId) {
       throw PermissionDeniedException('Not your score');
     }
 
@@ -383,7 +385,7 @@ class ScoreEndpoint extends Endpoint {
     if (instrumentScore == null) throw NotFoundException('Instrument score not found');
 
     final score = await Score.db.findById(session, instrumentScore.scoreId);
-    if (score == null || score.userId != validatedUserId) {
+    if (score == null || score.scopeType != 'user' || score.scopeId != validatedUserId) {
       throw PermissionDeniedException('Not your score');
     }
 
@@ -409,7 +411,7 @@ class ScoreEndpoint extends Endpoint {
     if (instrumentScore == null) return false;
 
     final score = await Score.db.findById(session, instrumentScore.scoreId);
-    if (score == null || score.userId != validatedUserId) {
+    if (score == null || score.scopeType != 'user' || score.scopeId != validatedUserId) {
       throw PermissionDeniedException('Not your score');
     }
 
@@ -423,7 +425,7 @@ class ScoreEndpoint extends Endpoint {
     // Calculate total storage used by user (based on number of scores/instrument scores)
     final scores = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(userId) & t.deletedAt.equals(null),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(userId) & t.deletedAt.equals(null),
     );
 
     int totalBytes = 0;

@@ -382,16 +382,25 @@ class PdfSyncService {
   }
 
   /// Get team PDFs needing download
+  /// Uses unified instrumentScores table with scopeType='team'
   Future<List<String>> _getTeamPdfsNeedingDownload() async {
-    final records =
-        await (_db.select(_db.teamInstrumentScores)..where((is_) {
-              return is_.pdfHash.isNotNull() &
-                  is_.deletedAt.isNull() &
-                  (is_.pdfSyncStatus.equals('needsDownload') |
-                      is_.pdfPath.isNull() |
-                      is_.pdfPath.equals(''));
-            }))
-            .get();
+    // Get all team scores
+    final teamScores = await (_db.select(_db.scores)
+      ..where((s) => s.scopeType.equals('team'))
+      ..where((s) => s.deletedAt.isNull())).get();
+
+    if (teamScores.isEmpty) return [];
+
+    final scoreIds = teamScores.map((s) => s.id).toSet();
+
+    final records = await (_db.select(_db.instrumentScores)
+      ..where((is_) => is_.scoreId.isIn(scoreIds))
+      ..where((is_) => is_.pdfHash.isNotNull())
+      ..where((is_) => is_.deletedAt.isNull())
+      ..where((is_) =>
+          is_.pdfSyncStatus.equals('needsDownload') |
+          is_.pdfPath.isNull() |
+          is_.pdfPath.equals(''))).get();
 
     return records
         .where((r) => r.pdfHash != null && r.pdfHash!.isNotEmpty)
@@ -408,21 +417,11 @@ class PdfSyncService {
   ) async {
     try {
       await _db.transaction(() async {
-        // Update library
+        // Update all instrument scores (both user and team scope)
         await (_db.update(
           _db.instrumentScores,
         )..where((is_) => is_.pdfHash.equals(pdfHash))).write(
           InstrumentScoresCompanion(
-            pdfPath: Value(localPath),
-            pdfSyncStatus: Value(status),
-          ),
-        );
-
-        // Update all teams
-        await (_db.update(
-          _db.teamInstrumentScores,
-        )..where((is_) => is_.pdfHash.equals(pdfHash))).write(
-          TeamInstrumentScoresCompanion(
             pdfPath: Value(localPath),
             pdfSyncStatus: Value(status),
           ),

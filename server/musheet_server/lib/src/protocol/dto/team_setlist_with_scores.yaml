@@ -1,5 +1,0 @@
-# DTO: TeamSetlist with its TeamScores
-class: TeamSetlistWithScores
-fields:
-  teamSetlist: TeamSetlist
-  scores: List<TeamScore>

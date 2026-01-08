@@ -424,7 +424,7 @@ class ApiClient {
   // ============================================================================
 
   /// Pull team changes since version
-  Future<ApiResult<server.TeamSyncPullResponse>> teamPull({
+  Future<ApiResult<server.SyncPullResponse>> teamPull({
     required int userId,
     required int teamId,
     int since = 0,
@@ -434,10 +434,10 @@ class ApiClient {
   );
 
   /// Push team changes to server
-  Future<ApiResult<server.TeamSyncPushResponse>> teamPush({
+  Future<ApiResult<server.SyncPushResponse>> teamPush({
     required int userId,
     required int teamId,
-    required server.TeamSyncPushRequest request,
+    required server.SyncPushRequest request,
   }) => _execute(
     operation: 'teamPush',
     call: () => _client.teamSync.push(userId, teamId, request),

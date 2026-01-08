@@ -1,64 +1,91 @@
-/// Setlist State Provider - Setlist management with Repository pattern
+/// Setlist State Provider - Unified setlist management with DataScope
 ///
-/// This provider wraps the SetlistRepository and provides
-/// reactive state management for the UI.
+/// Uses DataScope to provide a single Notifier that works for both
+/// personal Library and Team setlists. Eliminates code duplication.
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/setlist.dart';
 import '../models/score.dart';
-import '../core/sync/sync_coordinator.dart';
+import '../core/core.dart';
+import '../core/data/data_scope.dart';
 import 'core_providers.dart';
+import 'base_data_notifier.dart';
 import 'auth_state_provider.dart';
 import 'scores_state_provider.dart';
 
 // ============================================================================
-// Setlists State Notifier
+// Scoped Setlist Repository Provider
 // ============================================================================
 
-/// Notifier for managing setlists state
-class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
+/// Unified setlist repository provider using DataScope
+/// - DataScope.user: Personal library
+/// - DataScope.team(teamServerId): Team library
+final scopedSetlistRepositoryProvider =
+    Provider.family<SetlistRepository, DataScope>((ref, scope) {
+  final db = ref.watch(appDatabaseProvider);
+
+  // Create scoped data source
+  final scopedDataSource = ScopedLocalDataSource(db, scope);
+  final repo = SetlistRepository(local: scopedDataSource);
+
+  // Connect to appropriate sync coordinator
+  if (scope.isUser) {
+    if (SyncCoordinator.isInitialized) {
+      repo.onDataChanged = () => SyncCoordinator.instance.onLocalDataChanged();
+    }
+  } else {
+    // Team scope
+    ref.listen(
+      teamSyncCoordinatorProvider(scope.id),
+      (previous, next) {
+        next.whenData((coordinator) {
+          if (coordinator != null) {
+            repo.onDataChanged = () => coordinator.onLocalDataChanged();
+          }
+        });
+      },
+      fireImmediately: true,
+    );
+  }
+
+  return repo;
+});
+
+// ============================================================================
+// Scoped Setlists Notifier - Unified for Library and Team
+// ============================================================================
+
+/// Unified notifier for managing setlists state
+/// Works with both personal Library (DataScope.user) and Team (DataScope.team)
+class ScopedSetlistsNotifier extends AsyncNotifier<List<Setlist>> {
+  ScopedSetlistsNotifier(this.scope);
+
+  final DataScope scope;
+
   @override
   Future<List<Setlist>> build() async {
-    // Listen to auth state changes (not watch to avoid rebuilds)
-    ref.listen(authStateProvider, (previous, next) {
-      // Skip initial emission - build() already handles initial state
-      if (previous == null) return;
-
-      final wasAuth = previous.status == AuthStatus.authenticated;
-      final isAuth = next.status == AuthStatus.authenticated;
-
-      // Clear on logout
-      if (wasAuth && !isAuth) {
-        ref.invalidateSelf();
-      }
-      // Reload on login
-      else if (!wasAuth && isAuth) {
-        ref.invalidateSelf();
-      }
-    });
-
-    // Listen to sync state (not watch) - only refresh when sync completes
-    ref.listen(syncStateProvider, (previous, next) {
-      next.whenData((syncState) {
-        final wasWorking = previous?.value?.phase != SyncPhase.idle;
-        final isNowIdle = syncState.phase == SyncPhase.idle;
-        // Only refresh when sync just completed (was working, now idle)
-        if (wasWorking && isNowIdle && syncState.lastSyncAt != null) {
-          ref.invalidateSelf();
-        }
-      });
-    });
-
-    // Check current auth state
-    final authState = ref.read(authStateProvider);
-    if (authState.status == AuthStatus.unauthenticated) {
-      return [];
+    // Setup auth/sync listeners based on scope
+    if (scope.isUser) {
+      setupCommonListeners(
+        ref: ref,
+        authProvider: authStateProvider,
+        syncProvider: syncStateProvider,
+      );
+    } else {
+      setupCommonListeners(
+        ref: ref,
+        authProvider: authStateProvider,
+        syncProvider: teamSyncStateProvider(scope.id),
+      );
     }
 
-    // Load from repository
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    // Check auth
+    if (!checkAuth(ref)) return [];
+
+    // Load from scoped repository
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     return setlistRepo.getAllSetlists();
   }
 
@@ -71,6 +98,8 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
   Future<void> createSetlist(String name, String description) async {
     final newSetlist = Setlist(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
+      scopeType: scope.isUser ? 'user' : 'team',
+      scopeId: scope.id,
       name: name,
       description: description,
       scoreIds: [],
@@ -81,7 +110,7 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
 
   /// Add a new setlist
   Future<void> addSetlist(Setlist setlist) async {
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     await setlistRepo.addSetlist(setlist);
 
     // Update local state
@@ -91,7 +120,7 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
 
   /// Update a setlist
   Future<void> updateSetlist(Setlist setlist) async {
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     await setlistRepo.updateSetlist(setlist);
 
     // Update local state
@@ -103,7 +132,7 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
 
   /// Delete a setlist
   Future<void> deleteSetlist(String setlistId) async {
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     await setlistRepo.deleteSetlist(setlistId);
 
     // Update local state
@@ -113,7 +142,7 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
 
   /// Add score to setlist
   Future<void> addScoreToSetlist(String setlistId, String scoreId) async {
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     await setlistRepo.addScoreToSetlist(setlistId, scoreId);
 
     // Update local state
@@ -130,7 +159,7 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
 
   /// Remove score from setlist
   Future<void> removeScoreFromSetlist(String setlistId, String scoreId) async {
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     await setlistRepo.removeScoreFromSetlist(setlistId, scoreId);
 
     // Update local state
@@ -149,7 +178,7 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
 
   /// Reorder scores in setlist
   Future<void> reorderScores(String setlistId, List<String> newOrder) async {
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     await setlistRepo.reorderScores(setlistId, newOrder);
 
     // Update local state
@@ -170,30 +199,37 @@ class SetlistsStateNotifier extends AsyncNotifier<List<Setlist>> {
       state = const AsyncLoading();
     }
 
-    final setlistRepo = ref.read(setlistRepositoryProvider);
+    final setlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
     final setlists = await setlistRepo.getAllSetlists();
     state = AsyncData(setlists);
   }
 }
 
 // ============================================================================
-// Providers
+// Unified Provider (Family by DataScope)
 // ============================================================================
 
-/// Main setlists provider
-final setlistsStateProvider =
-    AsyncNotifierProvider<SetlistsStateNotifier, List<Setlist>>(() {
-      return SetlistsStateNotifier();
-    });
+/// Main scoped setlists provider - works for both Library and Team
+final scopedSetlistsProvider =
+    AsyncNotifierProvider.family<ScopedSetlistsNotifier, List<Setlist>, DataScope>(
+  (scope) => ScopedSetlistsNotifier(scope),
+);
 
-/// Convenience provider for setlists list (non-async)
+// ============================================================================
+// Backward-Compatible Providers (Library-specific aliases)
+// ============================================================================
+
+/// Main setlists provider (backward compatible - alias for user scope)
+final setlistsStateProvider = scopedSetlistsProvider(DataScope.user);
+
+/// Convenience provider for setlists list (non-async) - alias for user scope
 final setlistsListProvider = Provider<List<Setlist>>((ref) {
-  final setlistsAsync = ref.watch(setlistsStateProvider);
-  return setlistsAsync.value ?? [];
+  return ref.watch(scopedSetlistsListProvider(DataScope.user));
 });
 
-/// Provider for a specific setlist by ID
-final setlistByIdProvider = Provider.family<Setlist?, String>((ref, setlistId) {
+/// Provider for a specific setlist by ID (user scope)
+final setlistByIdProvider =
+    Provider.family<Setlist?, String>((ref, setlistId) {
   final setlists = ref.watch(setlistsListProvider);
   try {
     return setlists.firstWhere((s) => s.id == setlistId);
@@ -202,7 +238,7 @@ final setlistByIdProvider = Provider.family<Setlist?, String>((ref, setlistId) {
   }
 });
 
-/// Provider for scores in a setlist
+/// Provider for scores in a setlist (user scope)
 final setlistScoresProvider = Provider.family<List<Score>, String>((
   ref,
   setlistId,
@@ -211,6 +247,48 @@ final setlistScoresProvider = Provider.family<List<Score>, String>((
   if (setlist == null) return [];
 
   final allScores = ref.watch(scoresListProvider);
+  return setlist.scoreIds
+      .map((id) {
+        try {
+          return allScores.firstWhere((s) => s.id == id);
+        } catch (_) {
+          return null;
+        }
+      })
+      .whereType<Score>()
+      .toList();
+});
+
+// ============================================================================
+// Scoped Convenience Providers
+// ============================================================================
+
+/// Scoped setlists list provider (non-async)
+final scopedSetlistsListProvider =
+    Provider.family<List<Setlist>, DataScope>((ref, scope) {
+  return ref.watch(scopedSetlistsProvider(scope)).value ?? [];
+});
+
+/// Scoped setlist by ID provider
+final scopedSetlistByIdProvider =
+    Provider.family<Setlist?, (DataScope, String)>((ref, params) {
+  final (scope, setlistId) = params;
+  final setlists = ref.watch(scopedSetlistsListProvider(scope));
+  try {
+    return setlists.firstWhere((s) => s.id == setlistId);
+  } catch (_) {
+    return null;
+  }
+});
+
+/// Scoped setlist scores provider - gets scores for a setlist in the given scope
+final scopedSetlistScoresProvider =
+    Provider.family<List<Score>, (DataScope, String)>((ref, params) {
+  final (scope, setlistId) = params;
+  final setlist = ref.watch(scopedSetlistByIdProvider((scope, setlistId)));
+  if (setlist == null) return [];
+
+  final allScores = ref.watch(scopedScoresListProvider(scope));
   return setlist.scoreIds
       .map((id) {
         try {

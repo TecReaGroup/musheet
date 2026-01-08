@@ -1,17 +1,17 @@
-### User Library
-### Tracks the global library version for each user (Zotero-style)
+### User Library (scope = user)
+### Tracks the scope-wide version for each user
 class: UserLibrary
 table: user_libraries
 fields:
   ### User ID (foreign key to users)
   userId: int, relation(parent=users)
-  
-  ### Current library version (increments on any change)
+
+  ### Current scope version (increments on any change in user scope)
   libraryVersion: int
-  
+
   ### Last sync timestamp
   lastSyncAt: DateTime
-  
+
   ### Last modification timestamp
   lastModifiedAt: DateTime
 

@@ -11,7 +11,6 @@ import '../models/team.dart';
 import '../utils/logger.dart';
 import 'core_providers.dart';
 import 'auth_state_provider.dart';
-import 'team_operations_provider.dart';
 
 // Re-export team operations for easy access
 export 'team_operations_provider.dart';
@@ -207,22 +206,6 @@ final teamByIdProvider = Provider.family<Team?, String>((ref, teamId) {
 // Team Data Providers
 // ============================================================================
 
-// Note: teamScoresStateProvider, teamSetlistsStateProvider, teamScoresListProvider,
-// teamSetlistsListProvider are exported from team_operations_provider.dart
-// via the export directive at the top.
-
-/// Team scores provider (wrapper for backward compatibility)
-final teamScoresProvider = FutureProvider.family<List<TeamScore>, int>((
-  ref,
-  teamServerId,
-) async {
-  return ref.watch(teamScoresStateProvider(teamServerId).future);
-});
-
-/// Team setlists provider (wrapper for backward compatibility)
-final teamSetlistsProvider = FutureProvider.family<List<TeamSetlist>, int>((
-  ref,
-  teamServerId,
-) async {
-  return ref.watch(teamSetlistsStateProvider(teamServerId).future);
-});
+// Note: teamScoresProvider, teamSetlistsProvider, teamScoresListProvider,
+// teamSetlistsListProvider are now defined in team_operations_provider.dart
+// and use the same pattern as Library providers.

@@ -4,6 +4,7 @@
 /// Extends BaseSyncCoordinator to reuse common sync logic.
 ///
 /// Per sync_logic.md §9.2: TeamSyncCoordinator extends BaseSyncCoordinator
+/// Uses unified SyncPullResponse/SyncPushRequest with scopeType='team'
 library;
 
 import 'dart:convert';
@@ -12,7 +13,8 @@ import 'package:crypto/crypto.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
 
 import '../services/services.dart';
-import '../data/local/team_local_data_source.dart';
+import '../data/local/local_data_source.dart';
+import '../data/data_scope.dart';
 import '../data/remote/api_client.dart';
 import '../../database/database.dart';
 import 'base_sync_coordinator.dart';
@@ -22,14 +24,15 @@ import 'base_sync_coordinator.dart';
 // ============================================================================
 
 /// Per-team sync coordinator - extends BaseSyncCoordinator
-class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.TeamSyncPullResponse> {
+/// Uses unified SyncPullResponse with scopeType='team', scopeId=teamId
+class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.SyncPullResponse> {
   final int teamId;
-  final TeamLocalDataSource _local;
+  final SyncableDataSource _local;
   final ApiClient _api;
 
   TeamSyncCoordinator({
     required this.teamId,
-    required TeamLocalDataSource local,
+    required SyncableDataSource local,
     required ApiClient api,
     required super.session,
     required super.network,
@@ -77,8 +80,9 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
 
   @override
   Future<void> loadSyncState() async {
-    final version = await _local.getTeamLibraryVersion(teamId);
-    final lastSync = await _local.getLastSyncTime(teamId);
+    // SyncableDataSource methods are scoped - no teamId parameter needed
+    final version = await _local.getLibraryVersion();
+    final lastSync = await _local.getLastSyncTime();
 
     updateState(state.copyWith(
       localVersion: version,
@@ -88,7 +92,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
 
   @override
   Future<int> getPendingChangesCount() async {
-    return await _local.getPendingChangesCount(teamId);
+    return await _local.getPendingChangesCount();
   }
 
   @override
@@ -96,12 +100,12 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
     final userId = session.userId;
     if (userId == null) return PushResult.empty;
 
-    // Get pending data from local data source
-    final pendingScores = await _local.getPendingTeamScores(teamId);
-    final pendingInstrumentScores = await _local.getPendingTeamInstrumentScores(teamId);
-    final pendingSetlists = await _local.getPendingTeamSetlists(teamId);
-    final pendingSetlistScores = await _local.getPendingTeamSetlistScores(teamId);
-    final pendingDeletes = await _local.getPendingTeamDeletes(teamId);
+    // Get pending data from local data source (scoped - no teamId needed)
+    final pendingScores = await _local.getPendingScores();
+    final pendingInstrumentScores = await _local.getPendingInstrumentScores();
+    final pendingSetlists = await _local.getPendingSetlists();
+    final pendingSetlistScores = await _local.getPendingSetlistScores();
+    final pendingDeletes = await _local.getPendingDeletes();
 
     log('Pending: scores=${pendingScores.length}, IS=${pendingInstrumentScores.length}, setlists=${pendingSetlists.length}, SS=${pendingSetlistScores.length}, deletes=${pendingDeletes.length}');
 
@@ -111,18 +115,20 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
         pendingSetlistScores.isEmpty &&
         pendingDeletes.isEmpty) {
       // Mark local-only deletions as synced
-      await _local.markPendingDeletesAsSynced(teamId);
+      await _local.markPendingDeletesAsSynced();
       log('Nothing to push');
       return PushResult.empty;
     }
 
-    // Build push request
-    final request = server.TeamSyncPushRequest(
-      clientTeamLibraryVersion: state.localVersion,
-      teamScores: pendingScores.isEmpty ? null : _buildEntityChanges('teamScore', pendingScores),
-      teamInstrumentScores: pendingInstrumentScores.isEmpty ? null : _buildEntityChanges('teamInstrumentScore', pendingInstrumentScores),
-      teamSetlists: pendingSetlists.isEmpty ? null : _buildEntityChanges('teamSetlist', pendingSetlists),
-      teamSetlistScores: pendingSetlistScores.isEmpty ? null : _buildEntityChanges('teamSetlistScore', pendingSetlistScores),
+    // Build push request using UNIFIED SyncPushRequest with scopeType='team'
+    final request = server.SyncPushRequest(
+      scopeType: 'team',
+      scopeId: teamId,
+      clientScopeVersion: state.localVersion,
+      scores: pendingScores.isEmpty ? null : _buildEntityChanges('score', pendingScores),
+      instrumentScores: pendingInstrumentScores.isEmpty ? null : _buildEntityChanges('instrumentScore', pendingInstrumentScores),
+      setlists: pendingSetlists.isEmpty ? null : _buildEntityChanges('setlist', pendingSetlists),
+      setlistScores: pendingSetlistScores.isEmpty ? null : _buildEntityChanges('setlistScore', pendingSetlistScores),
       deletes: pendingDeletes.isEmpty ? null : pendingDeletes,
     );
 
@@ -139,7 +145,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
     }
 
     final pushResult = result.data!;
-    log('Push result: success=${pushResult.success}, conflict=${pushResult.conflict}, newVersion=${pushResult.newTeamLibraryVersion}');
+    log('Push result: success=${pushResult.success}, conflict=${pushResult.conflict}, newVersion=${pushResult.newScopeVersion}');
 
     // Check for conflict first
     if (pushResult.conflict) {
@@ -153,25 +159,25 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
     }
 
     // Get new version
-    final newVersion = pushResult.newTeamLibraryVersion ?? state.localVersion;
+    final newVersion = pushResult.newScopeVersion ?? state.localVersion;
 
     // Update serverIds from mapping
     final serverIdMapping = pushResult.serverIdMapping ?? {};
     if (serverIdMapping.isNotEmpty) {
-      await _local.updateTeamServerIds(teamId, serverIdMapping);
+      await _local.updateServerIds(serverIdMapping);
     }
 
     // Mark entities as synced
     final entityIds = [
-      ...pendingScores.map((s) => 'teamScore:${s['id']}'),
-      ...pendingInstrumentScores.map((s) => 'teamInstrumentScore:${s['id']}'),
-      ...pendingSetlists.map((s) => 'teamSetlist:${s['id']}'),
-      ...pendingSetlistScores.map((s) => 'teamSetlistScore:${s['id']}'),
+      ...pendingScores.map((s) => s['id'] as String),
+      ...pendingInstrumentScores.map((s) => s['id'] as String),
+      ...pendingSetlists.map((s) => s['id'] as String),
+      ...pendingSetlistScores.map((s) => s['id'] as String),
     ];
-    await _local.markTeamEntitiesAsSynced(teamId, entityIds, newVersion);
+    await _local.markAsSynced(entityIds, newVersion);
 
     // Mark deletions as synced
-    await _local.markPendingDeletesAsSynced(teamId);
+    await _local.markPendingDeletesAsSynced();
 
     updateState(state.copyWith(localVersion: newVersion));
 
@@ -179,7 +185,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
   }
 
   @override
-  Future<PullResult<server.TeamSyncPullResponse>> pull() async {
+  Future<PullResult<server.SyncPullResponse>> pull() async {
     final userId = session.userId;
     if (userId == null) {
       return PullResult(pulledCount: 0, newVersion: state.localVersion);
@@ -197,26 +203,26 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
 
     final pullResult = result.data!;
 
-    log('Pull returned: version=${pullResult.teamLibraryVersion}, scores=${pullResult.teamScores?.length ?? 0}, IS=${pullResult.teamInstrumentScores?.length ?? 0}');
+    log('Pull returned: version=${pullResult.scopeVersion}, scores=${pullResult.scores?.length ?? 0}, IS=${pullResult.instrumentScores?.length ?? 0}');
 
     return PullResult(
-      pulledCount: (pullResult.teamScores?.length ?? 0) +
-                   (pullResult.teamInstrumentScores?.length ?? 0) +
-                   (pullResult.teamSetlists?.length ?? 0),
-      newVersion: pullResult.teamLibraryVersion,
+      pulledCount: (pullResult.scores?.length ?? 0) +
+                   (pullResult.instrumentScores?.length ?? 0) +
+                   (pullResult.setlists?.length ?? 0),
+      newVersion: pullResult.scopeVersion,
       data: pullResult,
     );
   }
 
   @override
-  Future<void> merge(PullResult<server.TeamSyncPullResponse> pullResult) async {
+  Future<void> merge(PullResult<server.SyncPullResponse> pullResult) async {
     if (pullResult.data == null) return;
 
     final data = pullResult.data!;
 
     // Convert server SyncEntityData to maps for local storage
     // Note: Server does NOT return localId, so we generate it from serverId
-    final teamScores = data.teamScores?.map((s) {
+    final teamScores = data.scores?.map((s) {
       final entityData = jsonDecode(s.data) as Map<String, dynamic>;
       return {
         'serverId': s.serverId,
@@ -232,13 +238,13 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
       };
     }).toList() ?? [];
 
-    final teamInstrumentScores = data.teamInstrumentScores?.map((is_) {
+    final teamInstrumentScores = data.instrumentScores?.map((is_) {
       final entityData = jsonDecode(is_.data) as Map<String, dynamic>;
       return {
         'serverId': is_.serverId,
         'localId': entityData['localId'] ?? 'team_${teamId}_is_${is_.serverId}',
-        'teamScoreId': entityData['teamScoreId'],
-        'teamScoreLocalId': entityData['teamScoreLocalId'],
+        'scoreId': entityData['scoreId'],
+        'scoreLocalId': entityData['scoreLocalId'],
         'instrumentType': entityData['instrumentType'],
         'customInstrument': entityData['customInstrument'],
         'pdfHash': entityData['pdfHash'],
@@ -249,7 +255,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
       };
     }).toList() ?? [];
 
-    final teamSetlists = data.teamSetlists?.map((s) {
+    final teamSetlists = data.setlists?.map((s) {
       final entityData = jsonDecode(s.data) as Map<String, dynamic>;
       return {
         'serverId': s.serverId,
@@ -264,15 +270,15 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
       };
     }).toList() ?? [];
 
-    final teamSetlistScores = data.teamSetlistScores?.map((ss) {
+    final teamSetlistScores = data.setlistScores?.map((ss) {
       final entityData = jsonDecode(ss.data) as Map<String, dynamic>;
       return {
         'serverId': ss.serverId,
         'localId': entityData['localId'] ?? 'team_${teamId}_ss_${ss.serverId}',
-        'teamSetlistId': entityData['teamSetlistId'],
-        'teamSetlistLocalId': entityData['teamSetlistLocalId'],
-        'teamScoreId': entityData['teamScoreId'],
-        'teamScoreLocalId': entityData['teamScoreLocalId'],
+        'setlistId': entityData['setlistId'],
+        'setlistLocalId': entityData['setlistLocalId'],
+        'scoreId': entityData['scoreId'],
+        'scoreLocalId': entityData['scoreLocalId'],
         'orderIndex': entityData['orderIndex'],
         'createdAt': entityData['createdAt'],
         'updatedAt': entityData['updatedAt'] ?? ss.updatedAt.toIso8601String(),
@@ -282,13 +288,13 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
 
     log('Merge: ${teamScores.length} scores, ${teamInstrumentScores.length} IS, ${teamSetlists.length} setlists, ${teamSetlistScores.length} SS');
 
-    await _local.applyPulledTeamData(
-      teamId: teamId,
-      teamScores: teamScores,
-      teamInstrumentScores: teamInstrumentScores,
-      teamSetlists: teamSetlists,
-      teamSetlistScores: teamSetlistScores,
-      newVersion: pullResult.newVersion,
+    // Use unified applyPulledData method
+    await _local.applyPulledData(
+      scores: teamScores,
+      instrumentScores: teamInstrumentScores,
+      setlists: teamSetlists,
+      setlistScores: teamSetlistScores,
+      newLibraryVersion: pullResult.newVersion,
     );
 
     updateState(state.copyWith(localVersion: pullResult.newVersion));
@@ -303,7 +309,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
   @override
   Future<void> cleanupAfterPush() async {
     // Per sync_logic.md §6.2: Physically delete synced deletes after Push success
-    await _local.cleanupSyncedDeletes(teamId);
+    await _local.cleanupSyncedDeletes();
   }
 
   // ============================================================================
@@ -322,30 +328,30 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
       // Build data to send
       Map<String, dynamic> dataToSend = Map<String, dynamic>.from(e);
 
-      // For team instrument scores, use teamScoreServerId if available
-      if (type == 'teamInstrumentScore') {
-        final teamScoreServerId = e['teamScoreServerId'] as int?;
-        log('TIS build: id=${e['id']}, teamScoreId=${e['teamScoreId']}, teamScoreServerId=$teamScoreServerId');
-        if (teamScoreServerId != null) {
-          dataToSend['teamScoreId'] = teamScoreServerId;
-          log('TIS using teamScoreServerId: $teamScoreServerId');
+      // For instrument scores, use scoreServerId if available
+      if (type == 'instrumentScore') {
+        final scoreServerId = e['scoreServerId'] as int?;
+        log('IS build: id=${e['id']}, scoreId=${e['scoreId']}, scoreServerId=$scoreServerId');
+        if (scoreServerId != null) {
+          dataToSend['scoreId'] = scoreServerId;
+          log('IS using scoreServerId: $scoreServerId');
         } else {
-          log('TIS keeping local teamScoreId: ${e['teamScoreId']}');
+          log('IS keeping local scoreId: ${e['scoreId']}');
         }
       }
 
-      // For team setlist scores, map both teamSetlistId and teamScoreId to server IDs
-      if (type == 'teamSetlistScore') {
-        final teamSetlistServerId = e['teamSetlistServerId'] as int?;
-        final teamScoreServerId = e['teamScoreServerId'] as int?;
-        log('TSS build: id=${e['id']}, teamSetlistId=${e['teamSetlistId']}, teamSetlistServerId=$teamSetlistServerId, teamScoreId=${e['teamScoreId']}, teamScoreServerId=$teamScoreServerId');
-        if (teamSetlistServerId != null) {
-          dataToSend['teamSetlistId'] = teamSetlistServerId;
-          log('TSS using teamSetlistServerId: $teamSetlistServerId');
+      // For setlist scores, map both setlistId and scoreId to server IDs
+      if (type == 'setlistScore') {
+        final setlistServerId = e['setlistServerId'] as int?;
+        final scoreServerId = e['scoreServerId'] as int?;
+        log('SS build: id=${e['id']}, setlistId=${e['setlistId']}, setlistServerId=$setlistServerId, scoreId=${e['scoreId']}, scoreServerId=$scoreServerId');
+        if (setlistServerId != null) {
+          dataToSend['setlistId'] = setlistServerId;
+          log('SS using setlistServerId: $setlistServerId');
         }
-        if (teamScoreServerId != null) {
-          dataToSend['teamScoreId'] = teamScoreServerId;
-          log('TSS using teamScoreServerId: $teamScoreServerId');
+        if (scoreServerId != null) {
+          dataToSend['scoreId'] = scoreServerId;
+          log('SS using scoreServerId: $scoreServerId');
         }
       }
 
@@ -368,7 +374,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
     final userId = session.userId;
     if (userId == null) return;
 
-    final pendingPdfs = await _local.getTeamInstrumentScoresNeedingPdfUpload(teamId);
+    final pendingPdfs = await _local.getPendingPdfUploads();
 
     for (final isData in pendingPdfs) {
       final pdfPath = isData['pdfPath'] as String?;
@@ -389,7 +395,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
         final checkResult = await _api.checkPdfHash(userId: userId, hash: hash);
         if (checkResult.isSuccess && checkResult.data == true) {
           log('PDF already on server (instant upload): $hash');
-          await _local.updateTeamInstrumentScorePdfStatus(isData['id'] as String, hash, 'synced');
+          await _local.markPdfAsSynced(isData['id'] as String, hash);
           continue;
         }
 
@@ -402,7 +408,7 @@ class TeamSyncCoordinator extends BaseSyncCoordinator<TeamSyncState, server.Team
 
         if (uploadResult.isSuccess) {
           log('PDF uploaded: $hash');
-          await _local.updateTeamInstrumentScorePdfStatus(isData['id'] as String, hash, 'synced');
+          await _local.markPdfAsSynced(isData['id'] as String, hash);
         } else {
           logError('PDF upload failed', uploadResult.error?.message ?? 'Unknown error');
         }
@@ -465,7 +471,8 @@ class TeamSyncManager {
   /// Get or create coordinator for a team
   Future<TeamSyncCoordinator> getCoordinator(int teamId) async {
     if (!_coordinators.containsKey(teamId)) {
-      final local = DriftTeamLocalDataSource(_db);
+      // Create team-scoped data source using unified ScopedLocalDataSource
+      final local = ScopedLocalDataSource(_db, DataScope.team(teamId));
       final coordinator = TeamSyncCoordinator(
         teamId: teamId,
         local: local,

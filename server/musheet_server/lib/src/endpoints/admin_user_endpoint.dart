@@ -213,7 +213,7 @@ class AdminUserEndpoint extends Endpoint {
     // Delete user's scores and related data
     final scores = await Score.db.find(
       session,
-      where: (t) => t.userId.equals(userId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(userId),
     );
     
     for (final score in scores) {
@@ -239,13 +239,13 @@ class AdminUserEndpoint extends Endpoint {
     
     await Score.db.deleteWhere(
       session,
-      where: (t) => t.userId.equals(userId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(userId),
     );
 
     // Delete setlists
     final setlists = await Setlist.db.find(
       session,
-      where: (t) => t.userId.equals(userId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(userId),
     );
     
     for (final setlist in setlists) {
@@ -257,7 +257,7 @@ class AdminUserEndpoint extends Endpoint {
     
     await Setlist.db.deleteWhere(
       session,
-      where: (t) => t.userId.equals(userId),
+      where: (t) => t.scopeType.equals('user') & t.scopeId.equals(userId),
     );
 
     // Remove from teams

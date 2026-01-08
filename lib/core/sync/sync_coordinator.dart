@@ -145,13 +145,11 @@ class SyncCoordinator
     extends BaseSyncCoordinator<SyncState, server.SyncPullResponse> {
   static SyncCoordinator? _instance;
 
-  final LocalDataSource _local;
+  final SyncableDataSource _local;
   final ApiClient _api;
 
-  AppLifecycleListener? _lifecycleListener;
-
   SyncCoordinator._({
-    required LocalDataSource local,
+    required SyncableDataSource local,
     required ApiClient api,
     required super.session,
     required super.network,
@@ -160,7 +158,7 @@ class SyncCoordinator
 
   /// Initialize the singleton
   static Future<SyncCoordinator> initialize({
-    required LocalDataSource local,
+    required SyncableDataSource local,
     required ApiClient api,
     required SessionService session,
     required NetworkService network,
@@ -222,19 +220,9 @@ class SyncCoordinator
   Future<void> _init() async {
     await super.initializeBase();
 
-    // Note: Session login/logout monitoring is handled by UnifiedSyncManager
-    // to avoid duplicate sync triggers. Per sync_logic.md §9.5.
-
-    // Set up lifecycle monitoring for this coordinator
-    _startLifecycleMonitoring();
-  }
-
-  void _startLifecycleMonitoring() {
-    _lifecycleListener = AppLifecycleListener(
-      onResume: () {
-        requestSync(immediate: false);
-      },
-    );
+    // Note: Session login/logout monitoring AND lifecycle monitoring are handled
+    // by UnifiedSyncManager to avoid duplicate sync triggers. Per sync_logic.md §9.5.
+    // SyncCoordinator should NOT set up its own lifecycle monitoring.
   }
 
   // ============================================================================
@@ -307,10 +295,11 @@ class SyncCoordinator
     log('Actually pushing: ${scoreChanges.length} scores, ${isChanges.length} IS, ${setlistChanges.length} setlists, ${setlistScoreChanges.length} SS, ${pendingDeletes.length} deletes');
 
     final request = server.SyncPushRequest(
-      clientLibraryVersion: state.localVersion,
+      scopeType: 'user',
+      scopeId: userId,
+      clientScopeVersion: state.localVersion,
       scores: scoreChanges.isEmpty ? null : scoreChanges,
       instrumentScores: isChanges.isEmpty ? null : isChanges,
-      annotations: null,
       setlists: setlistChanges.isEmpty ? null : setlistChanges,
       setlistScores: setlistScoreChanges.isEmpty ? null : setlistScoreChanges,
       deletes: pendingDeletes.isEmpty ? null : pendingDeletes,
@@ -323,7 +312,7 @@ class SyncCoordinator
     }
 
     final pushResult = result.data!;
-    log('Push result: success=${pushResult.success}, conflict=${pushResult.conflict}, newVersion=${pushResult.newLibraryVersion}');
+    log('Push result: success=${pushResult.success}, conflict=${pushResult.conflict}, newVersion=${pushResult.newScopeVersion}');
 
     // Check for conflict first
     if (pushResult.conflict) {
@@ -336,7 +325,7 @@ class SyncCoordinator
     }
 
     // Get new version
-    final newVersion = pushResult.newLibraryVersion ?? state.localVersion;
+    final newVersion = pushResult.newScopeVersion ?? state.localVersion;
 
     // Update serverIds from mapping
     final serverIdMapping = pushResult.serverIdMapping ?? {};
@@ -428,13 +417,13 @@ class SyncCoordinator
     }
 
     final pullResult = result.data!;
-    log('Pull returned: version=${pullResult.libraryVersion}, scores=${pullResult.scores?.length ?? 0}');
+    log('Pull returned: version=${pullResult.scopeVersion}, scores=${pullResult.scores?.length ?? 0}');
 
     return PullResult(
       pulledCount: (pullResult.scores?.length ?? 0) +
           (pullResult.instrumentScores?.length ?? 0) +
           (pullResult.setlists?.length ?? 0),
-      newVersion: pullResult.libraryVersion,
+      newVersion: pullResult.scopeVersion,
       data: pullResult,
     );
   }
@@ -626,8 +615,8 @@ class SyncCoordinator
 
   @override
   void dispose() {
-    _lifecycleListener?.dispose();
-    // Note: Session listeners are no longer registered in _init
+    // Note: Lifecycle monitoring is handled by UnifiedSyncManager
+    // No lifecycle listener to dispose here
     super.dispose();
   }
 }

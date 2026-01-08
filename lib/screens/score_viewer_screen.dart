@@ -7,12 +7,11 @@ import 'package:go_router/go_router.dart';
 import 'package:pdfrx/pdfrx.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
-import '../models/score.dart';
 import '../models/team.dart';
 import '../models/annotation.dart';
 import '../models/viewer_data.dart';
 import '../providers/scores_state_provider.dart';
-import '../providers/teams_state_provider.dart';
+import '../core/data/data_scope.dart';
 import '../providers/core_providers.dart';
 import '../core/sync/pdf_sync_service.dart';
 import '../theme/app_colors.dart';
@@ -30,48 +29,27 @@ import 'library_screen.dart'
         getBestInstrumentIndex;
 
 /// Unified Score Viewer Screen
-/// Supports both personal library scores and team scores
+/// Supports both personal library scores and team scores using DataScope
 class ScoreViewerScreen extends ConsumerStatefulWidget {
-  // Personal library mode
-  final Score? score;
+  final DataScope scope;
+  final Score score;
   final InstrumentScore? instrumentScore;
   final List<Score>? setlistScores;
-
-  // Team mode
-  final TeamScore? teamScore;
-  final TeamInstrumentScore? teamInstrumentScore;
-  final List<TeamScore>? teamSetlistScores;
-
-  // Common
   final int? currentIndex;
   final String? setlistName;
 
-  /// Constructor for personal library scores
   const ScoreViewerScreen({
     super.key,
-    required Score this.score,
+    required this.scope,
+    required this.score,
     this.instrumentScore,
     this.setlistScores,
     this.currentIndex,
     this.setlistName,
-  }) : teamScore = null,
-       teamInstrumentScore = null,
-       teamSetlistScores = null;
-
-  /// Constructor for team scores
-  const ScoreViewerScreen.team({
-    super.key,
-    required TeamScore this.teamScore,
-    this.teamInstrumentScore,
-    this.teamSetlistScores,
-    this.currentIndex,
-    this.setlistName,
-  }) : score = null,
-       instrumentScore = null,
-       setlistScores = null;
+  });
 
   /// Check if this is a team score viewer
-  bool get isTeamMode => teamScore != null;
+  bool get isTeamMode => scope.isTeam;
 
   @override
   ConsumerState<ScoreViewerScreen> createState() => _ScoreViewerScreenState();
@@ -120,7 +98,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   Size _previewSize = Size.zero;
 
   // Cached provider notifier for safe dispose usage
-  ScoresStateNotifier? _scoresNotifier;
+  ScopedScoresNotifier? _scoresNotifier;
 
   // BPM save debounce for team mode
   Timer? _bpmSaveDebounce;
@@ -146,14 +124,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   void initState() {
     super.initState();
 
-    // Initialize unified score data
+    // Initialize unified score data based on scope
     if (widget.isTeamMode) {
-      _scoreData = ViewerScoreData.fromTeam(widget.teamScore!);
-      _currentInstrument = widget.teamInstrumentScore != null
-          ? ViewerInstrumentData.fromTeam(widget.teamInstrumentScore!)
+      _scoreData = ViewerScoreData.fromTeam(widget.score);
+      _currentInstrument = widget.instrumentScore != null
+          ? ViewerInstrumentData.fromTeam(widget.instrumentScore!)
           : _scoreData.firstInstrumentScore;
     } else {
-      _scoreData = ViewerScoreData.fromPersonal(widget.score!);
+      _scoreData = ViewerScoreData.fromPersonal(widget.score);
       _currentInstrument = widget.instrumentScore != null
           ? ViewerInstrumentData.fromPersonal(widget.instrumentScore!)
           : _scoreData.firstInstrumentScore;
@@ -166,13 +144,11 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     _initAnnotations();
     _loadPdfDocument();
 
-    // Cache the notifier for safe dispose usage (personal mode only)
-    if (!_isTeamMode) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _scoresNotifier = ref.read(scoresStateProvider.notifier);
-      });
-    }
+    // Cache the notifier for safe dispose usage
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scoresNotifier = ref.read(scopedScoresProvider(widget.scope).notifier);
+    });
   }
 
   void _onMetronomeChanged() {
@@ -191,20 +167,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   /// Save BPM - handles both personal and team modes
   void _saveBpm(int bpm) async {
-    if (_isTeamMode) {
-      // Team mode: save via team operations
-      if (widget.teamScore != null) {
-        final updatedScore = widget.teamScore!.copyWith(bpm: bpm);
-        await updateTeamScore(
-          ref: ref,
-          teamServerId: widget.teamScore!.teamId,
-          score: updatedScore,
-        );
-      }
-    } else {
-      // Personal mode: save via scores provider
-      ref.read(scoresStateProvider.notifier).updateBpm(_scoreData.id, bpm);
-    }
+    final updatedScore = widget.score.copyWith(bpm: bpm);
+    await _scoresNotifier?.updateScore(updatedScore);
   }
 
   void _initAnnotations() {
@@ -619,43 +583,41 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   }
 
   void _navigateToScore(int index) async {
-    if (_isTeamMode) {
-      _navigateToTeamScore(index);
+    if (widget.setlistScores == null ||
+        index < 0 ||
+        index >= widget.setlistScores!.length) {
       return;
     }
 
-    if (widget.setlistScores != null &&
-        index >= 0 &&
-        index < widget.setlistScores!.length) {
-      // Record the score index being navigated to in the setlist
-      if (widget.setlistScores != null) {
-        // Find the setlist ID by looking up which setlist contains these scores
-        // We need to get the setlist ID from somewhere - we can use the setlistName to find it
-        // For now, we'll use a simple approach: store by setlist name or pass setlist ID
-        // Since we have setlistName, we can create a composite key or just track by the score order
-        final setlists = ref.read(setlistsListProvider);
-        final currentSetlist = setlists.firstWhere(
-          (s) => s.name == widget.setlistName,
-          orElse: () => setlists.first,
-        );
-        ref
-            .read(lastOpenedScoreInSetlistProvider.notifier)
-            .recordLastOpened(currentSetlist.id, index);
-      }
+    // Record the score index being navigated to in the setlist (personal mode only)
+    if (!_isTeamMode) {
+      final setlists = ref.read(scopedSetlistsListProvider(widget.scope));
+      final currentSetlist = setlists.firstWhere(
+        (s) => s.name == widget.setlistName,
+        orElse: () => setlists.first,
+      );
+      ref
+          .read(lastOpenedScoreInSetlistProvider.notifier)
+          .recordLastOpened(currentSetlist.id, index);
+    }
 
-      // Stop and destroy metronome before navigating to properly release audio resources
-      _metronomeController?.stop();
-      _metronomeController?.removeListener(_onMetronomeChanged);
-      _metronomeController?.dispose();
-      _metronomeController = null;
+    // Stop and destroy metronome before navigating to properly release audio resources
+    _metronomeController?.stop();
+    _metronomeController?.removeListener(_onMetronomeChanged);
+    _metronomeController?.dispose();
+    _metronomeController = null;
 
-      // Small delay to allow audio resources to be fully released
-      await Future.delayed(const Duration(milliseconds: 50));
+    // Small delay to allow audio resources to be fully released
+    await Future.delayed(const Duration(milliseconds: 50));
 
-      if (!mounted) return;
+    if (!mounted) return;
 
-      // Get the best instrument for the target score
-      final targetScore = widget.setlistScores![index];
+    // Get the best instrument for the target score
+    final targetScore = widget.setlistScores![index];
+    InstrumentScore? instrumentScore;
+
+    if (!_isTeamMode) {
+      // Personal mode: use instrument priority
       final lastOpenedInstrumentIndex = ref
           .read(lastOpenedInstrumentInScoreProvider.notifier)
           .getLastOpened(targetScore.id);
@@ -665,53 +627,27 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         lastOpenedInstrumentIndex,
         preferredInstrument,
       );
-      final instrumentScore = targetScore.instrumentScores.isNotEmpty
+      instrumentScore = targetScore.instrumentScores.isNotEmpty
           ? targetScore.instrumentScores[bestInstrumentIndex]
           : null;
-
-      context.replace(
-        AppRoutes.scoreViewer,
-        extra: {
-          'score': targetScore,
-          'instrumentScore': instrumentScore,
-          'setlistScores': widget.setlistScores,
-          'currentIndex': index,
-          'setlistName': widget.setlistName,
-        },
-      );
-    }
-  }
-
-  /// Navigate to team score (team mode)
-  void _navigateToTeamScore(int index) async {
-    if (widget.teamSetlistScores != null &&
-        index >= 0 &&
-        index < widget.teamSetlistScores!.length) {
-      // Stop and destroy metronome before navigating
-      _metronomeController?.stop();
-      _metronomeController?.removeListener(_onMetronomeChanged);
-      _metronomeController?.dispose();
-      _metronomeController = null;
-
-      await Future.delayed(const Duration(milliseconds: 50));
-      if (!mounted) return;
-
-      final targetScore = widget.teamSetlistScores![index];
-      final instrumentScore = targetScore.instrumentScores.isNotEmpty
+    } else {
+      // Team mode: use first instrument
+      instrumentScore = targetScore.instrumentScores.isNotEmpty
           ? targetScore.instrumentScores.first
           : null;
-
-      context.replace(
-        AppRoutes.teamScoreViewer,
-        extra: {
-          'teamScore': targetScore,
-          'instrumentScore': instrumentScore,
-          'setlistScores': widget.teamSetlistScores,
-          'currentIndex': index,
-          'setlistName': widget.setlistName,
-        },
-      );
     }
+
+    context.replace(
+      AppRoutes.scoreViewer,
+      extra: {
+        'scope': widget.scope,
+        'score': targetScore,
+        'instrumentScore': instrumentScore,
+        'setlistScores': widget.setlistScores,
+        'currentIndex': index,
+        'setlistName': widget.setlistName,
+      },
+    );
   }
 
   @override
@@ -1233,9 +1169,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                     const itemHeight = 48.0;
                     const listHeight = 168.0;
                     const listPadding = 12.0; // vertical padding 6*2
-                    final int scoreCount = _isTeamMode
-                        ? (widget.teamSetlistScores?.length ?? 1)
-                        : (widget.setlistScores?.length ?? 1);
+                    final int scoreCount =
+                        widget.setlistScores?.length ?? 1;
                     final totalContentHeight =
                         scoreCount * itemHeight + listPadding;
                     final maxScrollOffset = (totalContentHeight - listHeight)
@@ -1845,16 +1780,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   Widget _buildSetlistNavModal() {
     // Get score count and check if we have a setlist based on mode
-    final int scoreCount;
-    final bool hasSetlist;
-
-    if (_isTeamMode) {
-      scoreCount = widget.teamSetlistScores?.length ?? 1;
-      hasSetlist = widget.teamSetlistScores != null;
-    } else {
-      scoreCount = widget.setlistScores?.length ?? 1;
-      hasSetlist = widget.setlistScores != null;
-    }
+    final int scoreCount = widget.setlistScores?.length ?? 1;
+    final bool hasSetlist = widget.setlistScores != null;
 
     return Positioned(
       top: MediaQuery.of(context).padding.top + 72,
@@ -1922,16 +1849,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
                   itemCount: scoreCount,
                   itemBuilder: (context, index) {
                     // Get score title based on mode
-                    final String scoreTitle;
-                    if (_isTeamMode) {
-                      scoreTitle =
-                          widget.teamSetlistScores?[index].title ??
-                          _scoreData.title;
-                    } else {
-                      scoreTitle =
-                          widget.setlistScores?[index].title ??
-                          _scoreData.title;
-                    }
+                    final String scoreTitle =
+                        widget.setlistScores?[index].title ??
+                        _scoreData.title;
                     final isCurrent = hasSetlist
                         ? (index == widget.currentIndex)
                         : true;

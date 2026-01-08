@@ -1,50 +1,29 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/setlist.dart';
-import '../models/score.dart';
 import '../models/team.dart';
-import '../models/base_models.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/scores_state_provider.dart';
-import '../providers/teams_state_provider.dart';
-import '../providers/team_operations_provider.dart';
+import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
+import '../router/app_router.dart';
 import 'library_screen.dart'
-    show scoreSortProvider, recentlyOpenedScoresProvider, SortState, SortType;
+    show scoreSortProvider, recentlyOpenedScoresProvider, SortState, SortType, lastOpenedInstrumentInScoreProvider;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
-import 'setlist_detail_adapter.dart';
 
-/// Unified Setlist Detail Screen using adapter pattern
+/// Unified Setlist Detail Screen using DataScope
 ///
-/// For Personal Library: use [SetlistDetailScreen.library]
-/// For Team: use [SetlistDetailScreen.team]
+/// Works with both personal Library (DataScope.user) and Team (DataScope.team)
 class SetlistDetailScreen extends ConsumerStatefulWidget {
-  /// Personal setlist (for Library mode)
-  final Setlist? setlist;
+  final DataScope scope;
+  final Setlist setlist;
 
-  /// Team setlist (for Team mode)
-  final TeamSetlist? teamSetlist;
-
-  /// Team server ID (required for Team mode)
-  final int? teamServerId;
-
-  /// Constructor for Library mode
-  const SetlistDetailScreen.library({
+  const SetlistDetailScreen({
     super.key,
+    required this.scope,
     required this.setlist,
-  }) : teamSetlist = null,
-       teamServerId = null;
-
-  /// Constructor for Team mode
-  const SetlistDetailScreen.team({
-    super.key,
-    required this.teamSetlist,
-    required this.teamServerId,
-  }) : setlist = null;
-
-  bool get isTeamMode => teamSetlist != null;
+  });
 
   @override
   ConsumerState<SetlistDetailScreen> createState() =>
@@ -61,8 +40,13 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       TextEditingController();
   String? _editErrorMessage;
 
-  /// Adapter instance (created per build for latest data)
-  SetlistDetailAdapter? _adapter;
+  // Helper getters
+  DataScope get _scope => widget.scope;
+  bool get _isTeam => _scope.isTeam;
+
+  /// Get the setlists notifier for current scope
+  ScopedSetlistsNotifier get _setlistsNotifier =>
+      ref.read(scopedSetlistsProvider(_scope).notifier);
 
   @override
   void dispose() {
@@ -77,79 +61,43 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   }
 
   void _openEditModal() {
-    final adapter = _adapter;
-    if (adapter == null) return;
-
-    _editNameController.text = adapter.setlist.name;
-    _editDescriptionController.text = adapter.setlist.description ?? '';
+    final currentSetlist = _getCurrentSetlist();
+    _editNameController.text = currentSetlist.name;
+    _editDescriptionController.text = currentSetlist.description ?? '';
     _editErrorMessage = null;
     setState(() => _showEditModal = true);
   }
 
+  /// Get current setlist from state (fresh data)
+  Setlist _getCurrentSetlist() {
+    final setlists = ref.read(scopedSetlistsListProvider(_scope));
+    return setlists.firstWhere(
+      (s) => s.id == widget.setlist.id,
+      orElse: () => widget.setlist,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (widget.isTeamMode) {
-      return _buildTeamMode(context);
-    } else {
-      return _buildLibraryMode(context);
-    }
-  }
+    // Watch for updates to setlists and scores
+    final setlists = ref.watch(scopedSetlistsListProvider(_scope));
+    final allScores = ref.watch(scopedScoresListProvider(_scope));
 
-  /// Build for Team mode - creates TeamSetlistAdapter
-  /// Uses synchronous list providers (like library's scoresListProvider pattern)
-  Widget _buildTeamMode(BuildContext context) {
-    final teamScores = ref.watch(teamScoresListProvider(widget.teamServerId!));
-    final teamSetlists = ref.watch(
-      teamSetlistsListProvider(widget.teamServerId!),
-    );
-
-    final currentSetlist = teamSetlists.firstWhere(
-      (s) => s.id == widget.teamSetlist!.id,
-      orElse: () => widget.teamSetlist!,
-    );
-
-    // Create adapter with fresh data
-    _adapter = TeamSetlistAdapter(
-      ref: ref,
-      setlist: currentSetlist,
-      teamServerId: widget.teamServerId!,
-      allScores: teamScores,
-    );
-
-    return _buildContent(
-      adapter: _adapter! as TeamSetlistAdapter,
-      allScores: teamScores,
-    );
-  }
-
-  /// Build for Library mode - creates LibrarySetlistAdapter
-  Widget _buildLibraryMode(BuildContext context) {
-    final scores = ref.watch(scoresListProvider);
-    final setlists = ref.watch(setlistsListProvider);
     final currentSetlist = setlists.firstWhere(
-      (s) => s.id == widget.setlist!.id,
-      orElse: () => widget.setlist!,
+      (s) => s.id == widget.setlist.id,
+      orElse: () => widget.setlist,
     );
 
-    // Create adapter with fresh data
-    _adapter = LibrarySetlistAdapter(
-      ref: ref,
-      setlist: currentSetlist,
-      allScores: scores,
-    );
-
-    return _buildContent(
-      adapter: _adapter! as LibrarySetlistAdapter,
-      allScores: scores,
-    );
-  }
-
-  /// Build the unified content using adapter
-  Widget _buildContent<TSetlist extends SetlistBase, TScore extends ScoreBase>({
-    required SetlistDetailAdapter<TSetlist, TScore> adapter,
-    required List<TScore> allScores,
-  }) {
-    final setlistScores = adapter.setlistScores;
+    final setlistScores = currentSetlist.scoreIds
+        .map((id) {
+          try {
+            return allScores.firstWhere((s) => s.id == id);
+          } catch (_) {
+            return null;
+          }
+        })
+        .whereType<Score>()
+        .toList();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -157,7 +105,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         children: [
           Column(
             children: [
-              _buildHeader(adapter),
+              _buildHeader(currentSetlist, setlistScores.length),
               Expanded(
                 child: setlistScores.isEmpty
                     ? const EmptyState(
@@ -189,19 +137,21 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           );
                         },
                         onReorder: (oldIndex, newIndex) async {
-                          await adapter.reorderScores(oldIndex, newIndex);
-                          setState(() {}); // Refresh UI
+                          if (newIndex > oldIndex) newIndex--;
+                          final newOrder = List<String>.from(currentSetlist.scoreIds);
+                          final item = newOrder.removeAt(oldIndex);
+                          newOrder.insert(newIndex, item);
+                          await _setlistsNotifier.reorderScores(currentSetlist.id, newOrder);
                         },
                         itemBuilder: (context, index) {
                           final score = setlistScores[index];
                           return _buildScoreItem(
-                            key: ValueKey(adapter.getScoreId(score)),
+                            key: ValueKey(score.id),
                             index: index,
-                            title: adapter.getScoreTitle(score),
-                            composer: adapter.getScoreComposer(score),
-                            onTap: () =>
-                                adapter.navigateToScore(context, index),
-                            onRemove: () => _showRemoveDialog(adapter, score),
+                            title: score.title,
+                            composer: score.composer,
+                            onTap: () => _navigateToScore(currentSetlist, setlistScores, index),
+                            onRemove: () => _showRemoveDialog(currentSetlist.id, score),
                           );
                         },
                       ),
@@ -209,19 +159,43 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
               _buildBottomButton(),
             ],
           ),
-          if (_showAddModal) _buildAddScoreModal(adapter, allScores),
-          if (_showEditModal) _buildEditModal(adapter),
+          if (_showAddModal) _buildAddScoreModal(currentSetlist, allScores),
+          if (_showEditModal) _buildEditModal(currentSetlist, setlists),
         ],
       ),
     );
   }
 
-  Widget _buildHeader<TSetlist extends SetlistBase, TScore extends ScoreBase>(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-  ) {
-    final setlist = adapter.setlist;
-    final scoreCount = adapter.setlistScores.length;
+  /// Navigate to score viewer with setlist context
+  void _navigateToScore(Setlist setlist, List<Score> setlistScores, int index) {
+    final score = setlistScores[index];
 
+    // Get preferred instrument
+    InstrumentScore? instrumentScore;
+    if (!_isTeam && score.instrumentScores.isNotEmpty) {
+      final lastOpened = ref.read(lastOpenedInstrumentInScoreProvider);
+      final lastIndex = lastOpened[score.id];
+      if (lastIndex != null && lastIndex < score.instrumentScores.length) {
+        instrumentScore = score.instrumentScores[lastIndex];
+      } else {
+        instrumentScore = score.instrumentScores.first;
+      }
+    } else if (score.instrumentScores.isNotEmpty) {
+      instrumentScore = score.instrumentScores.first;
+    }
+
+    AppNavigation.navigateToScoreViewer(
+      context,
+      scope: _scope,
+      score: score,
+      instrumentScore: instrumentScore,
+      setlistScores: setlistScores,
+      currentIndex: index,
+      setlistName: setlist.name,
+    );
+  }
+
+  Widget _buildHeader(Setlist setlist, int scoreCount) {
     return Container(
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -284,7 +258,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                       const SizedBox(height: 2),
                     ],
                     Text(
-                      '$scoreCount ${scoreCount == 1 ? "score" : "scores"} · ${adapter.sourceLabel} · ${_formatDate(setlist.createdAt)}',
+                      '$scoreCount ${scoreCount == 1 ? "score" : "scores"} · ${_isTeam ? "Team" : "Personal"} · ${_formatDate(setlist.createdAt)}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.gray400,
@@ -470,11 +444,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  void
-  _showRemoveDialog<TSetlist extends SetlistBase, TScore extends ScoreBase>(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-    TScore score,
-  ) {
+  void _showRemoveDialog(String setlistId, Score score) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -489,9 +459,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await adapter.removeScore(adapter.getScoreId(score));
+              await _setlistsNotifier.removeScoreFromSetlist(setlistId, score.id);
               if (ctx.mounted) Navigator.pop(ctx);
-              setState(() {});
             },
             child: const Text(
               'Remove',
@@ -505,10 +474,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
 
   // ==================== Edit Modal ====================
 
-  Widget
-  _buildEditModal<TSetlist extends SetlistBase, TScore extends ScoreBase>(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-  ) {
+  Widget _buildEditModal(Setlist currentSetlist, List<Setlist> allSetlists) {
     return Stack(
       children: [
         Positioned.fill(
@@ -536,7 +502,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _buildEditModalHeader(),
-                _buildEditModalContent(adapter),
+                _buildEditModalContent(currentSetlist, allSetlists),
               ],
             ),
           ),
@@ -601,12 +567,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  Widget _buildEditModalContent<
-    TSetlist extends SetlistBase,
-    TScore extends ScoreBase
-  >(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-  ) {
+  Widget _buildEditModalContent(Setlist currentSetlist, List<Setlist> allSetlists) {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -692,7 +653,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () => _saveEdit(adapter),
+                  onPressed: () => _saveEdit(currentSetlist, allSetlists),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.emerald500,
                     foregroundColor: Colors.white,
@@ -715,39 +676,40 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  void _saveEdit<TSetlist extends SetlistBase, TScore extends ScoreBase>(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-  ) async {
+  void _saveEdit(Setlist currentSetlist, List<Setlist> allSetlists) async {
     final name = _editNameController.text.trim();
     if (name.isEmpty) return;
 
-    if (adapter.isDuplicateName(name)) {
+    // Check for duplicate name
+    final isDuplicate = allSetlists.any(
+      (s) => s.id != currentSetlist.id && s.name.toLowerCase() == name.toLowerCase(),
+    );
+    if (isDuplicate) {
       setState(
         () => _editErrorMessage = 'A setlist with this name already exists',
       );
       return;
     }
 
-    await adapter.updateSetlist(
+    final updatedSetlist = currentSetlist.copyWith(
       name: name,
-      description: _editDescriptionController.text.trim(),
+      description: _editDescriptionController.text.trim().isEmpty
+          ? null
+          : _editDescriptionController.text.trim(),
     );
+    await _setlistsNotifier.updateSetlist(updatedSetlist);
     setState(() => _showEditModal = false);
   }
 
   // ==================== Add Score Modal ====================
 
-  Widget
-  _buildAddScoreModal<TSetlist extends SetlistBase, TScore extends ScoreBase>(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-    List<TScore> allScores,
-  ) {
-    final currentIds = adapter.currentScoreIds;
+  Widget _buildAddScoreModal(Setlist currentSetlist, List<Score> allScores) {
+    final currentIds = currentSetlist.scoreIds.toSet();
     final availableScores = allScores
         .where((s) => !currentIds.contains(s.id))
         .toList();
 
-    List<TScore> filteredScores;
+    List<Score> filteredScores;
     if (_addScoreSearchQuery.isEmpty) {
       filteredScores = availableScores;
     } else {
@@ -755,21 +717,17 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
       filteredScores = availableScores
           .where(
             (s) =>
-                adapter.getScoreTitle(s).toLowerCase().contains(query) ||
-                adapter.getScoreComposer(s).toLowerCase().contains(query),
+                s.title.toLowerCase().contains(query) ||
+                s.composer.toLowerCase().contains(query),
           )
           .toList();
     }
 
     // Apply sorting for library mode
-    if (adapter is LibrarySetlistAdapter) {
+    if (!_isTeam) {
       final sortState = ref.watch(scoreSortProvider);
       final recentlyOpened = ref.watch(recentlyOpenedScoresProvider);
-      filteredScores = _sortScores(
-        filteredScores.cast<Score>(),
-        sortState,
-        recentlyOpened,
-      ).cast<TScore>();
+      filteredScores = _sortScores(filteredScores, sortState, recentlyOpened);
     }
 
     return Stack(
@@ -807,9 +765,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _buildAddModalHeader(adapter),
+                _buildAddModalHeader(),
                 if (availableScores.isNotEmpty) _buildSearchBar(),
-                _buildScoreList(adapter, availableScores, filteredScores),
+                _buildScoreList(currentSetlist, availableScores, filteredScores),
               ],
             ),
           ),
@@ -818,11 +776,8 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  Widget
-  _buildAddModalHeader<TSetlist extends SetlistBase, TScore extends ScoreBase>(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-  ) {
-    final subtitle = adapter is TeamSetlistAdapter
+  Widget _buildAddModalHeader() {
+    final subtitle = _isTeam
         ? 'Choose team scores to add'
         : 'Choose scores to add';
 
@@ -939,13 +894,12 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
     );
   }
 
-  Widget
-  _buildScoreList<TSetlist extends SetlistBase, TScore extends ScoreBase>(
-    SetlistDetailAdapter<TSetlist, TScore> adapter,
-    List<TScore> availableScores,
-    List<TScore> filteredScores,
+  Widget _buildScoreList(
+    Setlist currentSetlist,
+    List<Score> availableScores,
+    List<Score> filteredScores,
   ) {
-    final emptyMessage = adapter is TeamSetlistAdapter
+    final emptyMessage = _isTeam
         ? 'All team scores have been added to this setlist'
         : 'All scores have been added to this setlist';
 
@@ -977,10 +931,13 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                 itemBuilder: (context, index) {
                   final score = filteredScores[index];
                   return _buildAddScoreItem(
-                    title: adapter.getScoreTitle(score),
-                    composer: adapter.getScoreComposer(score),
+                    title: score.title,
+                    composer: score.composer,
                     onTap: () async {
-                      await adapter.addScore(adapter.getScoreId(score));
+                      await _setlistsNotifier.addScoreToSetlist(
+                        currentSetlist.id,
+                        score.id,
+                      );
                       setState(() {
                         _showAddModal = false;
                         _addScoreSearchQuery = '';

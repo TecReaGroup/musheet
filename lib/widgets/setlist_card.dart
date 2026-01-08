@@ -97,10 +97,10 @@ class SetlistCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         // Description (optional)
-        if (showDescription && setlist.description.isNotEmpty) ...[
+        if (showDescription && (setlist.description ?? '').isNotEmpty) ...[
           const SizedBox(height: 2),
           Text(
-            setlist.description,
+            setlist.description ?? '',
             style: TextStyle(
               fontSize: compact ? 12 : 14,
               color: AppColors.gray600,
@@ -221,10 +221,10 @@ class SetlistCardWithActions extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (setlist.description.isNotEmpty) ...[
+                        if ((setlist.description ?? '').isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            setlist.description,
+                            setlist.description ?? '',
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.gray600,

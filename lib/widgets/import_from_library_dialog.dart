@@ -28,8 +28,8 @@ IconData _getInstrumentIcon(InstrumentType type) {
 /// Dialog for importing instrument scores from personal library to Team
 /// Per TEAM_SYNC_LOGIC.md §3.3.1: Select source Score �?Select instruments �?Execute import
 class ImportFromLibraryDialog extends ConsumerStatefulWidget {
-  /// The target TeamScore to import instruments into
-  final TeamScore targetTeamScore;
+  /// The target Score to import instruments into
+  final Score targetScore;
   
   /// Callback when import is successful
   final void Function(Score sourceScore, List<InstrumentScore> selectedInstruments) onImport;
@@ -39,7 +39,7 @@ class ImportFromLibraryDialog extends ConsumerStatefulWidget {
   
   const ImportFromLibraryDialog({
     super.key,
-    required this.targetTeamScore,
+    required this.targetScore,
     required this.onImport,
     required this.onClose,
   });
@@ -61,8 +61,8 @@ class _ImportFromLibraryDialogState extends ConsumerState<ImportFromLibraryDialo
   // Search query for filtering scores
   String _searchQuery = '';
   
-  // Get instruments that already exist in target TeamScore
-  Set<String> get _existingInstrumentKeys => widget.targetTeamScore.existingInstrumentKeys;
+  // Get instruments that already exist in target Score
+  Set<String> get _existingInstrumentKeys => widget.targetScore.existingInstrumentKeys;
 
   @override
   Widget build(BuildContext context) {
@@ -193,7 +193,7 @@ class _ImportFromLibraryDialogState extends ConsumerState<ImportFromLibraryDialo
   Widget _buildScoreSelectionStep() {
     final scores = ref.watch(scoresListProvider);
     
-    // Filter scores matching the TeamScore's title/composer for suggestions
+    // Filter scores matching the Score's title/composer for suggestions
     // But also allow searching all scores
     final filteredScores = _searchQuery.isEmpty
         ? scores
@@ -205,13 +205,13 @@ class _ImportFromLibraryDialogState extends ConsumerState<ImportFromLibraryDialo
     
     // Put matching scores (same title/composer) at the top
     final matchingScores = filteredScores.where((s) =>
-        s.title.toLowerCase() == widget.targetTeamScore.title.toLowerCase() &&
-        s.composer.toLowerCase() == widget.targetTeamScore.composer.toLowerCase()
+        s.title.toLowerCase() == widget.targetScore.title.toLowerCase() &&
+        s.composer.toLowerCase() == widget.targetScore.composer.toLowerCase()
     ).toList();
     
     final otherScores = filteredScores.where((s) =>
-        s.title.toLowerCase() != widget.targetTeamScore.title.toLowerCase() ||
-        s.composer.toLowerCase() != widget.targetTeamScore.composer.toLowerCase()
+        s.title.toLowerCase() != widget.targetScore.title.toLowerCase() ||
+        s.composer.toLowerCase() != widget.targetScore.composer.toLowerCase()
     ).toList();
     
     final sortedScores = [...matchingScores, ...otherScores];

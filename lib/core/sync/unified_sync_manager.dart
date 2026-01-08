@@ -11,7 +11,7 @@ import 'package:flutter/widgets.dart';
 
 import '../services/services.dart';
 import '../data/local/local_data_source.dart';
-import '../data/local/team_local_data_source.dart';
+import '../data/data_scope.dart';
 import '../data/remote/api_client.dart';
 import '../../database/database.dart';
 import '../../utils/logger.dart';
@@ -23,8 +23,7 @@ import 'pdf_sync_service.dart';
 class UnifiedSyncManager {
   static UnifiedSyncManager? _instance;
 
-  final LocalDataSource _localLibrary;
-  final TeamLocalDataSource _localTeam;
+  final SyncableDataSource _localLibrary;
   final ApiClient _api;
   final SessionService _session;
   final NetworkService _network;
@@ -36,14 +35,12 @@ class UnifiedSyncManager {
   AppLifecycleListener? _lifecycleListener;
 
   UnifiedSyncManager._({
-    required LocalDataSource localLibrary,
-    required TeamLocalDataSource localTeam,
+    required SyncableDataSource localLibrary,
     required ApiClient api,
     required SessionService session,
     required NetworkService network,
     required AppDatabase db,
   }) : _localLibrary = localLibrary,
-       _localTeam = localTeam,
        _api = api,
        _session = session,
        _network = network,
@@ -51,8 +48,7 @@ class UnifiedSyncManager {
 
   /// Initialize the singleton
   static Future<UnifiedSyncManager> initialize({
-    required LocalDataSource localLibrary,
-    required TeamLocalDataSource localTeam,
+    required SyncableDataSource localLibrary,
     required ApiClient api,
     required SessionService session,
     required NetworkService network,
@@ -61,7 +57,6 @@ class UnifiedSyncManager {
     _instance?.dispose();
     _instance = UnifiedSyncManager._(
       localLibrary: localLibrary,
-      localTeam: localTeam,
       api: api,
       session: session,
       network: network,
@@ -233,9 +228,12 @@ class UnifiedSyncManager {
       return _teamCoordinators[teamId]!;
     }
 
+    // Create team-scoped data source dynamically
+    final teamDataSource = ScopedLocalDataSource(_db, DataScope.team(teamId));
+
     final coordinator = TeamSyncCoordinator(
       teamId: teamId,
-      local: _localTeam,
+      local: teamDataSource,
       api: _api,
       session: _session,
       network: _network,

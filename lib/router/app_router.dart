@@ -17,9 +17,8 @@ import '../screens/settings/help_support_screen.dart';
 import '../screens/settings/about_screen.dart';
 import '../screens/settings/login_screen.dart';
 import '../screens/settings/profile_screen.dart';
-import '../models/score.dart';
-import '../models/setlist.dart';
 import '../models/team.dart';
+import '../core/data/data_scope.dart';
 import '../app.dart';
 
 // Route paths
@@ -28,12 +27,13 @@ class AppRoutes {
   static const String library = '/library';
   static const String team = '/team';
   static const String settings = '/settings';
+
+  // Unified routes (scope passed via extra)
   static const String scoreViewer = '/score-viewer';
   static const String scoreDetail = '/score-detail';
   static const String setlistDetail = '/setlist-detail';
-  static const String teamScoreViewer = '/team-score-viewer';
-  static const String teamScoreDetail = '/team-score-detail';
-  static const String teamSetlistDetail = '/team-setlist-detail';
+
+  // Settings sub-routes
   static const String instrumentPreference = '/instrument-preference';
   static const String cloudSync = '/cloud-sync';
   static const String bluetoothDevices = '/bluetooth-devices';
@@ -139,24 +139,36 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // Full screen routes (outside shell)
+      // ========================================================================
+      // Unified Full Screen Routes (outside shell)
+      // ========================================================================
+
+      // Unified Score Viewer - supports both Library and Team via DataScope
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.scoreViewer,
         pageBuilder: (context, state) {
           final extra = state.extra as Map<String, dynamic>;
-          
-          // Handle potential serialization: convert Map to Score if needed
+
+          // Parse DataScope
+          final scope = extra['scope'] is DataScope
+              ? extra['scope'] as DataScope
+              : DataScope.fromJson(extra['scope'] as Map<String, dynamic>);
+
+          // Parse Score
           final score = extra['score'] is Score
               ? extra['score'] as Score
               : Score.fromJson(extra['score'] as Map<String, dynamic>);
-          
+
+          // Parse optional InstrumentScore
           final instrumentScore = extra['instrumentScore'] == null
               ? null
               : (extra['instrumentScore'] is InstrumentScore
                   ? extra['instrumentScore'] as InstrumentScore
-                  : InstrumentScore.fromJson(extra['instrumentScore'] as Map<String, dynamic>));
-          
+                  : InstrumentScore.fromJson(
+                      extra['instrumentScore'] as Map<String, dynamic>));
+
+          // Parse optional setlistScores
           final setlistScores = extra['setlistScores'] == null
               ? null
               : (extra['setlistScores'] as List).map((item) {
@@ -164,10 +176,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                       ? item
                       : Score.fromJson(item as Map<String, dynamic>);
                 }).toList();
-          
+
           return MaterialPage(
             key: state.pageKey,
             child: ScoreViewerScreen(
+              scope: scope,
               score: score,
               instrumentScore: instrumentScore,
               setlistScores: setlistScores,
@@ -177,26 +190,37 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+
+      // Unified Score Detail - supports both Library and Team via DataScope
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.scoreDetail,
         pageBuilder: (context, state) {
-          // Handle potential serialization: convert Map to Score if needed
-          final score = state.extra is Score
-              ? state.extra as Score
-              : Score.fromJson(state.extra as Map<String, dynamic>);
+          final extra = state.extra as Map<String, dynamic>;
+
+          // Parse DataScope
+          final scope = extra['scope'] is DataScope
+              ? extra['scope'] as DataScope
+              : DataScope.fromJson(extra['scope'] as Map<String, dynamic>);
+
+          // Parse Score
+          final score = extra['score'] is Score
+              ? extra['score'] as Score
+              : Score.fromJson(extra['score'] as Map<String, dynamic>);
+
           return MaterialPage(
             key: state.pageKey,
-            child: ScoreDetailScreen(score: score),
+            child: ScoreDetailScreen(scope: scope, score: score),
           );
         },
       ),
+
+      // Unified Setlist Detail - supports both Library and Team via DataScope
       GoRoute(
         parentNavigatorKey: _rootNavigatorKey,
         path: AppRoutes.setlistDetail,
         pageBuilder: (context, state) {
-          // Handle potential serialization: convert Map to Setlist if needed
-          final extra = state.extra;
+          final extra = state.extra as Map<String, dynamic>?;
           if (extra == null) {
             return MaterialPage(
               key: state.pageKey,
@@ -205,93 +229,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             );
           }
-          final setlist = extra is Setlist
-              ? extra
-              : Setlist.fromJson(extra as Map<String, dynamic>);
-          return MaterialPage(
-            key: state.pageKey,
-            child: SetlistDetailScreen.library(setlist: setlist),
-          );
-        },
-      ),
-      // Team Score Viewer Route
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
-        path: AppRoutes.teamScoreViewer,
-        pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
 
-          final teamScore = extra['teamScore'] is TeamScore
-              ? extra['teamScore'] as TeamScore
-              : TeamScore.fromJson(extra['teamScore'] as Map<String, dynamic>);
+          // Parse DataScope
+          final scope = extra['scope'] is DataScope
+              ? extra['scope'] as DataScope
+              : DataScope.fromJson(extra['scope'] as Map<String, dynamic>);
 
-          final instrumentScore = extra['instrumentScore'] == null
-              ? null
-              : (extra['instrumentScore'] is TeamInstrumentScore
-                  ? extra['instrumentScore'] as TeamInstrumentScore
-                  : TeamInstrumentScore.fromJson(extra['instrumentScore'] as Map<String, dynamic>));
-
-          final setlistScores = extra['setlistScores'] == null
-              ? null
-              : (extra['setlistScores'] as List).map((item) {
-                  return item is TeamScore
-                      ? item
-                      : TeamScore.fromJson(item as Map<String, dynamic>);
-                }).toList();
+          // Parse Setlist
+          final setlist = extra['setlist'] is Setlist
+              ? extra['setlist'] as Setlist
+              : Setlist.fromJson(extra['setlist'] as Map<String, dynamic>);
 
           return MaterialPage(
             key: state.pageKey,
-            child: ScoreViewerScreen.team(
-              teamScore: teamScore,
-              teamInstrumentScore: instrumentScore,
-              teamSetlistScores: setlistScores,
-              currentIndex: extra['currentIndex'] as int?,
-              setlistName: extra['setlistName'] as String?,
-            ),
-          );
-        },
-      ),
-      // Team Score Detail Route
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
-        path: AppRoutes.teamScoreDetail,
-        pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
-
-          final teamScore = extra['teamScore'] is TeamScore
-              ? extra['teamScore'] as TeamScore
-              : TeamScore.fromJson(extra['teamScore'] as Map<String, dynamic>);
-
-          final teamServerId = extra['teamServerId'] as int;
-
-          return MaterialPage(
-            key: state.pageKey,
-            child: ScoreDetailScreen.team(
-              teamScore: teamScore,
-              teamServerId: teamServerId,
-            ),
-          );
-        },
-      ),
-      // Team Setlist Detail Route
-      GoRoute(
-        parentNavigatorKey: _rootNavigatorKey,
-        path: AppRoutes.teamSetlistDetail,
-        pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
-
-          final setlist = extra['setlist'] is TeamSetlist
-              ? extra['setlist'] as TeamSetlist
-              : TeamSetlist.fromJson(extra['setlist'] as Map<String, dynamic>);
-
-          final teamServerId = extra['teamServerId'] as int;
-
-          return MaterialPage(
-            key: state.pageKey,
-            child: SetlistDetailScreen.team(
-              teamSetlist: setlist,
-              teamServerId: teamServerId,
-            ),
+            child: SetlistDetailScreen(scope: scope, setlist: setlist),
           );
         },
       ),
@@ -299,7 +250,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-// Navigation helper for bottom navigation bar
+// ============================================================================
+// Navigation Helpers
+// ============================================================================
+
 class AppNavigation {
   static void navigateToHome(BuildContext context) {
     context.go(AppRoutes.home);
@@ -317,8 +271,14 @@ class AppNavigation {
     context.go(AppRoutes.settings);
   }
 
+  // ========================================================================
+  // Unified Navigation Methods (using DataScope)
+  // ========================================================================
+
+  /// Navigate to score viewer (unified for Library and Team)
   static void navigateToScoreViewer(
     BuildContext context, {
+    required DataScope scope,
     required Score score,
     InstrumentScore? instrumentScore,
     List<Score>? setlistScores,
@@ -328,6 +288,7 @@ class AppNavigation {
     context.push(
       AppRoutes.scoreViewer,
       extra: {
+        'scope': scope,
         'score': score,
         'instrumentScore': instrumentScore,
         'setlistScores': setlistScores,
@@ -337,59 +298,32 @@ class AppNavigation {
     );
   }
 
-  static void navigateToScoreDetail(BuildContext context, Score score) {
-    context.push(AppRoutes.scoreDetail, extra: score);
-  }
-
-  static void navigateToSetlistDetail(BuildContext context, Setlist setlist) {
-    context.push(AppRoutes.setlistDetail, extra: setlist);
-  }
-
-  // Team navigation methods
-  static void navigateToTeamScoreViewer(
+  /// Navigate to score detail (unified for Library and Team)
+  static void navigateToScoreDetail(
     BuildContext context, {
-    required TeamScore teamScore,
-    TeamInstrumentScore? instrumentScore,
-    List<TeamScore>? setlistScores,
-    int? currentIndex,
-    String? setlistName,
+    required DataScope scope,
+    required Score score,
   }) {
     context.push(
-      AppRoutes.teamScoreViewer,
+      AppRoutes.scoreDetail,
       extra: {
-        'teamScore': teamScore,
-        'instrumentScore': instrumentScore,
-        'setlistScores': setlistScores,
-        'currentIndex': currentIndex,
-        'setlistName': setlistName,
+        'scope': scope,
+        'score': score,
       },
     );
   }
 
-  static void navigateToTeamScoreDetail(
-    BuildContext context,
-    TeamScore teamScore, {
-    required int teamServerId,
+  /// Navigate to setlist detail (unified for Library and Team)
+  static void navigateToSetlistDetail(
+    BuildContext context, {
+    required DataScope scope,
+    required Setlist setlist,
   }) {
     context.push(
-      AppRoutes.teamScoreDetail,
+      AppRoutes.setlistDetail,
       extra: {
-        'teamScore': teamScore,
-        'teamServerId': teamServerId,
-      },
-    );
-  }
-
-  static void navigateToTeamSetlistDetail(
-    BuildContext context,
-    TeamSetlist setlist, {
-    required int teamServerId,
-  }) {
-    context.push(
-      AppRoutes.teamSetlistDetail,
-      extra: {
+        'scope': scope,
         'setlist': setlist,
-        'teamServerId': teamServerId,
       },
     );
   }

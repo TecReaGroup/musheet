@@ -1,24 +1,30 @@
 ### Sync Push Response DTO
-### Response from push operation
+### Unified push response for both user and team scopes
 class: SyncPushResponse
 fields:
   ### Whether the push was successful
   success: bool
-  
-  ### New library version after push (if successful)
-  newLibraryVersion: int?
-  
+
+  ### Scope type: "user" or "team"
+  scopeType: String
+
+  ### Scope identifier: userId or teamId
+  scopeId: int
+
+  ### New scope version after push (if successful)
+  newScopeVersion: int?
+
   ### List of accepted entity IDs
   accepted: List<String>?
-  
+
   ### Map of local entity ID to server ID for newly created entities
   serverIdMapping: Map<String, int>?
-  
+
   ### Whether a conflict occurred (HTTP 412 equivalent)
   conflict: bool
-  
-  ### Current server library version (if conflict)
-  serverLibraryVersion: int?
-  
+
+  ### Current server scope version (if conflict)
+  serverScopeVersion: int?
+
   ### Error message if any
   errorMessage: String?

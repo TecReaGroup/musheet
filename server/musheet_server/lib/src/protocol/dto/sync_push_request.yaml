@@ -1,24 +1,27 @@
 ### Sync Push Request DTO
-### Unified push request for all entity changes
+### Unified push request for both user and team scopes
 class: SyncPushRequest
 fields:
-  ### Client's current library version (for conflict detection)
-  clientLibraryVersion: int
-  
+  ### Scope type: "user" or "team"
+  scopeType: String
+
+  ### Scope identifier: userId or teamId
+  scopeId: int
+
+  ### Client's current scope version (for conflict detection)
+  clientScopeVersion: int
+
   ### List of score changes
   scores: List<SyncEntityChange>?
-  
-  ### List of instrument score changes  
+
+  ### List of instrument score changes
   instrumentScores: List<SyncEntityChange>?
-  
-  ### List of annotation changes
-  annotations: List<SyncEntityChange>?
-  
+
   ### List of setlist changes
   setlists: List<SyncEntityChange>?
-  
+
   ### List of setlist score changes
   setlistScores: List<SyncEntityChange>?
-  
+
   ### List of entity IDs to delete (format: "type:id")
   deletes: List<String>?

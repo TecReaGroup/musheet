@@ -15,8 +15,8 @@
 6. [级联删除规则](#6-级联删除规则)
 7. [PDF 文件管理](#7-pdf-文件管理)
 
-**Part 2: Library 与 Team 同步差异**
-8. [Library 与 Team 对比](#8-library-与-team-对比)
+**Part 2: Library 与 Team 统一**
+8. [Library 与 Team 统一要求](#8-library-与-team-统一要求强制)
 9. [统一协调器架构](#9-统一协调器架构)
 
 **Part 3: App 端实现**
@@ -66,8 +66,8 @@
 │                                                                      │
 │         │                         │                                  │
 │         ▼                         ▼                                  │
-│   libraryVersion            pdfHash (MD5)                           │
-│   (全局版本号)               (内容寻址)                               │
+│   scopeVersion              pdfHash (MD5)                           │
+│   (按 scope 递增)            (内容寻址)                               │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -76,10 +76,10 @@
 
 | 原则 | 说明 | App 端 | Server 端 |
 |------|------|--------|-----------|
-| **Library-Wide Version** | 每个用户有一个全局 libraryVersion，每次实体变更递增 | 维护本地 libraryVersion | 管理用户的 libraryVersion |
+| **Scope-Wide Version** | 版本号按“作用域”隔离：个人库=每个 user 一个版本；团队库=每个 team 一个版本 | 维护本地版本（user/libraryVersion 或 team/teamLibraryVersion） | 管理对应作用域的版本号 |
 | **Push 先于 Pull** | 铁律：总是先推送本地变更，再拉取服务器数据 | 发起顺序控制 | 被动响应 |
 | **本地优先** | 冲突时，pending 状态的本地数据优先保留 | 合并时执行 | 通过 update 自动恢复 |
-| **乐观锁冲突检测** | 通过 clientLibraryVersion 检测版本冲突 | 发送版本号 | 检测并返回 412 |
+| **乐观锁冲突检测** | 通过 clientScopeVersion 检测版本冲突（Library/Team 只是字段名不同） | 发送版本号 | 检测并返回 412 |
 | **软删除机制** | 删除记录通过 deletedAt 标记，支持恢复 | 本地标记 | 服务器标记 |
 | **PDF 全局去重** | 基于 Hash 的内容寻址，跨用户共享相同文件 | 本地去重 | 全局去重 |
 | **双通道分离** | 元数据和 PDF 使用独立的同步队列和版本控制 | 独立管理 | 独立存储 |
@@ -88,90 +88,68 @@
 
 ## 2. 数据模型
 
-### 2.1 实体关系图
+### 2.1 实体关系图（统一模型：Library 与 Team 共享同一套实体）
 
-#### Library 实体
+本规范要求 **Library 和 Team 使用相同的同步实体模型**，禁止出现 `TeamScore/TeamInstrumentScore/TeamSetlist/...` 这类“按域复制一份类型”的同步模型。
+
+差异只允许出现在“作用域（Scope）”上：
+- Library：`scopeType = user`，`scopeId = userId`
+- Team：`scopeType = team`，`scopeId = teamId`
+
+统一后的实体关系如下（同一套表结构/字段，按 scope 隔离数据）：
 
 ```
 Score (乐谱)
-├── id (UUID/INT)
+├── localId (UUID, App 端生成)
+├── serverId (INT?, 服务器分配)
+├── scopeType (user | team)
+├── scopeId (userId | teamId)
 ├── title, composer, bpm
-├── userId (所属用户 - Server 端)
+├── createdById? (仅 team scope 必填；user scope 可省略或等于 userId)
+├── sourceScoreId? (仅 team scope 可能存在；记录来源 Library 的 serverId)
 │
 ├── 1:N → InstrumentScore (分谱)
-│         ├── scoreId (外键)
+│         ├── localId, serverId
+│         ├── scoreServerId (INT?)  ← push 时必须使用父实体 serverId
 │         ├── instrumentType, customInstrument
-│         ├── pdfHash (指向全局 PDF)
+│         ├── pdfHash (指向全局 PDF，跨 scope 共享)
 │         ├── pdfPath (本地路径 - App 端)
 │         ├── pdfSyncStatus (App 端)
-│         └── annotationsJson (嵌入的标注数据)
+│         ├── annotationsJson (嵌入的标注数据)
+│         └── sourceInstrumentScoreId? (仅 team scope 可能存在)
 │
 └── M:N → Setlist (通过 SetlistScore)
 
 Setlist (曲单)
-├── id (UUID/INT)
+├── localId, serverId
+├── scopeType, scopeId
 ├── name, description
-├── userId (所属用户 - Server 端)
+├── createdById? (仅 team scope 必填)
+├── sourceSetlistId? (仅 team scope 可能存在)
 │
 └── 1:N → SetlistScore (曲单-乐谱关联)
-          ├── setlistId (外键)
-          ├── scoreId (外键)
+          ├── localId, serverId
+          ├── setlistServerId (INT?) ← push 时必须使用父实体 serverId
+          ├── scoreServerId (INT?)   ← push 时必须使用父实体 serverId
           └── orderIndex
 ```
 
-#### Team 实体
-
-```
-TeamScore (团队乐谱)
-├── id (UUID/INT)
-├── teamId (所属团队)
-├── title, composer, bpm
-├── createdById (创建者 userId)
-├── sourceScoreId (来源 Library Score 的 serverId，可为 null)
-│
-├── 1:N → TeamInstrumentScore (团队分谱)
-│         ├── teamScoreId (外键)
-│         ├── instrumentType, customInstrument
-│         ├── pdfHash (指向全局 PDF，与 Library 共享)
-│         ├── pdfPath (本地路径 - App 端)
-│         ├── pdfSyncStatus (App 端)
-│         ├── annotationsJson (嵌入的标注数据)
-│         └── sourceInstrumentScoreId (来源分谱 serverId，可为 null)
-│
-└── M:N → TeamSetlist (通过 TeamSetlistScore)
-
-TeamSetlist (团队曲单)
-├── id (UUID/INT)
-├── teamId (所属团队)
-├── name, description
-├── createdById (创建者 userId)
-├── sourceSetlistId (来源 Library Setlist 的 serverId，可为 null)
-│
-└── 1:N → TeamSetlistScore (团队曲单-乐谱关联)
-          ├── teamSetlistId (外键)
-          ├── teamScoreId (外键)
-          └── orderIndex
-```
-
-**Team 与 Library 实体的关键差异：**
-
-| 差异点 | Library | Team |
-|-------|---------|------|
-| 所属标识 | userId | teamId |
-| 创建者追踪 | 无（就是 userId） | createdById |
-| 来源追踪 | 无 | sourceScoreId / sourceInstrumentScoreId / sourceSetlistId |
-| PDF 存储 | 共享 | 共享（基于 pdfHash） |
+**强制一致性约束：**
+- 同步协议（Push/Pull/Merge/删除/冲突决策树）在 Library 与 Team 间必须 100% 相同；唯一不同是 scope 参数（`userId` vs `teamId`）以及对应的版本号字段名。
+- 任何子实体（InstrumentScore / SetlistScore）的 Push，如果父实体没有 `serverId`，必须跳过本轮，等待下轮（见“跳过规则”）。禁止把本地 `localId` 当作服务器外键发送。
 
 ### 2.2 同步字段规范
 
-每个需要同步的实体都必须包含以下字段：
+每个需要同步的实体都必须包含以下字段（Library 与 Team 完全一致）：
 
 | 字段 | 类型 | App 端 | Server 端 | 说明 |
 |------|------|--------|-----------|------|
-| `id` | TEXT/INT | UUID (本地生成) | 自增 INT (serverId) | 实体唯一标识 |
-| `serverId` | INT? | Push 成功后返回 | 同 id | 服务器端 ID |
+| `localId` | TEXT | UUID (本地生成) | - | 客户端唯一标识，作为 `SyncEntityChange.entityId` 发送，永不变更 |
+| `serverId` | INT? | Push 成功后返回 | 自增 INT | 服务器端主键/标识，用于外键引用（子实体 push 时必须使用父 serverId） |
+| `scopeType` | TEXT | `user` / `team` | `user` / `team` | 数据作用域类型 |
+| `scopeId` | INT | userId / teamId | userId / teamId | 数据作用域标识 |
 | `syncStatus` | TEXT | `pending` / `synced` | 固定 `synced` | 同步状态 |
-| `version` | INT (64-bit) | 最后修改时的 libraryVersion | 变更时的 libraryVersion | 版本号 |
+| `version` | INT (64-bit) | 最后修改时的 scopeVersion | 变更时的 scopeVersion | 版本号（user/team 分别递增，各自隔离） |
 | `updatedAt` | DATETIME | 本地更新时间 | 服务器更新时间 | 最后更新时间 |
 | `deletedAt` | DATETIME? | 软删除时间戳 | 软删除时间戳 | null 表示未删除 |
 
@@ -186,27 +164,18 @@ TeamSetlist (团队曲单)
 | `synced` | NULL | 已同步，正常状态 |
 | `synced` | NOT NULL | 已同步的删除记录（服务器软删除） |
 
-### 2.4 唯一性约束
+### 2.4 唯一性约束（统一模型）
 
-#### Library 实体
+唯一性约束必须在 **同一套实体** 上生效，并且按 `scopeType/scopeId` 隔离。
 
-| 实体 | 唯一键 | 说明 |
-|------|--------|------|
-| Score | (userId, title, composer) | 同一用户不能有同名同作曲家的乐谱 |
-| InstrumentScore | (scoreId, instrumentName) | 同一乐谱不能有同名乐器分谱 |
-| Setlist | (userId, name) | 同一用户不能有同名曲单 |
-| SetlistScore | (setlistId, scoreId) | 同一曲单不能重复添加同一乐谱 |
+| 实体 | 唯一键（统一） | 说明 |
+|------|----------------|------|
+| Score | (scopeType, scopeId, title, composer) | 同一 scope 下不能有同名同作曲家的乐谱 |
+| InstrumentScore | (scoreServerId, instrumentName) | 同一 Score 下不能有同名乐器分谱 |
+| Setlist | (scopeType, scopeId, name) | 同一 scope 下不能有同名曲单 |
+| SetlistScore | (setlistServerId, scoreServerId) | 同一曲单不能重复添加同一乐谱 |
 
-#### Team 实体
-
-| 实体 | 唯一键 | 说明 |
-|------|--------|------|
-| TeamScore | (teamId, title, composer) | 同一团队不能有同名同作曲家的乐谱 |
-| TeamInstrumentScore | (teamScoreId, instrumentName) | 同一乐谱不能有同名乐器分谱 |
-| TeamSetlist | (teamId, name) | 同一团队不能有同名曲单 |
-| TeamSetlistScore | (teamSetlistId, teamScoreId) | 同一曲单不能重复添加同一乐谱 |
-
-**恢复规则：** 如果创建的实体与已删除实体的唯一键相同，视为"恢复"该实体（清除 deletedAt，不创建新记录）。
+**恢复规则：** 如果创建的实体与已删除实体的唯一键相同，视为“恢复”该实体（清除 deletedAt，不创建新记录）。
 
 ### 2.5 Annotation 嵌入方案
 
@@ -243,24 +212,27 @@ Annotation（标注）采用嵌入 InstrumentScore 方案，不作为独立同�
 
 ## 3. 版本号机制
 
-### 3.1 Per-Entity Version 策略
+### 3.1 Per-Entity Version 策略（按 scope 递增）
 
-每个实体变更都会使全局 libraryVersion 递增，该实体的 version 字段记录变更时的 libraryVersion。
+每个实体变更都会使对应 scope 的 **scopeVersion** 递增，该实体的 `version` 字段记录变更时的 scopeVersion。
 
-**示例：Push 4 个实体**
+- user scope：scopeVersion 字段名为 `libraryVersion`
+- team scope：scopeVersion 字段名为 `teamLibraryVersion`
+
+**示例：Push 4 个实体（任意单一 scope 内）**
 ```
-处理前: libraryVersion = 100
+处理前: scopeVersion = 100
 
 处理后:
-  score1.version = 101, libraryVersion = 101
-  score2.version = 102, libraryVersion = 102
-  instrumentScore1.version = 103, libraryVersion = 103
-  instrumentScore2.version = 104, libraryVersion = 104
+  score1.version = 101, scopeVersion = 101
+  score2.version = 102, scopeVersion = 102
+  instrumentScore1.version = 103, scopeVersion = 103
+  instrumentScore2.version = 104, scopeVersion = 104
 
-最终 libraryVersion = 104
+最终 scopeVersion = 104
 ```
 
-**Pull(since=100) 时：** 返回所有 version > 100 的实体。
+**Pull(since=100) 时：** 返回所有 `version > 100` 的实体（同一 scope 内）。
 
 ### 3.2 版本号类型
 
@@ -281,7 +253,7 @@ Annotation 采用嵌入方案后，标注变更不再独立递增 libraryVersion
 
 ## 4. 同步协议
 
-### 4.1 完整同步周期
+### 4.1 完整同步周期（Library 与 Team 完全一致）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -295,12 +267,14 @@ Annotation 采用嵌入方案后，标注变更不再独立递增 libraryVersion
 │  ║  App 端:                                                       ║  │
 │  ║  1. 收集 syncStatus='pending' 的记录                           ║  │
 │  ║  2. 按依赖顺序排序 (Score/Setlist → InstrumentScore → SetlistScore) ║
-│  ║  3. 发送 POST /library/push，包含 clientLibraryVersion         ║  │
+│  ║  3. 发送 Push 请求，包含 clientScopeVersion                    ║  │
+│  ║     - Library: POST /library/push (clientLibraryVersion)       ║  │
+│  ║     - Team:    POST /team/{teamId}/push (clientTeamLibraryVersion)║ │
 │  ║                                                                ║  │
 │  ║  Server 端:                                                    ║  │
-│  ║  1. 检查版本冲突 (clientVersion < serverVersion → 412)         ║  │
+│  ║  1. 检查版本冲突 (clientScopeVersion < serverScopeVersion → 412)║  │
 │  ║  2. 按依赖顺序处理变更，每个实体 version++                       ║  │
-│  ║  3. 返回 serverIdMapping 和 newLibraryVersion                  ║  │
+│  ║  3. 返回 serverIdMapping 和 newScopeVersion                    ║  │
 │  ║                                                                ║  │
 │  ║  App 端处理响应:                                                ║  │
 │  ║  • 200 OK: 保存 serverId，更新 syncStatus='synced'             ║  │
@@ -312,11 +286,13 @@ Annotation 采用嵌入方案后，标注变更不再独立递增 libraryVersion
 │  ║  阶段 2: PULL 元数据                                           ║  │
 │  ╠═══════════════════════════════════════════════════════════════╣  │
 │  ║                                                                ║  │
-│  ║  App 端: GET /library/pull?since={localVersion}                ║  │
+│  ║  App 端 Pull:                                                  ║  │
+│  ║     - Library: GET /library/pull?since={libraryVersion}         ║  │
+│  ║     - Team:    GET /team/{teamId}/pull?since={teamLibraryVersion}║ │
 │  ║                                                                ║  │
 │  ║  Server 端:                                                    ║  │
 │  ║  1. 查询所有 version > since 的实体（包括已删除的）             ║  │
-│  ║  2. 返回 libraryVersion + 各实体数组 + isDeleted 标记          ║  │
+│  ║  2. 返回 scopeVersion + 各实体数组 + isDeleted 标记            ║  │
 │  ║                                                                ║  │
 │  ║  App 端合并:                                                   ║  │
 │  ║  • 本地 pending → 保留本地                                     ║  │
@@ -339,15 +315,17 @@ Annotation 采用嵌入方案后，标注变更不再独立递增 libraryVersion
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Push 请求格式
+### 4.2 Push 请求格式（统一 schema）
 
-**请求端点：** `POST /library/push`
+**请求端点：**
+- Library：`POST /library/push`
+- Team：`POST /team/{teamId}/push`
 
 **请求体 (SyncPushRequest)：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| clientLibraryVersion | INT | 客户端当前版本号 |
+| clientScopeVersion | INT | 客户端当前版本号（Library=clientLibraryVersion，Team=clientTeamLibraryVersion） |
 | scores | Array? | Score 变更数组 |
 | instrumentScores | Array? | InstrumentScore 变更数组（含 annotationsJson） |
 | setlists | Array? | Setlist 变更数组 |
@@ -372,21 +350,23 @@ Annotation 采用嵌入方案后，标注变更不再独立递增 libraryVersion
 |------|------|------|
 | success | BOOL | 是否成功 |
 | conflict | BOOL | 是否版本冲突 |
-| newLibraryVersion | INT? | 新版本号（成功时） |
-| serverLibraryVersion | INT? | 服务器版本号（冲突时） |
+| newScopeVersion | INT? | 新版本号（成功时；Library=newLibraryVersion，Team=newTeamLibraryVersion） |
+| serverScopeVersion | INT? | 服务器版本号（冲突时；Library=serverLibraryVersion，Team=serverTeamLibraryVersion） |
 | accepted | Array? | 成功处理的 entityId 列表 |
 | serverIdMapping | Map? | entityId → serverId 映射表 |
 | errorMessage | STRING? | 错误信息 |
 
-### 4.3 Pull 请求格式
+### 4.3 Pull 请求格式（统一 schema）
 
-**请求端点：** `GET /library/pull?since={version}`
+**请求端点：**
+- Library：`GET /library/pull?since={libraryVersion}`
+- Team：`GET /team/{teamId}/pull?since={teamLibraryVersion}`
 
 **响应体 (SyncPullResponse)：**
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| libraryVersion | INT | 最新版本号 |
+| scopeVersion | INT | 最新版本号（字段名随 scope 变化：libraryVersion / teamLibraryVersion） |
 | isFullSync | BOOL | 是否全量同步 (since=0) |
 | scores | Array? | Score 实体数组 |
 | instrumentScores | Array? | InstrumentScore 实体数组（含 annotationsJson） |
@@ -543,7 +523,7 @@ T6: 平板 B 再次 Push "Song B"，clientLibraryVersion = 11
 │  └── 789xyz000111.pdf                                                │
 │                                                                      │
 │  本地引用计数 = COUNT(InstrumentScore WHERE pdfHash=? AND deletedAt IS NULL)  │
-│                + COUNT(TeamInstrumentScore WHERE pdfHash=? AND deletedAt IS NULL) │
+│  （InstrumentScore 覆盖 user/team 两种 scope，无需额外 Team 类型）             │
 │                                                                      │
 │  ─────────────────────────────────────────────────────────────────  │
 │                                                                      │
@@ -553,8 +533,7 @@ T6: 平板 B 再次 Push "Song B"，clientLibraryVersion = 11
 │  └── 789xyz000111.pdf                                                │
 │                                                                      │
 │  全局引用计数 = COUNT(InstrumentScore WHERE pdf_hash=? AND deleted_at IS NULL)  │
-│                + COUNT(TeamInstrumentScore WHERE pdf_hash=? AND deleted_at IS NULL) │
-│  (跨所有用户和团队统计)                                                   │
+│  （跨所有 scope 统计：user + team）                                        │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -595,123 +574,48 @@ InstrumentScore 表中的 `pdfSyncStatus` 字段：
 
 ---
 
-# Part 2: Library 与 Team 同步差异
+# Part 2: Library 与 Team：模型与同步逻辑必须完全一致
 
-## 8. Library 与 Team 对比
+## 8. Library 与 Team 统一要求（强制）
 
-### 8.1 可复用部分（约 90%）
+### 8.1 统一目标
 
-Library 和 Team 共用以下核心逻辑：
+本规范的目标是：
+- **同一套同步模型（实体类型 + 字段语义）** 同时覆盖 Library 与 Team（见 [`sync_logic.md §2.1`](docs/sync_logic/sync_logic.md:91)）。
+- **同一套同步逻辑（Push/Pull/Merge/冲突/删除/依赖跳过规则）** 同时覆盖 Library 与 Team。
+- Team 与 Library 的差异只允许出现在：作用域参数（userId/teamId）、版本号字段名（libraryVersion/teamLibraryVersion）、API 路径。
 
-| 共享逻辑 | 说明 |
-|---------|------|
-| **同步协议** | Push → Pull → Merge → PDF Sync 流程完全一致 |
-| **版本号机制** | Per-Entity Version，乐观锁冲突检测 (412) |
-| **冲突解决策略** | pending 本地优先，synced 服务器优先 |
-| **状态机** | idle → pushing → pulling → merging → pdfSync → idle |
-| **触发机制** | 5秒防抖 + 网络恢复立即同步 |
-| **PDF 存储架构** | 基于 Hash 的全局去重，秒传机制 |
-| **PDF 同步服务** | 共用同一个 `PdfSyncService`，统一优先级队列 |
-| **软删除机制** | deletedAt + syncStatus = pending |
-| **Annotation 嵌入** | annotationsJson 字段，随 InstrumentScore 同步 |
-| **级联删除** | Score → InstrumentScore → (annotations embedded) |
+### 8.2 允许存在的“差异”（但不允许分叉模型）
 
-### 8.2 不可复用部分
-
-#### 8.2.1 数据隔离维度不同
+#### 8.2.1 数据隔离维度（Scope）
 
 | 对比 | Library | Team |
 |-----|---------|------|
-| 数据所有权 | `userId` | `teamId` |
-| 版本号字段 | `libraryVersion` | `teamLibraryVersion` (每个 Team 独立) |
-| 同步状态表 | `SyncState` (单条记录) | `TeamSyncState` (每个 Team 一条记录) |
+| scopeType | `user` | `team` |
+| scopeId | `userId` | `teamId` |
+| scopeVersion 字段名 | `libraryVersion` | `teamLibraryVersion` |
+| 同步状态记录 | 单条（user scope） | 每个 team 一条（team scope） |
 
-#### 8.2.2 实体表结构不同
+> 说明：这是“同一模型按 scope 分区”的表现，不是两套模型。
 
-| Library 实体 | Team 实体 | 额外字段 |
-|-------------|----------|---------|
-| Score | TeamScore | `teamId`, `createdById`, `sourceScoreId` |
-| InstrumentScore | TeamInstrumentScore | `sourceInstrumentScoreId` |
-| Setlist | TeamSetlist | `teamId`, `createdById`, `sourceSetlistId` |
-| SetlistScore | TeamSetlistScore | 引用 TeamScoreId 而非 ScoreId |
+#### 8.2.2 业务字段差异（必须以“可选字段”表达）
 
-#### 8.2.3 API 端点不同
+Team 的 `createdById/source*Id` 属于业务元数据：
+- 必须作为**同一实体的可选字段**存在，而不是复制出 `TeamScore/TeamSetlist/...` 一套新类型。
 
-| Library | Team |
-|---------|------|
-| `POST /library/push` | `POST /team/{teamId}/push` |
-| `GET /library/pull?since=` | `GET /team/{teamId}/pull?since=` |
+### 8.3 强制一致的规则清单（防止 Team/Library 出现不同 bug）
 
-#### 8.2.4 唯一键约束范围不同
+1. **子实体依赖跳过规则必须一致**
+- InstrumentScore / SetlistScore 的 Push：如果父实体没有 `serverId`，必须跳过本轮，等待下一轮。
 
-| Library | Team |
-|---------|------|
-| `(userId, title, composer)` | `(teamId, title, composer)` |
+2. **serverId 语义必须一致**
+- 所有外键引用在网络协议里都必须使用 `serverId`（INT）。严禁发送本地 `localId` 作为外键。
 
-#### 8.2.5 实例管理模式不同
+3. **Merge 决策树必须一致**
+- pending 本地优先 / synced 服务器优先，完全按同一决策树实现（见 [`sync_logic.md §5.2`](docs/sync_logic/sync_logic.md:441)）。
 
-| Library | Team |
-|---------|------|
-| **单例模式**: 一个用户只有一个 Library | **多实例管理**: 一个用户可能加入多个 Team |
-
-#### 8.2.6 Team 权限模型
-
-Team 采用简化的权限模型：
-
-| 角色 | 权限 |
-|------|------|
-| member | 所有 Team 资源的完全权限（创建、修改、删除） |
-
-**说明：** Team 内所有成员权限平等，任何成员都可以创建、修改、删除 TeamScore、TeamInstrumentScore、TeamSetlist 等资源。
-
-#### 8.2.7 从 Library 导入到 Team
-
-Team 支持从个人 Library 导入数据，导入是一次性复制操作，复制后的数据独立于源数据。
-
-**导入规则：**
-
-| 场景 | 处理方式 |
-|------|---------|
-| **从 Add 按钮导入 Score** | |
-| → Team 中无同名 | ✅ 导入，级联创建 TeamScore + 所有 TeamInstrumentScore + annotations |
-| → Team 中有同名 | ❌ 拒绝，提示去 TeamScore 详情页添加分谱 |
-| **从 Add 按钮导入 Setlist** | |
-| → Team 中无同名 Setlist | ✅ 导入，级联处理所有 Score（已有的复用，没有的创建）|
-| → Team 中有同名 Setlist | ❌ 拒绝导入 |
-| **在 TeamScore 详情页添加分谱** | |
-| → 从 Library 同名曲目导入 | ✅ 只能添加 Team 中不存在的分谱类型 |
-| → 直接创建新分谱 | ✅ 只要分谱类型不重复 |
-| **直接创建 Score** | |
-| → Team 中无同名 | ✅ 创建成功 |
-| → Team 中有同名 | 提示选择：添加分谱到已有 / 取消 |
-| **PDF 处理** | 与本地 Library 共用，基于 pdfHash |
-
-**导入后的数据关系：**
-- 导入的实体通过 `sourceScoreId` / `sourceInstrumentScoreId` / `sourceSetlistId` 记录来源
-- 源数据被删除不影响已导入的 Team 数据
-- 导入的 PDF 共享同一个 pdfHash，不会重复存储
-
-**导入与同步的关系：**
-- 导入操作在本地完成后，创建的 Team 实体标记为 `pending`
-- 正常触发 Team 同步流程，Push 到服务器
-
-#### 8.2.8 PDF 引用计数范围
-
-PDF 文件在 Library 和 Team 之间共享，因此引用计数需要统一计算：
-
-| 场景 | 引用计数公式 |
-|------|-------------|
-| 删除 InstrumentScore 时 | `COUNT(InstrumentScore) + COUNT(TeamInstrumentScore)` 使用相同 pdfHash |
-| 删除 TeamInstrumentScore 时 | 同上 |
-
-**说明：** 无论是 Library 还是 Team 的分谱删除，都需要检查全局引用计数（包括两者）。只有当引用计数为 0 时，才物理删除 PDF 文件。
-
-#### 8.2.9 特殊生命周期事件
-
-| Library | Team |
-|---------|------|
-| 用户登录 → 全量同步 | 加入 Team → 该 Team 全量同步 |
-| 用户登出 → 清空本地 | 退出 Team → 只清空该 Team 数据 |
+4. **删除与恢复必须一致**
+- 软删除 + update 自动恢复 的语义在 Library 与 Team 必须一致（见 [`sync_logic.md §5.3`](docs/sync_logic/sync_logic.md:473)）。
 
 ---
 
@@ -821,14 +725,14 @@ TeamSyncCoordinator 继承 BaseSyncCoordinator，负责团队库同步。每个 
 | identifier | `"TEAM:{teamId}"` |
 | localVersion | `state.teamLibraryVersion` |
 | 数据源 | TeamLocalDataSource |
-| Push 请求类型 | TeamSyncPushRequest |
-| Pull 响应类型 | TeamSyncPullResponse |
+| Push 请求类型 | SyncPushRequest（同 schema，仅 scope/teamId 不同） |
+| Pull 响应类型 | SyncPullResponse（同 schema，仅 scope/teamId 不同） |
 | API 端点 | `POST /team/{teamId}/push`, `GET /team/{teamId}/pull` |
 
-**与 Library 的关键差异：**
-- 需要传递 `teamId` 参数
-- 使用 Team 专用的实体类型（TeamScore, TeamInstrumentScore 等）
-- 版本号按 Team 隔离
+**与 Library 的关键差异（仅允许这些差异）：**
+- 需要传递 `teamId`（等价于 `scopeType=team, scopeId=teamId`）
+- API 路径不同（`/library/*` vs `/team/{teamId}/*`）
+- 版本号按 Team 隔离（字段名 `teamLibraryVersion`）
 
 ### 9.5 UnifiedSyncManager 统一入口
 
@@ -1024,12 +928,14 @@ syncing 内部阶段:
 新建/修改: WHERE syncStatus='pending' AND deletedAt IS NULL
 删除:      WHERE syncStatus='pending' AND deletedAt IS NOT NULL
 
-依赖排序:
+依赖排序（Library 与 Team 完全一致，仅 scope 不同）:
   批次 1: Scores, Setlists (无依赖)
-  批次 2: InstrumentScores (依赖 Score.serverId)
-  批次 3: SetlistScores (依赖 Setlist + Score 的 serverId)
+  批次 2: InstrumentScores (依赖父 Score.serverId)
+  批次 3: SetlistScores (依赖父 Setlist.serverId + Score.serverId)
 
-跳过规则: 父实体无 serverId → 跳过本次，等待下次同步
+跳过规则（强制一致）:
+  父实体无 serverId → 跳过本次，等待下次同步
+  （禁止用 localId 代替 serverId 作为外键发送）
 ```
 
 ### 12.3 本地 Annotation 缓存
@@ -1127,7 +1033,7 @@ T4: 触发 Push（防抖后）→ 只发送最终状态：title="曲目2", bpm=1
 收到 Push 请求
     │
     ▼
-检查 clientLibraryVersion < serverVersion ?
+检查 clientScopeVersion < serverScopeVersion ?
     │
     ├─ YES → 返回 412 Conflict
     │        { success: false, conflict: true, serverLibraryVersion: X }
@@ -1285,10 +1191,10 @@ COMMIT
 ```
 BEGIN TRANSACTION
 
-  处理所有 TeamScores
-  处理所有 TeamInstrumentScores
-  处理所有 TeamSetlists
-  处理所有 TeamSetlistScores
+  处理所有 Scores (scopeType=team, scopeId=teamId)
+  处理所有 InstrumentScores (scopeType=team, scopeId=teamId)
+  处理所有 Setlists (scopeType=team, scopeId=teamId)
+  处理所有 SetlistScores (scopeType=team, scopeId=teamId)
   处理所有 Deletes
   更新 TeamLibrary.teamLibraryVersion
 
@@ -1571,7 +1477,7 @@ UserAppData 偏好设置的同步流程：
 
 | 优化项 | 说明 |
 |-------|------|
-| 防抖 5 秒 | 本地操作后 5 秒内的变更合并为一次同步 |
+| 防抖 2 秒 | 本地操作后 2 秒内的变更合并为一次同步 |
 | 串行 PDF | PDF 上传/下载串行执行，避免带宽竞争 |
 | 按需加载 | Annotations 和 PDF 按需加载 |
 

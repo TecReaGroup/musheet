@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import '../core/sync/pdf_sync_service.dart';
+import '../core/data/data_scope.dart';
 import '../providers/scores_state_provider.dart';
-import '../providers/teams_state_provider.dart';
 import '../screens/library_screen.dart' show preferredInstrumentProvider;
 import '../theme/app_colors.dart';
 import '../models/score.dart';
@@ -15,22 +15,23 @@ import '../utils/photo_to_pdf.dart';
 import 'common_widgets.dart';
 
 /// A reusable widget for adding new scores or instrument sheets.
-/// 
+///
+/// Uses DataScope to distinguish between Library and Team contexts:
+/// - DataScope.user: Personal library
+/// - DataScope.team(id): Team with given serverId
+///
 /// For library screen (New Score): showTitleComposer = true
-/// For score detail screen (Add Instrument): showTitleComposer = false
-/// For team screen (Team Score): showTitleComposer = true, isTeamScore = true
-/// For team score detail (Add Team Instrument): showTitleComposer = false, isTeamScore = true, existingTeamScore
+/// For score detail screen (Add Instrument): showTitleComposer = false, existingScore provided
 class AddScoreWidget extends ConsumerStatefulWidget {
   const AddScoreWidget({
     super.key,
     required this.onClose,
     required this.onSuccess,
     this.showTitleComposer = true,
+    this.scope,
     this.existingScore,
-    this.existingTeamScore,
     this.disabledInstruments = const {},
     this.sourceInstrumentToCopy,
-    this.sourceTeamInstrumentToCopy,
     this.headerIcon = AppIcons.musicNote,
     this.headerIconGradient = const [AppColors.blue400, AppColors.blue600],
     this.headerGradient = const [AppColors.blue50, Colors.white],
@@ -38,66 +39,54 @@ class AddScoreWidget extends ConsumerStatefulWidget {
     this.headerSubtitle,
     this.confirmButtonText,
     this.presetFilePath,
-    this.isTeamScore = false,
-    this.teamServerId,
   });
 
   /// Callback when modal is closed/cancelled
   final VoidCallback onClose;
-  
+
   /// Callback when score/instrument is successfully added
   final VoidCallback onSuccess;
-  
+
   /// Whether to show title and composer fields
   /// true for New Score modal in library
   /// false for Add Instrument modal in score detail
   final bool showTitleComposer;
-  
-  /// If provided, the instrument will be added to this score (personal mode)
+
+  /// The data scope (user library or team)
+  /// If null, defaults to DataScope.user for backward compatibility
+  final DataScope? scope;
+
+  /// If provided, the instrument will be added to this score
   /// Used when showTitleComposer = false
   final Score? existingScore;
-  
-  /// If provided, the instrument will be added to this team score (team mode)
-  /// Used when showTitleComposer = false and isTeamScore = true
-  final TeamScore? existingTeamScore;
-  
+
   /// Set of instrument keys that are already in use (for disabling)
   final Set<String> disabledInstruments;
-  
-  /// If provided, the PDF from this instrument will be copied (copy mode - personal)
+
+  /// If provided, the PDF from this instrument will be copied (copy mode)
   /// In copy mode, PDF selection is skipped and this instrument's PDF is used
   final InstrumentScore? sourceInstrumentToCopy;
-  
-  /// If provided, the PDF from this team instrument will be copied (copy mode - team)
-  /// In copy mode, PDF selection is skipped and this instrument's PDF is used
-  final TeamInstrumentScore? sourceTeamInstrumentToCopy;
-  
+
   /// Icon for the header
   final IconData headerIcon;
-  
+
   /// Gradient colors for header icon background
   final List<Color> headerIconGradient;
-  
+
   /// Gradient colors for header background
   final List<Color> headerGradient;
-  
+
   /// Custom header title (optional)
   final String? headerTitle;
-  
+
   /// Custom header subtitle (optional)
   final String? headerSubtitle;
-  
+
   /// Custom confirm button text (optional)
   final String? confirmButtonText;
 
   /// Preset file path from sharing intent (PDF or image)
   final String? presetFilePath;
-
-  /// Whether this is creating a team score (instead of personal library score)
-  final bool isTeamScore;
-  
-  /// The team server ID (required when isTeamScore is true)
-  final int? teamServerId;
 
   @override
   ConsumerState<AddScoreWidget> createState() => _AddScoreWidgetState();
@@ -108,7 +97,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _composerController = TextEditingController();
   final TextEditingController _customInstrumentController = TextEditingController();
-  
+
   // Focus nodes
   final FocusNode _titleFocusNode = FocusNode();
   final FocusNode _composerFocusNode = FocusNode();
@@ -120,7 +109,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     _composerFocusNode.unfocus();
     _customInstrumentFocusNode.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
-    
+
     setState(() {
       _showInstrumentDropdown = !_showInstrumentDropdown;
       _showTitleSuggestions = false;
@@ -142,19 +131,19 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     _composerFocusNode.unfocus();
     _customInstrumentFocusNode.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
-    
+
     setState(() {
       _selectedInstrument = type;
       _customInstrumentController.clear();
       _showInstrumentDropdown = false;
     });
   }
-  
+
   // Global keys for positioning suggestions
   final GlobalKey _titleFieldKey = GlobalKey();
   final GlobalKey _composerFieldKey = GlobalKey();
   final GlobalKey _instrumentFieldKey = GlobalKey();
-  
+
   // State
   bool _showInstrumentDropdown = false;
   String? _selectedPdfPath;
@@ -163,7 +152,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   bool _isInitialized = false; // Track if instrument has been initialized
   bool _isConverting = false; // Track if photo is being converted to PDF
   bool _wasConvertedFromImage = false; // Track if the file was converted from image
-  
+
   // Autocomplete state (only used when showTitleComposer = true)
   List<Score> _titleSuggestions = [];
   List<String> _composerSuggestions = [];
@@ -172,22 +161,24 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   Score? _matchedScore;
   Set<String> _disabledInstruments = {};
 
+  /// Get the effective scope (defaults to user if not provided)
+  DataScope get _scope => widget.scope ?? DataScope.user;
+
+  /// Get the scores notifier for current scope
+  ScopedScoresNotifier get _scoresNotifier =>
+      ref.read(scopedScoresProvider(_scope).notifier);
+
   @override
   void initState() {
     super.initState();
     // Initialize disabled instruments from widget property
     _disabledInstruments = Set.from(widget.disabledInstruments);
 
-    // If in copy mode, auto-set the PDF from source instrument (personal or team)
+    // If in copy mode, auto-set the PDF from source instrument
     if (widget.sourceInstrumentToCopy != null) {
       _selectedPdfPath = widget.sourceInstrumentToCopy!.pdfPath;
       _selectedPdfName = widget.sourceInstrumentToCopy!.pdfPath != null
           ? path.basename(widget.sourceInstrumentToCopy!.pdfPath!)
-          : null;
-    } else if (widget.sourceTeamInstrumentToCopy != null) {
-      _selectedPdfPath = widget.sourceTeamInstrumentToCopy!.pdfPath;
-      _selectedPdfName = widget.sourceTeamInstrumentToCopy!.pdfPath != null
-          ? path.basename(widget.sourceTeamInstrumentToCopy!.pdfPath!)
           : null;
     }
 
@@ -266,27 +257,27 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       });
     }
   }
-  
+
   void _initializeDefaultInstrument() {
     if (_isInitialized) return;
     _isInitialized = true;
-    
+
     final preferredInstrumentKey = ref.read(preferredInstrumentProvider);
-    
+
     // Priority 1: Use preferred instrument if set and available
     if (preferredInstrumentKey != null) {
       final preferredType = InstrumentType.values.firstWhere(
         (type) => type.name == preferredInstrumentKey,
         orElse: () => InstrumentType.vocal,
       );
-      
+
       // Check if preferred instrument is not disabled
       if (!_disabledInstruments.contains(preferredType.name)) {
         _selectedInstrument = preferredType;
         return;
       }
     }
-    
+
     // Priority 2: Find first available instrument
     _selectedInstrument = _findFirstAvailableInstrument();
   }
@@ -303,7 +294,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   }
 
   void _updateTitleSuggestions(String query) {
-    final suggestions = ref.read(scoresStateProvider.notifier).getSuggestionsByTitle(query);
+    // Use scoped provider for suggestions
+    final notifier = ref.read(scopedScoresProvider(_scope).notifier);
+    final suggestions = notifier.getSuggestionsByTitle(query);
     setState(() {
       _titleSuggestions = suggestions;
       _showTitleSuggestions = suggestions.isNotEmpty && query.isNotEmpty;
@@ -320,10 +313,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       _checkForMatchedScore();
       return;
     }
-    
+
     // Get all unique composers that match the query
-    // Use scoresListProvider for synchronous access
-    final scores = ref.read(scoresListProvider);
+    final scores = ref.read(scopedScoresListProvider(_scope));
     final queryLower = query.toLowerCase();
     final composers = scores
         .map((s) => s.composer)
@@ -331,7 +323,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
         .toSet()
         .take(5)
         .toList();
-    
+
     setState(() {
       _composerSuggestions = composers;
       _showComposerSuggestions = composers.isNotEmpty;
@@ -342,10 +334,10 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   void _checkForMatchedScore() {
     // Only check for matched score when showing title/composer fields
     if (!widget.showTitleComposer) return;
-    
+
     final title = _titleController.text.trim();
     final composer = _composerController.text.trim();
-    
+
     if (title.isEmpty) {
       setState(() {
         _matchedScore = null;
@@ -353,16 +345,16 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       });
       return;
     }
-    
+
     final composerToCheck = composer.isEmpty ? 'Unknown' : composer;
-    final matched = ref.read(scoresStateProvider.notifier).findByTitleAndComposer(title, composerToCheck);
-    
+    final matched = _scoresNotifier.findByTitleAndComposer(title, composerToCheck);
+
     setState(() {
       _matchedScore = matched;
       if (matched != null) {
         _disabledInstruments = matched.existingInstrumentKeys;
         // Auto-select first available instrument if current is disabled
-        if (_selectedInstrument != InstrumentType.other && 
+        if (_selectedInstrument != InstrumentType.other &&
             _isInstrumentDisabled(_selectedInstrument!, _customInstrumentController.text)) {
           _selectedInstrument = _findFirstAvailableInstrument();
         }
@@ -374,12 +366,12 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
 
   bool _isInstrumentDisabled(InstrumentType type, String customInstrument) {
     // Use widget's disabled instruments when not showing title/composer
-    final disabledSet = widget.showTitleComposer 
-        ? _disabledInstruments 
+    final disabledSet = widget.showTitleComposer
+        ? _disabledInstruments
         : widget.disabledInstruments;
-    
+
     if (disabledSet.isEmpty) return false;
-    
+
     final key = type == InstrumentType.other && customInstrument.isNotEmpty
         ? customInstrument.toLowerCase().trim()
         : type.name;
@@ -387,10 +379,10 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   }
 
   InstrumentType _findFirstAvailableInstrument() {
-    final disabledSet = widget.showTitleComposer 
-        ? _disabledInstruments 
+    final disabledSet = widget.showTitleComposer
+        ? _disabledInstruments
         : widget.disabledInstruments;
-    
+
     for (final type in InstrumentType.values) {
       if (type != InstrumentType.other && !disabledSet.contains(type.name)) {
         return type;
@@ -422,29 +414,29 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       type: FileType.custom,
       allowedExtensions: ['pdf', ...PhotoToPdfConverter.supportedImageExtensions],
     );
-    
+
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
       final filePath = file.path;
-      
+
       if (filePath == null) return;
-      
+
       // Check if it's an image file that needs conversion
       if (PhotoToPdfConverter.isImageFile(filePath)) {
         setState(() {
           _isConverting = true;
         });
-        
+
         try {
           // Convert image to PDF
           final pdfPath = await PhotoToPdfConverter.convertImageToPdf(filePath);
-          
+
           setState(() {
             _selectedPdfPath = pdfPath;
             _selectedPdfName = file.name;
             _wasConvertedFromImage = true;
             _isConverting = false;
-            
+
             if (widget.showTitleComposer && _titleController.text.isEmpty) {
               // Remove extension from filename for title
               final baseName = file.name.split('.').first;
@@ -466,7 +458,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
           _selectedPdfPath = filePath;
           _selectedPdfName = file.name;
           _wasConvertedFromImage = false;
-          
+
           if (widget.showTitleComposer && _titleController.text.isEmpty) {
             _titleController.text = file.name.replaceAll('.pdf', '');
             _updateTitleSuggestions(_titleController.text);
@@ -479,105 +471,20 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   void _handleConfirm() async {
     // In copy mode, PDF is already set from source instrument
     // In normal mode, user must select a PDF
-    final sourcePdfFromCopy = widget.sourceInstrumentToCopy?.pdfPath ?? widget.sourceTeamInstrumentToCopy?.pdfPath;
+    final sourcePdfFromCopy = widget.sourceInstrumentToCopy?.pdfPath;
     if (_selectedPdfPath == null && sourcePdfFromCopy == null) return;
-    
+
     // Use source PDF if in copy mode
     final pdfPath = sourcePdfFromCopy ?? _selectedPdfPath!;
-    
+
     // Check if instrument is disabled
     if (_isInstrumentDisabled(_selectedInstrument!, _customInstrumentController.text)) {
       AppToast.warning(context, 'This instrument already exists for this score');
       return;
     }
-    
+
     final now = DateTime.now();
-    
-    // Team score mode - adding to existing team score
-    if (widget.isTeamScore && widget.teamServerId != null && widget.existingTeamScore != null && !widget.showTitleComposer) {
-      // Calculate PDF hash for sync
-      String? teamPdfHash;
-      try {
-        teamPdfHash = await PdfSyncService.calculateFileHash(pdfPath);
-        Log.d('ADD_SCORE', 'Team IS pdfHash: $teamPdfHash');
-      } catch (e) {
-        Log.e('ADD_SCORE', 'Failed to calculate team PDF hash', error: e);
-      }
-      
-      // Create team instrument score
-      final teamInstrument = TeamInstrumentScore(
-        id: '${now.millisecondsSinceEpoch}-tis',
-        teamScoreId: widget.existingTeamScore!.id,
-        instrumentType: _selectedInstrument!,
-        customInstrument: _selectedInstrument == InstrumentType.other
-            ? _customInstrumentController.text.trim()
-            : null,
-        pdfPath: pdfPath,
-        pdfHash: teamPdfHash,
-        orderIndex: widget.existingTeamScore!.instrumentScores.length,
-        createdAt: now,
-      );
-      
-      final success = await addTeamInstrumentScore(
-        ref: ref,
-        teamServerId: widget.teamServerId!,
-        scoreId: widget.existingTeamScore!.id,
-        instrument: teamInstrument,
-      );
-      
-      if (!mounted) return;
-      if (success) {
-        widget.onSuccess();
-      } else {
-        AppToast.error(context, 'Failed to add instrument');
-      }
-      return;
-    }
-    
-    // Team score mode - creating new team score
-    if (widget.isTeamScore && widget.teamServerId != null) {
-      // Calculate PDF hash for sync
-      String? newTeamPdfHash;
-      try {
-        newTeamPdfHash = await PdfSyncService.calculateFileHash(pdfPath);
-        Log.d('ADD_SCORE', 'New Team IS pdfHash: $newTeamPdfHash');
-      } catch (e) {
-        Log.e('ADD_SCORE', 'Failed to calculate new team PDF hash', error: e);
-      }
-      
-      // Create team instrument score
-      final teamInstrument = TeamInstrumentScore(
-        id: '${now.millisecondsSinceEpoch}-tis',
-        teamScoreId: '',  // Will be set by createTeamScore
-        instrumentType: _selectedInstrument!,
-        customInstrument: _selectedInstrument == InstrumentType.other
-            ? _customInstrumentController.text.trim()
-            : null,
-        pdfPath: pdfPath,
-        pdfHash: newTeamPdfHash,
-        orderIndex: 0,
-        createdAt: now,
-      );
-      
-      final teamScore = await createTeamScore(
-        ref: ref,
-        teamServerId: widget.teamServerId!,
-        title: _titleController.text.trim(),
-        composer: _composerController.text.trim().isEmpty 
-            ? 'Unknown' 
-            : _composerController.text.trim(),
-        instrumentScores: [teamInstrument],
-      );
-      
-      if (!mounted) return;
-      if (teamScore != null) {
-        widget.onSuccess();
-      } else {
-        AppToast.error(context, 'Failed to create team score');
-      }
-      return;
-    }
-    
+
     // Calculate PDF hash for sync
     String? pdfHash;
     try {
@@ -586,53 +493,73 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     } catch (e) {
       Log.e('ADD_SCORE', 'Failed to calculate PDF hash', error: e);
     }
-    
-    // Create the instrument score (for personal library)
-    final instrumentScore = InstrumentScore(
-      id: '${now.millisecondsSinceEpoch}-is',
-      pdfPath: pdfPath,
-      pdfHash: pdfHash,
-      instrumentType: _selectedInstrument!,
-      customInstrument: _selectedInstrument == InstrumentType.other
-          ? _customInstrumentController.text.trim()
-          : null,
-      createdAt: now,
-    );
-    
+
+    // Adding instrument to existing score (showTitleComposer = false)
+    if (!widget.showTitleComposer && widget.existingScore != null) {
+      final instrumentScore = InstrumentScore(
+        id: now.millisecondsSinceEpoch.toString(),
+        scoreId: widget.existingScore!.id,
+        instrumentType: _selectedInstrument!,
+        customInstrument: _selectedInstrument == InstrumentType.other
+            ? _customInstrumentController.text.trim()
+            : null,
+        pdfPath: pdfPath,
+        pdfHash: pdfHash,
+        orderIndex: widget.existingScore!.instrumentScores.length,
+        createdAt: now,
+      );
+
+      await _scoresNotifier.addInstrumentScore(
+        widget.existingScore!.id,
+        instrumentScore,
+      );
+
+      if (!mounted) return;
+      widget.onSuccess();
+      return;
+    }
+
+    // Creating new score (showTitleComposer = true)
     if (widget.showTitleComposer) {
-      // Library screen mode: create new score or add to matched score
       final title = _titleController.text.trim();
       if (title.isEmpty) return;
-      
-      final composer = _composerController.text.trim().isEmpty 
-          ? 'Unknown' 
+
+      final composer = _composerController.text.trim().isEmpty
+          ? 'Unknown'
           : _composerController.text.trim();
-      
+
+      // Create the instrument score
+      final instrumentScore = InstrumentScore(
+        id: '${now.millisecondsSinceEpoch}-is',
+        pdfPath: pdfPath,
+        pdfHash: pdfHash,
+        instrumentType: _selectedInstrument!,
+        customInstrument: _selectedInstrument == InstrumentType.other
+            ? _customInstrumentController.text.trim()
+            : null,
+        createdAt: now,
+      );
+
       if (_matchedScore != null) {
         // Add instrument score to existing score
-        ref.read(scoresStateProvider.notifier).addInstrumentScore(_matchedScore!.id, instrumentScore);
+        await _scoresNotifier.addInstrumentScore(_matchedScore!.id, instrumentScore);
       } else {
         // Create new score with instrument score
         final newScore = Score(
           id: now.millisecondsSinceEpoch.toString(),
+          scopeType: _scope.scopeType,
+          scopeId: _scope.scopeId,
           title: title,
           composer: composer,
           createdAt: now,
           instrumentScores: [instrumentScore],
         );
-        ref.read(scoresStateProvider.notifier).addScore(newScore);
+        await _scoresNotifier.addScore(newScore);
       }
-    } else {
-      // Score detail screen mode: add to existing score
-      if (widget.existingScore != null) {
-        ref.read(scoresStateProvider.notifier).addInstrumentScore(
-          widget.existingScore!.id, 
-          instrumentScore,
-        );
-      }
+
+      if (!mounted) return;
+      widget.onSuccess();
     }
-    
-    widget.onSuccess();
   }
 
   String get _headerTitle {
@@ -646,7 +573,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     if (!widget.showTitleComposer && widget.existingScore != null) {
       return 'Add to "${widget.existingScore!.title}"';
     }
-    return _matchedScore != null 
+    return _matchedScore != null
         ? 'Add to "${_matchedScore!.title}"'
         : 'Add a new score';
   }
@@ -663,15 +590,13 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     if (!_isInitialized) {
       _initializeDefaultInstrument();
     }
-    
+
     final isInstrumentDisabled = _isInstrumentDisabled(
       _selectedInstrument!,
       _customInstrumentController.text,
     );
     // In copy mode, PDF is already set, so we don't need to check _selectedPdfPath
-    final hasPdf = widget.sourceInstrumentToCopy != null || 
-                   widget.sourceTeamInstrumentToCopy != null || 
-                   _selectedPdfPath != null;
+    final hasPdf = widget.sourceInstrumentToCopy != null || _selectedPdfPath != null;
     final canConfirm = widget.showTitleComposer
         ? (hasPdf &&
            _titleController.text.trim().isNotEmpty &&
@@ -876,9 +801,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
             ),
           const SizedBox(height: 12),
           // PDF select button (only show if not in copy mode)
-          if (widget.sourceInstrumentToCopy == null && widget.sourceTeamInstrumentToCopy == null)
+          if (widget.sourceInstrumentToCopy == null)
             _buildPdfSelectButton(),
-          if (widget.sourceInstrumentToCopy != null || widget.sourceTeamInstrumentToCopy != null)
+          if (widget.sourceInstrumentToCopy != null)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -917,7 +842,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
       builder: (context, child) {
         final isFocused = _customInstrumentFocusNode.hasFocus;
         final showBlueBorder = _selectedInstrument! == InstrumentType.other && isFocused && !isInstrumentDisabled;
-        
+
         return GestureDetector(
           key: _instrumentFieldKey,
           onTap: _selectedInstrument! != InstrumentType.other ? _toggleInstrumentDropdown : null,
@@ -927,8 +852,8 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
               color: isInstrumentDisabled ? AppColors.gray100 : AppColors.gray50,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isInstrumentDisabled 
-                    ? Colors.red.shade400 
+                color: isInstrumentDisabled
+                    ? Colors.red.shade400
                     : (showBlueBorder ? AppColors.blue500 : AppColors.gray200),
                 width: (isInstrumentDisabled || showBlueBorder) ? 1.5 : 1,
               ),
@@ -995,8 +920,8 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(2, 12, 12, 12),
                 child: Icon(
-                  _showInstrumentDropdown ? AppIcons.chevronUp : AppIcons.chevronDown, 
-                  size: 20, 
+                  _showInstrumentDropdown ? AppIcons.chevronUp : AppIcons.chevronDown,
+                  size: 20,
                   color: AppColors.gray400,
                 ),
               ),
@@ -1016,12 +941,12 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
         if (renderBox == null) return const SizedBox.shrink();
         final position = renderBox.localToGlobal(Offset.zero);
         final size = renderBox.size;
-        
+
         final items = InstrumentType.values;
-        final disabledSet = widget.showTitleComposer 
-            ? _disabledInstruments 
+        final disabledSet = widget.showTitleComposer
+            ? _disabledInstruments
             : widget.disabledInstruments;
-        
+
         return Positioned(
           top: position.dy + size.height + 4,
           left: position.dx,
@@ -1043,9 +968,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
                     mainAxisSize: MainAxisSize.min,
                     children: items.map((type) {
                       final isSelected = _selectedInstrument! == type;
-                      final isDisabled = type != InstrumentType.other && 
+                      final isDisabled = type != InstrumentType.other &&
                           disabledSet.contains(type.name);
-                      
+
                       return InkWell(
                         onTap: isDisabled ? null : () => _selectInstrument(type),
                         child: Container(

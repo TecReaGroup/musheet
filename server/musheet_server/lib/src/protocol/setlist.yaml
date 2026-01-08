@@ -1,21 +1,31 @@
 class: Setlist
 table: setlists
 fields:
-  userId: int, relation(parent=users)
+  # Unified scope partitioning
+  scopeType: String
+  scopeId: int
+
+  # Business fields
   name: String
   description: String?
+
+  # Team-only business metadata (nullable in user scope)
+  createdById: int?
+  sourceSetlistId: int?
+
+  # Sync fields
   createdAt: DateTime
   updatedAt: DateTime
   deletedAt: DateTime?
   version: int
   syncStatus: String?
 indexes:
-  setlist_user_idx:
-    fields: userId
+  setlist_scope_idx:
+    fields: scopeType, scopeId
     type: btree
-  setlist_user_name_unique:
-    fields: userId, name
+  setlist_scope_name_unique:
+    fields: scopeType, scopeId, name
     unique: true
-  setlist_version_idx:
-    fields: userId, version
+  setlist_scope_version_idx:
+    fields: scopeType, scopeId, version
     type: btree
