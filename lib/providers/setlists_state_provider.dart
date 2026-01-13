@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/setlist.dart';
 import '../models/score.dart';
 import '../core/core.dart';
-import '../core/data/data_scope.dart';
 import 'core_providers.dart';
 import 'base_data_notifier.dart';
 import 'auth_state_provider.dart';

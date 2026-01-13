@@ -22,3 +22,9 @@ export 'setlist_card.dart';
 
 // Metronome widget - Metronome component
 export 'metronome_widget.dart';
+
+// Sort bar - Reusable sort bar with search and sort controls
+export 'sort_bar.dart';
+
+// Expandable drawer mixin - Shared drawer animation logic
+export 'expandable_drawer_mixin.dart';

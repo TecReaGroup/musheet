@@ -11,12 +11,10 @@ import 'package:flutter/widgets.dart';
 
 import '../services/services.dart';
 import '../data/local/local_data_source.dart';
-import '../data/data_scope.dart';
 import '../data/remote/api_client.dart';
 import '../../database/database.dart';
 import '../../utils/logger.dart';
-import 'sync_coordinator.dart';
-import 'team_sync_coordinator.dart';
+import 'scoped_sync_coordinator.dart';
 import 'pdf_sync_service.dart';
 
 /// Unified sync manager for coordinating all sync operations
@@ -29,9 +27,6 @@ class UnifiedSyncManager {
   final NetworkService _network;
   final AppDatabase _db;
 
-  // Cache of team sync coordinators by teamId
-  final Map<int, TeamSyncCoordinator> _teamCoordinators = {};
-
   AppLifecycleListener? _lifecycleListener;
 
   UnifiedSyncManager._({
@@ -40,11 +35,11 @@ class UnifiedSyncManager {
     required SessionService session,
     required NetworkService network,
     required AppDatabase db,
-  }) : _localLibrary = localLibrary,
-       _api = api,
-       _session = session,
-       _network = network,
-       _db = db;
+  })  : _localLibrary = localLibrary,
+        _api = api,
+        _session = session,
+        _network = network,
+        _db = db;
 
   /// Initialize the singleton
   static Future<UnifiedSyncManager> initialize({
@@ -94,6 +89,17 @@ class UnifiedSyncManager {
       );
     }
 
+    // Initialize TeamSyncManager if not already done
+    // This ensures we can delegate to TeamSyncManager for team coordinators
+    if (!TeamSyncManager.isInitialized) {
+      TeamSyncManager.initialize(
+        db: _db,
+        api: _api,
+        session: _session,
+        network: _network,
+      );
+    }
+
     // Set up session monitoring
     _session.addLoginListener(_onLogin);
     _session.addLogoutListener(_onLogout);
@@ -119,15 +125,8 @@ class UnifiedSyncManager {
   }
 
   void _onLogout() {
-    Log.d('UNIFIED_SYNC', 'User logged out - clearing team coordinators');
-    _clearTeamCoordinators();
-  }
-
-  void _clearTeamCoordinators() {
-    for (final coordinator in _teamCoordinators.values) {
-      coordinator.dispose();
-    }
-    _teamCoordinators.clear();
+    Log.d('UNIFIED_SYNC', 'User logged out');
+    // TeamSyncManager handles its own cleanup via TeamSyncManager.reset()
   }
 
   // ============================================================================
@@ -158,7 +157,8 @@ class UnifiedSyncManager {
       final syncFutures = <Future<void>>[];
 
       // Library sync
-      syncFutures.add(SyncCoordinator.instance.requestSync(immediate: immediate));
+      syncFutures
+          .add(SyncCoordinator.instance.requestSync(immediate: immediate));
 
       // Team syncs
       for (final teamId in joinedTeamIds) {
@@ -199,14 +199,22 @@ class UnifiedSyncManager {
 
   /// Called when team data changes
   void onTeamDataChanged(int teamId) {
-    if (_teamCoordinators.containsKey(teamId)) {
-      _teamCoordinators[teamId]!.onLocalDataChanged();
+    if (TeamSyncManager.isInitialized) {
+      // Use TeamSyncManager's coordinator to ensure UI sees the change
+      TeamSyncManager.instance.getCoordinator(teamId).then((coordinator) {
+        coordinator.onLocalDataChanged();
+      });
     }
   }
 
   /// Get team sync coordinator for a specific team
-  TeamSyncCoordinator? getTeamCoordinator(int teamId) {
-    return _teamCoordinators[teamId];
+  /// Delegates to TeamSyncManager to ensure UI watches the same instance
+  ScopedSyncCoordinator? getTeamCoordinator(int teamId) {
+    if (!TeamSyncManager.isInitialized) return null;
+    // Note: This is synchronous access to the cached coordinator
+    // If the coordinator hasn't been created yet, this returns null
+    // Use _getOrCreateTeamCoordinator for async access that creates if needed
+    return TeamSyncManager.instance.getCachedCoordinator(teamId);
   }
 
   // ============================================================================
@@ -216,33 +224,14 @@ class UnifiedSyncManager {
   /// Get list of joined team IDs from local database
   Future<List<int>> _getJoinedTeamIds() async {
     final teams = await _db.select(_db.teams).get();
-    return teams
-        .where((t) => t.serverId > 0)
-        .map((t) => t.serverId)
-        .toList();
+    return teams.where((t) => t.serverId > 0).map((t) => t.serverId).toList();
   }
 
-  /// Get or create a TeamSyncCoordinator for the given team
-  Future<TeamSyncCoordinator> _getOrCreateTeamCoordinator(int teamId) async {
-    if (_teamCoordinators.containsKey(teamId)) {
-      return _teamCoordinators[teamId]!;
-    }
-
-    // Create team-scoped data source dynamically
-    final teamDataSource = ScopedLocalDataSource(_db, DataScope.team(teamId));
-
-    final coordinator = TeamSyncCoordinator(
-      teamId: teamId,
-      local: teamDataSource,
-      api: _api,
-      session: _session,
-      network: _network,
-    );
-
-    await coordinator.initialize();
-    _teamCoordinators[teamId] = coordinator;
-
-    return coordinator;
+  /// Get or create a ScopedSyncCoordinator for the given team
+  /// Delegates to TeamSyncManager to ensure UI watches the same coordinator instance
+  Future<ScopedSyncCoordinator> _getOrCreateTeamCoordinator(int teamId) async {
+    // Delegate to TeamSyncManager to ensure UI watches the same instance
+    return TeamSyncManager.instance.getCoordinator(teamId);
   }
 
   // ============================================================================
@@ -253,6 +242,6 @@ class UnifiedSyncManager {
     _lifecycleListener?.dispose();
     _session.removeLoginListener(_onLogin);
     _session.removeLogoutListener(_onLogout);
-    _clearTeamCoordinators();
+    // TeamSyncManager handles its own cleanup
   }
 }
