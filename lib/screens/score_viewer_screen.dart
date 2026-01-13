@@ -452,8 +452,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   @override
   void dispose() {
-    // Save annotations before disposing if we were in edit mode (personal mode only)
-    if (_isDrawMode && !_isTeamMode) {
+    // Save annotations before disposing if we were in edit mode
+    if (_isDrawMode) {
       _saveAnnotationsSync();
     }
 
@@ -465,9 +465,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     super.dispose();
   }
 
-  /// Synchronous version for dispose - uses cached notifier for safe access (personal mode)
+  /// Synchronous version for dispose - uses cached notifier for safe access
   void _saveAnnotationsSync() {
-    if (_currentInstrument == null || _scoresNotifier == null || _isTeamMode) {
+    if (_currentInstrument == null || _scoresNotifier == null) {
       return;
     }
 
@@ -869,8 +869,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       key: ValueKey('pdf_page_$_currentPage'),
       document: _pdfDocument!,
       pageNumber: _currentPage,
-      isDrawMode:
-          _isDrawMode && !_isTeamMode, // Disable draw mode for team scores
+      isDrawMode: _isDrawMode, // Enable draw mode for all scopes
       selectedTool: _selectedTool,
       penColor: _penColor,
       penWidth: _penWidth,
@@ -1358,7 +1357,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   /// Save all annotations for the current instrument score to the database
   void _saveAnnotations() {
-    if (_currentInstrument == null || _isTeamMode) return;
+    if (_currentInstrument == null) return;
 
     // Collect all annotations from all pages
     final allAnnotations = <Annotation>[];
@@ -1368,9 +1367,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       }
     }
 
-    // Save to database via provider
+    // Save to database via scoped provider (works for both personal and team)
     ref
-        .read(scoresStateProvider.notifier)
+        .read(scopedScoresProvider(widget.scope).notifier)
         .updateAnnotations(
           _scoreData.id,
           _currentInstrument!.id,

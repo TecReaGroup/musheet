@@ -13,7 +13,7 @@ import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../router/app_router.dart';
-import 'library_screen.dart' show SortType, SortState;
+import '../models/sort_state.dart';
 
 enum TeamTab { setlists, scores, members }
 
@@ -1574,7 +1574,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                             AppColors.blue600,
                           ],
                           title: 'Import from Library',
-                          subtitle: 'Copy a score from your personal library',
+                          subtitle: 'Copy a score from personal library',
                           onTap: () {
                             ref
                                     .read(showScoreModalProvider.notifier)

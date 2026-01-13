@@ -362,32 +362,26 @@ class AuthStateNotifier extends Notifier<AuthState> {
       ref.invalidate(pdfSyncServiceProvider);
     }
 
-    if (!SyncCoordinator.isInitialized) {
-      await SyncCoordinator.initialize(
-        local: local,
+    // Initialize UnifiedSyncManager - this handles both Library and Team sync
+    // It internally initializes SyncCoordinator and TeamSyncManager
+    if (!UnifiedSyncManager.isInitialized) {
+      await UnifiedSyncManager.initialize(
+        localLibrary: local,
         api: ApiClient.instance,
         session: SessionService.instance,
         network: NetworkService.instance,
+        db: db,
       );
       // Invalidate provider to pick up new instance
       ref.invalidate(syncCoordinatorProvider);
-    }
-
-    if (!TeamSyncManager.isInitialized) {
-      TeamSyncManager.initialize(
-        db: db,
-        api: ApiClient.instance,
-        session: SessionService.instance,
-        network: NetworkService.instance,
-      );
     }
 
     // Re-connect repositories to sync coordinator now that it's initialized
     ref.invalidate(scoreRepositoryProvider);
     ref.invalidate(setlistRepositoryProvider);
 
-    // Trigger initial sync
-    SyncCoordinator.instance.requestSync(immediate: true);
+    // Trigger initial sync for both Library AND Team data
+    await UnifiedSyncManager.instance.requestSync(immediate: true);
   }
 }
 

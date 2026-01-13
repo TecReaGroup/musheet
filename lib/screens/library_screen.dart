@@ -7,6 +7,7 @@ import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
+import '../models/sort_state.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
@@ -14,24 +15,6 @@ import '../app.dart' show sharedFilePathProvider;
 import '../router/app_router.dart';
 
 enum LibraryTab { scores, setlists }
-
-// Sort type
-enum SortType { recentCreated, alphabetical, recentOpened }
-
-// Sort state
-class SortState {
-  final SortType type;
-  final bool ascending;
-  
-  const SortState({this.type = SortType.recentCreated, this.ascending = false});
-  
-  SortState copyWith({SortType? type, bool? ascending}) {
-    return SortState(
-      type: type ?? this.type,
-      ascending: ascending ?? this.ascending,
-    );
-  }
-}
 
 class LibraryTabNotifier extends Notifier<LibraryTab> {
   @override

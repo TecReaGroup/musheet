@@ -7,8 +7,9 @@ import '../providers/scores_state_provider.dart';
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../router/app_router.dart';
+import '../models/sort_state.dart';
 import 'library_screen.dart'
-    show scoreSortProvider, recentlyOpenedScoresProvider, SortState, SortType, lastOpenedInstrumentInScoreProvider;
+    show scoreSortProvider, recentlyOpenedScoresProvider, lastOpenedInstrumentInScoreProvider;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 

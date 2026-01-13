@@ -183,7 +183,7 @@ final pdfSyncServiceProvider = Provider<PdfSyncService?>((ref) {
 
 /// Provider for SyncCoordinator
 /// Returns null if not initialized (user not logged in or no server configured)
-final syncCoordinatorProvider = Provider<SyncCoordinator?>((ref) {
+final syncCoordinatorProvider = Provider<ScopedSyncCoordinator?>((ref) {
   if (!SyncCoordinator.isInitialized) return null;
   return SyncCoordinator.instance;
 });
@@ -192,7 +192,7 @@ final syncCoordinatorProvider = Provider<SyncCoordinator?>((ref) {
 final syncStateProvider = StreamProvider<SyncState>((ref) async* {
   final coordinator = ref.watch(syncCoordinatorProvider);
   if (coordinator == null) {
-    yield const SyncState(phase: SyncPhase.waitingForNetwork);
+    yield ScopedSyncState(scope: DataScope.user, phase: SyncPhase.waitingForNetwork);
     return;
   }
   // Emit current state first
@@ -206,8 +206,8 @@ final currentSyncStateProvider = Provider<SyncState>((ref) {
   final syncAsync = ref.watch(syncStateProvider);
   return syncAsync.when(
     data: (state) => state,
-    loading: () => const SyncState(),
-    error: (_, _) => const SyncState(phase: SyncPhase.error),
+    loading: () => ScopedSyncState(scope: DataScope.user),
+    error: (_, _) => ScopedSyncState(scope: DataScope.user, phase: SyncPhase.error),
   );
 });
 
@@ -249,7 +249,7 @@ final teamSyncManagerProvider = Provider<TeamSyncManager?>((ref) {
 });
 
 /// Family provider for individual team sync coordinators
-final teamSyncCoordinatorProvider = FutureProvider.family<TeamSyncCoordinator?, int>((ref, teamId) async {
+final teamSyncCoordinatorProvider = FutureProvider.family<ScopedSyncCoordinator?, int>((ref, teamId) async {
   final manager = ref.watch(teamSyncManagerProvider);
   if (manager == null) return null;
   final coordinator = await manager.getCoordinator(teamId);
@@ -259,11 +259,11 @@ final teamSyncCoordinatorProvider = FutureProvider.family<TeamSyncCoordinator?, 
 });
 
 /// Stream provider for team sync state (per team)
-final teamSyncStateProvider = StreamProvider.family<TeamSyncState, int>((ref, teamId) async* {
+final teamSyncStateProvider = StreamProvider.family<ScopedSyncState, int>((ref, teamId) async* {
   final coordinatorAsync = ref.watch(teamSyncCoordinatorProvider(teamId));
   final coordinator = coordinatorAsync.value;
   if (coordinator == null) {
-    yield TeamSyncState(teamId: teamId, phase: SyncPhase.waitingForNetwork);
+    yield ScopedSyncState(scope: DataScope.team(teamId), phase: SyncPhase.waitingForNetwork);
     return;
   }
   // Emit current state first

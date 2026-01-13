@@ -47,6 +47,9 @@ class AppDatabase extends _$AppDatabase {
   // Private constructor
   AppDatabase._internal() : super(_openConnection());
 
+  // Constructor for testing with custom executor (e.g., in-memory database)
+  AppDatabase.forTesting(super.e);
+
   @override
   int get schemaVersion => 4; // Unified tables with scopeType/scopeId
 
