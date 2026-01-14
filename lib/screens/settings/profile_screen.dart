@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../providers/auth_state_provider.dart';
@@ -491,106 +492,261 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _showChangePasswordDialog(BuildContext context) {
     final oldPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
-    final confirmPasswordController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Change Password'),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: oldPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Current Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter current password';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: newPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'New Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter new password';
-                    }
-                    if (value.length < 6) {
-                      return 'Password must be at least 6 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: confirmPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm New Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value != newPasswordController.text) {
-                      return 'Passwords do not match';
-                    }
-                    return null;
-                  },
+      barrierColor: Colors.black.withValues(alpha: 0.5),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 400),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.12),
+                  blurRadius: 30,
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Lock icon header
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppColors.blue50, AppColors.blue100],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(
+                          AppIcons.rotateCcwKey,
+                          size: 28,
+                          color: AppColors.blue550,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Title
+                      const Text(
+                        'Change Password',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray900,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Current Password
+                      TextFormField(
+                        controller: oldPasswordController,
+                        style: const TextStyle(color: AppColors.gray500),
+                        decoration: InputDecoration(
+                          labelText: 'Current Password',
+                          labelStyle: const TextStyle(color: AppColors.gray400),
+                          prefixIcon: const Icon(
+                            AppIcons.rotateCcwKey,
+                            size: 20,
+                            color: AppColors.gray400,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.gray200),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.gray200),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.blue400,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter current password';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      // New Password
+                      TextFormField(
+                        controller: newPasswordController,
+                        style: const TextStyle(color: AppColors.gray500),
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          labelStyle: const TextStyle(color: AppColors.gray400),
+                          prefixIcon: const Icon(
+                            LucideIcons.keyRound,
+                            size: 20,
+                            color: AppColors.gray400,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.gray200),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: AppColors.gray200),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppColors.blue400,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter new password';
+                          }
+                          if (value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Action buttons
+                      Row(
+                        children: [
+                          // Cancel button
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.pop(dialogContext),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                side: const BorderSide(color: AppColors.gray200),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: AppColors.gray600,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // Change button
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () async {
+                                      if (!formKey.currentState!.validate()) {
+                                        return;
+                                      }
+
+                                      final authState =
+                                          ref.read(authStateProvider);
+                                      if (authState.user == null ||
+                                          !ApiClient.isInitialized) {
+                                        Navigator.pop(dialogContext);
+                                        AppToast.warning(
+                                          dialogContext,
+                                          'Not logged in',
+                                        );
+                                        return;
+                                      }
+
+                                      setDialogState(() => isSubmitting = true);
+
+                                      final result =
+                                          await ApiClient.instance.changePassword(
+                                        userId: authState.user!.id,
+                                        oldPassword: oldPasswordController.text,
+                                        newPassword: newPasswordController.text,
+                                      );
+
+                                      if (!mounted) return;
+                                      if (!dialogContext.mounted) return;
+
+                                      Navigator.pop(dialogContext);
+
+                                      if (result.isSuccess &&
+                                          result.data == true) {
+                                        AppToast.success(
+                                          this.context,
+                                          'Password changed!',
+                                        );
+                                      } else {
+                                        AppToast.error(
+                                          this.context,
+                                          'Failed: ${result.error?.message ?? 'Check your current password'}',
+                                        );
+                                      }
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.blue500,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: isSubmitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Confirm',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-
-                final authState = ref.read(authStateProvider);
-                if (authState.user == null || !ApiClient.isInitialized) {
-                  Navigator.pop(context);
-                  AppToast.warning(context, 'Not logged in');
-                  return;
-                }
-
-                Navigator.pop(context);
-
-                final result = await ApiClient.instance.changePassword(
-                  userId: authState.user!.id,
-                  oldPassword: oldPasswordController.text,
-                  newPassword: newPasswordController.text,
-                );
-
-                if (!mounted) return;
-                if (result.isSuccess && result.data == true) {
-                  AppToast.success(this.context, 'Password changed!');
-                } else {
-                  AppToast.error(
-                    this.context,
-                    'Failed: ${result.error?.message ?? 'Check your current password'}',
-                  );
-                }
-              },
-              child: const Text('Change'),
-            ),
-          ],
         ),
       ),
     );

@@ -240,6 +240,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
   /// Logout
   Future<void> logout() async {
     // Stop sync coordinators and services
+    // IMPORTANT: Reset UnifiedSyncManager first, as it holds references to other coordinators
+    if (UnifiedSyncManager.isInitialized) {
+      UnifiedSyncManager.reset();
+    }
     if (PdfSyncService.isInitialized) {
       PdfSyncService.reset();
     }

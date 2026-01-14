@@ -1110,12 +1110,17 @@ class ScopedLocalDataSource implements SyncableDataSource {
     final isDeleted = scoreData['isDeleted'] as bool? ?? false;
 
     // Try to find existing record by id first, then by serverId
+    // IMPORTANT: Always filter by scope to avoid cross-scope conflicts
     var existing = await (_db.select(_db.scores)
-          ..where((s) => s.id.equals(id)))
+          ..where((s) => s.id.equals(id))
+          ..where((s) => s.scopeType.equals(_scope.type))
+          ..where((s) => s.scopeId.equals(_scope.id)))
         .getSingleOrNull();
     if (existing == null && serverId != null) {
       existing = await (_db.select(_db.scores)
-            ..where((s) => s.serverId.equals(serverId)))
+            ..where((s) => s.serverId.equals(serverId))
+            ..where((s) => s.scopeType.equals(_scope.type))
+            ..where((s) => s.scopeId.equals(_scope.id)))
           .getSingleOrNull();
     }
 
@@ -1185,13 +1190,40 @@ class ScopedLocalDataSource implements SyncableDataSource {
     final serverId = isData['serverId'] as int?;
     final isDeleted = isData['isDeleted'] as bool? ?? false;
 
+    // IMPORTANT: InstrumentScore inherits scope from parent Score
+    // We need to find existing records that belong to this scope
     var existing = await (_db.select(_db.instrumentScores)
           ..where((s) => s.id.equals(id)))
         .getSingleOrNull();
-    if (existing == null && serverId != null) {
-      existing = await (_db.select(_db.instrumentScores)
-            ..where((s) => s.serverId.equals(serverId)))
+
+    // Verify existing record belongs to this scope (via parent Score)
+    if (existing != null) {
+      final parentScore = await (_db.select(_db.scores)
+            ..where((s) => s.id.equals(existing!.scoreId)))
           .getSingleOrNull();
+      if (parentScore == null ||
+          parentScore.scopeType != _scope.type ||
+          parentScore.scopeId != _scope.id) {
+        existing = null; // Not in this scope, treat as not found
+      }
+    }
+
+    if (existing == null && serverId != null) {
+      // Search by serverId, but only within this scope
+      final candidates = await (_db.select(_db.instrumentScores)
+            ..where((s) => s.serverId.equals(serverId)))
+          .get();
+      for (final candidate in candidates) {
+        final parentScore = await (_db.select(_db.scores)
+              ..where((s) => s.id.equals(candidate.scoreId)))
+            .getSingleOrNull();
+        if (parentScore != null &&
+            parentScore.scopeType == _scope.type &&
+            parentScore.scopeId == _scope.id) {
+          existing = candidate;
+          break;
+        }
+      }
     }
 
     if (isDeleted) {
@@ -1291,12 +1323,17 @@ class ScopedLocalDataSource implements SyncableDataSource {
     final serverId = setlistData['serverId'] as int?;
     final isDeleted = setlistData['isDeleted'] as bool? ?? false;
 
+    // IMPORTANT: Always filter by scope to avoid cross-scope conflicts
     var existing = await (_db.select(_db.setlists)
-          ..where((s) => s.id.equals(id)))
+          ..where((s) => s.id.equals(id))
+          ..where((s) => s.scopeType.equals(_scope.type))
+          ..where((s) => s.scopeId.equals(_scope.id)))
         .getSingleOrNull();
     if (existing == null && serverId != null) {
       existing = await (_db.select(_db.setlists)
-            ..where((s) => s.serverId.equals(serverId)))
+            ..where((s) => s.serverId.equals(serverId))
+            ..where((s) => s.scopeType.equals(_scope.type))
+            ..where((s) => s.scopeId.equals(_scope.id)))
           .getSingleOrNull();
     }
 
@@ -1368,48 +1405,80 @@ class ScopedLocalDataSource implements SyncableDataSource {
     final isDeleted = ssData['isDeleted'] as bool? ?? false;
 
     // Resolve setlistId if it's a serverId reference
+    // IMPORTANT: Filter by scope to avoid cross-scope conflicts
     if (setlistId.startsWith('server_')) {
       final setlistServerId = int.tryParse(setlistId.substring(7));
       if (setlistServerId != null) {
         final localSetlist = await (_db.select(_db.setlists)
-              ..where((s) => s.serverId.equals(setlistServerId)))
+              ..where((s) => s.serverId.equals(setlistServerId))
+              ..where((s) => s.scopeType.equals(_scope.type))
+              ..where((s) => s.scopeId.equals(_scope.id)))
             .getSingleOrNull();
         if (localSetlist != null) {
           setlistId = localSetlist.id;
         } else {
           Log.e('SYNC',
-              'Cannot find local Setlist with serverId=$setlistServerId for SetlistScore');
+              'Cannot find local Setlist with serverId=$setlistServerId for SetlistScore in scope $_scope');
           return;
         }
       }
     }
 
     // Resolve scoreId if it's a serverId reference
+    // IMPORTANT: Filter by scope to avoid cross-scope conflicts
     if (scoreId.startsWith('server_')) {
       final scoreServerId = int.tryParse(scoreId.substring(7));
       if (scoreServerId != null) {
         final localScore = await (_db.select(_db.scores)
-              ..where((s) => s.serverId.equals(scoreServerId)))
+              ..where((s) => s.serverId.equals(scoreServerId))
+              ..where((s) => s.scopeType.equals(_scope.type))
+              ..where((s) => s.scopeId.equals(_scope.id)))
             .getSingleOrNull();
         if (localScore != null) {
           scoreId = localScore.id;
         } else {
           Log.e('SYNC',
-              'Cannot find local Score with serverId=$scoreServerId for SetlistScore');
+              'Cannot find local Score with serverId=$scoreServerId for SetlistScore in scope $_scope');
           return;
         }
       }
     }
 
     // First try to find by composite key, then by serverId
+    // SetlistScore inherits scope from parent Setlist
     var existing = await (_db.select(_db.setlistScores)
           ..where((ss) =>
               ss.setlistId.equals(setlistId) & ss.scoreId.equals(scoreId)))
         .getSingleOrNull();
-    if (existing == null && serverId != null) {
-      existing = await (_db.select(_db.setlistScores)
-            ..where((ss) => ss.serverId.equals(serverId)))
+
+    // Verify existing record belongs to this scope (via parent Setlist)
+    if (existing != null) {
+      final parentSetlist = await (_db.select(_db.setlists)
+            ..where((s) => s.id.equals(existing!.setlistId)))
           .getSingleOrNull();
+      if (parentSetlist == null ||
+          parentSetlist.scopeType != _scope.type ||
+          parentSetlist.scopeId != _scope.id) {
+        existing = null; // Not in this scope, treat as not found
+      }
+    }
+
+    if (existing == null && serverId != null) {
+      // Search by serverId, but only within this scope
+      final candidates = await (_db.select(_db.setlistScores)
+            ..where((ss) => ss.serverId.equals(serverId)))
+          .get();
+      for (final candidate in candidates) {
+        final parentSetlist = await (_db.select(_db.setlists)
+              ..where((s) => s.id.equals(candidate.setlistId)))
+            .getSingleOrNull();
+        if (parentSetlist != null &&
+            parentSetlist.scopeType == _scope.type &&
+            parentSetlist.scopeId == _scope.id) {
+          existing = candidate;
+          break;
+        }
+      }
     }
 
     if (isDeleted) {

@@ -7,6 +7,7 @@ library;
 
 import 'dart:async';
 
+import 'package:drift/drift.dart' as drift;
 import 'package:flutter/widgets.dart';
 
 import '../services/services.dart';
@@ -146,10 +147,20 @@ class UnifiedSyncManager {
       return;
     }
 
+    // Defensive check: ensure SyncCoordinator is initialized
+    if (!SyncCoordinator.isInitialized) {
+      Log.w('UNIFIED_SYNC', 'SyncCoordinator not initialized - sync request ignored');
+      return;
+    }
+
     Log.d('UNIFIED_SYNC', 'Requesting sync (immediate=$immediate)');
 
     try {
-      // Get list of joined teams
+      // IMPORTANT: First sync team list from server to ensure we have team IDs
+      // This fixes the bug where team data wasn't synced on first login
+      await _syncTeamListFromServer();
+
+      // Get list of joined teams (now includes freshly synced teams)
       final joinedTeamIds = await _getJoinedTeamIds();
       Log.d('UNIFIED_SYNC', 'Syncing Library + ${joinedTeamIds.length} teams');
 
@@ -180,6 +191,43 @@ class UnifiedSyncManager {
     }
   }
 
+  /// Sync team list from server to local database
+  /// This ensures we have team IDs before syncing team data
+  Future<void> _syncTeamListFromServer() async {
+    final userId = _session.userId;
+    if (userId == null) return;
+
+    try {
+      final result = await _api.getMyTeams(userId);
+
+      if (result.isFailure) {
+        Log.w('UNIFIED_SYNC', 'Failed to fetch teams: ${result.error?.message}');
+        return;
+      }
+
+      for (final teamWithRole in result.data!) {
+        final serverTeam = teamWithRole.team;
+
+        // Upsert team to local database (minimal data, just enough for sync)
+        await _db.into(_db.teams).insertOnConflictUpdate(
+          TeamsCompanion.insert(
+            id: 'server_${serverTeam.id}',
+            serverId: serverTeam.id!,
+            name: serverTeam.name,
+            description: drift.Value(serverTeam.description),
+            createdAt: serverTeam.createdAt,
+            updatedAt: drift.Value(DateTime.now()),
+          ),
+        );
+      }
+
+      Log.d('UNIFIED_SYNC', 'Synced ${result.data!.length} team IDs from server');
+    } catch (e) {
+      Log.w('UNIFIED_SYNC', 'Error syncing team list: $e');
+      // Don't throw - continue with whatever teams we have locally
+    }
+  }
+
   /// Request sync for a specific team only
   Future<void> requestTeamSync(int teamId, {bool immediate = false}) async {
     if (!_network.isOnline || !_session.isAuthenticated) return;
@@ -194,6 +242,7 @@ class UnifiedSyncManager {
 
   /// Called when local data changes (for Library)
   void onLibraryDataChanged() {
+    if (!SyncCoordinator.isInitialized) return;
     SyncCoordinator.instance.onLocalDataChanged();
   }
 

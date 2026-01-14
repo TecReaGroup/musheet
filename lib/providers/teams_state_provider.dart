@@ -11,6 +11,7 @@ import '../models/team.dart';
 import '../utils/logger.dart';
 import 'core_providers.dart';
 import 'auth_state_provider.dart';
+import '../core/sync/sync_coordinator.dart' show SyncPhase;
 
 // Re-export team operations for easy access
 export 'team_operations_provider.dart';
@@ -50,10 +51,20 @@ class TeamsState {
 
 /// Notifier for managing teams state
 class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
-  bool _hasInitialSync = false;
-
   @override
   Future<TeamsState> build() async {
+    // Listen to sync state changes - refresh when sync completes
+    // This ensures team list is refreshed after login sync completes
+    ref.listen(syncStateProvider, (previous, next) {
+      next.whenData((syncState) {
+        final wasWorking = previous?.value?.phase != SyncPhase.idle;
+        final isNowIdle = syncState.phase == SyncPhase.idle;
+        if (wasWorking && isNowIdle && syncState.lastSyncAt != null) {
+          ref.invalidateSelf();
+        }
+      });
+    });
+
     // Listen to auth state changes (not watch to avoid rebuilds)
     ref.listen(authStateProvider, (previous, next) {
       // Skip initial emission - build() already handles initial state
@@ -62,13 +73,8 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
       final wasAuth = previous.status == AuthStatus.authenticated;
       final isAuth = next.status == AuthStatus.authenticated;
 
-      // Reset sync flag on logout
-      if (wasAuth && !isAuth) {
-        _hasInitialSync = false;
-        ref.invalidateSelf();
-      }
-      // Refresh on login
-      else if (!wasAuth && isAuth) {
+      // Refresh on logout or login
+      if (wasAuth != isAuth) {
         ref.invalidateSelf();
       }
     });
@@ -76,27 +82,23 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
     // Check current auth state
     final authState = ref.read(authStateProvider);
     if (authState.status != AuthStatus.authenticated) {
-      _hasInitialSync = false;
       return const TeamsState();
     }
 
-    return _loadTeams(syncFromServer: !_hasInitialSync);
+    return _loadTeams();
   }
 
-  Future<TeamsState> _loadTeams({bool syncFromServer = false}) async {
+  Future<TeamsState> _loadTeams() async {
     final teamRepo = ref.read(teamRepositoryProvider);
     if (teamRepo == null) {
       return const TeamsState(error: 'Team service not available');
     }
 
     try {
-      // Only sync from server if requested and online
-      if (syncFromServer) {
-        final isOnline = ref.read(isOnlineProvider);
-        if (isOnline) {
-          await teamRepo.syncTeamsFromServer();
-          _hasInitialSync = true;
-        }
+      // Always sync from server when online
+      final isOnline = ref.read(isOnlineProvider);
+      if (isOnline) {
+        await teamRepo.syncTeamsFromServer();
       }
 
       // Load from local database
@@ -111,7 +113,7 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
   /// Refresh teams (force sync from server)
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = AsyncData(await _loadTeams(syncFromServer: true));
+    state = AsyncData(await _loadTeams());
   }
 
   /// Create a new team
