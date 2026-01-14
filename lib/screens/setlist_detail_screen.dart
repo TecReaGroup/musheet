@@ -4,12 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/team.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/scores_state_provider.dart';
+import '../providers/ui_state_providers.dart';
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../router/app_router.dart';
-import '../models/sort_state.dart';
-import 'library_screen.dart'
-    show scoreSortProvider, recentlyOpenedScoresProvider, lastOpenedInstrumentInScoreProvider;
+import '../utils/sort_utils.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 
@@ -171,18 +170,16 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   void _navigateToScore(Setlist setlist, List<Score> setlistScores, int index) {
     final score = setlistScores[index];
 
-    // Get preferred instrument
+    // Get preferred instrument (unified for all scopes)
     InstrumentScore? instrumentScore;
-    if (!_isTeam && score.instrumentScores.isNotEmpty) {
-      final lastOpened = ref.read(lastOpenedInstrumentInScoreProvider);
+    if (score.instrumentScores.isNotEmpty) {
+      final lastOpened = ref.read(scopedLastOpenedIndexProvider((_scope, 'instrumentInScore')));
       final lastIndex = lastOpened[score.id];
       if (lastIndex != null && lastIndex < score.instrumentScores.length) {
         instrumentScore = score.instrumentScores[lastIndex];
       } else {
         instrumentScore = score.instrumentScores.first;
       }
-    } else if (score.instrumentScores.isNotEmpty) {
-      instrumentScore = score.instrumentScores.first;
     }
 
     AppNavigation.navigateToScoreViewer(
@@ -724,12 +721,10 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           .toList();
     }
 
-    // Apply sorting for library mode
-    if (!_isTeam) {
-      final sortState = ref.watch(scoreSortProvider);
-      final recentlyOpened = ref.watch(recentlyOpenedScoresProvider);
-      filteredScores = _sortScores(filteredScores, sortState, recentlyOpened);
-    }
+    // Apply sorting (unified for all scopes)
+    final sortState = ref.watch(scopedSortProvider((_scope, 'scores')));
+    final recentlyOpened = ref.watch(scopedRecentlyOpenedProvider((_scope, 'scores')));
+    filteredScores = sortScores(filteredScores, sortState, recentlyOpened);
 
     return Stack(
       children: [
@@ -1029,39 +1024,5 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
         ),
       ),
     );
-  }
-
-  List<Score> _sortScores(
-    List<Score> scores,
-    SortState sortState,
-    Map<String, DateTime> recentlyOpened,
-  ) {
-    final sorted = List<Score>.from(scores);
-    switch (sortState.type) {
-      case SortType.recentCreated:
-        sorted.sort(
-          (a, b) => sortState.ascending
-              ? a.createdAt.compareTo(b.createdAt)
-              : b.createdAt.compareTo(a.createdAt),
-        );
-        break;
-      case SortType.alphabetical:
-        sorted.sort(
-          (a, b) => sortState.ascending
-              ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-              : b.title.toLowerCase().compareTo(a.title.toLowerCase()),
-        );
-        break;
-      case SortType.recentOpened:
-        sorted.sort((a, b) {
-          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
-          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
-          return sortState.ascending
-              ? aOpened.compareTo(bOpened)
-              : bOpened.compareTo(aOpened);
-        });
-        break;
-    }
-    return sorted;
   }
 }

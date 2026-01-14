@@ -11,7 +11,7 @@ import '../widgets/import_from_library_dialog.dart';
 import '../widgets/common_widgets.dart';
 import '../utils/icon_mappings.dart';
 import '../router/app_router.dart';
-import 'library_screen.dart' show lastOpenedInstrumentInScoreProvider;
+import '../providers/ui_state_providers.dart';
 
 /// Unified Score Detail Screen for both Personal and Team scores
 /// Uses DataScope to differentiate between user library and team contexts
@@ -762,12 +762,10 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            // Record last opened for personal mode
-            if (!_isTeam) {
-              ref
-                  .read(lastOpenedInstrumentInScoreProvider.notifier)
-                  .recordLastOpened(score.id, index);
-            }
+            // Record last opened instrument index
+            ref
+                .read(scopedLastOpenedIndexProvider((_scope, 'instrumentInScore')).notifier)
+                .recordLastOpened(score.id, index);
             // Navigate to score viewer with unified navigation
             AppNavigation.navigateToScoreViewer(
               context,

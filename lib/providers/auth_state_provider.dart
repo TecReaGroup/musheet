@@ -10,7 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/core.dart';
 import '../core/services/avatar_cache_service.dart';
 import 'core_providers.dart';
-import 'team_operations_provider.dart' show clearAllTeamCaches;
 
 // ============================================================================
 // Auth State
@@ -253,9 +252,6 @@ class AuthStateNotifier extends Notifier<AuthState> {
     if (TeamSyncManager.isInitialized) {
       TeamSyncManager.reset();
     }
-
-    // Clear team caches
-    clearAllTeamCaches();
 
     // Logout from server and clear session first
     final authRepo = ref.read(authRepositoryProvider);

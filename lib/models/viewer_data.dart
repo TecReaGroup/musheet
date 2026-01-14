@@ -14,27 +14,12 @@ class ViewerScoreData with ScoreBase {
 
   ViewerScoreData(this.score);
 
-  /// Create from a score (auto-detects source from scopeType)
-  factory ViewerScoreData.from(Score score) => ViewerScoreData(score);
-
-  /// Legacy factory for backward compatibility
-  factory ViewerScoreData.fromPersonal(Score score) => ViewerScoreData(score);
-
-  /// Legacy factory for backward compatibility
-  factory ViewerScoreData.fromTeam(Score score) => ViewerScoreData(score);
-
   /// Get source type based on scopeType
   ViewerSource get source =>
       score.isTeamScore ? ViewerSource.team : ViewerSource.library;
 
   bool get isPersonal => source == ViewerSource.library;
   bool get isTeam => source == ViewerSource.team;
-
-  /// Get the score (works for both personal and team)
-  Score get personalScore => score;
-
-  /// Alias for backward compatibility (TeamScore is just Score)
-  Score get teamScore => score;
 
   // ScoreBase implementation - delegate to underlying score
   @override
@@ -79,27 +64,6 @@ class ViewerInstrumentData with InstrumentScoreBase {
 
   ViewerInstrumentData(this.instrument);
 
-  /// Legacy factory for backward compatibility
-  factory ViewerInstrumentData.fromPersonal(InstrumentScore instrument) =>
-      ViewerInstrumentData(instrument);
-
-  /// Legacy factory for backward compatibility
-  factory ViewerInstrumentData.fromTeam(InstrumentScore instrument) =>
-      ViewerInstrumentData(instrument);
-
-  /// Source is determined by parent score context (not stored here)
-  /// For most use cases, this is not needed since we use unified model
-  ViewerSource get source => ViewerSource.library; // Default to library
-
-  bool get isPersonal => true;
-  bool get isTeam => false;
-
-  /// Get the instrument (works for both personal and team)
-  InstrumentScore get personalInstrument => instrument;
-
-  /// Alias for backward compatibility
-  InstrumentScore get teamInstrument => instrument;
-
   // InstrumentScoreBase implementation - delegate to underlying instrument
   @override
   String get id => instrument.id;
@@ -139,14 +103,6 @@ class ViewerSetlistData with SetlistBase {
   final Setlist setlist;
 
   ViewerSetlistData(this.setlist);
-
-  /// Legacy factory for backward compatibility
-  factory ViewerSetlistData.fromPersonal(Setlist setlist) =>
-      ViewerSetlistData(setlist);
-
-  /// Legacy factory for backward compatibility
-  factory ViewerSetlistData.fromTeam(Setlist setlist) =>
-      ViewerSetlistData(setlist);
 
   /// Get source type based on scopeType
   ViewerSource get source =>

@@ -129,7 +129,7 @@ void main() {
         librarySynced = true;
 
         // Sync Teams (but teamIds is empty!)
-        for (final teamId in teamIds) {
+        for (final _ in teamIds) {
           teamDataSynced = true; // This never executes!
         }
       }

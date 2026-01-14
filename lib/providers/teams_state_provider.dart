@@ -13,9 +13,6 @@ import 'core_providers.dart';
 import 'auth_state_provider.dart';
 import '../core/sync/sync_coordinator.dart' show SyncPhase;
 
-// Re-export team operations for easy access
-export 'team_operations_provider.dart';
-
 // ============================================================================
 // Teams State
 // ============================================================================
@@ -205,9 +202,13 @@ final teamByIdProvider = Provider.family<Team?, String>((ref, teamId) {
 });
 
 // ============================================================================
-// Team Data Providers
+// Team Data Providers - Use scopedScoresProvider/scopedSetlistsProvider
 // ============================================================================
 
-// Note: teamScoresProvider, teamSetlistsProvider, teamScoresListProvider,
-// teamSetlistsListProvider are now defined in team_operations_provider.dart
-// and use the same pattern as Library providers.
+// Team scores and setlists use the unified scoped providers:
+// - scopedScoresProvider(DataScope.team(teamServerId))
+// - scopedSetlistsProvider(DataScope.team(teamServerId))
+// - scopedScoresListProvider(DataScope.team(teamServerId))
+// - scopedSetlistsListProvider(DataScope.team(teamServerId))
+//
+// See scores_state_provider.dart and setlists_state_provider.dart for details.

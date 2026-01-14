@@ -4,10 +4,12 @@ todo:
   change password pop-up window pattern:
 
   refactor riverpod specification(state management):
+    its logic is too complex right now, does it?
 
   network test:
 
   network address:
+    http/https and port auto choice:
 
   team add data pattern:
 
