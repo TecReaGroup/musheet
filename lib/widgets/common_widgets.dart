@@ -1088,7 +1088,7 @@ mixin SwipeHandlerMixin<T extends StatefulWidget> on State<T> {
 // ============================================================================
 
 /// Score card with arrow button for detail navigation
-/// Used in Library and Team screens
+/// Used in Library, Team, and Home screens
 class ScoreItemCard extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -1107,12 +1107,12 @@ class ScoreItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
       child: Row(
         children: [
           GradientIconBox.score(),
@@ -1161,11 +1161,25 @@ class ScoreItemCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: content,
+        ),
+      );
+    }
+
+    return content;
   }
 }
 
 /// Setlist card with arrow button for detail navigation
-/// Used in Library and Team screens
+/// Used in Library, Team, and Home screens
 class SetlistItemCard extends StatelessWidget {
   final String name;
   final String description;
@@ -1186,12 +1200,12 @@ class SetlistItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.gray200),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
       child: Row(
         children: [
           GradientIconBox.setlist(),
@@ -1240,6 +1254,20 @@ class SetlistItemCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: content,
+        ),
+      );
+    }
+
+    return content;
   }
 }
 

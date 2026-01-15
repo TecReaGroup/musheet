@@ -633,143 +633,72 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }) {
     final scope = teamServerId != null ? DataScope.team(teamServerId) : DataScope.user;
     final sourceLabel = teamServerId != null ? 'Team' : 'Personal';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: () {
-            // Record open for recent items
-            ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
-            // Card tap: preview last opened score or first score if available
-            if (setlistScores.isNotEmpty) {
-              // Get last opened score index, default to 0 if not found
-              final lastOpenedIndex =
-                  ref
-                      .read(lastOpenedScoreInSetlistProvider.notifier)
-                      .getLastOpened(setlist.id) ??
-                  0;
-              // Ensure index is valid
-              final validIndex = lastOpenedIndex.clamp(
-                0,
-                setlistScores.length - 1,
-              );
-              final selectedScore = setlistScores[validIndex];
+      child: SetlistItemCard(
+        name: setlist.name,
+        description: setlist.description ?? '',
+        scoreCount: scoreCount,
+        source: sourceLabel,
+        onTap: () {
+          // Record open for recent items
+          ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+          // Card tap: preview last opened score or first score if available
+          if (setlistScores.isNotEmpty) {
+            // Get last opened score index, default to 0 if not found
+            final lastOpenedIndex =
+                ref
+                    .read(lastOpenedScoreInSetlistProvider.notifier)
+                    .getLastOpened(setlist.id) ??
+                0;
+            // Ensure index is valid
+            final validIndex = lastOpenedIndex.clamp(
+              0,
+              setlistScores.length - 1,
+            );
+            final selectedScore = setlistScores[validIndex];
 
-              // Get best instrument using priority: recent > preferred > default
-              final lastOpenedInstrumentIndex = ref
-                  .read(lastOpenedInstrumentInScoreProvider.notifier)
-                  .getLastOpened(selectedScore.id);
-              final preferredInstrument = ref.read(preferredInstrumentProvider);
-              final bestInstrumentIndex = getBestInstrumentIndex(
-                selectedScore,
-                lastOpenedInstrumentIndex,
-                preferredInstrument,
-              );
-              final instrumentScore = selectedScore.instrumentScores.isNotEmpty
-                  ? selectedScore.instrumentScores[bestInstrumentIndex]
-                  : null;
+            // Get best instrument using priority: recent > preferred > default
+            final lastOpenedInstrumentIndex = ref
+                .read(lastOpenedInstrumentInScoreProvider.notifier)
+                .getLastOpened(selectedScore.id);
+            final preferredInstrument = ref.read(preferredInstrumentProvider);
+            final bestInstrumentIndex = getBestInstrumentIndex(
+              selectedScore,
+              lastOpenedInstrumentIndex,
+              preferredInstrument,
+            );
+            final instrumentScore = selectedScore.instrumentScores.isNotEmpty
+                ? selectedScore.instrumentScores[bestInstrumentIndex]
+                : null;
 
-              AppNavigation.navigateToScoreViewer(
-                context,
-                scope: scope,
-                score: selectedScore,
-                instrumentScore: instrumentScore,
-                setlistScores: setlistScores,
-                currentIndex: validIndex,
-                setlistName: setlist.name,
-              );
-            } else {
-              // Empty setlist: go to detail screen
-              AppNavigation.navigateToSetlistDetail(
-                context,
-                scope: scope,
-                setlist: setlist,
-              );
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gray200),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.emerald50, AppColors.emerald100],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    AppIcons.setlistIcon,
-                    size: 24,
-                    color: AppColors.emerald550,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        setlist.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        setlist.description ?? '',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • $sourceLabel',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.gray400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      // Arrow tap: go to detail screen
-                      AppNavigation.navigateToSetlistDetail(
-                        context,
-                        scope: scope,
-                        setlist: setlist,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(
-                        AppIcons.chevronRight,
-                        color: AppColors.gray400,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+            AppNavigation.navigateToScoreViewer(
+              context,
+              scope: scope,
+              score: selectedScore,
+              instrumentScore: instrumentScore,
+              setlistScores: setlistScores,
+              currentIndex: validIndex,
+              setlistName: setlist.name,
+            );
+          } else {
+            // Empty setlist: go to detail screen
+            AppNavigation.navigateToSetlistDetail(
+              context,
+              scope: scope,
+              setlist: setlist,
+            );
+          }
+        },
+        onArrowTap: () {
+          // Arrow tap: go to detail screen
+          AppNavigation.navigateToSetlistDetail(
+            context,
+            scope: scope,
+            setlist: setlist,
+          );
+        },
       ),
     );
   }
@@ -777,116 +706,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildScoreCard(Score score, {int? teamServerId}) {
     final scope = teamServerId != null ? DataScope.team(teamServerId) : DataScope.user;
     final sourceLabel = teamServerId != null ? 'Team' : 'Personal';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: () {
-            // Record open for recent items
-            ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
-            // Get best instrument using priority: recent > preferred > default
-            final lastOpenedInstrumentIndex = ref
-                .read(lastOpenedInstrumentInScoreProvider.notifier)
-                .getLastOpened(score.id);
-            final preferredInstrument = ref.read(preferredInstrumentProvider);
-            final bestInstrumentIndex = getBestInstrumentIndex(
-              score,
-              lastOpenedInstrumentIndex,
-              preferredInstrument,
-            );
-            final instrumentScore = score.instrumentScores.isNotEmpty
-                ? score.instrumentScores[bestInstrumentIndex]
-                : null;
+      child: ScoreItemCard(
+        title: score.title,
+        subtitle: score.composer,
+        meta: sourceLabel,
+        onTap: () {
+          // Record open for recent items
+          ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+          // Get best instrument using priority: recent > preferred > default
+          final lastOpenedInstrumentIndex = ref
+              .read(lastOpenedInstrumentInScoreProvider.notifier)
+              .getLastOpened(score.id);
+          final preferredInstrument = ref.read(preferredInstrumentProvider);
+          final bestInstrumentIndex = getBestInstrumentIndex(
+            score,
+            lastOpenedInstrumentIndex,
+            preferredInstrument,
+          );
+          final instrumentScore = score.instrumentScores.isNotEmpty
+              ? score.instrumentScores[bestInstrumentIndex]
+              : null;
 
-            AppNavigation.navigateToScoreViewer(
-              context,
-              scope: scope,
-              score: score,
-              instrumentScore: instrumentScore,
-            );
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gray200),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.blue50, AppColors.blue100],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    AppIcons.musicNote,
-                    size: 24,
-                    color: AppColors.blue550,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        score.title,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        score.composer,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        sourceLabel,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.gray400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      AppNavigation.navigateToScoreDetail(
-                        context,
-                        scope: scope,
-                        score: score,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(
-                        AppIcons.chevronRight,
-                        color: AppColors.gray400,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+          AppNavigation.navigateToScoreViewer(
+            context,
+            scope: scope,
+            score: score,
+            instrumentScore: instrumentScore,
+          );
+        },
+        onArrowTap: () {
+          AppNavigation.navigateToScoreDetail(
+            context,
+            scope: scope,
+            score: score,
+          );
+        },
       ),
     );
   }
