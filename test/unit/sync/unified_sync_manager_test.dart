@@ -5,6 +5,8 @@
 /// trigger team sync or UI refresh due to coordinator instance mismatch.
 library;
 
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:musheet/core/data/data_scope.dart';
@@ -180,158 +182,138 @@ void main() {
   });
 
   group('Login Flow Team Sync Tests', () {
+    late String authStateProviderSource;
+    late String unifiedSyncManagerSource;
+
+    setUpAll(() {
+      // Read source files to analyze their structure
+      final projectRoot = Directory.current.path;
+      authStateProviderSource = File(
+        '$projectRoot/lib/providers/auth_state_provider.dart',
+      ).readAsStringSync();
+      unifiedSyncManagerSource = File(
+        '$projectRoot/lib/core/sync/unified_sync_manager.dart',
+      ).readAsStringSync();
+    });
+
     test(
-      'BUG: _initializeSync() only triggers library sync, not team sync',
+      '_initializeSync() uses UnifiedSyncManager.requestSync for both library and team sync',
       () {
-        // Analyze the code in auth_state_provider.dart _initializeSync():
-        //
-        // Lines 365-390:
-        //   if (!SyncCoordinator.isInitialized) {
-        //     await SyncCoordinator.initialize(...);
-        //   }
-        //   if (!TeamSyncManager.isInitialized) {
-        //     TeamSyncManager.initialize(...);
-        //   }
-        //   // Trigger initial sync
-        //   SyncCoordinator.instance.requestSync(immediate: true);
-        //
-        // PROBLEM: Only SyncCoordinator.requestSync() is called!
-        // TeamSyncManager.syncAllTeams() is NEVER called.
-        // UnifiedSyncManager is not even initialized.
+        // Verify _initializeSync() triggers unified sync (not just library sync)
+        // This ensures both library AND team data are synced after login
 
-        // Expected behavior:
-        // After login, BOTH library AND team data should be synced.
-        // Either use:
-        //   await UnifiedSyncManager.instance.requestSync(immediate: true);
-        // Or:
-        //   await SyncCoordinator.instance.requestSync(immediate: true);
-        //   await TeamSyncManager.instance.syncAllTeams();
-
-        // This test documents the bug by checking the expected code structure
+        // Check that UnifiedSyncManager.initialize is called
         expect(
-          true,
+          authStateProviderSource.contains('UnifiedSyncManager.initialize'),
           isTrue,
           reason:
-              'Bug documented: _initializeSync() needs to trigger team sync after login',
+              'BUG DETECTED: _initializeSync() should call UnifiedSyncManager.initialize. '
+              'Without UnifiedSyncManager, team sync will not be triggered after login.',
+        );
+
+        // Check that UnifiedSyncManager.requestSync is called (not just SyncCoordinator)
+        expect(
+          authStateProviderSource.contains('UnifiedSyncManager.instance.requestSync'),
+          isTrue,
+          reason:
+              'BUG DETECTED: _initializeSync() should call UnifiedSyncManager.instance.requestSync(). '
+              'This triggers both library AND team sync. '
+              'If only SyncCoordinator.requestSync is called, teams will not sync after login.',
         );
       },
     );
 
     test(
-      'BUG: When UnifiedSyncManager syncs, UI watching TeamSyncManager does not update',
+      'UnifiedSyncManager._getOrCreateTeamCoordinator delegates to TeamSyncManager',
       () {
-        // The architectural issue:
-        //
-        // 1. TeamSyncManager (scoped_sync_coordinator.dart lines 684-776):
-        //    - Has: Map<int, ScopedSyncCoordinator> _coordinators = {};
-        //    - getCoordinator(teamId) creates/returns coordinators from this map
-        //
-        // 2. UnifiedSyncManager (unified_sync_manager.dart lines 22-255):
-        //    - Has: Map<int, ScopedSyncCoordinator> _teamCoordinators = {};
-        //    - _getOrCreateTeamCoordinator(teamId) creates/returns from THIS map
-        //
-        // 3. UI providers use: TeamSyncManager.instance.getCoordinator(teamId)
-        //    to watch for state changes.
-        //
-        // 4. But UnifiedSyncManager.requestSync() uses its OWN coordinators
-        //    in _teamCoordinators.
-        //
-        // RESULT: When UnifiedSyncManager syncs team data:
-        //   - It updates state in its own coordinator
-        //   - UI is watching a DIFFERENT coordinator from TeamSyncManager
-        //   - UI never sees the state change
-        //   - UI never refreshes!
-
-        // The fix should be ONE of:
-        // A) UnifiedSyncManager._getOrCreateTeamCoordinator() should delegate
-        //    to TeamSyncManager.instance.getCoordinator() instead of
-        //    creating its own instances.
-        //
-        // B) Don't use UnifiedSyncManager for team sync at all - use
-        //    TeamSyncManager directly in _initializeSync().
+        // Verify that UnifiedSyncManager uses TeamSyncManager's coordinators
+        // This ensures UI (watching TeamSyncManager) sees sync state changes
 
         expect(
-          true,
+          unifiedSyncManagerSource.contains('TeamSyncManager.instance.getCoordinator'),
           isTrue,
           reason:
-              'Bug documented: UnifiedSyncManager and TeamSyncManager coordinator instance mismatch',
+              'BUG DETECTED: UnifiedSyncManager._getOrCreateTeamCoordinator() should delegate '
+              'to TeamSyncManager.instance.getCoordinator(). '
+              'Without this delegation, UnifiedSyncManager creates its own coordinator instances, '
+              'and UI watching TeamSyncManager will never see sync state changes.',
+        );
+      },
+    );
+
+    test(
+      'UnifiedSyncManager.getTeamCoordinator uses TeamSyncManager.getCachedCoordinator',
+      () {
+        // Verify synchronous access also uses the shared cache
+
+        expect(
+          unifiedSyncManagerSource.contains('TeamSyncManager.instance.getCachedCoordinator'),
+          isTrue,
+          reason:
+              'BUG DETECTED: UnifiedSyncManager.getTeamCoordinator() should use '
+              'TeamSyncManager.instance.getCachedCoordinator() for synchronous access. '
+              'This ensures the same coordinator instance is returned.',
         );
       },
     );
   });
 
-  group('Expected Behavior After Fix', () {
-    test(
-      'Fix Option 1: UnifiedSyncManager delegates to TeamSyncManager',
-      () {
-        // Expected fix in unified_sync_manager.dart:
-        //
-        // BEFORE (lines 223-243):
-        //   Future<ScopedSyncCoordinator> _getOrCreateTeamCoordinator(int teamId) async {
-        //     if (_teamCoordinators.containsKey(teamId)) {
-        //       return _teamCoordinators[teamId]!;
-        //     }
-        //     // Create team-scoped data source dynamically
-        //     final teamDataSource = ScopedLocalDataSource(_db, DataScope.team(teamId));
-        //     final coordinator = ScopedSyncCoordinator(...);
-        //     await coordinator.initialize();
-        //     _teamCoordinators[teamId] = coordinator;
-        //     return coordinator;
-        //   }
-        //
-        // AFTER:
-        //   Future<ScopedSyncCoordinator> _getOrCreateTeamCoordinator(int teamId) async {
-        //     // Delegate to TeamSyncManager to ensure UI watches the same instance
-        //     return TeamSyncManager.instance.getCoordinator(teamId);
-        //   }
+  group('Initialization Order Tests', () {
+    late String authStateProviderSource;
 
-        expect(true, isTrue);
-      },
-    );
+    setUpAll(() {
+      final projectRoot = Directory.current.path;
+      authStateProviderSource = File(
+        '$projectRoot/lib/providers/auth_state_provider.dart',
+      ).readAsStringSync();
+    });
 
-    test(
-      'Fix Option 2: _initializeSync calls TeamSyncManager.syncAllTeams()',
-      () {
-        // Expected fix in auth_state_provider.dart _initializeSync():
-        //
-        // BEFORE (line 390):
-        //   SyncCoordinator.instance.requestSync(immediate: true);
-        //
-        // AFTER:
-        //   SyncCoordinator.instance.requestSync(immediate: true);
-        //   await TeamSyncManager.instance.syncAllTeams();
-        //
-        // This directly uses TeamSyncManager's coordinators, so UI will
-        // correctly observe state changes.
+    test('PdfSyncService is initialized before UnifiedSyncManager', () {
+      // PdfSyncService is used by sync coordinators for PDF sync
+      // It should be initialized first
 
-        expect(true, isTrue);
-      },
-    );
+      final pdfInitIndex =
+          authStateProviderSource.indexOf('PdfSyncService.initialize');
+      final unifiedInitIndex =
+          authStateProviderSource.indexOf('UnifiedSyncManager.initialize');
 
-    test(
-      'Fix Option 3: Use UnifiedSyncManager with Option 1 fix',
-      () {
-        // Expected fix combining both:
-        //
-        // 1. Apply Option 1 fix to UnifiedSyncManager
-        // 2. In auth_state_provider.dart _initializeSync():
-        //
-        //   if (!UnifiedSyncManager.isInitialized) {
-        //     await UnifiedSyncManager.initialize(
-        //       localLibrary: local,
-        //       api: ApiClient.instance,
-        //       session: SessionService.instance,
-        //       network: NetworkService.instance,
-        //       db: db,
-        //     );
-        //   }
-        //   // This now triggers both library AND team sync
-        //   // Team sync uses TeamSyncManager's coordinators
-        //   await UnifiedSyncManager.instance.requestSync(immediate: true);
+      expect(
+        pdfInitIndex,
+        isNot(-1),
+        reason: 'PdfSyncService.initialize should be called in _initializeSync',
+      );
+      expect(
+        unifiedInitIndex,
+        isNot(-1),
+        reason: 'UnifiedSyncManager.initialize should be called in _initializeSync',
+      );
 
-        expect(true, isTrue);
-      },
-    );
+      expect(
+        pdfInitIndex < unifiedInitIndex,
+        isTrue,
+        reason:
+            'BUG: PdfSyncService.initialize must come BEFORE UnifiedSyncManager.initialize. '
+            'UnifiedSyncManager triggers PDF sync after data sync completes.',
+      );
+    });
+
+    test('Sync initialization has proper guards', () {
+      // Each initialization should be guarded by isInitialized check
+
+      final guards = [
+        'if (!PdfSyncService.isInitialized)',
+        'if (!UnifiedSyncManager.isInitialized)',
+      ];
+
+      for (final guard in guards) {
+        expect(
+          authStateProviderSource.contains(guard),
+          isTrue,
+          reason: 'BUG: Missing guard "$guard" before initialization. '
+              'Double initialization should be prevented.',
+        );
+      }
+    });
   });
 
   group('DataScope Tests', () {

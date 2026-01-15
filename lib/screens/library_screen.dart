@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/teams_state_provider.dart';
@@ -13,6 +15,7 @@ import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
 import '../app.dart' show sharedFilePathProvider;
 import '../router/app_router.dart';
+import '../utils/sort_utils.dart';
 
 enum LibraryTab { scores, setlists }
 
@@ -87,26 +90,86 @@ final showCreateScoreModalProvider = NotifierProvider<ShowCreateScoreModalNotifi
 final setlistSortProvider = NotifierProvider<SetlistSortNotifier, SortState>(SetlistSortNotifier.new);
 final scoreSortProvider = NotifierProvider<ScoreSortNotifier, SortState>(ScoreSortNotifier.new);
 
-// Recently opened records - using Notifier (in-memory only for now)
+// Recently opened records - persisted to SharedPreferences
 class RecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
+  static const _storageKey = 'recently_opened_setlists';
+
   @override
   Map<String, DateTime> build() {
+    _loadFromStorage();
     return {};
   }
-  
+
+  Future<void> _loadFromStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonStr = prefs.getString(_storageKey);
+    if (jsonStr != null) {
+      try {
+        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
+        final Map<String, DateTime> loaded = {};
+        for (final entry in decoded.entries) {
+          loaded[entry.key] = DateTime.parse(entry.value as String);
+        }
+        state = loaded;
+      } catch (_) {
+        // Ignore parse errors, start fresh
+      }
+    }
+  }
+
+  Future<void> _saveToStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final Map<String, String> toSave = {};
+    for (final entry in state.entries) {
+      toSave[entry.key] = entry.value.toIso8601String();
+    }
+    await prefs.setString(_storageKey, jsonEncode(toSave));
+  }
+
   void recordOpen(String id) {
     state = {...state, id: DateTime.now()};
+    _saveToStorage();
   }
 }
 
 class RecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
+  static const _storageKey = 'recently_opened_scores';
+
   @override
   Map<String, DateTime> build() {
+    _loadFromStorage();
     return {};
   }
-  
+
+  Future<void> _loadFromStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonStr = prefs.getString(_storageKey);
+    if (jsonStr != null) {
+      try {
+        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
+        final Map<String, DateTime> loaded = {};
+        for (final entry in decoded.entries) {
+          loaded[entry.key] = DateTime.parse(entry.value as String);
+        }
+        state = loaded;
+      } catch (_) {
+        // Ignore parse errors, start fresh
+      }
+    }
+  }
+
+  Future<void> _saveToStorage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final Map<String, String> toSave = {};
+    for (final entry in state.entries) {
+      toSave[entry.key] = entry.value.toIso8601String();
+    }
+    await prefs.setString(_storageKey, jsonEncode(toSave));
+  }
+
   void recordOpen(String id) {
     state = {...state, id: DateTime.now()};
+    _saveToStorage();
   }
 }
 
@@ -469,7 +532,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     final filteredSetlists = _searchQuery.isEmpty
         ? setlists
         : setlists.where((s) => s.name.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    final sortedSetlists = _sortSetlists(filteredSetlists, sortState, recentlyOpened);
+    final sortedSetlists = sortSetlists(filteredSetlists, sortState, recentlyOpened);
 
     if (sortedSetlists.isEmpty && _searchQuery.isNotEmpty) {
       return Padding(
@@ -561,7 +624,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
     final filteredScores = _searchQuery.isEmpty
         ? scores
         : scores.where((s) => s.title.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
-    final sortedScores = _sortScores(filteredScores, sortState, recentlyOpened);
+    final sortedScores = sortScores(filteredScores, sortState, recentlyOpened);
 
     if (sortedScores.isEmpty && _searchQuery.isNotEmpty) {
       return Padding(
@@ -615,59 +678,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           );
         },
       );
-  }
-
-  List<Setlist> _sortSetlists(List<Setlist> setlists, SortState sortState, Map<String, DateTime> recentlyOpened) {
-    final sorted = List<Setlist>.from(setlists);
-    
-    switch (sortState.type) {
-      case SortType.recentCreated:
-        sorted.sort((a, b) => sortState.ascending 
-            ? a.createdAt.compareTo(b.createdAt)
-            : b.createdAt.compareTo(a.createdAt));
-        break;
-      case SortType.alphabetical:
-        sorted.sort((a, b) => sortState.ascending
-            ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
-            : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
-        break;
-      case SortType.recentOpened:
-        sorted.sort((a, b) {
-          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
-          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
-          return sortState.ascending
-              ? aOpened.compareTo(bOpened)
-              : bOpened.compareTo(aOpened);
-        });
-        break;
-    }
-    return sorted;
-  }
-  List<Score> _sortScores(List<Score> scores, SortState sortState, Map<String, DateTime> recentlyOpened) {
-    final sorted = List<Score>.from(scores);
-    
-    switch (sortState.type) {
-      case SortType.recentCreated:
-        sorted.sort((a, b) => sortState.ascending 
-            ? a.createdAt.compareTo(b.createdAt)
-            : b.createdAt.compareTo(a.createdAt));
-        break;
-      case SortType.alphabetical:
-        sorted.sort((a, b) => sortState.ascending
-            ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-            : b.title.toLowerCase().compareTo(a.title.toLowerCase()));
-        break;
-      case SortType.recentOpened:
-        sorted.sort((a, b) {
-          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
-          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
-          return sortState.ascending
-              ? aOpened.compareTo(bOpened)
-              : bOpened.compareTo(aOpened);
-        });
-        break;
-    }
-    return sorted;
   }
 
   Widget _buildDrawerSection({

@@ -20,13 +20,8 @@ import '../widgets/common_widgets.dart';
 import '../utils/icon_mappings.dart';
 import '../utils/pdf_export_service.dart';
 import '../providers/setlists_state_provider.dart';
+import '../providers/ui_state_providers.dart';
 import '../router/app_router.dart';
-import 'library_screen.dart'
-    show
-        lastOpenedScoreInSetlistProvider,
-        lastOpenedInstrumentInScoreProvider,
-        preferredInstrumentProvider,
-        getBestInstrumentIndex;
 
 /// Unified Score Viewer Screen
 /// Supports both personal library scores and team scores using DataScope
@@ -47,9 +42,6 @@ class ScoreViewerScreen extends ConsumerStatefulWidget {
     this.currentIndex,
     this.setlistName,
   });
-
-  /// Check if this is a team score viewer
-  bool get isTeamMode => scope.isTeam;
 
   @override
   ConsumerState<ScoreViewerScreen> createState() => _ScoreViewerScreenState();
@@ -117,25 +109,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   // Track last saved BPM to avoid unnecessary updates
   int _lastSavedBpm = 120;
 
-  // Helper getters
-  bool get _isTeamMode => widget.isTeamMode;
-
   @override
   void initState() {
     super.initState();
 
-    // Initialize unified score data based on scope
-    if (widget.isTeamMode) {
-      _scoreData = ViewerScoreData.fromTeam(widget.score);
-      _currentInstrument = widget.instrumentScore != null
-          ? ViewerInstrumentData.fromTeam(widget.instrumentScore!)
-          : _scoreData.firstInstrumentScore;
-    } else {
-      _scoreData = ViewerScoreData.fromPersonal(widget.score);
-      _currentInstrument = widget.instrumentScore != null
-          ? ViewerInstrumentData.fromPersonal(widget.instrumentScore!)
-          : _scoreData.firstInstrumentScore;
-    }
+    // Initialize unified score data - no need to differentiate team/personal
+    _scoreData = ViewerScoreData(widget.score);
+    _currentInstrument = widget.instrumentScore != null
+        ? ViewerInstrumentData(widget.instrumentScore!)
+        : _scoreData.firstInstrumentScore;
 
     // Initialize metronome with score's saved BPM
     _lastSavedBpm = _scoreData.bpm;
@@ -203,123 +185,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     });
   }
 
+  /// Unified PDF loading - works for both personal and team modes
   Future<void> _loadPdfDocument() async {
-    if (_isTeamMode) {
-      await _loadTeamPdfDocument();
-    } else {
-      await _loadPersonalPdfDocument();
-    }
-  }
-
-  /// Load PDF for personal library mode
-  Future<void> _loadPersonalPdfDocument() async {
-    final instrumentScoreId = _currentInstrument?.id;
-    var pdfPath = _currentInstrument?.pdfPath ?? '';
-
-    // No instrument score ID means we can't load anything
-    if (instrumentScoreId == null) {
-      if (!mounted) return;
-      setState(() {
-        _pdfError = 'No PDF file specified';
-      });
-      return;
-    }
-
-    // Helper function to try downloading PDF from server
-    Future<String?> tryDownloadPdf() async {
-      final pdfService = ref.read(pdfSyncServiceProvider);
-      if (pdfService != null && _currentInstrument?.pdfHash != null) {
-        setState(() {
-          _pdfError = null;
-          _isDownloadingPdf = true;
-        });
-
-        final downloadedPath = await pdfService.downloadWithPriority(
-          _currentInstrument!.pdfHash!,
-          PdfPriority.high,
-        );
-
-        if (!mounted) return null;
-
-        setState(() {
-          _isDownloadingPdf = false;
-        });
-
-        return downloadedPath;
-      }
-      return null;
-    }
-
-    // If pdfPath is empty, try to download from server first
-    // This handles the case when synced data doesn't have local PDF yet
-    if (pdfPath.isEmpty) {
-      if (!mounted) return;
-
-      final downloadedPath = await tryDownloadPdf();
-      if (downloadedPath != null) {
-        pdfPath = downloadedPath;
-      } else {
-        setState(() {
-          _pdfError = 'PDF file not found on server';
-        });
-        return;
-      }
-    }
-
-    // Check if PDF file exists locally
-    if (!pdfPath.startsWith('http://') && !pdfPath.startsWith('https://')) {
-      final file = File(pdfPath);
-      if (!await file.exists()) {
-        if (!mounted) return;
-
-        // Try to download from server with priority
-        final downloadedPath = await tryDownloadPdf();
-
-        if (!mounted) return;
-
-        if (downloadedPath != null) {
-          pdfPath = downloadedPath;
-        } else {
-          setState(() {
-            _pdfError = 'PDF file not found locally or on server';
-          });
-          return;
-        }
-      }
-    }
-
-    if (!mounted) return;
-
-    try {
-      PdfDocument doc;
-      if (pdfPath.startsWith('http://') || pdfPath.startsWith('https://')) {
-        doc = await PdfDocument.openUri(Uri.parse(pdfPath));
-      } else {
-        doc = await PdfDocument.openFile(pdfPath);
-      }
-      if (!mounted) {
-        doc.dispose();
-        return;
-      }
-      setState(() {
-        _pdfDocument = doc;
-        _totalPages = doc.pages.length;
-        _pdfError = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _pdfError = 'Failed to load PDF: $e';
-      });
-    }
-  }
-
-  /// Load PDF for team mode
-  Future<void> _loadTeamPdfDocument() async {
     if (_currentInstrument == null) {
-      setState(() {
-        _pdfError = 'No instrument score available';
-      });
+      if (mounted) {
+        setState(() {
+          _pdfError = 'No instrument score available';
+        });
+      }
       return;
     }
 
@@ -332,8 +205,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       String? pdfPath = _currentInstrument!.pdfPath;
       final pdfHash = _currentInstrument!.pdfHash;
 
-      // Step 1: Check if we have a valid local file
+      // Step 1: Check if we have a valid local file path
       if (pdfPath != null && pdfPath.isNotEmpty) {
+        // Handle URL paths
+        if (pdfPath.startsWith('http://') || pdfPath.startsWith('https://')) {
+          await _openPdfFromUrl(pdfPath);
+          return;
+        }
+        // Handle local file paths
         final file = File(pdfPath);
         if (await file.exists()) {
           await _openPdfFile(pdfPath);
@@ -352,33 +231,17 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         }
 
         // Step 3: Download from server using PdfSyncService
-        final pdfService = ref.read(pdfSyncServiceProvider);
-
-        if (pdfService != null) {
-          final downloadedPath = await pdfService.downloadWithPriority(
-            pdfHash,
-            PdfPriority.high,
-          );
-          if (downloadedPath != null) {
-            await _openPdfFile(downloadedPath);
-            return;
-          }
+        final downloadedPath = await _tryDownloadPdf(pdfHash);
+        if (downloadedPath != null) {
+          await _openPdfFile(downloadedPath);
+          return;
         }
-
-        // Download failed
-        if (mounted) {
-          setState(() {
-            _pdfError = 'Failed to download PDF. Please check your connection.';
-            _isDownloadingPdf = false;
-          });
-        }
-        return;
       }
 
       // No PDF available
       if (mounted) {
         setState(() {
-          _pdfError = 'No PDF available for this instrument';
+          _pdfError = 'PDF file not found locally or on server';
           _isDownloadingPdf = false;
         });
       }
@@ -386,6 +249,43 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       if (mounted) {
         setState(() {
           _pdfError = 'Failed to load PDF: $e';
+          _isDownloadingPdf = false;
+        });
+      }
+    }
+  }
+
+  /// Try to download PDF from server
+  Future<String?> _tryDownloadPdf(String pdfHash) async {
+    final pdfService = ref.read(pdfSyncServiceProvider);
+    if (pdfService != null) {
+      final downloadedPath = await pdfService.downloadWithPriority(
+        pdfHash,
+        PdfPriority.high,
+      );
+      return downloadedPath;
+    }
+    return null;
+  }
+
+  /// Open PDF from URL
+  Future<void> _openPdfFromUrl(String url) async {
+    try {
+      final doc = await PdfDocument.openUri(Uri.parse(url));
+      if (!mounted) {
+        doc.dispose();
+        return;
+      }
+      setState(() {
+        _pdfDocument = doc;
+        _totalPages = doc.pages.length;
+        _pdfError = null;
+        _isDownloadingPdf = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _pdfError = 'Failed to load PDF from URL: $e';
           _isDownloadingPdf = false;
         });
       }
@@ -420,16 +320,14 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       return;
     }
 
-    // Record the instrument index being switched to (personal mode only)
-    if (!_isTeamMode) {
-      final instrumentIndex = _scoreData.instrumentScores.indexWhere(
-        (s) => s.id == instrument.id,
-      );
-      if (instrumentIndex >= 0) {
-        ref
-            .read(lastOpenedInstrumentInScoreProvider.notifier)
-            .recordLastOpened(_scoreData.id, instrumentIndex);
-      }
+    // Record the instrument index being switched to (using scoped provider)
+    final instrumentIndex = _scoreData.instrumentScores.indexWhere(
+      (s) => s.id == instrument.id,
+    );
+    if (instrumentIndex >= 0) {
+      ref
+          .read(scopedLastOpenedIndexProvider((widget.scope, 'instrumentInScore')).notifier)
+          .recordLastOpened(_scoreData.id, instrumentIndex);
     }
 
     // Dispose old document
@@ -589,17 +487,15 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       return;
     }
 
-    // Record the score index being navigated to in the setlist (personal mode only)
-    if (!_isTeamMode) {
-      final setlists = ref.read(scopedSetlistsListProvider(widget.scope));
-      final currentSetlist = setlists.firstWhere(
-        (s) => s.name == widget.setlistName,
-        orElse: () => setlists.first,
-      );
-      ref
-          .read(lastOpenedScoreInSetlistProvider.notifier)
-          .recordLastOpened(currentSetlist.id, index);
-    }
+    // Record the score index being navigated to in the setlist (using scoped provider)
+    final setlists = ref.read(scopedSetlistsListProvider(widget.scope));
+    final currentSetlist = setlists.firstWhere(
+      (s) => s.name == widget.setlistName,
+      orElse: () => setlists.first,
+    );
+    ref
+        .read(scopedLastOpenedIndexProvider((widget.scope, 'scoreInSetlist')).notifier)
+        .recordLastOpened(currentSetlist.id, index);
 
     // Stop and destroy metronome before navigating to properly release audio resources
     _metronomeController?.stop();
@@ -612,30 +508,21 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
     if (!mounted) return;
 
-    // Get the best instrument for the target score
+    // Get the best instrument for the target score (unified for all scopes)
     final targetScore = widget.setlistScores![index];
-    InstrumentScore? instrumentScore;
-
-    if (!_isTeamMode) {
-      // Personal mode: use instrument priority
-      final lastOpenedInstrumentIndex = ref
-          .read(lastOpenedInstrumentInScoreProvider.notifier)
-          .getLastOpened(targetScore.id);
-      final preferredInstrument = ref.read(preferredInstrumentProvider);
-      final bestInstrumentIndex = getBestInstrumentIndex(
-        targetScore,
-        lastOpenedInstrumentIndex,
-        preferredInstrument,
-      );
-      instrumentScore = targetScore.instrumentScores.isNotEmpty
-          ? targetScore.instrumentScores[bestInstrumentIndex]
-          : null;
-    } else {
-      // Team mode: use first instrument
-      instrumentScore = targetScore.instrumentScores.isNotEmpty
-          ? targetScore.instrumentScores.first
-          : null;
-    }
+    final lastOpenedInstrumentIndex = ref
+        .read(scopedLastOpenedIndexProvider((widget.scope, 'instrumentInScore')).notifier)
+        .getLastOpened(targetScore.id);
+    final preferredInstrument = ref.read(preferredInstrumentProvider);
+    final bestInstrumentIndex = getBestInstrumentIndex(
+      instrumentCount: targetScore.instrumentScores.length,
+      getInstrumentKey: (i) => targetScore.instrumentScores[i].instrumentKey,
+      lastOpenedIndex: lastOpenedInstrumentIndex,
+      preferredInstrumentKey: preferredInstrument,
+    );
+    final instrumentScore = targetScore.instrumentScores.isNotEmpty
+        ? targetScore.instrumentScores[bestInstrumentIndex]
+        : null;
 
     context.replace(
       AppRoutes.scoreViewer,

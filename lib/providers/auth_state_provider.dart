@@ -10,7 +10,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/core.dart';
 import '../core/services/avatar_cache_service.dart';
 import 'core_providers.dart';
-import 'team_operations_provider.dart' show clearAllTeamCaches;
 
 // ============================================================================
 // Auth State
@@ -240,6 +239,10 @@ class AuthStateNotifier extends Notifier<AuthState> {
   /// Logout
   Future<void> logout() async {
     // Stop sync coordinators and services
+    // IMPORTANT: Reset UnifiedSyncManager first, as it holds references to other coordinators
+    if (UnifiedSyncManager.isInitialized) {
+      UnifiedSyncManager.reset();
+    }
     if (PdfSyncService.isInitialized) {
       PdfSyncService.reset();
     }
@@ -249,9 +252,6 @@ class AuthStateNotifier extends Notifier<AuthState> {
     if (TeamSyncManager.isInitialized) {
       TeamSyncManager.reset();
     }
-
-    // Clear team caches
-    clearAllTeamCaches();
 
     // Logout from server and clear session first
     final authRepo = ref.read(authRepositoryProvider);

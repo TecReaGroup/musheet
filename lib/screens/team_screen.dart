@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/teams_state_provider.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
+import '../providers/ui_state_providers.dart';
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/team.dart';
@@ -13,7 +14,151 @@ import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../router/app_router.dart';
-import '../models/sort_state.dart';
+import '../utils/sort_utils.dart';
+import 'library_screen.dart' show recentlyOpenedScoresProvider, recentlyOpenedSetlistsProvider;
+
+// ============================================================================
+// Team Operations - Unified helper functions using scoped providers
+// ============================================================================
+
+/// Delete a setlist from the team
+Future<void> deleteSetlist({
+  required WidgetRef ref,
+  required int teamServerId,
+  required String setlistId,
+}) async {
+  final scope = DataScope.team(teamServerId);
+  final repo = ref.read(scopedSetlistRepositoryProvider(scope));
+  await repo.deleteSetlist(setlistId);
+}
+
+/// Delete a score from the team
+Future<void> deleteScore({
+  required WidgetRef ref,
+  required int teamServerId,
+  required String scoreId,
+}) async {
+  final scope = DataScope.team(teamServerId);
+  final repo = ref.read(scopedScoreRepositoryProvider(scope));
+  await repo.deleteScore(scoreId);
+}
+
+/// Create a new setlist in the team
+Future<void> createSetlist({
+  required WidgetRef ref,
+  required int teamServerId,
+  required String name,
+  String? description,
+  List<String> scoreIds = const [],
+}) async {
+  final scope = DataScope.team(teamServerId);
+  final repo = ref.read(scopedSetlistRepositoryProvider(scope));
+
+  final setlist = Setlist(
+    id: DateTime.now().millisecondsSinceEpoch.toString(),
+    scopeType: 'team',
+    scopeId: teamServerId,
+    name: name,
+    description: description,
+    scoreIds: scoreIds,
+    createdAt: DateTime.now(),
+  );
+
+  await repo.addSetlist(setlist);
+}
+
+/// Copy a personal score to a team
+Future<void> copyScoreToTeam({
+  required WidgetRef ref,
+  required Score personalScore,
+  required int teamServerId,
+}) async {
+  final scope = DataScope.team(teamServerId);
+  final teamScoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
+
+  // Create a copy of the score with new ID for the team
+  final newId = DateTime.now().millisecondsSinceEpoch.toString();
+  final teamScore = personalScore.copyWith(
+    id: newId,
+    serverId: null,
+    scopeType: 'team',
+    scopeId: teamServerId,
+    createdAt: DateTime.now(),
+    sourceScoreId: personalScore.serverId,
+    instrumentScores: [], // Don't copy inline, we'll add them separately
+  );
+
+  await teamScoreRepo.addScore(teamScore);
+
+  // Copy instrument scores
+  for (final instrScore in personalScore.instrumentScores) {
+    final newInstrScore = instrScore.copyWith(
+      id: '${newId}_${instrScore.instrumentKey}',
+    );
+    await teamScoreRepo.addInstrumentScore(newId, newInstrScore);
+  }
+}
+
+/// Copy a personal setlist to a team (including all scores)
+Future<void> copySetlistToTeam({
+  required WidgetRef ref,
+  required Setlist personalSetlist,
+  required List<Score> scoresInSetlist,
+  required int teamServerId,
+}) async {
+  final scope = DataScope.team(teamServerId);
+  final teamScoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
+  final teamSetlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
+
+  // Map old score IDs to new team score IDs
+  final scoreIdMapping = <String, String>{};
+
+  // Copy all scores first
+  for (final score in scoresInSetlist) {
+    final newId = DateTime.now().millisecondsSinceEpoch.toString();
+    // Add small delay to ensure unique timestamps
+    await Future.delayed(const Duration(milliseconds: 1));
+
+    final teamScore = score.copyWith(
+      id: newId,
+      serverId: null,
+      scopeType: 'team',
+      scopeId: teamServerId,
+      createdAt: DateTime.now(),
+      sourceScoreId: score.serverId,
+      instrumentScores: [],
+    );
+    scoreIdMapping[score.id] = newId;
+
+    await teamScoreRepo.addScore(teamScore);
+
+    // Copy instrument scores
+    for (final instrScore in score.instrumentScores) {
+      final newInstrScore = instrScore.copyWith(
+        id: '${newId}_${instrScore.instrumentKey}',
+      );
+      await teamScoreRepo.addInstrumentScore(newId, newInstrScore);
+    }
+  }
+
+  // Create the setlist with mapped score IDs
+  final newScoreIds = personalSetlist.scoreIds
+      .map((id) => scoreIdMapping[id])
+      .whereType<String>()
+      .toList();
+
+  final teamSetlist = personalSetlist.copyWith(
+    id: DateTime.now().millisecondsSinceEpoch.toString(),
+    serverId: null,
+    scopeType: 'team',
+    scopeId: teamServerId,
+    scoreIds: newScoreIds,
+    createdAt: DateTime.now(),
+    sourceSetlistId: personalSetlist.serverId,
+  );
+
+  await teamSetlistRepo.addSetlist(teamSetlist);
+}
 
 enum TeamTab { setlists, scores, members }
 
@@ -33,54 +178,7 @@ class ShowTeamSwitcherNotifier extends Notifier<bool> {
   set state(bool newState) => super.state = newState;
 }
 
-// Team sort state providers
-class SetlistSortNotifier extends Notifier<SortState> {
-  @override
-  SortState build() => const SortState();
-
-  void setSort(SortType type) {
-    if (state.type == type) {
-      state = state.copyWith(ascending: !state.ascending);
-    } else {
-      state = SortState(type: type, ascending: false);
-    }
-  }
-}
-
-class ScoreSortNotifier extends Notifier<SortState> {
-  @override
-  SortState build() => const SortState();
-
-  void setSort(SortType type) {
-    if (state.type == type) {
-      state = state.copyWith(ascending: !state.ascending);
-    } else {
-      state = SortState(type: type, ascending: false);
-    }
-  }
-}
-
-// Recently opened records
-class TeamRecentlyOpenedSetlistsNotifier
-    extends Notifier<Map<String, DateTime>> {
-  @override
-  Map<String, DateTime> build() => {};
-
-  void recordOpen(String id) {
-    state = {...state, id: DateTime.now()};
-  }
-}
-
-class TeamRecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
-  @override
-  Map<String, DateTime> build() => {};
-
-  void recordOpen(String id) {
-    state = {...state, id: DateTime.now()};
-  }
-}
-
-// Modal state notifiers (like library_screen.dart)
+// Modal state notifiers (team-specific UI state)
 class ShowScoreModalNotifier extends Notifier<bool> {
   @override
   bool build() => false;
@@ -140,24 +238,8 @@ final showTeamSwitcherProvider =
     NotifierProvider<ShowTeamSwitcherNotifier, bool>(
       ShowTeamSwitcherNotifier.new,
     );
-final teamSetlistSortProvider =
-    NotifierProvider<SetlistSortNotifier, SortState>(
-      SetlistSortNotifier.new,
-    );
-final teamScoreSortProvider =
-    NotifierProvider<ScoreSortNotifier, SortState>(
-      ScoreSortNotifier.new,
-    );
-final teamRecentlyOpenedSetlistsProvider =
-    NotifierProvider<TeamRecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(
-      TeamRecentlyOpenedSetlistsNotifier.new,
-    );
-final teamRecentlyOpenedScoresProvider =
-    NotifierProvider<TeamRecentlyOpenedScoresNotifier, Map<String, DateTime>>(
-      TeamRecentlyOpenedScoresNotifier.new,
-    );
 
-// Modal state providers (like library_screen.dart)
+// Modal state providers (team-specific UI state)
 final showScoreModalProvider =
     NotifierProvider<ShowScoreModalNotifier, bool>(
       ShowScoreModalNotifier.new,
@@ -311,11 +393,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
       );
     }
 
-    // Use synchronous list providers (like library's scoresListProvider pattern)
-    final teamScores = ref.watch(teamScoresListProvider(currentTeam.serverId));
-    final teamSetlists = ref.watch(
-      teamSetlistsListProvider(currentTeam.serverId),
-    );
+    // Use unified scoped providers (same pattern as library)
+    final teamScope = DataScope.team(currentTeam.serverId);
+    final teamScores = ref.watch(scopedScoresListProvider(teamScope));
+    final teamSetlists = ref.watch(scopedSetlistsListProvider(teamScope));
 
     // Get counts for header
     final scoresCount = teamScores.length;
@@ -443,11 +524,11 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               if (activeTab == TeamTab.setlists || activeTab == TeamTab.scores)
                 _buildDrawerSection(
                   sortState: activeTab == TeamTab.setlists
-                      ? ref.watch(teamSetlistSortProvider)
-                      : ref.watch(teamScoreSortProvider),
+                      ? ref.watch(scopedSortProvider((teamScope, 'setlists')))
+                      : ref.watch(scopedSortProvider((teamScope, 'scores'))),
                   onSort: (type) => activeTab == TeamTab.setlists
-                      ? ref.read(teamSetlistSortProvider.notifier).setSort(type)
-                      : ref.read(teamScoreSortProvider.notifier).setSort(type),
+                      ? ref.read(scopedSortProvider((teamScope, 'setlists')).notifier).setSort(type)
+                      : ref.read(scopedSortProvider((teamScope, 'scores')).notifier).setSort(type),
                 ),
               // Divider for members tab (same style as other tabs but without drawer)
               if (activeTab == TeamTab.members)
@@ -562,8 +643,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
       );
     }
 
-    final sortState = ref.watch(teamSetlistSortProvider);
-    final recentlyOpened = ref.watch(teamRecentlyOpenedSetlistsProvider);
+    final teamScope = DataScope.team(teamServerId);
+    final sortState = ref.watch(scopedSortProvider((teamScope, 'setlists')));
+    final recentlyOpened = ref.watch(scopedRecentlyOpenedProvider((teamScope, 'setlists')));
 
     // Apply search filter
     final filteredSetlists = _searchQuery.isEmpty
@@ -575,7 +657,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                 ),
               )
               .toList();
-    final sortedSetlists = _sortSetlists(
+    final sortedSetlists = sortSetlists(
       filteredSetlists,
       sortState,
       recentlyOpened,
@@ -619,12 +701,14 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           onDelete: () => _handleDeleteSetlist(setlist, teamServerId),
           onTap: () {
             ref
-                .read(teamRecentlyOpenedSetlistsProvider.notifier)
+                .read(scopedRecentlyOpenedProvider((teamScope, 'setlists')).notifier)
                 .recordOpen(setlist.id);
+            // Also record to global provider for home screen recent list
+            ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
             // Card tap: preview first score if setlist has scores
             if (setlist.teamScoreIds.isNotEmpty) {
               // Get the team scores to find the first score
-              final teamScores = ref.read(teamScoresListProvider(teamServerId));
+              final teamScores = ref.read(scopedScoresListProvider(DataScope.team(teamServerId)));
               // Build the list of scores in setlist order
               final setlistScores = <Score>[];
               for (final scoreId in setlist.teamScoreIds) {
@@ -657,8 +741,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           onArrowTap: () {
             // Arrow tap: go to detail screen
             ref
-                .read(teamRecentlyOpenedSetlistsProvider.notifier)
+                .read(scopedRecentlyOpenedProvider((teamScope, 'setlists')).notifier)
                 .recordOpen(setlist.id);
+            // Also record to global provider for home screen recent list
+            ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
             AppNavigation.navigateToSetlistDetail(
               context,
               scope: DataScope.team(teamServerId),
@@ -723,8 +809,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
       );
     }
 
-    final sortState = ref.watch(teamScoreSortProvider);
-    final recentlyOpened = ref.watch(teamRecentlyOpenedScoresProvider);
+    final teamScope = DataScope.team(teamServerId);
+    final sortState = ref.watch(scopedSortProvider((teamScope, 'scores')));
+    final recentlyOpened = ref.watch(scopedRecentlyOpenedProvider((teamScope, 'scores')));
 
     // Apply search filter - search both title and composer
     final filteredScores = _searchQuery.isEmpty
@@ -740,7 +827,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                     ),
               )
               .toList();
-    final sortedScores = _sortScores(
+    final sortedScores = sortScores(
       filteredScores,
       sortState,
       recentlyOpened,
@@ -782,8 +869,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           onDelete: () => _handleDeleteScore(score, teamServerId),
           onTap: () {
             ref
-                .read(teamRecentlyOpenedScoresProvider.notifier)
+                .read(scopedRecentlyOpenedProvider((teamScope, 'scores')).notifier)
                 .recordOpen(score.id);
+            // Also record to global provider for home screen recent list
+            ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
             AppNavigation.navigateToScoreViewer(
               context,
               scope: DataScope.team(teamServerId),
@@ -792,8 +881,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           },
           onArrowTap: () {
             ref
-                .read(teamRecentlyOpenedScoresProvider.notifier)
+                .read(scopedRecentlyOpenedProvider((teamScope, 'scores')).notifier)
                 .recordOpen(score.id);
+            // Also record to global provider for home screen recent list
+            ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
             // Arrow tap: go to score detail screen
             AppNavigation.navigateToScoreDetail(
               context,
@@ -838,76 +929,6 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
         ],
       ),
     );
-  }
-
-  List<Setlist> _sortSetlists(
-    List<Setlist> setlists,
-    SortState sortState,
-    Map<String, DateTime> recentlyOpened,
-  ) {
-    final sorted = List<Setlist>.from(setlists);
-
-    switch (sortState.type) {
-      case SortType.recentCreated:
-        sorted.sort(
-          (a, b) => sortState.ascending
-              ? a.createdAt.compareTo(b.createdAt)
-              : b.createdAt.compareTo(a.createdAt),
-        );
-        break;
-      case SortType.alphabetical:
-        sorted.sort(
-          (a, b) => sortState.ascending
-              ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
-              : b.name.toLowerCase().compareTo(a.name.toLowerCase()),
-        );
-        break;
-      case SortType.recentOpened:
-        sorted.sort((a, b) {
-          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
-          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
-          return sortState.ascending
-              ? aOpened.compareTo(bOpened)
-              : bOpened.compareTo(aOpened);
-        });
-        break;
-    }
-    return sorted;
-  }
-
-  List<Score> _sortScores(
-    List<Score> scores,
-    SortState sortState,
-    Map<String, DateTime> recentlyOpened,
-  ) {
-    final sorted = List<Score>.from(scores);
-
-    switch (sortState.type) {
-      case SortType.recentCreated:
-        sorted.sort(
-          (a, b) => sortState.ascending
-              ? a.createdAt.compareTo(b.createdAt)
-              : b.createdAt.compareTo(a.createdAt),
-        );
-        break;
-      case SortType.alphabetical:
-        sorted.sort(
-          (a, b) => sortState.ascending
-              ? a.title.toLowerCase().compareTo(b.title.toLowerCase())
-              : b.title.toLowerCase().compareTo(a.title.toLowerCase()),
-        );
-        break;
-      case SortType.recentOpened:
-        sorted.sort((a, b) {
-          final aOpened = recentlyOpened[a.id] ?? DateTime(1970);
-          final bOpened = recentlyOpened[b.id] ?? DateTime(1970);
-          return sortState.ascending
-              ? aOpened.compareTo(bOpened)
-              : bOpened.compareTo(aOpened);
-        });
-        break;
-    }
-    return sorted;
   }
 
   Widget _buildDrawerSection({

@@ -112,15 +112,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     // Sort by recently opened (only include items that have been opened)
+    // Combine library and current team items for recent sorting
+    final teamServerId = currentTeam?.serverId;
+    final teamScope = teamServerId != null ? DataScope.team(teamServerId) : null;
+
+    // Get team scores and setlists from scoped providers (not from Team model)
+    final teamScores = teamScope != null
+        ? ref.watch(scopedScoresListProvider(teamScope))
+        : <Score>[];
+    final teamSetlists = teamScope != null
+        ? ref.watch(scopedSetlistsListProvider(teamScope))
+        : <Setlist>[];
+
+    // Create combined lists with unique items (library items take precedence)
+    final allScoresMap = <String, Score>{};
+    for (final score in scores) {
+      allScoresMap[score.id] = score;
+    }
+    for (final score in teamScores) {
+      allScoresMap.putIfAbsent(score.id, () => score);
+    }
+
+    final allSetlistsMap = <String, Setlist>{};
+    for (final setlist in setlists) {
+      allSetlistsMap[setlist.id] = setlist;
+    }
+    for (final setlist in teamSetlists) {
+      allSetlistsMap.putIfAbsent(setlist.id, () => setlist);
+    }
+
     final recentSetlistsList =
-        setlists.where((s) => recentlyOpenedSetlists.containsKey(s.id)).toList()
+        allSetlistsMap.values.where((s) => recentlyOpenedSetlists.containsKey(s.id)).toList()
           ..sort(
             (a, b) => recentlyOpenedSetlists[b.id]!.compareTo(
               recentlyOpenedSetlists[a.id]!,
             ),
           );
     final recentScoresList =
-        scores.where((s) => recentlyOpenedScores.containsKey(s.id)).toList()
+        allScoresMap.values.where((s) => recentlyOpenedScores.containsKey(s.id)).toList()
           ..sort(
             (a, b) => recentlyOpenedScores[b.id]!.compareTo(
               recentlyOpenedScores[a.id]!,
@@ -130,8 +159,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final searchData = searchScope == SearchScope.library
         ? {'scores': scores, 'setlists': setlists}
         : {
-            'scores': currentTeam?.sharedScores ?? [],
-            'setlists': currentTeam?.sharedSetlists ?? [],
+            'scores': teamScores,
+            'setlists': teamSetlists,
           };
 
     final searchResultsScores = searchQuery.trim().isNotEmpty
@@ -349,6 +378,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     SearchScope scope,
   ) {
     final teamEnabled = ref.watch(teamEnabledProvider);
+    final currentTeam = ref.watch(currentTeamProvider);
+    final teamServerId = scope == SearchScope.team ? currentTeam?.serverId : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -391,13 +422,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 12),
                 ...setlists.map((setlist) {
+                  final dataScope = teamServerId != null
+                      ? DataScope.team(teamServerId)
+                      : DataScope.user;
                   final setlistScores = ref.watch(
-                    setlistScoresProvider(setlist.id),
+                    scopedSetlistScoresProvider((dataScope, setlist.id)),
                   );
                   return _buildSetlistCard(
                     setlist,
                     setlistScores.length,
                     setlistScores,
+                    teamServerId: teamServerId,
                   );
                 }),
                 const SizedBox(height: 24),
@@ -408,7 +443,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   style: TextStyle(fontSize: 14, color: AppColors.gray500),
                 ),
                 const SizedBox(height: 12),
-                ...scores.map((score) => _buildScoreCard(score)),
+                ...scores.map((score) => _buildScoreCard(
+                  score,
+                  teamServerId: teamServerId,
+                )),
               ],
             ],
           ),
@@ -445,11 +483,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildHomeContent(
-    List<Score> scores,
-    List<Setlist> setlists,
+    List<Score> libraryScores,
+    List<Setlist> librarySetlists,
     Iterable<Score> recentScores,
     Iterable<Setlist> recentSetlists,
   ) {
+    // Create sets for quick lookup
+    final libraryScoreIds = libraryScores.map((s) => s.id).toSet();
+    final librarySetlistIds = librarySetlists.map((s) => s.id).toSet();
+    final currentTeam = ref.watch(currentTeamProvider);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -457,7 +500,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             Expanded(
               child: StatCard.scores(
-                count: scores.length,
+                count: libraryScores.length,
                 onTap: () {
                   ref.read(libraryTabProvider.notifier).state =
                       LibraryTab.scores;
@@ -468,7 +511,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: StatCard.setlists(
-                count: setlists.length,
+                count: librarySetlists.length,
                 onTap: () {
                   ref.read(libraryTabProvider.notifier).state =
                       LibraryTab.setlists;
@@ -486,11 +529,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           const SizedBox(height: 12),
           ...recentSetlists.map((setlist) {
-            final setlistScores = ref.watch(setlistScoresProvider(setlist.id));
+            final isTeamItem = !librarySetlistIds.contains(setlist.id);
+            final scope = isTeamItem && currentTeam != null
+                ? DataScope.team(currentTeam.serverId)
+                : DataScope.user;
+            final setlistScores = ref.watch(scopedSetlistScoresProvider((scope, setlist.id)));
             return _buildSetlistCard(
               setlist,
               setlistScores.length,
               setlistScores,
+              teamServerId: isTeamItem ? currentTeam?.serverId : null,
             );
           }),
           const SizedBox(height: 24),
@@ -498,12 +546,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (recentScores.isNotEmpty) ...[
           const SectionHeader(icon: AppIcons.musicNote, title: 'Recent Scores'),
           const SizedBox(height: 12),
-          ...recentScores.map((score) => _buildScoreCard(score)),
+          ...recentScores.map((score) {
+            final isTeamItem = !libraryScoreIds.contains(score.id);
+            return _buildScoreCard(
+              score,
+              teamServerId: isTeamItem ? currentTeam?.serverId : null,
+            );
+          }),
         ],
         // Show hint when both recent lists are empty but library has content
         if (recentSetlists.isEmpty &&
             recentScores.isEmpty &&
-            (scores.isNotEmpty || setlists.isNotEmpty))
+            (libraryScores.isNotEmpty || librarySetlists.isNotEmpty))
           Padding(
             padding: const EdgeInsets.only(top: 16, bottom: 32),
             child: Column(
@@ -561,7 +615,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
           ),
-        if (scores.isEmpty && setlists.isEmpty)
+        if (libraryScores.isEmpty && librarySetlists.isEmpty)
           const EmptyState(
             icon: AppIcons.musicNote,
             title: 'Welcome to MuSheet!',
@@ -574,256 +628,122 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildSetlistCard(
     Setlist setlist,
     int scoreCount,
-    List<Score> setlistScores,
-  ) {
+    List<Score> setlistScores, {
+    int? teamServerId,
+  }) {
+    final scope = teamServerId != null ? DataScope.team(teamServerId) : DataScope.user;
+    final sourceLabel = teamServerId != null ? 'Team' : 'Personal';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: () {
-            // Card tap: preview last opened score or first score if available
-            if (setlistScores.isNotEmpty) {
-              // Get last opened score index, default to 0 if not found
-              final lastOpenedIndex =
-                  ref
-                      .read(lastOpenedScoreInSetlistProvider.notifier)
-                      .getLastOpened(setlist.id) ??
-                  0;
-              // Ensure index is valid
-              final validIndex = lastOpenedIndex.clamp(
-                0,
-                setlistScores.length - 1,
-              );
-              final selectedScore = setlistScores[validIndex];
+      child: SetlistItemCard(
+        name: setlist.name,
+        description: setlist.description ?? '',
+        scoreCount: scoreCount,
+        source: sourceLabel,
+        onTap: () {
+          // Record open for recent items
+          ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+          // Card tap: preview last opened score or first score if available
+          if (setlistScores.isNotEmpty) {
+            // Get last opened score index, default to 0 if not found
+            final lastOpenedIndex =
+                ref
+                    .read(lastOpenedScoreInSetlistProvider.notifier)
+                    .getLastOpened(setlist.id) ??
+                0;
+            // Ensure index is valid
+            final validIndex = lastOpenedIndex.clamp(
+              0,
+              setlistScores.length - 1,
+            );
+            final selectedScore = setlistScores[validIndex];
 
-              // Get best instrument using priority: recent > preferred > default
-              final lastOpenedInstrumentIndex = ref
-                  .read(lastOpenedInstrumentInScoreProvider.notifier)
-                  .getLastOpened(selectedScore.id);
-              final preferredInstrument = ref.read(preferredInstrumentProvider);
-              final bestInstrumentIndex = getBestInstrumentIndex(
-                selectedScore,
-                lastOpenedInstrumentIndex,
-                preferredInstrument,
-              );
-              final instrumentScore = selectedScore.instrumentScores.isNotEmpty
-                  ? selectedScore.instrumentScores[bestInstrumentIndex]
-                  : null;
-
-              AppNavigation.navigateToScoreViewer(
-                context,
-                scope: DataScope.user,
-                score: selectedScore,
-                instrumentScore: instrumentScore,
-                setlistScores: setlistScores,
-                currentIndex: validIndex,
-                setlistName: setlist.name,
-              );
-            } else {
-              // Empty setlist: go to detail screen
-              AppNavigation.navigateToSetlistDetail(
-                context,
-                scope: DataScope.user,
-                setlist: setlist,
-              );
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gray200),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.emerald50, AppColors.emerald100],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    AppIcons.setlistIcon,
-                    size: 24,
-                    color: AppColors.emerald550,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        setlist.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        setlist.description ?? '',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        '$scoreCount ${scoreCount == 1 ? "score" : "scores"} • Personal',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.gray400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      // Arrow tap: go to detail screen
-                      AppNavigation.navigateToSetlistDetail(
-                        context,
-                        scope: DataScope.user,
-                        setlist: setlist,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(
-                        AppIcons.chevronRight,
-                        color: AppColors.gray400,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScoreCard(Score score) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: () {
             // Get best instrument using priority: recent > preferred > default
             final lastOpenedInstrumentIndex = ref
                 .read(lastOpenedInstrumentInScoreProvider.notifier)
-                .getLastOpened(score.id);
+                .getLastOpened(selectedScore.id);
             final preferredInstrument = ref.read(preferredInstrumentProvider);
             final bestInstrumentIndex = getBestInstrumentIndex(
-              score,
+              selectedScore,
               lastOpenedInstrumentIndex,
               preferredInstrument,
             );
-            final instrumentScore = score.instrumentScores.isNotEmpty
-                ? score.instrumentScores[bestInstrumentIndex]
+            final instrumentScore = selectedScore.instrumentScores.isNotEmpty
+                ? selectedScore.instrumentScores[bestInstrumentIndex]
                 : null;
 
             AppNavigation.navigateToScoreViewer(
               context,
-              scope: DataScope.user,
-              score: score,
+              scope: scope,
+              score: selectedScore,
               instrumentScore: instrumentScore,
+              setlistScores: setlistScores,
+              currentIndex: validIndex,
+              setlistName: setlist.name,
             );
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.gray200),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.blue50, AppColors.blue100],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    AppIcons.musicNote,
-                    size: 24,
-                    color: AppColors.blue550,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        score.title,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        score.composer,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const Text(
-                        'Personal',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.gray400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      AppNavigation.navigateToScoreDetail(
-                        context,
-                        scope: DataScope.user,
-                        score: score,
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(20),
-                    child: const Padding(
-                      padding: EdgeInsets.all(8),
-                      child: Icon(
-                        AppIcons.chevronRight,
-                        color: AppColors.gray400,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+          } else {
+            // Empty setlist: go to detail screen
+            AppNavigation.navigateToSetlistDetail(
+              context,
+              scope: scope,
+              setlist: setlist,
+            );
+          }
+        },
+        onArrowTap: () {
+          // Arrow tap: go to detail screen
+          AppNavigation.navigateToSetlistDetail(
+            context,
+            scope: scope,
+            setlist: setlist,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildScoreCard(Score score, {int? teamServerId}) {
+    final scope = teamServerId != null ? DataScope.team(teamServerId) : DataScope.user;
+    final sourceLabel = teamServerId != null ? 'Team' : 'Personal';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ScoreItemCard(
+        title: score.title,
+        subtitle: score.composer,
+        meta: sourceLabel,
+        onTap: () {
+          // Record open for recent items
+          ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+          // Get best instrument using priority: recent > preferred > default
+          final lastOpenedInstrumentIndex = ref
+              .read(lastOpenedInstrumentInScoreProvider.notifier)
+              .getLastOpened(score.id);
+          final preferredInstrument = ref.read(preferredInstrumentProvider);
+          final bestInstrumentIndex = getBestInstrumentIndex(
+            score,
+            lastOpenedInstrumentIndex,
+            preferredInstrument,
+          );
+          final instrumentScore = score.instrumentScores.isNotEmpty
+              ? score.instrumentScores[bestInstrumentIndex]
+              : null;
+
+          AppNavigation.navigateToScoreViewer(
+            context,
+            scope: scope,
+            score: score,
+            instrumentScore: instrumentScore,
+          );
+        },
+        onArrowTap: () {
+          AppNavigation.navigateToScoreDetail(
+            context,
+            scope: scope,
+            score: score,
+          );
+        },
       ),
     );
   }
