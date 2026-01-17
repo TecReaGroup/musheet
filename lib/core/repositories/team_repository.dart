@@ -14,6 +14,7 @@ import '../../models/team.dart';
 import '../../utils/logger.dart';
 import '../data/remote/api_client.dart';
 import '../services/services.dart';
+import '../network/connection_manager.dart';
 import '../../database/database.dart';
 
 /// Repository for team operations
@@ -111,8 +112,13 @@ class TeamRepository {
   // ============================================================================
 
   /// Sync teams from server
+  ///
+  /// Only syncs if service is actually reachable (not just device online).
+  /// Also removes local teams that user was removed from on server.
   Future<void> syncTeamsFromServer() async {
-    if (!_network.isOnline) return;
+    // Check service connectivity, not just device network
+    // This avoids timeout delays when device is online but server unreachable
+    if (!_isServiceConnected()) return;
     if (!_session.isAuthenticated) return;
 
     final userId = _session.userId;
@@ -126,8 +132,22 @@ class TeamRepository {
         return;
       }
 
+      // Track server team IDs to detect removed teams
+      final serverTeamIds = <int>{};
+      final newTeamIds = <int>[];
+
+      // Get existing local teams before sync
+      final localTeams = await _db.select(_db.teams).get();
+      final existingServerIds = localTeams.map((t) => t.serverId).toSet();
+
       for (final teamWithRole in result.data!) {
         final serverTeam = teamWithRole.team;
+        serverTeamIds.add(serverTeam.id!);
+
+        // Track new teams for data sync
+        if (!existingServerIds.contains(serverTeam.id!)) {
+          newTeamIds.add(serverTeam.id!);
+        }
 
         // Fetch members for this team
         final membersResult = await _api.getTeamMembers(userId, serverTeam.id!);
@@ -162,7 +182,21 @@ class TeamRepository {
         );
       }
 
+      // Remove local teams that are no longer in server (user was removed)
+      final removedTeamIds = existingServerIds.difference(serverTeamIds);
+      if (removedTeamIds.isNotEmpty) {
+        Log.i('TEAM_REPO', 'Removing ${removedTeamIds.length} stale teams: $removedTeamIds');
+        for (final removedId in removedTeamIds) {
+          await _deleteTeamLocally(removedId);
+        }
+      }
+
       Log.i('TEAM_REPO', 'Synced ${result.data!.length} teams from server');
+
+      // Notify about new teams so their data can be synced
+      for (final teamId in newTeamIds) {
+        onTeamDataChanged?.call(teamId);
+      }
     } catch (e, stack) {
       Log.e(
         'TEAM_REPO',
@@ -171,6 +205,49 @@ class TeamRepository {
         stackTrace: stack,
       );
     }
+  }
+
+  /// Delete a team and its related data from local database
+  Future<void> _deleteTeamLocally(int serverId) async {
+    final teamId = 'server_$serverId';
+
+    // Delete team members
+    await (_db.delete(_db.teamMembers)
+      ..where((m) => m.teamId.equals(teamId))).go();
+
+    // Delete team scores (scopeType='team', scopeId=serverId)
+    final teamScores = await (_db.select(_db.scores)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).get();
+
+    for (final score in teamScores) {
+      // Delete instrument scores for this score
+      await (_db.delete(_db.instrumentScores)
+        ..where((is_) => is_.scoreId.equals(score.id))).go();
+    }
+
+    // Delete scores
+    await (_db.delete(_db.scores)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).go();
+
+    // Delete team setlists (scopeType='team', scopeId=serverId)
+    final teamSetlists = await (_db.select(_db.setlists)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).get();
+
+    for (final setlist in teamSetlists) {
+      // Delete setlist scores for this setlist
+      await (_db.delete(_db.setlistScores)
+        ..where((ss) => ss.setlistId.equals(setlist.id))).go();
+    }
+
+    // Delete setlists
+    await (_db.delete(_db.setlists)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).go();
+
+    // Delete the team itself
+    await (_db.delete(_db.teams)
+      ..where((t) => t.serverId.equals(serverId))).go();
+
+    Log.i('TEAM_REPO', 'Deleted local team data for serverId=$serverId');
   }
 
   Future<void> _upsertTeam(Team team) async {
@@ -216,5 +293,17 @@ class TeamRepository {
   Future<void> leaveAllTeams() async {
     await _db.delete(_db.teams).go();
     await _db.delete(_db.teamMembers).go();
+  }
+
+  /// Check if service is actually connected (not just device online)
+  ///
+  /// Uses ConnectionManager for accurate service reachability status.
+  /// Falls back to network check if ConnectionManager not initialized.
+  bool _isServiceConnected() {
+    if (ConnectionManager.isInitialized) {
+      return ConnectionManager.instance.isConnected;
+    }
+    // Fallback to basic network check
+    return _network.isOnline;
   }
 }

@@ -195,7 +195,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             }
           })
           .catchError((e) {
-            debugPrint('Error getting initial media: $e');
+            Log.e('SHARE', 'Error getting initial media', error: e);
           });
     });
 
@@ -209,7 +209,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
             }
           },
           onError: (err) {
-            debugPrint('Error receiving shared files: $err');
+            Log.e('SHARE', 'Error receiving shared files', error: err);
           },
         );
   }
@@ -236,7 +236,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         // Copy shared file to app's documents directory to ensure it's accessible
         final sourceFile = File(filePath);
         if (!await sourceFile.exists()) {
-          debugPrint('Shared file does not exist: $filePath');
+          Log.w('SHARE', 'Shared file does not exist: $filePath');
           return;
         }
 
@@ -262,7 +262,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           ref.read(showCreateScoreModalProvider.notifier).state = true;
         }
       } catch (e) {
-        debugPrint('Error handling shared file: $e');
+        Log.e('SHARE', 'Error handling shared file', error: e);
       }
     }
 

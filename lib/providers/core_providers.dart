@@ -35,6 +35,66 @@ final isOnlineProvider = Provider<bool>((ref) {
   );
 });
 
+// ============================================================================
+// Connection Manager Providers
+// ============================================================================
+
+/// Notifier to track if ConnectionManager is initialized
+/// This can be updated to trigger re-subscription of dependent providers
+class ConnectionManagerInitializedNotifier extends Notifier<bool> {
+  @override
+  bool build() => ConnectionManager.isInitialized;
+
+  void markInitialized() => state = true;
+}
+
+/// State provider to track if ConnectionManager is initialized
+final connectionManagerInitializedProvider =
+    NotifierProvider<ConnectionManagerInitializedNotifier, bool>(
+      ConnectionManagerInitializedNotifier.new,
+    );
+
+/// Provider for ConnectionManager
+/// Returns null if not initialized (no server configured)
+final connectionManagerProvider = Provider<ConnectionManager?>((ref) {
+  // Watch the initialized state to trigger rebuild when it changes
+  final isInitialized = ref.watch(connectionManagerInitializedProvider);
+  if (!isInitialized) return null;
+  return ConnectionManager.instance;
+});
+
+/// Stream provider for connection state
+final connectionStateProvider = StreamProvider<ConnectionState>((ref) async* {
+  final manager = ref.watch(connectionManagerProvider);
+  if (manager == null) {
+    // Yield offline state but DON'T return - keep the provider alive
+    // so it will rebuild when connectionManagerProvider changes
+    yield const ConnectionState(status: ServiceStatus.offline);
+    // Wait for the provider to be invalidated when manager becomes available
+    await Future.delayed(const Duration(days: 365));
+  } else {
+    // Emit current state first
+    yield manager.state;
+    // Then listen to stream
+    yield* manager.stateStream;
+  }
+});
+
+/// Provider for service status (simple accessor)
+final serviceStatusProvider = Provider<ServiceStatus>((ref) {
+  final connAsync = ref.watch(connectionStateProvider);
+  return connAsync.when(
+    data: (state) => state.status,
+    loading: () => ServiceStatus.offline,
+    error: (_, _) => ServiceStatus.disconnected,
+  );
+});
+
+/// Provider for service connected status
+final isServiceConnectedProvider = Provider<bool>((ref) {
+  return ref.watch(serviceStatusProvider) == ServiceStatus.connected;
+});
+
 /// Provider for SessionService
 /// SessionService must be initialized before use via SessionService.initialize()
 final sessionServiceProvider = Provider<SessionService>((ref) {
@@ -159,15 +219,25 @@ final setlistRepositoryProvider = Provider<SetlistRepository>((ref) {
 final teamRepositoryProvider = Provider<TeamRepository?>((ref) {
   final api = ref.watch(apiClientProvider);
   if (api == null) return null;
-  
+
   final db = ref.watch(appDatabaseProvider);
-  
-  return TeamRepository(
+
+  final repo = TeamRepository(
     db: db,
     api: api,
     session: SessionService.instance,
     network: NetworkService.instance,
   );
+
+  // Connect callback to trigger team data sync for new teams
+  // This fixes Bug 1: team content not synced after adding team
+  repo.onTeamDataChanged = (teamId) {
+    if (UnifiedSyncManager.isInitialized) {
+      UnifiedSyncManager.instance.requestTeamSync(teamId, immediate: true);
+    }
+  };
+
+  return repo;
 });
 
 // ============================================================================
@@ -249,7 +319,8 @@ final teamSyncManagerProvider = Provider<TeamSyncManager?>((ref) {
 });
 
 /// Family provider for individual team sync coordinators
-final teamSyncCoordinatorProvider = FutureProvider.family<ScopedSyncCoordinator?, int>((ref, teamId) async {
+/// Uses autoDispose to ensure stale coordinators are not cached
+final teamSyncCoordinatorProvider = FutureProvider.autoDispose.family<ScopedSyncCoordinator?, int>((ref, teamId) async {
   final manager = ref.watch(teamSyncManagerProvider);
   if (manager == null) return null;
   final coordinator = await manager.getCoordinator(teamId);
@@ -259,13 +330,29 @@ final teamSyncCoordinatorProvider = FutureProvider.family<ScopedSyncCoordinator?
 });
 
 /// Stream provider for team sync state (per team)
-final teamSyncStateProvider = StreamProvider.family<ScopedSyncState, int>((ref, teamId) async* {
+/// Uses autoDispose to ensure stale states are not cached
+final teamSyncStateProvider = StreamProvider.autoDispose.family<ScopedSyncState, int>((ref, teamId) async* {
   final coordinatorAsync = ref.watch(teamSyncCoordinatorProvider(teamId));
-  final coordinator = coordinatorAsync.value;
-  if (coordinator == null) {
+
+  // Wait until coordinator is available
+  final coordinator = await coordinatorAsync.when<Future<ScopedSyncCoordinator?>>(
+    data: (c) async => c,
+    loading: () async {
+      // Wait for the provider to complete loading
+      // The ref.watch above will trigger rebuild when data is available
+      return null;
+    },
+    error: (e, s) async => null,
+  );
+
+  if (coordinator == null || coordinator.isDisposed) {
+    // Emit waiting state but keep stream alive for rebuild
     yield ScopedSyncState(scope: DataScope.team(teamId), phase: SyncPhase.waitingForNetwork);
+    // Don't return - the stream will naturally complete and
+    // the provider will rebuild when teamSyncCoordinatorProvider changes
     return;
   }
+
   // Emit current state first
   yield coordinator.state;
   // Then listen to stream
@@ -276,33 +363,33 @@ final teamSyncStateProvider = StreamProvider.family<ScopedSyncState, int>((ref, 
 // Preferences Provider
 // ============================================================================
 
-/// Simple preferences state class
+/// Simple preferences state class for app-level settings
+///
+/// Note: preferredInstrument is NOT stored here. It's managed by
+/// preferredInstrumentProvider in preferred_instrument_provider.dart,
+/// which syncs with the user's profile on the server.
 class AppPreferences {
-  final String? preferredInstrument;
   final bool darkMode;
   final int defaultBpm;
   final String libraryViewMode; // 'grid' or 'list'
   final String librarySortBy;   // 'title', 'composer', 'dateAdded'
   final bool librarySortAscending;
-  
+
   const AppPreferences({
-    this.preferredInstrument,
     this.darkMode = false,
     this.defaultBpm = 120,
     this.libraryViewMode = 'grid',
     this.librarySortBy = 'title',
     this.librarySortAscending = true,
   });
-  
+
   AppPreferences copyWith({
-    String? preferredInstrument,
     bool? darkMode,
     int? defaultBpm,
     String? libraryViewMode,
     String? librarySortBy,
     bool? librarySortAscending,
   }) => AppPreferences(
-    preferredInstrument: preferredInstrument ?? this.preferredInstrument,
     darkMode: darkMode ?? this.darkMode,
     defaultBpm: defaultBpm ?? this.defaultBpm,
     libraryViewMode: libraryViewMode ?? this.libraryViewMode,
@@ -317,27 +404,23 @@ class PreferencesNotifier extends Notifier<AppPreferences> {
   AppPreferences build() {
     return const AppPreferences();
   }
-  
-  void setPreferredInstrument(String? instrument) {
-    state = state.copyWith(preferredInstrument: instrument);
-  }
-  
+
   void setDarkMode(bool dark) {
     state = state.copyWith(darkMode: dark);
   }
-  
+
   void setDefaultBpm(int bpm) {
     state = state.copyWith(defaultBpm: bpm);
   }
-  
+
   void setLibraryViewMode(String mode) {
     state = state.copyWith(libraryViewMode: mode);
   }
-  
+
   void setLibrarySortBy(String sortBy) {
     state = state.copyWith(librarySortBy: sortBy);
   }
-  
+
   void setLibrarySortAscending(bool ascending) {
     state = state.copyWith(librarySortAscending: ascending);
   }
@@ -354,15 +437,18 @@ final preferencesProvider = NotifierProvider<PreferencesNotifier, AppPreferences
 
 /// Provider for backend connection status
 final backendStatusProvider = Provider<BackendConnectionStatus>((ref) {
-  final isOnline = ref.watch(isOnlineProvider);
+  final serviceStatus = ref.watch(serviceStatusProvider);
   final isAuthenticated = ref.watch(isAuthenticatedProvider);
   final api = ref.watch(apiClientProvider);
-  
+
   if (api == null) {
     return BackendConnectionStatus.notConfigured;
   }
-  if (!isOnline) {
+  if (serviceStatus == ServiceStatus.offline) {
     return BackendConnectionStatus.offline;
+  }
+  if (serviceStatus == ServiceStatus.disconnected) {
+    return BackendConnectionStatus.disconnected;
   }
   if (!isAuthenticated) {
     return BackendConnectionStatus.notAuthenticated;
@@ -374,6 +460,7 @@ final backendStatusProvider = Provider<BackendConnectionStatus>((ref) {
 enum BackendConnectionStatus {
   notConfigured,
   offline,
+  disconnected,
   notAuthenticated,
   connected,
 }

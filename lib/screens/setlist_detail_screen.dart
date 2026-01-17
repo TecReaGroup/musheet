@@ -44,9 +44,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   DataScope get _scope => widget.scope;
   bool get _isTeam => _scope.isTeam;
 
-  /// Get the setlists notifier for current scope
-  ScopedSetlistsNotifier get _setlistsNotifier =>
-      ref.read(scopedSetlistsProvider(_scope).notifier);
+  /// Get the setlists helper for current scope
+  ScopedSetlistsHelper get _setlistsHelper =>
+      ref.read(scopedSetlistsHelperProvider(_scope));
 
   @override
   void dispose() {
@@ -141,7 +141,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           final newOrder = List<String>.from(currentSetlist.scoreIds);
                           final item = newOrder.removeAt(oldIndex);
                           newOrder.insert(newIndex, item);
-                          await _setlistsNotifier.reorderScores(currentSetlist.id, newOrder);
+                          await _setlistsHelper.reorderScores(currentSetlist.id, newOrder);
                         },
                         itemBuilder: (context, index) {
                           final score = setlistScores[index];
@@ -457,7 +457,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await _setlistsNotifier.removeScoreFromSetlist(setlistId, score.id);
+              await _setlistsHelper.removeScoreFromSetlist(setlistId, score.id);
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text(
@@ -695,7 +695,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ? null
           : _editDescriptionController.text.trim(),
     );
-    await _setlistsNotifier.updateSetlist(updatedSetlist);
+    await _setlistsHelper.updateSetlist(updatedSetlist);
     setState(() => _showEditModal = false);
   }
 
@@ -930,7 +930,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     title: score.title,
                     composer: score.composer,
                     onTap: () async {
-                      await _setlistsNotifier.addScoreToSetlist(
+                      await _setlistsHelper.addScoreToSetlist(
                         currentSetlist.id,
                         score.id,
                       );

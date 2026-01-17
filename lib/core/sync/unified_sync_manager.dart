@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/widgets.dart';
 
+import '../network/connection_manager.dart';
 import '../services/services.dart';
 import '../data/local/local_data_source.dart';
 import '../data/remote/api_client.dart';
@@ -29,6 +30,7 @@ class UnifiedSyncManager {
   final AppDatabase _db;
 
   AppLifecycleListener? _lifecycleListener;
+  void Function()? _onConnectedCallback;
 
   UnifiedSyncManager._({
     required SyncableDataSource localLibrary,
@@ -108,6 +110,9 @@ class UnifiedSyncManager {
     // Set up lifecycle monitoring
     _startLifecycleMonitoring();
 
+    // Set up ConnectionManager service recovery monitoring
+    _startConnectionMonitoring();
+
     Log.d('UNIFIED_SYNC', 'Initialized');
   }
 
@@ -118,6 +123,17 @@ class UnifiedSyncManager {
         requestSync(immediate: false);
       },
     );
+  }
+
+  void _startConnectionMonitoring() {
+    // Subscribe to service recovery events from ConnectionManager
+    if (ConnectionManager.isInitialized) {
+      _onConnectedCallback = () {
+        Log.d('UNIFIED_SYNC', 'Service recovered - triggering sync');
+        requestSync(immediate: true);
+      };
+      ConnectionManager.instance.onConnected(_onConnectedCallback!);
+    }
   }
 
   void _onLogin(SessionState session) {
@@ -137,8 +153,9 @@ class UnifiedSyncManager {
   /// Request unified sync for Library and all joined Teams
   /// Per sync_logic.md §9.5: Parallel execution, then PDF sync
   Future<void> requestSync({bool immediate = false}) async {
-    if (!_network.isOnline) {
-      Log.d('UNIFIED_SYNC', 'No network - sync request ignored');
+    // Check service availability (not just device network)
+    if (!_isServiceAvailable()) {
+      Log.d('UNIFIED_SYNC', 'Service not available - sync request ignored');
       return;
     }
 
@@ -192,8 +209,15 @@ class UnifiedSyncManager {
   }
 
   /// Sync team list from server to local database
-  /// This ensures we have team IDs before syncing team data
+  /// This ensures we have team IDs before syncing team data.
+  /// Also removes local teams that user was removed from on server.
   Future<void> _syncTeamListFromServer() async {
+    // Skip network request when offline to avoid timeout delays
+    if (!_isServiceAvailable()) {
+      Log.d('UNIFIED_SYNC', 'Offline - skipping team list sync from server');
+      return;
+    }
+
     final userId = _session.userId;
     if (userId == null) return;
 
@@ -205,8 +229,16 @@ class UnifiedSyncManager {
         return;
       }
 
+      // Track server team IDs to detect removed teams
+      final serverTeamIds = <int>{};
+
+      // Get existing local teams before sync
+      final localTeams = await _db.select(_db.teams).get();
+      final existingServerIds = localTeams.map((t) => t.serverId).toSet();
+
       for (final teamWithRole in result.data!) {
         final serverTeam = teamWithRole.team;
+        serverTeamIds.add(serverTeam.id!);
 
         // Upsert team to local database (minimal data, just enough for sync)
         await _db.into(_db.teams).insertOnConflictUpdate(
@@ -221,6 +253,19 @@ class UnifiedSyncManager {
         );
       }
 
+      // Remove local teams that are no longer in server (user was removed)
+      final removedTeamIds = existingServerIds.difference(serverTeamIds);
+      if (removedTeamIds.isNotEmpty) {
+        Log.i('UNIFIED_SYNC', 'Removing ${removedTeamIds.length} stale teams user was removed from');
+        for (final removedId in removedTeamIds) {
+          await _deleteTeamLocally(removedId);
+          // Also remove the cached sync coordinator for this team
+          if (TeamSyncManager.isInitialized) {
+            TeamSyncManager.instance.removeCoordinator(removedId);
+          }
+        }
+      }
+
       Log.d('UNIFIED_SYNC', 'Synced ${result.data!.length} team IDs from server');
     } catch (e) {
       Log.w('UNIFIED_SYNC', 'Error syncing team list: $e');
@@ -228,9 +273,52 @@ class UnifiedSyncManager {
     }
   }
 
+  /// Delete a team and its related data from local database
+  Future<void> _deleteTeamLocally(int serverId) async {
+    final teamId = 'server_$serverId';
+
+    // Delete team members
+    await (_db.delete(_db.teamMembers)
+      ..where((m) => m.teamId.equals(teamId))).go();
+
+    // Delete team scores (scopeType='team', scopeId=serverId)
+    final teamScores = await (_db.select(_db.scores)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).get();
+
+    for (final score in teamScores) {
+      // Delete instrument scores for this score
+      await (_db.delete(_db.instrumentScores)
+        ..where((is_) => is_.scoreId.equals(score.id))).go();
+    }
+
+    // Delete scores
+    await (_db.delete(_db.scores)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).go();
+
+    // Delete team setlists (scopeType='team', scopeId=serverId)
+    final teamSetlists = await (_db.select(_db.setlists)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).get();
+
+    for (final setlist in teamSetlists) {
+      // Delete setlist scores for this setlist
+      await (_db.delete(_db.setlistScores)
+        ..where((ss) => ss.setlistId.equals(setlist.id))).go();
+    }
+
+    // Delete setlists
+    await (_db.delete(_db.setlists)
+      ..where((s) => s.scopeType.equals('team') & s.scopeId.equals(serverId))).go();
+
+    // Delete the team itself
+    await (_db.delete(_db.teams)
+      ..where((t) => t.serverId.equals(serverId))).go();
+
+    Log.i('UNIFIED_SYNC', 'Deleted local team data for serverId=$serverId');
+  }
+
   /// Request sync for a specific team only
   Future<void> requestTeamSync(int teamId, {bool immediate = false}) async {
-    if (!_network.isOnline || !_session.isAuthenticated) return;
+    if (!_isServiceAvailable() || !_session.isAuthenticated) return;
 
     try {
       final coordinator = await _getOrCreateTeamCoordinator(teamId);
@@ -270,6 +358,16 @@ class UnifiedSyncManager {
   // Internal Helpers
   // ============================================================================
 
+  /// Check if the server is available for sync
+  /// Uses ConnectionManager if initialized, falls back to network check
+  bool _isServiceAvailable() {
+    if (ConnectionManager.isInitialized) {
+      return ConnectionManager.instance.state.status == ServiceStatus.connected;
+    }
+    // Fallback to basic network check if ConnectionManager not available
+    return _network.isOnline;
+  }
+
   /// Get list of joined team IDs from local database
   Future<List<int>> _getJoinedTeamIds() async {
     final teams = await _db.select(_db.teams).get();
@@ -291,6 +389,10 @@ class UnifiedSyncManager {
     _lifecycleListener?.dispose();
     _session.removeLoginListener(_onLogin);
     _session.removeLogoutListener(_onLogout);
+    // Remove connection listener
+    if (_onConnectedCallback != null && ConnectionManager.isInitialized) {
+      ConnectionManager.instance.removeOnConnected(_onConnectedCallback!);
+    }
     // TeamSyncManager handles its own cleanup
   }
 }

@@ -148,31 +148,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   const SizedBox(height: 8),
 
                   // Connection status
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: authState.isConnected
-                              ? AppColors.emerald500
-                              : AppColors.gray400,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        authState.isConnected ? 'Connected' : 'Offline',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: authState.isConnected
-                              ? AppColors.emerald600
-                              : AppColors.gray500,
-                        ),
-                      ),
-                    ],
-                  ),
+                  ConnectionStatusIndicator.medium(isConnected: authState.isConnected),
                   const SizedBox(height: 32),
 
                   // Profile options

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:pdfrx/pdfrx.dart';
 
+import 'logger.dart';
+
 /// Performance optimization utilities for the MuSheet app
 
 /// PDF Document Cache Manager
@@ -73,7 +75,7 @@ class ImageCacheManager {
         await precacheImage(NetworkImage(url), context);
       } catch (e) {
         // Silently handle errors
-        debugPrint('Failed to precache image: $url');
+        Log.d('IMAGE_CACHE', 'Failed to precache image: $url');
       }
     }
   }
@@ -120,7 +122,7 @@ class MemoryOptimizer {
 
   /// Monitor memory usage (debug only)
   static void logMemoryUsage(String context) {
-    debugPrint('Memory checkpoint: $context');
+    Log.d('MEMORY', 'Memory checkpoint: $context');
   }
 }
 

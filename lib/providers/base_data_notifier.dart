@@ -11,7 +11,7 @@ import 'auth_state_provider.dart';
 
 /// Setup common auth and sync listeners for any AsyncNotifier or FamilyAsyncNotifier
 /// Call this in build() method of your notifier
-/// 
+///
 /// USAGE:
 /// - Library: setupCommonListeners(ref: ref, authProvider: authStateProvider, syncProvider: syncStateProvider)
 /// - Team: setupCommonListeners(ref: ref, authProvider: authStateProvider, syncProvider: teamSyncStateProvider(teamServerId))
@@ -29,11 +29,19 @@ void setupCommonListeners({
   });
 
   // Sync state listener - refresh when sync completes
+  // Also refresh on first emit if sync has completed (lastSyncAt != null)
   ref.listen(syncProvider, (AsyncValue<SyncState>? previous, AsyncValue<SyncState> next) {
     next.whenData((syncState) {
-      final wasWorking = previous?.value?.phase != SyncPhase.idle;
+      final prevPhase = previous?.value?.phase;
+      final wasWorking = prevPhase != null && prevPhase != SyncPhase.idle;
       final isNowIdle = syncState.phase == SyncPhase.idle;
-      if (wasWorking && isNowIdle && syncState.lastSyncAt != null) {
+
+      // Case 1: Sync just completed (was working -> now idle)
+      // Case 2: First emit with completed sync (previous is null, sync already done)
+      final syncJustCompleted = wasWorking && isNowIdle;
+      final firstEmitWithSyncDone = previous == null && isNowIdle && syncState.lastSyncAt != null;
+
+      if ((syncJustCompleted || firstEmitWithSyncDone) && syncState.lastSyncAt != null) {
         ref.invalidateSelf();
       }
     });

@@ -1,7 +1,7 @@
 A:
-了解项目后再深度分析，只是分析而不要修改文件：app还有什么不符合设计文档sync_logic.md的地方吗？或者可能存在的错误逻辑，尤其是基本同步流程是否无bug, 仔细分析 确保完全实现设计文档且无bug 中文回答
+了解项目后再深度分析，只是分析而不要修改文件：app还有什么不符合设计文档 NETWORK_AUTH_LOGIC.md 的地方吗？或者可能存在的错误逻辑，尤其是基本同步流程是否无bug, 仔细分析 确保完全实现设计文档且无bug 中文回答
 
-参考文档UNIFIED_DATA_LAYER_REFACTORING.md直接重构代码，给出修复方案，一个一个修复所有问题，不用考虑迁移问题，删除不再使用代码，完全使用设计方案里的实现方式，有问题积极和我讨论（就是输出问答模式）。前端代码在：./lib，后端代码在：./server
+参考文档 NETWORK_AUTH_LOGIC.md 直接重构代码，给出修复方案，一个一个修复所有问题，不用考虑迁移问题，删除不再使用代码，完全使用设计方案里的实现方式，但是注意现在有的功能需要继续维护，有问题积极和我讨论（就是输出问答模式）。前端代码在：./lib，后端代码在：./server
 
 serverpod command：
 "C:\Users\roupe\AppData\Local\Pub\Cache\bin\serverpod.bat" generate

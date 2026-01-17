@@ -2,6 +2,8 @@
 ///
 /// This replaces both BackendService and RpcClient with a single, clean API layer.
 /// All server calls go through this class for consistent error handling and auth.
+///
+/// Integrates with ConnectionManager to report service availability.
 library;
 
 import 'dart:async';
@@ -10,6 +12,9 @@ import 'package:musheet_client/musheet_client.dart' as server;
 import 'package:serverpod_client/serverpod_client.dart'
     show ClientAuthKeyProvider, wrapAsBearerAuthHeaderValue;
 import '../../../utils/logger.dart';
+import '../../network/errors.dart';
+import '../../network/connection_manager.dart';
+import '../../network/token_refresher.dart';
 
 // ============================================================================
 // API Result Types
@@ -19,7 +24,7 @@ import '../../../utils/logger.dart';
 @immutable
 class ApiResult<T> {
   final T? data;
-  final ApiError? error;
+  final NetworkError? error;
   final Duration? latency;
 
   const ApiResult._({this.data, this.error, this.latency});
@@ -29,7 +34,7 @@ class ApiResult<T> {
     latency: latency,
   );
 
-  factory ApiResult.failure(ApiError error) => ApiResult._(error: error);
+  factory ApiResult.failure(NetworkError error) => ApiResult._(error: error);
 
   bool get isSuccess => error == null && data != null;
   bool get isFailure => error != null;
@@ -41,92 +46,6 @@ class ApiResult<T> {
     }
     return ApiResult.failure(error!);
   }
-}
-
-/// API error with categorization
-@immutable
-class ApiError {
-  final ApiErrorCode code;
-  final String message;
-  final dynamic originalError;
-
-  const ApiError({
-    required this.code,
-    required this.message,
-    this.originalError,
-  });
-
-  factory ApiError.fromException(dynamic e) {
-    final message = e.toString();
-
-    // Categorize common errors
-    if (message.contains('SocketException') ||
-        message.contains('Connection refused') ||
-        message.contains('Network is unreachable')) {
-      return ApiError(
-        code: ApiErrorCode.networkError,
-        message: 'Network connection failed',
-        originalError: e,
-      );
-    }
-
-    if (message.contains('TimeoutException') || message.contains('timed out')) {
-      return ApiError(
-        code: ApiErrorCode.timeout,
-        message: 'Request timed out',
-        originalError: e,
-      );
-    }
-
-    if (message.contains('authorization') ||
-        message.contains('Invalid header') ||
-        message.contains('401')) {
-      return ApiError(
-        code: ApiErrorCode.unauthorized,
-        message: 'Authentication failed',
-        originalError: e,
-      );
-    }
-
-    if (message.contains('404') || message.contains('not found')) {
-      return ApiError(
-        code: ApiErrorCode.notFound,
-        message: 'Resource not found',
-        originalError: e,
-      );
-    }
-
-    if (message.contains('412') || message.contains('conflict')) {
-      return ApiError(
-        code: ApiErrorCode.conflict,
-        message: 'Version conflict',
-        originalError: e,
-      );
-    }
-
-    return ApiError(
-      code: ApiErrorCode.unknown,
-      message: message,
-      originalError: e,
-    );
-  }
-
-  bool get isRetryable => code.isRetryable;
-}
-
-/// Error code categories
-enum ApiErrorCode {
-  networkError(true),
-  timeout(true),
-  unauthorized(false),
-  forbidden(false),
-  notFound(false),
-  conflict(false),
-  serverError(true),
-  unknown(false);
-
-  final bool isRetryable;
-  const ApiErrorCode(this.isRetryable);
 }
 
 // ============================================================================
@@ -206,12 +125,23 @@ class ApiClient {
   bool get isAuthenticated => _authProvider.token != null;
 
   // ============================================================================
+  // Session Expired Callback
+  // ============================================================================
+
+  /// Callback when session expires (401 after token refresh fails)
+  void Function()? onSessionExpired;
+
+  /// Flag to prevent recursive token refresh
+  bool _isRefreshingToken = false;
+
+  // ============================================================================
   // Generic Request Execution
   // ============================================================================
 
   Future<ApiResult<T>> _execute<T>({
     required String operation,
     required Future<T> Function() call,
+    bool allowRetryOn401 = true,
   }) async {
     final stopwatch = Stopwatch()..start();
 
@@ -225,9 +155,40 @@ class ApiClient {
     } catch (e) {
       stopwatch.stop();
 
-      Log.w('API', '$operation: FAILED - $e');
+      final error = NetworkError.fromException(e);
+      Log.w('API', '$operation: FAILED - ${error.type}: ${error.message}');
 
-      return ApiResult.failure(ApiError.fromException(e));
+      // Notify ConnectionManager on network/server errors
+      if (error.shouldMarkDisconnected && ConnectionManager.isInitialized) {
+        ConnectionManager.instance.onRequestFailed(error.message);
+      }
+
+      // Handle 401 auth errors - try token refresh
+      if (error.isAuthError && allowRetryOn401 && !_isRefreshingToken) {
+        Log.d('API', '$operation: Attempting token refresh...');
+
+        _isRefreshingToken = true;
+        try {
+          final refreshResult = await TokenRefresher.instance.refreshIfNeeded();
+
+          if (refreshResult.success) {
+            Log.i('API', '$operation: Token refreshed, retrying request...');
+            // Retry the original request (without allowing another refresh)
+            return _execute(
+              operation: operation,
+              call: call,
+              allowRetryOn401: false,
+            );
+          } else {
+            Log.w('API', '$operation: Token refresh failed, session expired');
+            onSessionExpired?.call();
+          }
+        } finally {
+          _isRefreshingToken = false;
+        }
+      }
+
+      return ApiResult.failure(error);
     }
   }
 
@@ -290,6 +251,15 @@ class ApiClient {
   }) => _execute(
     operation: 'changePassword',
     call: () => _client.auth.changePassword(userId, oldPassword, newPassword),
+  );
+
+  /// Refresh access token using refresh token
+  /// This is called by TokenRefresher
+  Future<ApiResult<server.AuthResult>> refreshTokenApi(
+    String refreshToken,
+  ) => _execute(
+    operation: 'refreshToken',
+    call: () => _client.auth.refreshToken(refreshToken),
   );
 
   // ============================================================================

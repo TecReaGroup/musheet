@@ -5,7 +5,7 @@ import '../../models/instrument_score.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../router/app_router.dart';
-import '../library_screen.dart' show preferredInstrumentProvider;
+import '../../providers/preferred_instrument_provider.dart';
 
 class InstrumentPreferenceScreen extends ConsumerWidget {
   const InstrumentPreferenceScreen({super.key});

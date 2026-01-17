@@ -58,6 +58,12 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
     final isLoggedIn = authState.isAuthenticated;
     // Watch sync state for showing last sync time and status
     final syncState = ref.watch(currentSyncStateProvider);
+    // Watch connection state for network status
+    final connectionAsync = ref.watch(connectionStateProvider);
+    final isOnline = connectionAsync.whenOrNull(
+          data: (state) => state.isConnected,
+        ) ??
+        false;
 
     return PopScope(
       canPop: false,
@@ -158,49 +164,97 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                         ),
                       ),
                       const SizedBox(height: 40),
-                      // Status indicator
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isLoggedIn
-                              ? AppColors.emerald50
-                              : AppColors.gray100,
-                          borderRadius: BorderRadius.circular(100),
-                          border: Border.all(
-                            color: isLoggedIn
-                                ? AppColors.emerald200
-                                : AppColors.gray200,
+                      // Status indicators - Network and Account
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Network status
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isOnline
+                                  ? AppColors.emerald50
+                                  : AppColors.gray100,
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(
+                                color: isOnline
+                                    ? AppColors.emerald200
+                                    : AppColors.gray200,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: isOnline
+                                        ? AppColors.emerald500
+                                        : AppColors.gray400,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isOnline ? 'Online' : 'Offline',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: isOnline
+                                        ? AppColors.emerald600
+                                        : AppColors.gray600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
+                          const SizedBox(width: 12),
+                          // Account status
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isLoggedIn
+                                  ? AppColors.blue50
+                                  : AppColors.gray100,
+                              borderRadius: BorderRadius.circular(100),
+                              border: Border.all(
                                 color: isLoggedIn
-                                    ? AppColors.emerald500
-                                    : AppColors.gray400,
-                                shape: BoxShape.circle,
+                                    ? AppColors.blue200
+                                    : AppColors.gray200,
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Text(
-                              isLoggedIn ? 'Connected' : 'Not connected',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: isLoggedIn
-                                    ? AppColors.emerald600
-                                    : AppColors.gray600,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isLoggedIn ? AppIcons.check : AppIcons.person,
+                                  size: 14,
+                                  color: isLoggedIn
+                                      ? AppColors.blue500
+                                      : AppColors.gray400,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isLoggedIn ? 'Logged in' : 'Not logged in',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: isLoggedIn
+                                        ? AppColors.blue600
+                                        : AppColors.gray600,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                       // Sync button (only show when logged in)
                       if (isLoggedIn) ...[

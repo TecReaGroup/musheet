@@ -14,6 +14,19 @@ import '../core/data/data_scope.dart';
 
 export '../models/sort_state.dart';
 
+// Re-export preferred instrument provider for backward compatibility
+// Note: PreferredInstrumentNotifier and preferredInstrumentProvider have been
+// moved to preferred_instrument_provider.dart for unified management.
+// Import from there instead of this file.
+// Note: getBestInstrumentIndex is NOT re-exported here because library_screen.dart
+// has its own Score-specific version. Use the appropriate one based on context.
+export 'preferred_instrument_provider.dart'
+    show
+        preferredInstrumentProvider,
+        PreferredInstrumentNotifier,
+        lastOpenedInstrumentInScoreProvider,
+        LastOpenedInstrumentInScoreNotifier;
+
 // ============================================================================
 // Sort State Providers
 // ============================================================================
@@ -158,61 +171,4 @@ class TabStateNotifier<T> extends Notifier<T> {
   T build() => initialValue;
 
   void setTab(T tab) => state = tab;
-}
-
-// ============================================================================
-// Preferred Instrument
-// ============================================================================
-
-/// Preferred instrument notifier
-class PreferredInstrumentNotifier extends Notifier<String?> {
-  @override
-  String? build() => null;
-
-  void setPreferredInstrument(String? instrumentKey) {
-    state = instrumentKey;
-  }
-}
-
-final preferredInstrumentProvider = NotifierProvider<PreferredInstrumentNotifier, String?>(
-  PreferredInstrumentNotifier.new,
-);
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/// Get the best instrument index for a score
-/// Priority: 1. Last opened > 2. User preferred > 3. Vocal > 4. Default (first)
-int getBestInstrumentIndex({
-  required int instrumentCount,
-  required String Function(int) getInstrumentKey,
-  int? lastOpenedIndex,
-  String? preferredInstrumentKey,
-}) {
-  if (instrumentCount == 0) return 0;
-
-  // Priority 1: Use last opened if available
-  if (lastOpenedIndex != null && lastOpenedIndex >= 0 && lastOpenedIndex < instrumentCount) {
-    return lastOpenedIndex;
-  }
-
-  // Priority 2: Use preferred instrument if set and available
-  if (preferredInstrumentKey != null) {
-    for (var i = 0; i < instrumentCount; i++) {
-      if (getInstrumentKey(i) == preferredInstrumentKey) {
-        return i;
-      }
-    }
-  }
-
-  // Priority 3: Use Vocal if available
-  for (var i = 0; i < instrumentCount; i++) {
-    if (getInstrumentKey(i) == 'vocal') {
-      return i;
-    }
-  }
-
-  // Priority 4: Default to first instrument
-  return 0;
 }

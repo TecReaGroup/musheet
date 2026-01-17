@@ -11,6 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
 import 'package:musheet/core/data/remote/api_client.dart';
+import 'package:musheet/core/network/errors.dart';
 
 import '../../mocks/mocks.dart';
 import '../../fixtures/test_fixtures.dart';
@@ -588,8 +589,8 @@ void main() {
             userId: any(named: 'userId'),
             teamId: any(named: 'teamId'),
             request: any(named: 'request'),
-          )).thenAnswer((_) async => ApiResult.failure(const ApiError(
-            code: ApiErrorCode.forbidden,
+          )).thenAnswer((_) async => ApiResult.failure(const NetworkError(
+            type: NetworkErrorType.forbidden,
             message: 'Not a team member',
           )));
 
@@ -606,7 +607,7 @@ void main() {
 
       // Assert
       expect(result.isFailure, isTrue);
-      expect(result.error?.code, equals(ApiErrorCode.forbidden));
+      expect(result.error?.type, equals(NetworkErrorType.forbidden));
     });
 
     test('team pull handles team not found', () async {
@@ -615,8 +616,8 @@ void main() {
             userId: any(named: 'userId'),
             teamId: any(named: 'teamId'),
             since: any(named: 'since'),
-          )).thenAnswer((_) async => ApiResult.failure(const ApiError(
-            code: ApiErrorCode.notFound,
+          )).thenAnswer((_) async => ApiResult.failure(const NetworkError(
+            type: NetworkErrorType.notFound,
             message: 'Team not found',
           )));
 
@@ -629,7 +630,7 @@ void main() {
 
       // Assert
       expect(result.isFailure, isTrue);
-      expect(result.error?.code, equals(ApiErrorCode.notFound));
+      expect(result.error?.type, equals(NetworkErrorType.notFound));
     });
   });
 

@@ -5,6 +5,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/logger.dart';
@@ -88,6 +89,7 @@ class UserProfile {
 class SessionState {
   final SessionStatus status;
   final String? token;
+  final String? refreshToken;
   final int? userId;
   final UserProfile? user;
   final String? serverUrl;
@@ -98,6 +100,7 @@ class SessionState {
   const SessionState({
     this.status = SessionStatus.unknown,
     this.token,
+    this.refreshToken,
     this.userId,
     this.user,
     this.serverUrl,
@@ -109,6 +112,7 @@ class SessionState {
   SessionState copyWith({
     SessionStatus? status,
     String? token,
+    String? refreshToken,
     int? userId,
     UserProfile? user,
     String? serverUrl,
@@ -122,6 +126,7 @@ class SessionState {
   }) => SessionState(
     status: status ?? this.status,
     token: clearToken ? null : (token ?? this.token),
+    refreshToken: clearToken ? null : (refreshToken ?? this.refreshToken),
     userId: clearToken ? null : (userId ?? this.userId),
     user: clearUser ? null : (user ?? this.user),
     serverUrl: serverUrl ?? this.serverUrl,
@@ -139,7 +144,9 @@ class SessionState {
 /// Preference keys for session persistence
 class _SessionKeys {
   static const String authToken = 'auth_token';
+  static const String refreshToken = 'refresh_token';
   static const String serverUrl = 'backend_server_url';
+  static const String userProfile = 'user_profile';
 }
 
 /// Singleton session service
@@ -186,16 +193,19 @@ class SessionService {
   
   /// Quick access to auth status
   bool get isAuthenticated => _state.isAuthenticated;
-  
+
   /// Get current token
   String? get token => _state.token;
-  
+
+  /// Get current refresh token
+  String? get refreshToken => _state.refreshToken;
+
   /// Get current user ID
   int? get userId => _state.userId;
-  
+
   /// Get current user profile
   UserProfile? get user => _state.user;
-  
+
   /// Get server URL
   String? get serverUrl => _state.serverUrl;
 
@@ -203,27 +213,54 @@ class SessionService {
     // Load server URL
     final savedUrl = _prefs.getString(_SessionKeys.serverUrl);
     _state = _state.copyWith(serverUrl: savedUrl);
-    
-    // Check for saved token
+
+    // Check for saved tokens
     final savedToken = _prefs.getString(_SessionKeys.authToken);
-    
+    final savedRefreshToken = _prefs.getString(_SessionKeys.refreshToken);
+
     if (savedToken != null && savedToken.isNotEmpty) {
       // Extract user ID from token
       final userId = _extractUserIdFromToken(savedToken);
-      
+
+      // Restore user profile from preferences
+      UserProfile? savedProfile;
+      final profileJson = _prefs.getString(_SessionKeys.userProfile);
+      if (profileJson != null && profileJson.isNotEmpty) {
+        try {
+          final json = _decodeJson(profileJson);
+          if (json != null) {
+            savedProfile = UserProfile.fromJson(json);
+          }
+        } catch (e) {
+          Log.w('SESSION', 'Failed to restore user profile: $e');
+        }
+      }
+
       _state = _state.copyWith(
         status: SessionStatus.authenticated,
         token: savedToken,
+        refreshToken: savedRefreshToken,
         userId: userId,
+        user: savedProfile,
         authenticatedAt: DateTime.now(),
       );
-      
-      Log.i('SESSION', 'Restored session for user: $userId');
+
+      Log.i('SESSION', 'Restored session for user: $userId (profile: ${savedProfile != null})');
     } else {
       _state = _state.copyWith(status: SessionStatus.unauthenticated);
     }
-    
+
     _stateController.add(_state);
+  }
+
+  Map<String, dynamic>? _decodeJson(String json) {
+    try {
+      return Map<String, dynamic>.from(
+        (const JsonDecoder().convert(json)) as Map,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   int _extractUserIdFromToken(String token) {
@@ -246,31 +283,67 @@ class SessionService {
   /// Called after successful login
   Future<void> onLoginSuccess({
     required String token,
+    String? refreshToken,
     required int userId,
     UserProfile? user,
   }) async {
-    // Persist token
+    // Persist tokens
     await _prefs.setString(_SessionKeys.authToken, token);
-    
+    if (refreshToken != null) {
+      await _prefs.setString(_SessionKeys.refreshToken, refreshToken);
+    }
+
+    // Persist user profile for offline access
+    if (user != null) {
+      await _prefs.setString(
+        _SessionKeys.userProfile,
+        jsonEncode(user.toJson()),
+      );
+    }
+
     _updateState(SessionState(
       status: SessionStatus.authenticated,
       token: token,
+      refreshToken: refreshToken,
       userId: userId,
       user: user,
       serverUrl: _state.serverUrl,
       authenticatedAt: DateTime.now(),
     ));
-    
+
     // Notify listeners
     for (final callback in _onLoginCallbacks) {
       callback(_state);
     }
-    
+
     Log.i('SESSION', 'Login success for user: $userId');
   }
 
+  /// Update tokens after refresh
+  Future<void> updateTokens({
+    required String token,
+    String? refreshToken,
+  }) async {
+    await _prefs.setString(_SessionKeys.authToken, token);
+    if (refreshToken != null) {
+      await _prefs.setString(_SessionKeys.refreshToken, refreshToken);
+    }
+
+    _updateState(_state.copyWith(
+      token: token,
+      refreshToken: refreshToken,
+    ));
+
+    Log.i('SESSION', 'Tokens updated');
+  }
+
   /// Update user profile
-  void updateUserProfile(UserProfile profile) {
+  Future<void> updateUserProfile(UserProfile profile) async {
+    // Persist for offline access
+    await _prefs.setString(
+      _SessionKeys.userProfile,
+      jsonEncode(profile.toJson()),
+    );
     _updateState(_state.copyWith(user: profile));
   }
 
@@ -281,19 +354,20 @@ class SessionService {
 
   /// Called on logout
   Future<void> onLogout() async {
-    // Clear persisted token
+    // Clear persisted tokens
     await _prefs.remove(_SessionKeys.authToken);
-    
+    await _prefs.remove(_SessionKeys.refreshToken);
+
     _updateState(SessionState(
       status: SessionStatus.unauthenticated,
       serverUrl: _state.serverUrl,
     ));
-    
+
     // Notify listeners
     for (final callback in _onLogoutCallbacks) {
       callback();
     }
-    
+
     Log.i('SESSION', 'Logged out');
   }
 

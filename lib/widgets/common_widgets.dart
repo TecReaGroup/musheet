@@ -1650,3 +1650,68 @@ class AppToast {
     );
   }
 }
+
+// ============================================================================
+// CONNECTION STATUS INDICATOR - Unified connection status display
+// ============================================================================
+
+/// A unified connection status indicator widget
+///
+/// Displays a colored dot with "Connected" or "Offline" text based on
+/// the connection status. Used in settings and profile screens.
+///
+/// Usage:
+/// ```dart
+/// ConnectionStatusIndicator(isConnected: authState.isConnected)
+/// ```
+class ConnectionStatusIndicator extends StatelessWidget {
+  final bool isConnected;
+  final double fontSize;
+  final MainAxisSize mainAxisSize;
+
+  const ConnectionStatusIndicator({
+    super.key,
+    required this.isConnected,
+    this.fontSize = 12,
+    this.mainAxisSize = MainAxisSize.max,
+  });
+
+  /// Small variant (default, 12pt font)
+  const ConnectionStatusIndicator.small({
+    super.key,
+    required this.isConnected,
+  })  : fontSize = 12,
+        mainAxisSize = MainAxisSize.max;
+
+  /// Medium variant (14pt font)
+  const ConnectionStatusIndicator.medium({
+    super.key,
+    required this.isConnected,
+  })  : fontSize = 14,
+        mainAxisSize = MainAxisSize.min;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: mainAxisSize,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: isConnected ? AppColors.emerald500 : AppColors.gray400,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          isConnected ? 'Connected' : 'Offline',
+          style: TextStyle(
+            fontSize: fontSize,
+            color: isConnected ? AppColors.emerald600 : AppColors.gray500,
+          ),
+        ),
+      ],
+    );
+  }
+}
