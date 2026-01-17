@@ -143,6 +143,10 @@ class AuthEndpoint extends Endpoint {
   }
 
   /// Change own password - requires userId to be passed
+  ///
+  /// DESIGN: Password change does NOT invalidate existing tokens.
+  /// This allows users to stay logged in on other devices after changing password.
+  /// Only disabling the account will invalidate all tokens.
   Future<bool> changePassword(
     Session session,
     int userId,
@@ -176,6 +180,12 @@ class AuthEndpoint extends Endpoint {
   }
 
   /// Validate session token and return user ID
+  ///
+  /// DESIGN: Token validation is stateless and never expires.
+  /// - Only extracts userId from token format: {userId}.{timestamp}.{random}
+  /// - Does NOT check timestamp for expiration
+  /// - Does NOT verify against stored password hash
+  /// - Token only becomes invalid when account is disabled or deleted
   Future<int?> validateToken(Session session, String token) async {
     // Simple token validation - extract user ID from token
     // In production, use proper JWT validation
