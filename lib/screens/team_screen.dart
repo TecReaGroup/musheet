@@ -2,12 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../providers/teams_state_provider.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/ui_state_providers.dart';
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_strings.dart';
 import '../models/team.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
@@ -15,7 +17,8 @@ import '../widgets/add_score_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../router/app_router.dart';
 import '../utils/sort_utils.dart';
-import 'library_screen.dart' show recentlyOpenedScoresProvider, recentlyOpenedSetlistsProvider;
+import 'library_screen.dart'
+    show recentlyOpenedScoresProvider, recentlyOpenedSetlistsProvider;
 
 // ============================================================================
 // Team Operations - Unified helper functions using scoped providers
@@ -240,10 +243,9 @@ final showTeamSwitcherProvider =
     );
 
 // Modal state providers (team-specific UI state)
-final showScoreModalProvider =
-    NotifierProvider<ShowScoreModalNotifier, bool>(
-      ShowScoreModalNotifier.new,
-    );
+final showScoreModalProvider = NotifierProvider<ShowScoreModalNotifier, bool>(
+  ShowScoreModalNotifier.new,
+);
 final showSetlistModalProvider =
     NotifierProvider<ShowSetlistModalNotifier, bool>(
       ShowSetlistModalNotifier.new,
@@ -357,26 +359,6 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           );
         }
 
-        if (state.teams.isEmpty) {
-          return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.group_off, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('You are not a member of any team'),
-                  SizedBox(height: 8),
-                  Text(
-                    'Contact your admin to be added to a team',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-
         return _buildTeamContent(context, state.teams);
       },
     );
@@ -387,20 +369,26 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
     final activeTab = ref.watch(teamTabProvider);
     final showTeamSwitcher = ref.watch(showTeamSwitcherProvider);
 
-    if (currentTeam == null) {
-      return const Scaffold(
-        body: Center(child: Text('No team selected')),
-      );
-    }
+    // Check if we have a team (used for conditional rendering)
+    final hasTeam = currentTeam != null;
 
     // Use unified scoped providers (same pattern as library)
-    final teamScope = DataScope.team(currentTeam.serverId);
-    final teamScores = ref.watch(scopedScoresListProvider(teamScope));
-    final teamSetlists = ref.watch(scopedSetlistsListProvider(teamScope));
+    // Only access these when we have a team
+    final teamScope = hasTeam ? DataScope.team(currentTeam.serverId) : null;
+    final teamScores = teamScope != null
+        ? ref.watch(scopedScoresListProvider(teamScope))
+        : <Score>[];
+    final teamSetlists = teamScope != null
+        ? ref.watch(scopedSetlistsListProvider(teamScope))
+        : <Setlist>[];
 
     // Get counts for header
     final scoresCount = teamScores.length;
     final setlistsCount = teamSetlists.length;
+
+    // Team name: use actual name or 'None' from AppStrings
+    final teamName = currentTeam?.name ?? AppStrings.noTeam;
+    final membersCount = currentTeam?.members.length ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -423,9 +411,13 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     GestureDetector(
-                      onTap: () =>
-                          ref.read(showTeamSwitcherProvider.notifier).state =
-                              !showTeamSwitcher,
+                      onTap: teams.isNotEmpty
+                          ? () =>
+                                ref
+                                        .read(showTeamSwitcherProvider.notifier)
+                                        .state =
+                                    !showTeamSwitcher
+                          : null,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -439,7 +431,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                               ),
                             ),
                             child: Text(
-                              currentTeam.name,
+                              teamName,
                               style: const TextStyle(
                                 fontSize: 30,
                                 fontWeight: FontWeight.w600,
@@ -449,23 +441,25 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Icon(
-                              showTeamSwitcher
-                                  ? AppIcons.chevronUp
-                                  : AppIcons.chevronDown,
-                              size: 22,
-                              color: AppColors.gray500,
+                          if (teams.isNotEmpty) ...[
+                            const SizedBox(width: 10),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Icon(
+                                showTeamSwitcher
+                                    ? AppIcons.chevronUp
+                                    : AppIcons.chevronDown,
+                                size: 22,
+                                color: AppColors.gray500,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '$setlistsCount setlists · $scoresCount scores · ${currentTeam.members.length} members',
+                      '$setlistsCount setlists · $scoresCount scores · $membersCount members',
                       style: const TextStyle(
                         fontSize: 14,
                         color: AppColors.gray600,
@@ -520,18 +514,50 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                   ],
                 ),
               ),
-              // Drawer handle and search/sort bar (only for setlists and scores tabs)
-              if (activeTab == TeamTab.setlists || activeTab == TeamTab.scores)
+              // Drawer handle and search/sort bar (only for setlists and scores tabs when we have a team)
+              if (hasTeam &&
+                  (activeTab == TeamTab.setlists ||
+                      activeTab == TeamTab.scores))
                 _buildDrawerSection(
                   sortState: activeTab == TeamTab.setlists
-                      ? ref.watch(scopedSortProvider((teamScope, 'setlists')))
-                      : ref.watch(scopedSortProvider((teamScope, 'scores'))),
+                      ? ref.watch(scopedSortProvider((teamScope!, 'setlists')))
+                      : ref.watch(scopedSortProvider((teamScope!, 'scores'))),
                   onSort: (type) => activeTab == TeamTab.setlists
-                      ? ref.read(scopedSortProvider((teamScope, 'setlists')).notifier).setSort(type)
-                      : ref.read(scopedSortProvider((teamScope, 'scores')).notifier).setSort(type),
+                      ? ref
+                            .read(
+                              scopedSortProvider((
+                                teamScope,
+                                'setlists',
+                              )).notifier,
+                            )
+                            .setSort(type)
+                      : ref
+                            .read(
+                              scopedSortProvider((
+                                teamScope,
+                                'scores',
+                              )).notifier,
+                            )
+                            .setSort(type),
                 ),
               // Divider for members tab (same style as other tabs but without drawer)
               if (activeTab == TeamTab.members)
+                SizedBox(
+                  height: 20,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Container(
+                        height: 1,
+                        color: AppColors.gray200,
+                      ),
+                    ],
+                  ),
+                ),
+              // Simple divider when no team and on setlists/scores tab
+              if (!hasTeam &&
+                  (activeTab == TeamTab.setlists ||
+                      activeTab == TeamTab.scores))
                 SizedBox(
                   height: 20,
                   child: Stack(
@@ -555,20 +581,23 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                     }
                   },
                   behavior: HitTestBehavior.translucent,
-                  child: activeTab == TeamTab.setlists
-                      ? _buildSetlistsTab(
-                          currentTeam.serverId,
-                          teamSetlists,
-                        )
-                      : activeTab == TeamTab.scores
-                      ? _buildScoresTab(currentTeam.serverId, teamScores)
-                      : _buildMembersTab(currentTeam),
+                  child: hasTeam
+                      ? (activeTab == TeamTab.setlists
+                            ? _buildSetlistsTab(
+                                currentTeam.serverId,
+                                teamSetlists,
+                              )
+                            : activeTab == TeamTab.scores
+                            ? _buildScoresTab(currentTeam.serverId, teamScores)
+                            : _buildMembersTab(currentTeam))
+                      : _buildNoTeamContent(),
                 ),
               ),
             ],
           ),
-          // FAB positioned like library screen (only show for setlists and scores tabs)
-          if (activeTab == TeamTab.setlists || activeTab == TeamTab.scores)
+          // FAB positioned like library screen (only show for setlists and scores tabs AND when we have a team)
+          if (hasTeam &&
+              (activeTab == TeamTab.setlists || activeTab == TeamTab.scores))
             Positioned(
               bottom:
                   MediaQuery.of(context).padding.bottom +
@@ -577,8 +606,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               child: FloatingActionButton(
                 onPressed: () {
                   if (activeTab == TeamTab.setlists) {
-                    ref.read(showSetlistModalProvider.notifier).state =
-                        true;
+                    ref.read(showSetlistModalProvider.notifier).state = true;
                   } else {
                     ref.read(showScoreModalProvider.notifier).state = true;
                   }
@@ -589,37 +617,61 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                 child: const Icon(AppIcons.add, size: 28),
               ),
             ),
-          // Show modals (like library screen)
-          if (ref.watch(showScoreModalProvider))
+          // Show modals (like library screen) - only when we have a team
+          if (hasTeam && ref.watch(showScoreModalProvider))
             _buildScoreModal(currentTeam),
-          if (ref.watch(showSetlistModalProvider))
+          if (hasTeam && ref.watch(showSetlistModalProvider))
             _buildSetlistModal(currentTeam),
           // Show AddScoreWidget for creating new score with PDF
-          if (ref.watch(showCreateScoreModalProvider))
+          if (hasTeam && ref.watch(showCreateScoreModalProvider))
             AddScoreWidget(
               showTitleComposer: true,
               scope: DataScope.team(currentTeam.serverId),
               onClose: () {
-                ref.read(showCreateScoreModalProvider.notifier).state =
-                    false;
+                ref.read(showCreateScoreModalProvider.notifier).state = false;
               },
               onSuccess: () {
-                ref.read(showCreateScoreModalProvider.notifier).state =
-                    false;
+                ref.read(showCreateScoreModalProvider.notifier).state = false;
                 // No need to invalidate - createScore uses optimistic updates
               },
             ),
           // Show Create Setlist modal
-          if (ref.watch(showCreateSetlistDialogProvider))
+          if (hasTeam && ref.watch(showCreateSetlistDialogProvider))
             _buildCreateSetlistModal(currentTeam),
           // Show Import Score from Library modal
-          if (ref.watch(showImportScoreModalProvider))
+          if (hasTeam && ref.watch(showImportScoreModalProvider))
             _buildImportScoreModal(currentTeam),
           // Show Import Setlist from Library modal
-          if (ref.watch(showImportSetlistModalProvider))
+          if (hasTeam && ref.watch(showImportSetlistModalProvider))
             _buildImportSetlistModal(currentTeam),
-          if (showTeamSwitcher) _buildTeamSwitcher(teams, currentTeam),
+          if (showTeamSwitcher && teams.isNotEmpty)
+            _buildTeamSwitcher(teams, currentTeam!),
         ],
+      ),
+    );
+  }
+
+  /// Build content shown when no team is available
+  Widget _buildNoTeamContent() {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom:
+            MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight,
+      ),
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(LucideIcons.userPlus, size: 64, color: AppColors.gray400),
+            SizedBox(height: 16),
+            Text('You are not a member of any team'),
+            SizedBox(height: 8),
+            Text(
+              'Login in & Contact admin to be added to a team',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -645,7 +697,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
 
     final teamScope = DataScope.team(teamServerId);
     final sortState = ref.watch(scopedSortProvider((teamScope, 'setlists')));
-    final recentlyOpened = ref.watch(scopedRecentlyOpenedProvider((teamScope, 'setlists')));
+    final recentlyOpened = ref.watch(
+      scopedRecentlyOpenedProvider((teamScope, 'setlists')),
+    );
 
     // Apply search filter
     final filteredSetlists = _searchQuery.isEmpty
@@ -701,14 +755,23 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           onDelete: () => _handleDeleteSetlist(setlist, teamServerId),
           onTap: () {
             ref
-                .read(scopedRecentlyOpenedProvider((teamScope, 'setlists')).notifier)
+                .read(
+                  scopedRecentlyOpenedProvider((
+                    teamScope,
+                    'setlists',
+                  )).notifier,
+                )
                 .recordOpen(setlist.id);
             // Also record to global provider for home screen recent list
-            ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+            ref
+                .read(recentlyOpenedSetlistsProvider.notifier)
+                .recordOpen(setlist.id);
             // Card tap: preview first score if setlist has scores
             if (setlist.teamScoreIds.isNotEmpty) {
               // Get the team scores to find the first score
-              final teamScores = ref.read(scopedScoresListProvider(DataScope.team(teamServerId)));
+              final teamScores = ref.read(
+                scopedScoresListProvider(DataScope.team(teamServerId)),
+              );
               // Build the list of scores in setlist order
               final setlistScores = <Score>[];
               for (final scoreId in setlist.teamScoreIds) {
@@ -741,10 +804,17 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           onArrowTap: () {
             // Arrow tap: go to detail screen
             ref
-                .read(scopedRecentlyOpenedProvider((teamScope, 'setlists')).notifier)
+                .read(
+                  scopedRecentlyOpenedProvider((
+                    teamScope,
+                    'setlists',
+                  )).notifier,
+                )
                 .recordOpen(setlist.id);
             // Also record to global provider for home screen recent list
-            ref.read(recentlyOpenedSetlistsProvider.notifier).recordOpen(setlist.id);
+            ref
+                .read(recentlyOpenedSetlistsProvider.notifier)
+                .recordOpen(setlist.id);
             AppNavigation.navigateToSetlistDetail(
               context,
               scope: DataScope.team(teamServerId),
@@ -811,7 +881,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
 
     final teamScope = DataScope.team(teamServerId);
     final sortState = ref.watch(scopedSortProvider((teamScope, 'scores')));
-    final recentlyOpened = ref.watch(scopedRecentlyOpenedProvider((teamScope, 'scores')));
+    final recentlyOpened = ref.watch(
+      scopedRecentlyOpenedProvider((teamScope, 'scores')),
+    );
 
     // Apply search filter - search both title and composer
     final filteredScores = _searchQuery.isEmpty
@@ -869,10 +941,14 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           onDelete: () => _handleDeleteScore(score, teamServerId),
           onTap: () {
             ref
-                .read(scopedRecentlyOpenedProvider((teamScope, 'scores')).notifier)
+                .read(
+                  scopedRecentlyOpenedProvider((teamScope, 'scores')).notifier,
+                )
                 .recordOpen(score.id);
             // Also record to global provider for home screen recent list
-            ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+            ref
+                .read(recentlyOpenedScoresProvider.notifier)
+                .recordOpen(score.id);
             AppNavigation.navigateToScoreViewer(
               context,
               scope: DataScope.team(teamServerId),
@@ -881,10 +957,14 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
           },
           onArrowTap: () {
             ref
-                .read(scopedRecentlyOpenedProvider((teamScope, 'scores')).notifier)
+                .read(
+                  scopedRecentlyOpenedProvider((teamScope, 'scores')).notifier,
+                )
                 .recordOpen(score.id);
             // Also record to global provider for home screen recent list
-            ref.read(recentlyOpenedScoresProvider.notifier).recordOpen(score.id);
+            ref
+                .read(recentlyOpenedScoresProvider.notifier)
+                .recordOpen(score.id);
             // Arrow tap: go to score detail screen
             AppNavigation.navigateToScoreDetail(
               context,
@@ -1546,9 +1626,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                         ),
                         IconButton(
                           onPressed: () {
-                            ref
-                                    .read(showScoreModalProvider.notifier)
-                                    .state =
+                            ref.read(showScoreModalProvider.notifier).state =
                                 false;
                           },
                           icon: const Icon(
@@ -1574,9 +1652,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Create New Score',
                           subtitle: 'Create a score directly in team',
                           onTap: () {
-                            ref
-                                    .read(showScoreModalProvider.notifier)
-                                    .state =
+                            ref.read(showScoreModalProvider.notifier).state =
                                 false;
                             ref
                                     .read(
@@ -1597,9 +1673,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Import from Library',
                           subtitle: 'Copy a score from personal library',
                           onTap: () {
-                            ref
-                                    .read(showScoreModalProvider.notifier)
-                                    .state =
+                            ref.read(showScoreModalProvider.notifier).state =
                                 false;
                             ref
                                     .read(showImportScoreModalProvider.notifier)
@@ -1749,9 +1823,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                         ),
                         IconButton(
                           onPressed: () {
-                            ref
-                                    .read(showSetlistModalProvider.notifier)
-                                    .state =
+                            ref.read(showSetlistModalProvider.notifier).state =
                                 false;
                           },
                           icon: const Icon(
@@ -1777,14 +1849,11 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Create New Setlist',
                           subtitle: 'Create a setlist directly in team',
                           onTap: () {
-                            ref
-                                    .read(showSetlistModalProvider.notifier)
-                                    .state =
+                            ref.read(showSetlistModalProvider.notifier).state =
                                 false;
                             ref
                                     .read(
-                                      showCreateSetlistDialogProvider
-                                          .notifier,
+                                      showCreateSetlistDialogProvider.notifier,
                                     )
                                     .state =
                                 true;
@@ -1801,9 +1870,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Import from Library',
                           subtitle: 'Copy a setlist with all its scores',
                           onTap: () {
-                            ref
-                                    .read(showSetlistModalProvider.notifier)
-                                    .state =
+                            ref.read(showSetlistModalProvider.notifier).state =
                                 false;
                             ref
                                     .read(
@@ -2027,8 +2094,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           onPressed: () {
                             ref
                                     .read(
-                                      showCreateSetlistDialogProvider
-                                          .notifier,
+                                      showCreateSetlistDialogProvider.notifier,
                                     )
                                     .state =
                                 false;

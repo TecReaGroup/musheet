@@ -210,8 +210,22 @@ class ScopedSyncCoordinator
       final lastSync = await _local.getLastSyncTime();
       final pending = await _local.getPendingChangesCount();
 
+      // BUG FIX: Detect "user removed then re-added to team" scenario
+      // If version > 0 but no local data, user was likely removed and re-added
+      // Reset version to 0 to trigger a full sync
+      int effectiveVersion = version;
+      if (version > 0 && !scope.isUser) {
+        final scores = await _local.getAllScores();
+        final setlists = await _local.getAllSetlists();
+        if (scores.isEmpty && setlists.isEmpty) {
+          log('Detected empty team data with version $version - resetting to 0 for full sync');
+          await _local.setLibraryVersion(0);
+          effectiveVersion = 0;
+        }
+      }
+
       updateState(state.copyWith(
-        localVersion: version,
+        localVersion: effectiveVersion,
         lastSyncAt: lastSync,
         pendingChanges: pending,
       ));
@@ -729,8 +743,17 @@ class TeamSyncManager {
   static bool get isInitialized => _instance != null;
 
   /// Get or create coordinator for a team
+  /// If the cached coordinator was disposed (team was removed and re-added),
+  /// a new coordinator is created.
   Future<ScopedSyncCoordinator> getCoordinator(int teamId) async {
-    if (!_coordinators.containsKey(teamId)) {
+    final existing = _coordinators[teamId];
+    // Check if we need to create a new coordinator
+    // (either doesn't exist or was disposed after team removal)
+    if (existing == null || existing.isDisposed) {
+      // Remove disposed coordinator if present
+      if (existing != null) {
+        _coordinators.remove(teamId);
+      }
       // Create team-scoped data source using unified ScopedLocalDataSource
       final local = ScopedLocalDataSource(_db, DataScope.team(teamId));
       final coordinator = ScopedSyncCoordinator(

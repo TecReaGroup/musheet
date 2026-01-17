@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/teams_state_provider.dart';
+import '../providers/preferred_instrument_provider.dart'
+    show preferredInstrumentProvider, lastOpenedInstrumentInScoreProvider;
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
@@ -16,8 +18,6 @@ import 'library_screen.dart'
         recentlyOpenedSetlistsProvider,
         recentlyOpenedScoresProvider,
         lastOpenedScoreInSetlistProvider,
-        lastOpenedInstrumentInScoreProvider,
-        preferredInstrumentProvider,
         teamEnabledProvider,
         getBestInstrumentIndex;
 import '../utils/icon_mappings.dart';
@@ -43,7 +43,7 @@ class SearchScopeNotifier extends Notifier<SearchScope> {
 
 class HasUnreadNotificationsNotifier extends Notifier<bool> {
   @override
-  bool build() => true;
+  bool build() => false;
 
   @override
   set state(bool newState) => super.state = newState;
@@ -358,7 +358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         _buildHomeContent(
                           scores,
                           setlists,
-                          recentScoresList.take(5),
+                          recentScoresList.take(4),
                           recentSetlistsList.take(3),
                         ),
                     ],

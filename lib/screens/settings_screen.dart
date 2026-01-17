@@ -7,7 +7,8 @@ import '../widgets/common_widgets.dart';
 import '../widgets/user_avatar.dart';
 import '../models/instrument_score.dart';
 import '../providers/auth_state_provider.dart';
-import 'library_screen.dart' show preferredInstrumentProvider, teamEnabledProvider;
+import '../providers/preferred_instrument_provider.dart';
+import 'library_screen.dart' show teamEnabledProvider;
 import '../router/app_router.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -312,26 +313,7 @@ class SettingsScreen extends ConsumerWidget {
               const SizedBox(height: 4),
               Text(username, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
               const SizedBox(height: 4),
-              Row(
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: authState.isConnected ? AppColors.emerald500 : AppColors.gray400,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    authState.isConnected ? 'Connected' : 'Offline',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: authState.isConnected ? AppColors.emerald600 : AppColors.gray500,
-                    ),
-                  ),
-                ],
-              ),
+              ConnectionStatusIndicator.small(isConnected: authState.isConnected),
             ],
           ),
         ),

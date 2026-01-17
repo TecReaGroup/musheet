@@ -2,6 +2,7 @@ class: AuthResult
 fields:
   success: bool
   token: String?
+  refreshToken: String?
   user: User?
   mustChangePassword: bool
   errorMessage: String?

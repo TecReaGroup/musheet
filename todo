@@ -13,6 +13,8 @@ todo:
 
   team add data pattern:
 
+  Network boundary conditions:
+
   complete settings page:
 
   normalise code comments:
@@ -20,7 +22,7 @@ todo:
   i18n international support:
 
   reuse UI/UX code:
-
+    Including state management and network management.
   control webui:
     support: 
       history back forward
@@ -30,7 +32,7 @@ todo:
       storage manager
       data monitor
 
-
+  Consistency and redundancy issues:
 
 
 done:

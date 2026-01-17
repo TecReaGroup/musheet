@@ -85,8 +85,20 @@ class AuthStateNotifier extends Notifier<AuthState> {
     ref.listen(networkStateProvider, (prev, next) {
       next.whenData((networkState) {
         // Only update isConnected if user is authenticated
+        // If device is offline, we're definitely not connected to service
+        if (state.isAuthenticated && !networkState.isOnline) {
+          state = state.copyWith(isConnected: false);
+        }
+      });
+    });
+
+    // Watch connection state changes (service reachability)
+    ref.listen(connectionStateProvider, (prev, next) {
+      next.whenData((connectionState) {
+        // Only update isConnected if user is authenticated
+        // Use service connectivity status, not just device network
         if (state.isAuthenticated) {
-          state = state.copyWith(isConnected: networkState.isOnline);
+          state = state.copyWith(isConnected: connectionState.isConnected);
         }
       });
     });
@@ -129,21 +141,38 @@ class AuthStateNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Restore session with network validation
+  /// Restore session with cache-first pattern
+  ///
+  /// Loads cached data immediately for fast startup, then validates
+  /// and refreshes in background if online.
   Future<void> restoreSession() async {
     final authRepo = ref.read(authRepositoryProvider);
     if (authRepo == null) return;
 
+    // Step 1: Load cached avatar immediately (no network wait)
+    // This uses AvatarCacheService which returns disk cache first
+    await _loadAvatar();
+
+    // Step 2: Check if we're online before network operations
+    final isOnline = NetworkService.instance.isOnline;
+
+    // Step 3: Validate session (returns immediately if offline)
     final isValid = await authRepo.validateSession();
-    if (isValid) {
-      await authRepo.fetchProfile();
-      await _loadAvatar();
+    if (!isValid) return;
+
+    // Step 4: Update connection state
+    final isServiceConnected = ConnectionManager.isInitialized
+        ? ConnectionManager.instance.isConnected
+        : isOnline;
+    state = state.copyWith(isConnected: isServiceConnected);
+
+    // Step 5: If online, refresh profile and initialize sync in background
+    if (isOnline) {
+      // Fetch profile in background (don't await)
+      authRepo.fetchProfile();
 
       // Initialize sync services
       await _initializeSync();
-
-      // Update connection state
-      state = state.copyWith(isConnected: NetworkService.instance.isOnline);
     }
   }
 

@@ -204,6 +204,9 @@ abstract class BaseSyncCoordinator<TState extends BaseSyncState, TPullData> {
   bool _isSyncing = false;
   bool _disposed = false;
 
+  /// Check if this coordinator has been disposed
+  bool get isDisposed => _disposed;
+
   /// Debounce duration for sync requests
   Duration get debounceDuration => const Duration(seconds: 2);
 

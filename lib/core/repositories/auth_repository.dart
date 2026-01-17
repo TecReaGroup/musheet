@@ -1,5 +1,5 @@
 /// AuthRepository - Handles all authentication operations
-/// 
+///
 /// This repository coordinates between local storage and remote API
 /// for all authentication-related operations.
 library;
@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../services/services.dart';
+import '../services/avatar_cache_service.dart';
 import '../data/remote/api_client.dart';
 
 /// Result of authentication operations
@@ -88,18 +89,21 @@ class AuthRepository {
     // Set API credentials
     _api.setAuth(authResult.token!, authResult.user!.id!);
 
-    // Create user profile
+    // Create user profile (include preferredInstrument from server)
     final user = UserProfile(
       id: authResult.user!.id!,
       username: authResult.user!.username,
       displayName: authResult.user!.displayName,
       avatarUrl: authResult.user!.avatarPath,
       createdAt: authResult.user!.createdAt,
+      preferredInstrument: authResult.user!.preferredInstrument,
+      bio: authResult.user!.bio,
     );
 
     // Update session
     await _session.onLoginSuccess(
       token: authResult.token!,
+      refreshToken: authResult.refreshToken,
       userId: authResult.user!.id!,
       user: user,
     );
@@ -138,18 +142,21 @@ class AuthRepository {
     // Set API credentials
     _api.setAuth(authResult.token!, authResult.user!.id!);
 
-    // Create user profile
+    // Create user profile (include preferredInstrument from server)
     final user = UserProfile(
       id: authResult.user!.id!,
       username: authResult.user!.username,
       displayName: authResult.user!.displayName,
       avatarUrl: authResult.user!.avatarPath,
       createdAt: authResult.user!.createdAt,
+      preferredInstrument: authResult.user!.preferredInstrument,
+      bio: authResult.user!.bio,
     );
 
     // Update session
     await _session.onLoginSuccess(
       token: authResult.token!,
+      refreshToken: authResult.refreshToken,
       userId: authResult.user!.id!,
       user: user,
     );
@@ -192,9 +199,14 @@ class AuthRepository {
 
     final result = await _api.validateToken(token);
     if (result.isFailure) {
-      // Token validation failed - clear session
-      _session.onLogout();
-      return false;
+      // Only logout on auth errors (401), not network errors
+      // Network errors should keep the session and try again later
+      if (result.error?.isAuthError == true) {
+        _session.onLogout();
+        return false;
+      }
+      // Network error - trust local token, don't logout
+      return true;
     }
 
     return result.data != null;
@@ -221,7 +233,7 @@ class AuthRepository {
       bio: serverProfile.bio,
     );
 
-    _session.updateUserProfile(profile);
+    await _session.updateUserProfile(profile);
     return profile;
   }
 
@@ -254,7 +266,7 @@ class AuthRepository {
       bio: serverProfile.bio,
     );
 
-    _session.updateUserProfile(profile);
+    await _session.updateUserProfile(profile);
     return profile;
   }
 
@@ -282,20 +294,30 @@ class AuthRepository {
     return false;
   }
 
-  /// Get avatar bytes
+  /// Get avatar bytes (with offline support via disk cache)
+  ///
+  /// Returns cached avatar immediately. If online, refreshes in background
+  /// and updates session when new data arrives.
   Future<Uint8List?> fetchAvatar() async {
     final userId = _session.userId;
     if (userId == null) return null;
 
-    if (!_network.isOnline) return null;
+    // Use AvatarCacheService with stale-while-revalidate pattern
+    // Returns cache immediately, refreshes in background
+    final bytes = await AvatarCacheService().getAvatar(
+      userId,
+      onUpdate: (newBytes) {
+        // Background refresh completed with new data
+        if (newBytes != null) {
+          _session.updateAvatarBytes(newBytes);
+        }
+      },
+    );
 
-    final result = await _api.getAvatar(userId);
-    if (result.isSuccess && result.data != null) {
-      _session.updateAvatarBytes(result.data!);
-      return result.data;
+    if (bytes != null) {
+      _session.updateAvatarBytes(bytes);
     }
-
-    return null;
+    return bytes;
   }
 
   /// Change password

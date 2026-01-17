@@ -21,6 +21,7 @@ import '../utils/icon_mappings.dart';
 import '../utils/pdf_export_service.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/ui_state_providers.dart';
+import '../providers/preferred_instrument_provider.dart' show findBestInstrumentIndex;
 import '../router/app_router.dart';
 
 /// Unified Score Viewer Screen
@@ -89,8 +90,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   // Preview size for export scaling
   Size _previewSize = Size.zero;
 
-  // Cached provider notifier for safe dispose usage
-  ScopedScoresNotifier? _scoresNotifier;
+  // Cached provider helper for safe dispose usage
+  ScopedScoresHelper? _scoresHelper;
 
   // BPM save debounce for team mode
   Timer? _bpmSaveDebounce;
@@ -126,10 +127,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     _initAnnotations();
     _loadPdfDocument();
 
-    // Cache the notifier for safe dispose usage
+    // Cache the helper for safe dispose usage
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _scoresNotifier = ref.read(scopedScoresProvider(widget.scope).notifier);
+      _scoresHelper = ref.read(scopedScoresHelperProvider(widget.scope));
     });
   }
 
@@ -150,7 +151,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   /// Save BPM - handles both personal and team modes
   void _saveBpm(int bpm) async {
     final updatedScore = widget.score.copyWith(bpm: bpm);
-    await _scoresNotifier?.updateScore(updatedScore);
+    await _scoresHelper?.updateScore(updatedScore);
   }
 
   void _initAnnotations() {
@@ -365,7 +366,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
   /// Synchronous version for dispose - uses cached notifier for safe access
   void _saveAnnotationsSync() {
-    if (_currentInstrument == null || _scoresNotifier == null) {
+    if (_currentInstrument == null || _scoresHelper == null) {
       return;
     }
 
@@ -378,7 +379,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     }
 
     // Save to database via cached notifier (safe during dispose)
-    _scoresNotifier!.updateAnnotations(
+    _scoresHelper!.updateAnnotations(
       _scoreData.id,
       _currentInstrument!.id,
       allAnnotations,
@@ -514,7 +515,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
         .read(scopedLastOpenedIndexProvider((widget.scope, 'instrumentInScore')).notifier)
         .getLastOpened(targetScore.id);
     final preferredInstrument = ref.read(preferredInstrumentProvider);
-    final bestInstrumentIndex = getBestInstrumentIndex(
+    final bestInstrumentIndex = findBestInstrumentIndex(
       instrumentCount: targetScore.instrumentScores.length,
       getInstrumentKey: (i) => targetScore.instrumentScores[i].instrumentKey,
       lastOpenedIndex: lastOpenedInstrumentIndex,
@@ -1256,7 +1257,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
 
     // Save to database via scoped provider (works for both personal and team)
     ref
-        .read(scopedScoresProvider(widget.scope).notifier)
+        .read(scopedScoresHelperProvider(widget.scope))
         .updateAnnotations(
           _scoreData.id,
           _currentInstrument!.id,

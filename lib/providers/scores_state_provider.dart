@@ -1,7 +1,12 @@
 /// Score State Provider - Unified score management with DataScope
 ///
-/// Uses DataScope to provide a single Notifier that works for both
+/// Uses DataScope to provide a single pattern that works for both
 /// personal Library and Team scores. Eliminates code duplication.
+///
+/// SIMPLIFIED ARCHITECTURE:
+/// - Uses StreamProvider to directly watch database changes
+/// - No complex sync state monitoring
+/// - autoDispose ensures stale providers are cleaned up
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,7 +15,6 @@ import '../models/score.dart';
 import '../models/annotation.dart';
 import '../core/core.dart';
 import 'core_providers.dart';
-import 'base_data_notifier.dart';
 import 'auth_state_provider.dart';
 
 // ============================================================================
@@ -20,6 +24,9 @@ import 'auth_state_provider.dart';
 /// Unified score repository provider using DataScope
 /// - DataScope.user: Personal library
 /// - DataScope.team(teamServerId): Team library
+///
+/// NOTE: Does NOT use autoDispose to maintain consistent callback connection
+/// The stream provider uses autoDispose for cleanup, but repository must persist
 final scopedScoreRepositoryProvider =
     Provider.family<ScoreRepository, DataScope>((ref, scope) {
   final db = ref.watch(appDatabaseProvider);
@@ -28,77 +35,89 @@ final scopedScoreRepositoryProvider =
   final scopedDataSource = ScopedLocalDataSource(db, scope);
   final repo = ScoreRepository(local: scopedDataSource);
 
-  // Connect to appropriate sync coordinator
+  // Connect to appropriate sync coordinator for push notifications
+  // NOTE: Check isInitialized INSIDE the callback, not outside
+  // This ensures sync works even if repository is created before SyncCoordinator
   if (scope.isUser) {
-    if (SyncCoordinator.isInitialized) {
-      repo.onDataChanged = () => SyncCoordinator.instance.onLocalDataChanged();
-    }
+    repo.onDataChanged = () {
+      if (SyncCoordinator.isInitialized) {
+        SyncCoordinator.instance.onLocalDataChanged();
+      }
+    };
   } else {
-    // Team scope
-    ref.listen(
-      teamSyncCoordinatorProvider(scope.id),
-      (previous, next) {
-        next.whenData((coordinator) {
-          if (coordinator != null) {
-            repo.onDataChanged = () => coordinator.onLocalDataChanged();
-          }
-        });
-      },
-      fireImmediately: true,
-    );
+    // Team scope - connect to team sync when coordinator is available
+    repo.onDataChanged = () {
+      if (UnifiedSyncManager.isInitialized) {
+        UnifiedSyncManager.instance.onTeamDataChanged(scope.id);
+      }
+    };
   }
 
   return repo;
 });
 
 // ============================================================================
-// Scoped Scores Notifier - Unified for Library and Team
+// Scoped Scores Stream Provider - Direct Database Watch
 // ============================================================================
 
-/// Unified notifier for managing scores state
-/// Works with both personal Library (DataScope.user) and Team (DataScope.team)
-class ScopedScoresNotifier extends AsyncNotifier<List<Score>> {
-  ScopedScoresNotifier(this.scope);
+/// Stream provider that directly watches database for score changes
+/// This is the SIMPLEST and most reliable way to get reactive updates
+///
+/// Uses autoDispose with keepAlive for team scopes to prevent flicker on navigation
+final scopedScoresStreamProvider =
+    StreamProvider.autoDispose.family<List<Score>, DataScope>((ref, scope) {
+  // Keep team data alive to prevent reload on navigation
+  // This prevents the "flicker" when switching between library and team
+  if (scope.isTeam) {
+    ref.keepAlive();
+  }
 
+  // Check auth first
+  final authState = ref.watch(authStateProvider);
+  if (authState.status != AuthStatus.authenticated) {
+    return Stream.value(<Score>[]);
+  }
+
+  // Get repository and return its watch stream
+  final repo = ref.watch(scopedScoreRepositoryProvider(scope));
+  return repo.watchAllScores();
+});
+
+// ============================================================================
+// Scoped Scores Provider - AsyncValue wrapper for convenience
+// ============================================================================
+
+/// Main scoped scores provider - works for both Library and Team
+/// This wraps the stream provider and provides the AsyncValue
+final scopedScoresProvider =
+    Provider.autoDispose.family<AsyncValue<List<Score>>, DataScope>((ref, scope) {
+  return ref.watch(scopedScoresStreamProvider(scope));
+});
+
+// ============================================================================
+// Helper class for mutation operations
+// ============================================================================
+
+/// Helper class to access scores and perform mutations
+/// This is NOT a provider - just a utility class
+class ScopedScoresHelper {
+  final Ref _ref;
   final DataScope scope;
 
-  @override
-  Future<List<Score>> build() async {
-    // Setup auth/sync listeners based on scope
-    if (scope.isUser) {
-      setupCommonListeners(
-        ref: ref,
-        authProvider: authStateProvider,
-        syncProvider: syncStateProvider,
-      );
-    } else {
-      setupCommonListeners(
-        ref: ref,
-        authProvider: authStateProvider,
-        syncProvider: teamSyncStateProvider(scope.id),
-      );
-    }
+  ScopedScoresHelper(this._ref, this.scope);
 
-    // Check auth
-    if (!checkAuth(ref)) return [];
+  ScoreRepository get _repo => _ref.read(scopedScoreRepositoryProvider(scope));
 
-    // Load from scoped repository
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    return scoreRepo.getAllScores();
-  }
-
-  /// Helper to get current scores safely
-  List<Score> _getCurrentScores() {
-    return state.value ?? [];
-  }
+  /// Get current scores
+  List<Score> get currentScores =>
+      _ref.read(scopedScoresStreamProvider(scope)).value ?? [];
 
   /// Find score by title and composer
   Score? findByTitleAndComposer(String title, String composer) {
-    final scores = _getCurrentScores();
     final key =
         '${title.toLowerCase().trim()}|${composer.toLowerCase().trim()}';
     try {
-      return scores.firstWhere((s) => s.scoreKey == key);
+      return currentScores.firstWhere((s) => s.scoreKey == key);
     } catch (_) {
       return null;
     }
@@ -106,10 +125,9 @@ class ScopedScoresNotifier extends AsyncNotifier<List<Score>> {
 
   /// Get title suggestions
   List<Score> getSuggestionsByTitle(String query) {
-    final scores = _getCurrentScores();
     if (query.isEmpty) return [];
     final lowerQuery = query.toLowerCase();
-    return scores
+    return currentScores
         .where((s) => s.title.toLowerCase().contains(lowerQuery))
         .take(3)
         .toList();
@@ -117,11 +135,10 @@ class ScopedScoresNotifier extends AsyncNotifier<List<Score>> {
 
   /// Get composer suggestions
   List<Score> getSuggestionsByComposer(String title, String composerQuery) {
-    final scores = _getCurrentScores();
     if (composerQuery.isEmpty) return [];
     final lowerTitle = title.toLowerCase().trim();
     final lowerQuery = composerQuery.toLowerCase();
-    return scores
+    return currentScores
         .where(
           (s) =>
               s.title.toLowerCase().trim() == lowerTitle &&
@@ -131,124 +148,180 @@ class ScopedScoresNotifier extends AsyncNotifier<List<Score>> {
         .toList();
   }
 
-  /// Add a new score
+  // ============================================================================
+  // Mutation Methods
+  // ============================================================================
+
   Future<void> addScore(Score score) async {
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    await scoreRepo.addScore(score);
-    await refresh();
+    await _repo.addScore(score);
   }
 
-  /// Update a score
   Future<void> updateScore(Score score) async {
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    await scoreRepo.updateScore(score);
-
-    // Update local state
-    final scores = _getCurrentScores();
-    state = AsyncData(scores.map((s) => s.id == score.id ? score : s).toList());
+    await _repo.updateScore(score);
   }
 
-  /// Update BPM for a score
   Future<void> updateBpm(String scoreId, int bpm) async {
-    final scores = _getCurrentScores();
-    final score = scores.firstWhere(
+    final score = currentScores.firstWhere(
       (s) => s.id == scoreId,
       orElse: () => throw Exception('Score not found'),
     );
-    final updatedScore = score.copyWith(bpm: bpm);
-    await updateScore(updatedScore);
+    await updateScore(score.copyWith(bpm: bpm));
   }
 
-  /// Delete a score
   Future<void> deleteScore(String scoreId) async {
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    await scoreRepo.deleteScore(scoreId);
-
-    // Update local state
-    final scores = _getCurrentScores();
-    state = AsyncData(scores.where((s) => s.id != scoreId).toList());
+    await _repo.deleteScore(scoreId);
   }
 
-  /// Add instrument score
   Future<void> addInstrumentScore(
     String scoreId,
     InstrumentScore instrumentScore,
   ) async {
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    await scoreRepo.addInstrumentScore(scoreId, instrumentScore);
-
-    // Update local state
-    final scores = _getCurrentScores();
-    state = AsyncData(
-      scores.map((s) {
-        if (s.id == scoreId) {
-          return s.copyWith(
-            instrumentScores: [...s.instrumentScores, instrumentScore],
-          );
-        }
-        return s;
-      }).toList(),
-    );
+    await _repo.addInstrumentScore(scoreId, instrumentScore);
   }
 
-  /// Delete instrument score
   Future<void> deleteInstrumentScore(
     String scoreId,
     String instrumentScoreId,
   ) async {
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    await scoreRepo.deleteInstrumentScore(instrumentScoreId);
-
-    // Update local state
-    final scores = _getCurrentScores();
-    state = AsyncData(
-      scores.map((s) {
-        if (s.id == scoreId) {
-          return s.copyWith(
-            instrumentScores: s.instrumentScores
-                .where((is_) => is_.id != instrumentScoreId)
-                .toList(),
-          );
-        }
-        return s;
-      }).toList(),
-    );
+    await _repo.deleteInstrumentScore(instrumentScoreId);
   }
 
-  /// Update annotations
   Future<void> updateAnnotations(
     String scoreId,
     String instrumentScoreId,
     List<Annotation> annotations,
   ) async {
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    await scoreRepo.updateAnnotations(instrumentScoreId, annotations);
-
-    // Update local state
-    final scores = _getCurrentScores();
-    state = AsyncData(
-      scores.map((s) {
-        if (s.id == scoreId) {
-          return s.copyWith(
-            instrumentScores: s.instrumentScores.map((is_) {
-              if (is_.id == instrumentScoreId) {
-                return is_.copyWith(annotations: annotations);
-              }
-              return is_;
-            }).toList(),
-          );
-        }
-        return s;
-      }).toList(),
-    );
+    await _repo.updateAnnotations(instrumentScoreId, annotations);
   }
 
-  /// Reorder instrument scores (in-memory only)
+  Future<void> duplicateScore(String sourceScoreId) async {
+    await _repo.duplicateScore(sourceScoreId);
+  }
+
+  /// Reorder instrument scores within a score
   void reorderInstrumentScores(
     String scoreId,
     List<String> instrumentScoreIds,
   ) {
-    final scores = _getCurrentScores();
+    final score = currentScores.firstWhere(
+      (s) => s.id == scoreId,
+      orElse: () => throw Exception('Score not found'),
+    );
+    final reordered = instrumentScoreIds
+        .map((id) => score.instrumentScores.firstWhere((is_) => is_.id == id))
+        .toList();
+    final updatedScore = score.copyWith(instrumentScores: reordered);
+    // Persist the change to database
+    updateScore(updatedScore);
+  }
+
+  void refresh() {
+    _ref.invalidate(scopedScoresStreamProvider(scope));
+  }
+}
+
+/// Provider for ScopedScoresHelper
+final scopedScoresHelperProvider =
+    Provider.autoDispose.family<ScopedScoresHelper, DataScope>((ref, scope) {
+  return ScopedScoresHelper(ref, scope);
+});
+
+// ============================================================================
+// Backward-Compatible Notifier for Library (user scope)
+// ============================================================================
+
+/// Library scores notifier - provides backward compatible API for user scope
+class ScoresNotifier extends Notifier<AsyncValue<List<Score>>> {
+  @override
+  AsyncValue<List<Score>> build() {
+    return ref.watch(scopedScoresStreamProvider(DataScope.user));
+  }
+
+  ScoreRepository get _repo =>
+      ref.read(scopedScoreRepositoryProvider(DataScope.user));
+
+  List<Score> get currentScores => state.value ?? [];
+
+  Score? findByTitleAndComposer(String title, String composer) {
+    final key =
+        '${title.toLowerCase().trim()}|${composer.toLowerCase().trim()}';
+    try {
+      return currentScores.firstWhere((s) => s.scoreKey == key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<Score> getSuggestionsByTitle(String query) {
+    if (query.isEmpty) return [];
+    final lowerQuery = query.toLowerCase();
+    return currentScores
+        .where((s) => s.title.toLowerCase().contains(lowerQuery))
+        .take(3)
+        .toList();
+  }
+
+  List<Score> getSuggestionsByComposer(String title, String composerQuery) {
+    if (composerQuery.isEmpty) return [];
+    final lowerTitle = title.toLowerCase().trim();
+    final lowerQuery = composerQuery.toLowerCase();
+    return currentScores
+        .where(
+          (s) =>
+              s.title.toLowerCase().trim() == lowerTitle &&
+              s.composer.toLowerCase().contains(lowerQuery),
+        )
+        .take(3)
+        .toList();
+  }
+
+  Future<void> addScore(Score score) async {
+    await _repo.addScore(score);
+  }
+
+  Future<void> updateScore(Score score) async {
+    await _repo.updateScore(score);
+  }
+
+  Future<void> updateBpm(String scoreId, int bpm) async {
+    final score = currentScores.firstWhere(
+      (s) => s.id == scoreId,
+      orElse: () => throw Exception('Score not found'),
+    );
+    await updateScore(score.copyWith(bpm: bpm));
+  }
+
+  Future<void> deleteScore(String scoreId) async {
+    await _repo.deleteScore(scoreId);
+  }
+
+  Future<void> addInstrumentScore(
+    String scoreId,
+    InstrumentScore instrumentScore,
+  ) async {
+    await _repo.addInstrumentScore(scoreId, instrumentScore);
+  }
+
+  Future<void> deleteInstrumentScore(
+    String scoreId,
+    String instrumentScoreId,
+  ) async {
+    await _repo.deleteInstrumentScore(instrumentScoreId);
+  }
+
+  Future<void> updateAnnotations(
+    String scoreId,
+    String instrumentScoreId,
+    List<Annotation> annotations,
+  ) async {
+    await _repo.updateAnnotations(instrumentScoreId, annotations);
+  }
+
+  void reorderInstrumentScores(
+    String scoreId,
+    List<String> instrumentScoreIds,
+  ) {
+    final scores = currentScores;
     state = AsyncData(
       scores.map((s) {
         if (s.id == scoreId) {
@@ -262,41 +335,24 @@ class ScopedScoresNotifier extends AsyncNotifier<List<Score>> {
     );
   }
 
-  /// Duplicate a score
   Future<void> duplicateScore(String sourceScoreId) async {
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    await scoreRepo.duplicateScore(sourceScoreId);
-    await refresh();
+    await _repo.duplicateScore(sourceScoreId);
   }
 
-  /// Refresh scores from database
   Future<void> refresh({bool silent = false}) async {
-    if (!silent) {
-      state = const AsyncLoading();
-    }
-
-    final scoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-    final scores = await scoreRepo.getAllScores();
-    state = AsyncData(scores);
+    ref.invalidate(scopedScoresStreamProvider(DataScope.user));
   }
 }
 
-// ============================================================================
-// Unified Provider (Family by DataScope)
-// ============================================================================
-
-/// Main scoped scores provider - works for both Library and Team
-final scopedScoresProvider =
-    AsyncNotifierProvider.family<ScopedScoresNotifier, List<Score>, DataScope>(
-  (scope) => ScopedScoresNotifier(scope),
+/// Main scores provider (backward compatible - for user scope)
+final scoresStateProvider =
+    NotifierProvider<ScoresNotifier, AsyncValue<List<Score>>>(
+  ScoresNotifier.new,
 );
 
 // ============================================================================
 // Backward-Compatible Providers (Library-specific aliases)
 // ============================================================================
-
-/// Main scores provider (backward compatible - alias for user scope)
-final scoresStateProvider = scopedScoresProvider(DataScope.user);
 
 /// Convenience provider for scores list (non-async) - alias for user scope
 final scoresListProvider = Provider<List<Score>>((ref) {
@@ -335,13 +391,13 @@ final instrumentScoreProvider =
 
 /// Scoped scores list provider (non-async)
 final scopedScoresListProvider =
-    Provider.family<List<Score>, DataScope>((ref, scope) {
-  return ref.watch(scopedScoresProvider(scope)).value ?? [];
+    Provider.autoDispose.family<List<Score>, DataScope>((ref, scope) {
+  return ref.watch(scopedScoresStreamProvider(scope)).value ?? [];
 });
 
 /// Scoped score by ID provider
 final scopedScoreByIdProvider =
-    Provider.family<Score?, (DataScope, String)>((ref, params) {
+    Provider.autoDispose.family<Score?, (DataScope, String)>((ref, params) {
   final (scope, scoreId) = params;
   final scores = ref.watch(scopedScoresListProvider(scope));
   try {
@@ -353,7 +409,7 @@ final scopedScoreByIdProvider =
 
 /// Scoped instrument score provider
 final scopedInstrumentScoreProvider =
-    Provider.family<InstrumentScore?, (DataScope, String, String)>(
+    Provider.autoDispose.family<InstrumentScore?, (DataScope, String, String)>(
         (ref, params) {
   final (scope, scoreId, instrumentScoreId) = params;
   final score = ref.watch(scopedScoreByIdProvider((scope, scoreId)));

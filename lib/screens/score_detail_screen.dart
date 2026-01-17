@@ -113,9 +113,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
     );
   }
 
-  /// Get the scores notifier for current scope
-  ScopedScoresNotifier get _scoresNotifier =>
-      ref.read(scopedScoresProvider(_scope).notifier);
+  /// Get the scores helper for current scope
+  ScopedScoresHelper get _scoresHelper =>
+      ref.read(scopedScoresHelperProvider(_scope));
 
   @override
   Widget build(BuildContext context) {
@@ -445,7 +445,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
           newIds.insert(newIndex, item);
 
           // Use unified notifier
-          _scoresNotifier.reorderInstrumentScores(currentScore.id, newIds);
+          _scoresHelper.reorderInstrumentScores(currentScore.id, newIds);
         },
         itemBuilder: (context, index) {
           final instrumentScore = currentScore.instrumentScores[index];
@@ -728,7 +728,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
         createdAt: DateTime.now(),
       );
 
-      await _scoresNotifier.addInstrumentScore(teamScore.id, teamInstrument);
+      await _scoresHelper.addInstrumentScore(teamScore.id, teamInstrument);
       successCount++;
     }
 
@@ -910,7 +910,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                             TextButton(
                               onPressed: () async {
                                 Navigator.pop(context);
-                                await _scoresNotifier.deleteInstrumentScore(
+                                await _scoresHelper.deleteInstrumentScore(
                                   score.id,
                                   instrumentScore.id,
                                 );
@@ -1008,7 +1008,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                       composer: composer,
                     );
 
-                    await _scoresNotifier.updateScore(updatedScore);
+                    await _scoresHelper.updateScore(updatedScore);
                     if (!mounted) return;
                     if (_isTeam) {
                       AppToast.success(context, 'Score updated');

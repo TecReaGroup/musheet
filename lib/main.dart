@@ -57,6 +57,20 @@ Future<void> _initializeCoreServices() async {
     if (savedUrl != null && savedUrl.isNotEmpty) {
       ApiClient.initialize(baseUrl: savedUrl);
 
+      // 4. Initialize ConnectionManager (depends on NetworkService and ApiClient)
+      await ConnectionManager.initialize(
+        networkService: NetworkService.instance,
+      );
+
+      // 5. Register onSessionExpired callback to handle token expiration
+      ApiClient.instance.onSessionExpired = () {
+        Log.w('INIT', 'Session expired, logging out...');
+        // Clear local session state
+        SessionService.instance.onLogout();
+        // Clear API auth
+        ApiClient.instance.clearAuth();
+      };
+
       // Restore auth credentials if token exists
       if (SessionService.instance.isAuthenticated) {
         final token = SessionService.instance.token;

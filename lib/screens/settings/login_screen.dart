@@ -104,6 +104,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('backend_server_url', serverUrl);
       ApiClient.initialize(baseUrl: serverUrl);
+      // Initialize ConnectionManager if not already done
+      if (!ConnectionManager.isInitialized) {
+        await ConnectionManager.initialize(
+          networkService: NetworkService.instance,
+        );
+        // Notify providers that ConnectionManager is now available
+        ref.read(connectionManagerInitializedProvider.notifier).markInitialized();
+      }
       // Invalidate providers to pick up new ApiClient
       ref.invalidate(apiClientProvider);
       ref.invalidate(authRepositoryProvider);

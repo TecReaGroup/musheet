@@ -67,12 +67,14 @@ class AuthEndpoint extends Endpoint {
 
     final createdUser = await User.db.insertRow(session, user);
 
-    // Generate session token
+    // Generate session token and refresh token
     final token = _generateSessionToken(createdUser.id!);
+    final refreshToken = _generateRefreshToken(createdUser.id!);
 
     return AuthResult(
       success: true,
       token: token,
+      refreshToken: refreshToken,
       user: createdUser,
       mustChangePassword: false,
     );
@@ -121,12 +123,14 @@ class AuthEndpoint extends Endpoint {
     user.lastLoginAt = DateTime.now();
     await User.db.updateRow(session, user);
 
-    // Generate a simple session token (in production, use proper JWT or session management)
+    // Generate session token and refresh token
     final token = _generateSessionToken(user.id!);
+    final refreshToken = _generateRefreshToken(user.id!);
 
     return AuthResult(
       success: true,
       token: token,
+      refreshToken: refreshToken,
       user: user,
       mustChangePassword: user.mustChangePassword,
     );
@@ -139,6 +143,10 @@ class AuthEndpoint extends Endpoint {
   }
 
   /// Change own password - requires userId to be passed
+  ///
+  /// DESIGN: Password change does NOT invalidate existing tokens.
+  /// This allows users to stay logged in on other devices after changing password.
+  /// Only disabling the account will invalidate all tokens.
   Future<bool> changePassword(
     Session session,
     int userId,
@@ -172,6 +180,12 @@ class AuthEndpoint extends Endpoint {
   }
 
   /// Validate session token and return user ID
+  ///
+  /// DESIGN: Token validation is stateless and never expires.
+  /// - Only extracts userId from token format: {userId}.{timestamp}.{random}
+  /// - Does NOT check timestamp for expiration
+  /// - Does NOT verify against stored password hash
+  /// - Token only becomes invalid when account is disabled or deleted
   Future<int?> validateToken(Session session, String token) async {
     // Simple token validation - extract user ID from token
     // In production, use proper JWT validation
@@ -187,6 +201,71 @@ class AuthEndpoint extends Endpoint {
     return null;
   }
 
+  /// Refresh access token using refresh token
+  /// Returns new access token and refresh token
+  Future<AuthResult> refreshToken(
+    Session session,
+    String refreshToken,
+  ) async {
+    // Validate refresh token format: userId.timestamp.random
+    try {
+      final parts = refreshToken.split('.');
+      if (parts.length < 3) {
+        return AuthResult(
+          success: false,
+          mustChangePassword: false,
+          errorMessage: 'Invalid refresh token format',
+        );
+      }
+
+      final userId = int.tryParse(parts[0]);
+      if (userId == null) {
+        return AuthResult(
+          success: false,
+          mustChangePassword: false,
+          errorMessage: 'Invalid refresh token',
+        );
+      }
+
+      // Find user
+      final user = await User.db.findById(session, userId);
+      if (user == null) {
+        return AuthResult(
+          success: false,
+          mustChangePassword: false,
+          errorMessage: 'User not found',
+        );
+      }
+
+      // Check if account is disabled
+      if (user.isDisabled) {
+        return AuthResult(
+          success: false,
+          mustChangePassword: false,
+          errorMessage: 'Account is disabled',
+        );
+      }
+
+      // Generate new tokens
+      final newToken = _generateSessionToken(userId);
+      final newRefreshToken = _generateRefreshToken(userId);
+
+      return AuthResult(
+        success: true,
+        token: newToken,
+        refreshToken: newRefreshToken,
+        user: user,
+        mustChangePassword: user.mustChangePassword,
+      );
+    } catch (e) {
+      return AuthResult(
+        success: false,
+        mustChangePassword: false,
+        errorMessage: 'Token refresh failed',
+      );
+    }
+  }
+
   // === Helper methods ===
 
   /// Generate a simple session token
@@ -196,6 +275,16 @@ class AuthEndpoint extends Endpoint {
     final random = Random.secure();
     final bytes = List<int>.generate(32, (_) => random.nextInt(256));
     // Use hex encoding for complete safety - only 0-9, a-f characters
+    final randomPart = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    return '$userId.$timestamp.$randomPart';
+  }
+
+  /// Generate a refresh token (longer-lived than session token)
+  /// Format: userId.timestamp.random (same format but stored separately)
+  String _generateRefreshToken(int userId) {
+    final random = Random.secure();
+    final bytes = List<int>.generate(48, (_) => random.nextInt(256));
     final randomPart = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     return '$userId.$timestamp.$randomPart';

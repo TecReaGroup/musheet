@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/teams_state_provider.dart';
+import '../providers/preferred_instrument_provider.dart';
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
@@ -179,44 +180,12 @@ class LastOpenedScoreInSetlistNotifier extends Notifier<Map<String, int>> {
   Map<String, int> build() {
     return {};
   }
-  
+
   void recordLastOpened(String setlistId, int scoreIndex) {
     state = {...state, setlistId: scoreIndex};
   }
-  
+
   int? getLastOpened(String setlistId) => state[setlistId];
-}
-
-// Track last opened instrument index per score
-class LastOpenedInstrumentInScoreNotifier extends Notifier<Map<String, int>> {
-  @override
-  Map<String, int> build() {
-    return {};
-  }
-  
-  void recordLastOpened(String scoreId, int instrumentIndex) {
-    state = {...state, scoreId: instrumentIndex};
-  }
-  
-  int? getLastOpened(String scoreId) => state[scoreId];
-  
-  void clearAll() {
-    state = {};
-  }
-}
-
-// Track user's preferred instrument type
-class PreferredInstrumentNotifier extends Notifier<String?> {
-  @override
-  String? build() {
-    return null;
-  }
-  
-  void setPreferredInstrument(String? instrumentKey) {
-    state = instrumentKey;
-    // Clear all last opened instrument records when preference changes
-    ref.read(lastOpenedInstrumentInScoreProvider.notifier).clearAll();
-  }
 }
 
 // Track whether team feature is enabled
@@ -241,8 +210,7 @@ class TeamEnabledNotifier extends Notifier<bool> {
 final recentlyOpenedSetlistsProvider = NotifierProvider<RecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(RecentlyOpenedSetlistsNotifier.new);
 final recentlyOpenedScoresProvider = NotifierProvider<RecentlyOpenedScoresNotifier, Map<String, DateTime>>(RecentlyOpenedScoresNotifier.new);
 final lastOpenedScoreInSetlistProvider = NotifierProvider<LastOpenedScoreInSetlistNotifier, Map<String, int>>(LastOpenedScoreInSetlistNotifier.new);
-final lastOpenedInstrumentInScoreProvider = NotifierProvider<LastOpenedInstrumentInScoreNotifier, Map<String, int>>(LastOpenedInstrumentInScoreNotifier.new);
-final preferredInstrumentProvider = NotifierProvider<PreferredInstrumentNotifier, String?>(PreferredInstrumentNotifier.new);
+// Note: lastOpenedInstrumentInScoreProvider and preferredInstrumentProvider are now in preferred_instrument_provider.dart
 final teamEnabledProvider = NotifierProvider<TeamEnabledNotifier, bool>(TeamEnabledNotifier.new);
 
 // Helper function to get the best instrument index for a score

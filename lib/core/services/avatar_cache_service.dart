@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import '../data/remote/api_client.dart';
+import 'network_service.dart';
 import '../../utils/logger.dart';
 
 /// Avatar cache service with two-level caching:
@@ -36,13 +37,27 @@ class AvatarCacheService {
     return p.join(dir, '$userId.jpg');
   }
 
-  /// Get avatar with two-level caching
+  /// Get avatar with two-level caching (stale-while-revalidate pattern)
   /// Priority: Memory -> Disk -> Network
-  Future<Uint8List?> getAvatar(int userId) async {
+  ///
+  /// Returns cached data immediately, then fetches from network in background.
+  /// Use [onUpdate] callback to receive fresh data when network fetch completes.
+  Future<Uint8List?> getAvatar(
+    int userId, {
+    void Function(Uint8List? bytes)? onUpdate,
+  }) async {
+    Uint8List? cachedBytes;
+
     // Level 1: Check memory cache
     if (_memoryCache.containsKey(userId)) {
       Log.d('AVATAR', 'Memory cache hit for user $userId');
-      return _memoryCache[userId];
+      cachedBytes = _memoryCache[userId];
+
+      // If we have memory cache and online, trigger background refresh
+      if (NetworkService.instance.isOnline && ApiClient.isInitialized) {
+        _fetchFromNetworkAndUpdate(userId, onUpdate);
+      }
+      return cachedBytes;
     }
 
     // Level 2: Check disk cache
@@ -53,33 +68,44 @@ class AvatarCacheService {
         final bytes = await file.readAsBytes();
         _memoryCache[userId] = bytes;
         Log.d('AVATAR', 'Disk cache hit for user $userId');
-        return bytes;
+        cachedBytes = bytes;
+
+        // If we have disk cache and online, trigger background refresh
+        if (NetworkService.instance.isOnline && ApiClient.isInitialized) {
+          _fetchFromNetworkAndUpdate(userId, onUpdate);
+        }
+        return cachedBytes;
       }
     } catch (e) {
       Log.e('AVATAR', 'Failed to read disk cache for user $userId', error: e);
     }
 
-    // Level 3: Fetch from network
-    try {
-      if (!ApiClient.isInitialized) {
-        _memoryCache[userId] = null;
-        return null;
-      }
+    // Level 3: No cache - fetch from network (only if online)
+    if (!ApiClient.isInitialized || !NetworkService.instance.isOnline) {
+      Log.d('AVATAR', 'Offline and no cache for user $userId');
+      _memoryCache[userId] = null;
+      return null;
+    }
 
+    // Fetch synchronously since we have no cache
+    return _fetchFromNetwork(userId);
+  }
+
+  /// Fetch avatar from network and update cache
+  Future<Uint8List?> _fetchFromNetwork(int userId) async {
+    try {
       Log.d('AVATAR', 'Fetching avatar from network for user $userId');
       final result = await ApiClient.instance.getAvatar(userId);
-      
+
       if (result.isSuccess && result.data != null) {
         final bytes = result.data!;
-        
-        // Save to memory cache
         _memoryCache[userId] = bytes;
-        
+
         // Save to disk cache (async, don't block)
         _saveToDisk(userId, bytes).catchError((e) {
           Log.e('AVATAR', 'Failed to save avatar to disk for user $userId', error: e);
         });
-        
+
         return bytes;
       } else {
         _memoryCache[userId] = null;
@@ -90,6 +116,52 @@ class AvatarCacheService {
       _memoryCache[userId] = null;
       return null;
     }
+  }
+
+  /// Fetch from network in background and call onUpdate if data changed
+  void _fetchFromNetworkAndUpdate(
+    int userId,
+    void Function(Uint8List? bytes)? onUpdate,
+  ) {
+    // Run in background, don't await
+    Future(() async {
+      try {
+        if (!NetworkService.instance.isOnline || !ApiClient.isInitialized) {
+          return;
+        }
+
+        Log.d('AVATAR', 'Background refresh for user $userId');
+        final result = await ApiClient.instance.getAvatar(userId);
+
+        if (result.isSuccess && result.data != null) {
+          final newBytes = result.data!;
+          final oldBytes = _memoryCache[userId];
+
+          // Only update if data actually changed
+          if (oldBytes == null || !_bytesEqual(oldBytes, newBytes)) {
+            _memoryCache[userId] = newBytes;
+
+            // Save to disk cache
+            await _saveToDisk(userId, newBytes);
+
+            // Notify caller of update
+            onUpdate?.call(newBytes);
+            Log.d('AVATAR', 'Background refresh completed for user $userId');
+          }
+        }
+      } catch (e) {
+        Log.e('AVATAR', 'Background refresh failed for user $userId', error: e);
+      }
+    });
+  }
+
+  /// Compare two byte arrays for equality
+  bool _bytesEqual(Uint8List a, Uint8List b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   /// Save avatar to disk cache

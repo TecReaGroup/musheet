@@ -10,6 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
 import 'package:musheet/core/data/remote/api_client.dart';
+import 'package:musheet/core/network/errors.dart';
 import 'package:musheet/core/sync/base_sync_coordinator.dart';
 
 import '../../mocks/mocks.dart';
@@ -303,8 +304,8 @@ void main() {
       when(() => mockApiClient.libraryPull(
             userId: any(named: 'userId'),
             since: any(named: 'since'),
-          )).thenAnswer((_) async => ApiResult.failure(const ApiError(
-            code: ApiErrorCode.networkError,
+          )).thenAnswer((_) async => ApiResult.failure(const NetworkError(
+            type: NetworkErrorType.network,
             message: 'Network connection failed',
           )));
 
@@ -313,7 +314,7 @@ void main() {
 
       // Assert
       expect(result.isFailure, isTrue);
-      expect(result.error?.code, equals(ApiErrorCode.networkError));
+      expect(result.error?.type, equals(NetworkErrorType.network));
     });
   });
 
@@ -471,8 +472,8 @@ void main() {
       when(() => mockApiClient.libraryPush(
             userId: any(named: 'userId'),
             request: any(named: 'request'),
-          )).thenAnswer((_) async => ApiResult.failure(const ApiError(
-            code: ApiErrorCode.serverError,
+          )).thenAnswer((_) async => ApiResult.failure(const NetworkError(
+            type: NetworkErrorType.serverError,
             message: 'Internal server error',
           )));
 
@@ -488,7 +489,7 @@ void main() {
 
       // Assert
       expect(result.isFailure, isTrue);
-      expect(result.error?.code, equals(ApiErrorCode.serverError));
+      expect(result.error?.type, equals(NetworkErrorType.serverError));
     });
 
     test('pull handles timeout error', () async {
@@ -496,8 +497,8 @@ void main() {
       when(() => mockApiClient.libraryPull(
             userId: any(named: 'userId'),
             since: any(named: 'since'),
-          )).thenAnswer((_) async => ApiResult.failure(const ApiError(
-            code: ApiErrorCode.timeout,
+          )).thenAnswer((_) async => ApiResult.failure(const NetworkError(
+            type: NetworkErrorType.network,
             message: 'Request timed out',
           )));
 
@@ -506,8 +507,8 @@ void main() {
 
       // Assert
       expect(result.isFailure, isTrue);
-      expect(result.error?.code, equals(ApiErrorCode.timeout));
-      expect(result.error?.isRetryable, isTrue);
+      expect(result.error?.type, equals(NetworkErrorType.network));
+      expect(result.error?.shouldMarkDisconnected, isTrue);
     });
 
     test('unauthenticated user returns null userId', () async {

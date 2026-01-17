@@ -100,7 +100,6 @@ dependencies:
   # Native splash screen
   flutter_native_splash: ^2.4.7
   image_picker: ^1.2.1
-  image_cropper: ^11.0.0
   custom_image_crop: 0.1.1
 
 dev_dependencies:

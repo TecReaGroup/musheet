@@ -48,8 +48,15 @@ class TeamsState {
 
 /// Notifier for managing teams state
 class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
+  /// Flag to prevent repeated background syncs
+  /// Set to true after initial sync is triggered, reset on explicit refresh
+  bool _hasSyncedInSession = false;
+
   @override
   Future<TeamsState> build() async {
+    // Reset sync flag when provider is rebuilt (e.g., on login/logout)
+    _hasSyncedInSession = false;
+
     // Listen to sync state changes - refresh when sync completes
     // This ensures team list is refreshed after login sync completes
     ref.listen(syncStateProvider, (previous, next) {
@@ -57,7 +64,7 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
         final wasWorking = previous?.value?.phase != SyncPhase.idle;
         final isNowIdle = syncState.phase == SyncPhase.idle;
         if (wasWorking && isNowIdle && syncState.lastSyncAt != null) {
-          ref.invalidateSelf();
+          _reloadFromDatabase();
         }
       });
     });
@@ -72,6 +79,7 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
 
       // Refresh on logout or login
       if (wasAuth != isAuth) {
+        _hasSyncedInSession = false; // Reset on auth change
         ref.invalidateSelf();
       }
     });
@@ -82,24 +90,32 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
       return const TeamsState();
     }
 
-    return _loadTeams();
+    return _loadTeams(triggerBackgroundSync: true);
   }
 
-  Future<TeamsState> _loadTeams() async {
+  /// Load teams from database and optionally trigger background sync
+  Future<TeamsState> _loadTeams({bool triggerBackgroundSync = false}) async {
     final teamRepo = ref.read(teamRepositoryProvider);
     if (teamRepo == null) {
       return const TeamsState(error: 'Team service not available');
     }
 
     try {
-      // Always sync from server when online
-      final isOnline = ref.read(isOnlineProvider);
-      if (isOnline) {
-        await teamRepo.syncTeamsFromServer();
+      // Cache-first pattern: Load from local database immediately
+      final teams = await teamRepo.getAllTeams();
+
+      // Sync from server in background only on first load
+      // This prevents infinite loop: sync -> invalidate -> build -> sync...
+      if (triggerBackgroundSync && !_hasSyncedInSession) {
+        _hasSyncedInSession = true;
+        teamRepo.syncTeamsFromServer().then((_) {
+          // Reload from database after sync (without triggering another sync)
+          _reloadFromDatabase();
+        }).catchError((e) {
+          Log.w('TEAMS', 'Background sync failed: $e');
+        });
       }
 
-      // Load from local database
-      final teams = await teamRepo.getAllTeams();
       return TeamsState(teams: teams);
     } catch (e) {
       Log.e('TEAMS', 'Error loading teams', error: e);
@@ -107,10 +123,16 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
     }
   }
 
+  /// Reload teams from database without triggering background sync
+  Future<void> _reloadFromDatabase() async {
+    state = AsyncData(await _loadTeams(triggerBackgroundSync: false));
+  }
+
   /// Refresh teams (force sync from server)
   Future<void> refresh() async {
+    _hasSyncedInSession = false; // Reset to allow sync
     state = const AsyncLoading();
-    state = AsyncData(await _loadTeams());
+    state = AsyncData(await _loadTeams(triggerBackgroundSync: true));
   }
 
   /// Create a new team
