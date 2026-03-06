@@ -771,11 +771,10 @@ mixin SyncProcessor {
     if (references.isEmpty) {
       final globalPath = 'global/pdfs/$hash.pdf';
       await deleteFile(globalPath);
-      session.log('[SYNC] Deleted unreferenced PDF: $hash', level: LogLevel.info);
+      session.log('[SYNC] Deleted unreferenced PDF: $hash');
     } else {
       session.log(
         '[SYNC] PDF $hash still has ${references.length} references, keeping file',
-        level: LogLevel.debug,
       );
     }
   }

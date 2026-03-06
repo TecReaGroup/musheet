@@ -1,0 +1,49 @@
+name: musheet_admin_web
+description: MuSheet Admin Web Console - Flutter Web management interface
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^3.1.0
+
+  # Routing
+  go_router: ^17.0.0
+
+  # Icons
+  lucide_icons_flutter: ^3.1.7
+
+  # Charts
+  fl_chart: ^0.69.0
+
+  # HTTP Client
+  http: ^1.2.0
+
+  # Serverpod Client (shared with main app)
+  serverpod_client: ^3.0.1
+  musheet_client:
+    path: ../musheet_client
+
+  # Utilities
+  shared_preferences: ^2.5.4
+  intl: ^0.20.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # fonts:
+  #   - family: Righteous
+  #     fonts:
+  #       - asset: fonts/Righteous-Regular.ttf

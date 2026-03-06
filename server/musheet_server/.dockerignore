@@ -1,0 +1,16 @@
+# Ignore lock file (contains Windows paths)
+pubspec.lock
+
+# Ignore local build artifacts
+.dart_tool/
+build/
+bin/server
+bin/server.exe
+
+# Ignore IDE files
+.idea/
+.vscode/
+*.iml
+
+# Ignore test files in production build
+test/

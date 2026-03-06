@@ -38,10 +38,10 @@ class FileEndpoint extends Endpoint {
     if (!await globalFile.exists()) {
       // File doesn't exist - save it
       await _saveFile(globalPath, fileData);
-      session.log('[FILE] Uploaded new PDF: $hash ($fileSize bytes)', level: LogLevel.info);
+      session.log('[FILE] Uploaded new PDF: $hash ($fileSize bytes)');
     } else {
       // File exists - instant upload (秒传)
-      session.log('[FILE] Instant upload (秒传): $hash already exists', level: LogLevel.info);
+      session.log('[FILE] Instant upload: $hash already exists');
     }
 
     // Update storage stats
@@ -240,9 +240,9 @@ class FileEndpoint extends Endpoint {
       // No references left - physically delete the file
       final globalPath = 'global/pdfs/$hash.pdf';
       await _deleteFile(globalPath);
-      session.log('[FILE] Deleted unreferenced PDF: $hash', level: LogLevel.info);
+      session.log('[FILE] Deleted unreferenced PDF: $hash');
     } else {
-      session.log('[FILE] PDF $hash still has ${references.length} references, keeping file', level: LogLevel.debug);
+      session.log('[FILE] PDF $hash still has ${references.length} references, keeping file');
     }
   }
 

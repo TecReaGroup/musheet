@@ -19,7 +19,7 @@ class LibrarySyncEndpoint extends Endpoint with SyncProcessor {
     int userId, {
     int since = 0,
   }) async {
-    session.log('[LIBSYNC] pull called - userId: $userId, since: $since', level: LogLevel.info);
+    session.log('[LIBSYNC] pull called - userId: $userId, since: $since');
 
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
 
@@ -52,7 +52,6 @@ class LibrarySyncEndpoint extends Endpoint with SyncProcessor {
     session.log(
       '[LIBSYNC] Pull complete: ${scores.length} scores, ${instrumentScores.length} instrumentScores, '
       '${setlists.length} setlists, ${setlistScores.length} setlistScores, ${deleted.length} deleted',
-      level: LogLevel.info,
     );
 
     return SyncPullResponse(
@@ -78,7 +77,6 @@ class LibrarySyncEndpoint extends Endpoint with SyncProcessor {
     session.log(
       '[LIBSYNC] push called - userId: $userId, scopeType=${request.scopeType}, scopeId=${request.scopeId}, '
       'clientScopeVersion=${request.clientScopeVersion}',
-      level: LogLevel.info,
     );
 
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
@@ -100,7 +98,6 @@ class LibrarySyncEndpoint extends Endpoint with SyncProcessor {
     if (request.clientScopeVersion < serverVersion) {
       session.log(
         '[LIBSYNC] Version conflict: client=${request.clientScopeVersion}, server=$serverVersion',
-        level: LogLevel.warning,
       );
 
       return SyncPushResponse(
@@ -219,7 +216,6 @@ class LibrarySyncEndpoint extends Endpoint with SyncProcessor {
 
       session.log(
         '[LIBSYNC] Push complete: ${acceptedIds.length} changes, newVersion=$newVersion',
-        level: LogLevel.info,
       );
 
       return SyncPushResponse(
@@ -232,8 +228,8 @@ class LibrarySyncEndpoint extends Endpoint with SyncProcessor {
         serverIdMapping: serverIdMapping.isEmpty ? null : serverIdMapping,
       );
     } catch (e, stack) {
-      session.log('[LIBSYNC] Push failed: $e', level: LogLevel.error);
-      session.log('[LIBSYNC] Stack: $stack', level: LogLevel.error);
+      session.log('[LIBSYNC] Push failed: $e');
+      session.log('[LIBSYNC] Stack: $stack');
 
       return SyncPushResponse(
         success: false,

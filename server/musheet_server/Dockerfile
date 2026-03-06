@@ -2,21 +2,21 @@
 # Multi-stage build for optimized production image
 
 # Stage 1: Build stage
-FROM dart:stable AS build
+FROM dart:3.10.3 AS build
 
 WORKDIR /app
 
-# Copy pubspec files first for caching
-COPY pubspec.* ./
+# Copy pubspec.yaml only (lock file has Windows paths that won't work in Linux Docker)
+COPY pubspec.yaml ./
 
-# Get dependencies
+# Get dependencies fresh in Docker environment
 RUN dart pub get
 
 # Copy source code
 COPY . .
 
-# Generate Serverpod protocol
-RUN dart pub run serverpod generate
+# Note: Serverpod code must be pre-generated locally before Docker build
+# Run locally: serverpod generate
 
 # Build the server
 RUN dart compile exe bin/main.dart -o bin/server
@@ -27,6 +27,7 @@ FROM debian:bookworm-slim
 # Install necessary runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
@@ -39,6 +40,9 @@ COPY --from=build /app/bin/server ./bin/server
 
 # Copy config files
 COPY --from=build /app/config ./config
+
+# Copy admin web UI if exists
+COPY --from=build /app/web ./web
 
 # Create directories for file storage
 RUN mkdir -p /app/uploads /app/logs && \
@@ -61,5 +65,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENV SERVERPOD_ENV=production
 ENV SERVERPOD_LOG_LEVEL=info
 
-# Run the server
-ENTRYPOINT ["./bin/server"]
+# Run the server in production mode
+ENTRYPOINT ["./bin/server", "--mode", "production"]

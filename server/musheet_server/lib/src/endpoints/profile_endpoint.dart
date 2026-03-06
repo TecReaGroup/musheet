@@ -182,7 +182,7 @@ class ProfileEndpoint extends Endpoint {
   Future<DeleteUserDataResult> deleteAllUserData(Session session, int userId) async {
     final validatedUserId = AuthHelper.validateOrGetUserId(session, userId);
     
-    session.log('[PROFILE] ⚠️ DELETE ALL USER DATA called for userId: $validatedUserId', level: LogLevel.warning);
+    session.log('[PROFILE] DELETE ALL USER DATA called for userId: $validatedUserId');
 
     int deletedScores = 0;
     int deletedInstrumentScores = 0;
@@ -195,7 +195,7 @@ class ProfileEndpoint extends Endpoint {
       session,
       where: (t) => t.scopeType.equals('user') & t.scopeId.equals(validatedUserId),
     );
-    session.log('[PROFILE] Found ${scores.length} scores to delete', level: LogLevel.info);
+    session.log('[PROFILE] Found ${scores.length} scores to delete');
 
     // 2. For each score, delete annotations, instrument scores, and PDFs
     for (final score in scores) {
@@ -263,8 +263,7 @@ class ProfileEndpoint extends Endpoint {
     );
 
     session.log('[PROFILE] Deleted: scores=$deletedScores, instrumentScores=$deletedInstrumentScores, '
-        'annotations=$deletedAnnotations, setlists=$deletedSetlists, setlistScores=$deletedSetlistScores',
-        level: LogLevel.info);
+        'annotations=$deletedAnnotations, setlists=$deletedSetlists, setlistScores=$deletedSetlistScores');
 
     return DeleteUserDataResult(
       success: true,

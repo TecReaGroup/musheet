@@ -1,5 +1,17 @@
 # MuSheet Server Docker Compose Configuration
 # For private/self-hosted deployment
+#
+# Quick Start:
+#   docker-compose up -d                    # Start backend + database
+#   docker-compose --profile with-admin up -d  # Start with Admin Web UI
+#   docker-compose --profile full up -d     # Start everything (including nginx)
+#
+# Services:
+#   - postgres: PostgreSQL database
+#   - redis: Session/cache storage
+#   - musheet_server: Backend API (port 8080)
+#   - admin_web: Admin Web UI (port 3000) [optional]
+#   - nginx: Reverse proxy with SSL [optional]
 
 services:
   # PostgreSQL Database
@@ -82,6 +94,33 @@ services:
       retries: 3
     networks:
       - musheet_network
+
+  # Admin Web UI (Flutter Web)
+  # 使用 Dockerfile.prebuilt 需要先本地构建: cd admin_web && flutter build web --release --dart-define=API_URL=/api
+  admin_web:
+    build:
+      context: ./admin_web
+      dockerfile: Dockerfile.prebuilt
+    container_name: musheet_admin_web
+    restart: unless-stopped
+    depends_on:
+      musheet_server:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    environment:
+      API_URL: http://musheet_server:8080
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    networks:
+      - musheet_network
+    profiles:
+      - with-admin
+      - full
 
   # Nginx Reverse Proxy (optional, for SSL termination)
   nginx:

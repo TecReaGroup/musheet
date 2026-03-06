@@ -26,18 +26,17 @@ webServer:
 
 # Database Configuration
 database:
-  host: ${DATABASE_HOST:localhost}
-  port: ${DATABASE_PORT:5432}
-  name: ${DATABASE_NAME:musheet}
-  user: ${DATABASE_USER:musheet}
+  host: postgres
+  port: 5432
+  name: musheet
+  user: musheet
   requireSsl: false
 
 # Redis Configuration
 redis:
   enabled: true
-  host: ${REDIS_HOST:localhost}
-  port: ${REDIS_PORT:6379}
-  password: ${REDIS_PASSWORD:}
+  host: redis
+  port: 6379
 
 # Session Configuration
 session:

@@ -23,7 +23,6 @@ class TeamSyncEndpoint extends Endpoint with SyncProcessor {
   }) async {
     session.log(
       '[TEAMSYNC] pull called - userId: $userId, teamId: $teamId, since: $since',
-      level: LogLevel.info,
     );
 
     // Verify membership
@@ -62,7 +61,6 @@ class TeamSyncEndpoint extends Endpoint with SyncProcessor {
     session.log(
       '[TEAMSYNC] Pull complete: ${scores.length} scores, ${instrumentScores.length} instrumentScores, '
       '${setlists.length} setlists, ${setlistScores.length} setlistScores, ${deleted.length} deleted',
-      level: LogLevel.info,
     );
 
     return SyncPullResponse(
@@ -90,7 +88,6 @@ class TeamSyncEndpoint extends Endpoint with SyncProcessor {
       '[TEAMSYNC] push called - userId: $userId, teamId: $teamId, '
       'scopeType=${request.scopeType}, scopeId=${request.scopeId}, '
       'clientScopeVersion=${request.clientScopeVersion}',
-      level: LogLevel.info,
     );
 
     // Verify membership
@@ -118,7 +115,6 @@ class TeamSyncEndpoint extends Endpoint with SyncProcessor {
     if (request.clientScopeVersion < serverVersion) {
       session.log(
         '[TEAMSYNC] Version conflict: client=${request.clientScopeVersion}, server=$serverVersion',
-        level: LogLevel.warning,
       );
 
       return SyncPushResponse(
@@ -236,7 +232,6 @@ class TeamSyncEndpoint extends Endpoint with SyncProcessor {
 
       session.log(
         '[TEAMSYNC] Push complete: ${acceptedIds.length} changes, newVersion=$newVersion',
-        level: LogLevel.info,
       );
 
       return SyncPushResponse(
@@ -249,8 +244,8 @@ class TeamSyncEndpoint extends Endpoint with SyncProcessor {
         serverIdMapping: serverIdMapping.isEmpty ? null : serverIdMapping,
       );
     } catch (e, stack) {
-      session.log('[TEAMSYNC] Push failed: $e', level: LogLevel.error);
-      session.log('[TEAMSYNC] Stack: $stack', level: LogLevel.error);
+      session.log('[TEAMSYNC] Push failed: $e');
+      session.log('[TEAMSYNC] Stack: $stack');
 
       return SyncPushResponse(
         success: false,

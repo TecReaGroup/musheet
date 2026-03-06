@@ -47,14 +47,14 @@ class SetlistEndpoint extends Endpoint {
     if (existingList.isNotEmpty) {
       // Update existing
       final existing = existingList.first;
-      session.log('[SETLIST] Found existing setlist with same name (id: ${existing.id}), updating...', level: LogLevel.debug);
+      session.log('[SETLIST] Found existing setlist with same name (id: ${existing.id}), updating...');
       if (description != null) existing.description = description;
       existing.updatedAt = DateTime.now();
       return await Setlist.db.updateRow(session, existing);
     }
 
     // Create new
-    session.log('[SETLIST] Creating new setlist: $name', level: LogLevel.debug);
+    session.log('[SETLIST] Creating new setlist: $name');
     final setlist = Setlist(
       scopeType: 'user',
       scopeId: validatedUserId,
