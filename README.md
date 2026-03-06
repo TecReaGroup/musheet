@@ -185,6 +185,11 @@ musheet/
 │   ├── web/
 │   └── pubspec.yaml
 │
+├── packages/               # Shared workspace packages
+│   ├── musheet_shared_core/# Shared core/log utilities
+│   ├── musheet_shared_ui/  # Shared design tokens/UI primitives
+│   └── musheet_api_facade/ # Pure Dart Serverpod facade
+│
 └── docs/                   # Project documentation
 ```
 
@@ -197,11 +202,23 @@ musheet/
 cd app
 dart run build_runner build
 
-# Analyze code
+# Analyze app
 cd app
 flutter analyze
 
-# Run tests
+# Analyze admin web
+cd admin_web
+flutter analyze
+
+# Analyze shared packages
+cd packages/musheet_shared_core
+flutter analyze
+cd ../musheet_shared_ui
+flutter analyze
+cd ../musheet_api_facade
+flutter analyze
+
+# Run app tests
 cd app
 flutter test
 

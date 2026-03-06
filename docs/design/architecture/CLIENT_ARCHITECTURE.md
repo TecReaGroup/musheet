@@ -81,15 +81,17 @@ Infrastructure Layer
 
 ### 2.4 数据层
 主要包括：
-- [`lib/database/`](lib/database)
+- [`lib/database/`](app/lib/database)
 - 本地数据源
-- 远程 API 客户端
+- 远程 API 客户端适配层 [`ApiClient`](app/lib/core/data/remote/api_client.dart:36)
+- 共享纯 Dart facade [`MusheetClientFacade`](packages/musheet_api_facade/lib/src/musheet_client_facade.dart:21)
 
 职责：
 - 本地持久化
 - 数据模型读写
 - 远程接口访问
 - 本地 / 远程数据桥接
+- 将 app 特有的重试、连接状态与共享 RPC facade 解耦
 
 ---
 
@@ -114,10 +116,11 @@ Infrastructure Layer
 1. `NetworkService`
 2. `SessionService`
 3. `SharedPreferences`
-4. `ApiClient`
-5. `ConnectionManager`
-6. 会话恢复与回调绑定
-7. Avatar 缓存清理
+4. 共享 RPC facade 底座 [`MusheetClientFacade`](packages/musheet_api_facade/lib/src/musheet_client_facade.dart:21)
+5. App 适配层 [`ApiClient`](app/lib/core/data/remote/api_client.dart:36)
+6. `ConnectionManager`
+7. 会话恢复与回调绑定
+8. Avatar 缓存清理
 
 这个顺序的设计原则：
 - 先有网络感知
@@ -136,7 +139,7 @@ Infrastructure Layer
 
 ## 4. 主题与设计系统架构
 
-主题入口为 [`AppTheme`](lib/theme/app_theme.dart:4)，色板入口为 [`AppColors`](lib/theme/app_colors.dart:3)。
+主题入口为 [`AppTheme`](app/lib/theme/app_theme.dart:4)，色板入口为 [`AppColors`](packages/musheet_shared_ui/lib/src/app_colors.dart:3)。当前 [`app/lib/theme/app_colors.dart`](app/lib/theme/app_colors.dart:1) 仅作为兼容导出层。
 
 ### 4.1 主题职责
 [`AppTheme.lightTheme`](lib/theme/app_theme.dart:29) 统一定义：

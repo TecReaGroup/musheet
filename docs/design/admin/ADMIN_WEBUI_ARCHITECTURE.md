@@ -73,12 +73,13 @@ Team 的创建与成员管理（admin-only）由：
 
 推荐方案（实现成本最低且与现有 Flutter 技术栈一致）：
 
-- Admin Web UI = **Flutter Web**（独立入口/独立路由），直接使用 `musheet_client` 的 Serverpod RPC 调用。
-- 复用：`serverpod_client` 鉴权头注入机制（与 app 类似）。
+- Admin Web UI = **Flutter Web**（独立入口/独立路由），通过共享纯 Dart facade [`MusheetClientFacade`](packages/musheet_api_facade/lib/src/musheet_client_facade.dart:21) 访问 `musheet_client` 的 Serverpod RPC。
+- 管理端适配层 [`AdminApiClient`](admin_web/lib/core/admin_api_client.dart:38) 只保留管理端自己的结果包装与错误转换。
 
 原因：
 
 - 工程已有 `musheet_client` 包（见 [`musheet_client.dart`](server/musheet_client/lib/musheet_client.dart:1)）
+- 现已补充共享 API facade 包 [`packages/musheet_api_facade/`](packages/musheet_api_facade)，可在 app / admin_web 间复用 RPC 封装与鉴权头逻辑
 - Flutter Web 可以快速复用组件、状态管理（Riverpod）与现有 token 逻辑
 
 ### 3.2 部署拓扑（推荐）

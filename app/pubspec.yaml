@@ -100,6 +100,8 @@ dependencies:
     path: ../packages/musheet_shared_core
   musheet_shared_ui:
     path: ../packages/musheet_shared_ui
+  musheet_api_facade:
+    path: ../packages/musheet_api_facade
 
   # Native splash screen
   flutter_native_splash: ^2.4.7

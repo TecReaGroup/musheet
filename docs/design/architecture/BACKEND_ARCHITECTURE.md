@@ -131,6 +131,10 @@ musheet/
 │   ├── lib/
 │   ├── web/
 │   └── pubspec.yaml
+├── packages/                    # 共享 workspace package
+│   ├── musheet_shared_core/     # 日志/核心工具
+│   ├── musheet_shared_ui/       # 颜色与 UI token
+│   └── musheet_api_facade/      # 纯 Dart API facade
 ├── docs/                        # 项目文档
 └── server/
     ├── musheet_server/          # Serverpod 后端

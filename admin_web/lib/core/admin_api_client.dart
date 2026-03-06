@@ -1,20 +1,15 @@
-/// Admin API Client - Unified interface for admin operations
+/// Admin API Client - Unified interface for admin operations.
 ///
-/// This provides a clean API layer for the Admin Web UI,
-/// wrapping Serverpod RPC calls with consistent error handling.
+/// This adapts the shared pure-Dart facade to the admin web specific
+/// result and error handling model.
 library;
 
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:musheet_api_facade/musheet_api_facade.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
-import 'package:serverpod_client/serverpod_client.dart'
-    show ClientAuthKeyProvider, wrapAsBearerAuthHeaderValue;
 
-// ============================================================================
-// API Result Types
-// ============================================================================
-
-/// Generic result wrapper for API calls
 @immutable
 class ApiResult<T> {
   final T? data;
@@ -33,7 +28,6 @@ class ApiResult<T> {
   bool get isSuccess => error == null && data != null;
   bool get isFailure => error != null;
 
-  /// Transform success data
   ApiResult<R> map<R>(R Function(T) transform) {
     if (isSuccess) {
       return ApiResult.success(transform(data as T), latency: latency);
@@ -42,56 +36,22 @@ class ApiResult<T> {
   }
 }
 
-// ============================================================================
-// Auth Key Provider
-// ============================================================================
-
-class _AdminAuthKeyProvider implements ClientAuthKeyProvider {
-  String? _token;
-
-  void setToken(String? token) => _token = token;
-  String? get token => _token;
-
-  @override
-  Future<String?> get authHeaderValue async {
-    if (_token == null) return null;
-    return wrapAsBearerAuthHeaderValue(_token!);
-  }
-}
-
-// ============================================================================
-// Admin API Client
-// ============================================================================
-
-/// Unified API client for admin operations
 class AdminApiClient {
   static AdminApiClient? _instance;
 
   final String baseUrl;
-  late final server.Client _client;
-  late final _AdminAuthKeyProvider _authProvider;
+  final MusheetClientFacade _facade;
 
-  int? _currentUserId;
+  AdminApiClient._({required this.baseUrl})
+      : _facade = MusheetClientFacade(
+          baseUrl: baseUrl,
+          connectionTimeout: const Duration(seconds: 15),
+        );
 
-  AdminApiClient._({required this.baseUrl}) {
-    _authProvider = _AdminAuthKeyProvider();
-
-    final url =
-        baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
-
-    _client = server.Client(
-      url,
-      connectionTimeout: const Duration(seconds: 15),
-    );
-    _client.authKeyProvider = _authProvider;
-  }
-
-  /// Initialize the singleton
   static void initialize({required String baseUrl}) {
     _instance = AdminApiClient._(baseUrl: baseUrl);
   }
 
-  /// Get the singleton instance
   static AdminApiClient get instance {
     if (_instance == null) {
       throw StateError('AdminApiClient not initialized. Call initialize() first.');
@@ -99,33 +59,21 @@ class AdminApiClient {
     return _instance!;
   }
 
-  /// Check if initialized
   static bool get isInitialized => _instance != null;
 
-  /// Set authentication credentials
   void setAuth(String token, int userId) {
-    _authProvider.setToken(token);
-    _currentUserId = userId;
+    _facade.setAuth(token, userId: userId);
   }
 
-  /// Clear authentication
   void clearAuth() {
-    _authProvider.setToken(null);
-    _currentUserId = null;
+    _facade.clearAuth();
   }
 
-  /// Get current auth token
-  String? get token => _authProvider.token;
+  String? get token => _facade.token;
 
-  /// Get current user ID
-  int? get currentUserId => _currentUserId;
+  int? get currentUserId => _facade.currentUserId;
 
-  /// Check if authenticated
-  bool get isAuthenticated => _authProvider.token != null && _currentUserId != null;
-
-  // ============================================================================
-  // Generic Request Execution
-  // ============================================================================
+  bool get isAuthenticated => _facade.isAuthenticated && currentUserId != null;
 
   Future<ApiResult<T>> _execute<T>({
     required String operation,
@@ -165,30 +113,26 @@ class AdminApiClient {
     return msg;
   }
 
-  // ============================================================================
-  // Auth API
-  // ============================================================================
-
   Future<ApiResult<server.AuthResult>> login({
     required String username,
     required String password,
   }) =>
       _execute(
         operation: 'login',
-        call: () => _client.auth.login(username, password),
+        call: () => _facade.login(username: username, password: password),
       );
 
   Future<ApiResult<bool>> logout() => _execute(
         operation: 'logout',
         call: () async {
-          await _client.auth.logout();
+          await _facade.logout();
           return true;
         },
       );
 
   Future<ApiResult<bool>> needsAdminRegistration() => _execute(
         operation: 'needsAdminRegistration',
-        call: () => _client.adminUser.needsAdminRegistration(),
+        call: _facade.needsAdminRegistration,
       );
 
   Future<ApiResult<server.AuthResult>> register({
@@ -198,22 +142,17 @@ class AdminApiClient {
   }) =>
       _execute(
         operation: 'register',
-        call: () =>
-            _client.auth.register(username, password, displayName: displayName),
+        call: () => _facade.register(
+          username: username,
+          password: password,
+          displayName: displayName,
+        ),
       );
-
-  // ============================================================================
-  // Dashboard API
-  // ============================================================================
 
   Future<ApiResult<server.DashboardStats>> getDashboardStats() => _execute(
         operation: 'getDashboardStats',
-        call: () => _client.admin.getDashboardStats(_currentUserId!),
+        call: () => _facade.getDashboardStats(),
       );
-
-  // ============================================================================
-  // User Management API
-  // ============================================================================
 
   Future<ApiResult<List<server.UserInfo>>> getAllUsers({
     int page = 0,
@@ -221,11 +160,7 @@ class AdminApiClient {
   }) =>
       _execute(
         operation: 'getAllUsers',
-        call: () => _client.admin.getAllUsers(
-          _currentUserId!,
-          page: page,
-          pageSize: pageSize,
-        ),
+        call: () => _facade.getAllUsers(page: page, pageSize: pageSize),
       );
 
   Future<ApiResult<server.User>> createUser({
@@ -236,48 +171,43 @@ class AdminApiClient {
   }) =>
       _execute(
         operation: 'createUser',
-        call: () => _client.adminUser.createUser(
-          _currentUserId!,
-          username,
-          password,
-          displayName,
-          isAdmin,
+        call: () => _facade.createUser(
+          username: username,
+          password: password,
+          displayName: displayName,
+          isAdmin: isAdmin,
         ),
       );
 
   Future<ApiResult<bool>> deactivateUser(int targetUserId) => _execute(
         operation: 'deactivateUser',
-        call: () => _client.admin.deactivateUser(_currentUserId!, targetUserId),
+        call: () => _facade.deactivateUser(targetUserId),
       );
 
   Future<ApiResult<bool>> reactivateUser(int targetUserId) => _execute(
         operation: 'reactivateUser',
-        call: () => _client.admin.reactivateUser(_currentUserId!, targetUserId),
+        call: () => _facade.reactivateUser(targetUserId),
       );
 
   Future<ApiResult<bool>> deleteUser(int targetUserId) => _execute(
         operation: 'deleteUser',
-        call: () => _client.admin.deleteUser(_currentUserId!, targetUserId),
+        call: () => _facade.deleteUser(targetUserId),
       );
 
   Future<ApiResult<bool>> promoteToAdmin(int targetUserId) => _execute(
         operation: 'promoteToAdmin',
-        call: () => _client.admin.promoteToAdmin(_currentUserId!, targetUserId),
+        call: () => _facade.promoteToAdmin(targetUserId),
       );
 
   Future<ApiResult<bool>> demoteFromAdmin(int targetUserId) => _execute(
         operation: 'demoteFromAdmin',
-        call: () => _client.admin.demoteFromAdmin(_currentUserId!, targetUserId),
+        call: () => _facade.demoteFromAdmin(targetUserId),
       );
 
   Future<ApiResult<String>> resetUserPassword(int targetUserId) => _execute(
         operation: 'resetUserPassword',
-        call: () => _client.adminUser.resetUserPassword(_currentUserId!, targetUserId),
+        call: () => _facade.resetUserPassword(targetUserId),
       );
-
-  // ============================================================================
-  // Team Management API
-  // ============================================================================
 
   Future<ApiResult<List<server.TeamSummary>>> getAllTeams({
     int page = 0,
@@ -285,11 +215,7 @@ class AdminApiClient {
   }) =>
       _execute(
         operation: 'getAllTeams',
-        call: () => _client.admin.getAllTeams(
-          _currentUserId!,
-          page: page,
-          pageSize: pageSize,
-        ),
+        call: () => _facade.getAllTeams(page: page, pageSize: pageSize),
       );
 
   Future<ApiResult<server.Team>> createTeam({
@@ -298,51 +224,42 @@ class AdminApiClient {
   }) =>
       _execute(
         operation: 'createTeam',
-        call: () => _client.team.createTeam(_currentUserId!, name, description),
+        call: () => _facade.createTeam(name: name, description: description),
       );
 
   Future<ApiResult<bool>> deleteTeam(int teamId) => _execute(
         operation: 'deleteTeam',
-        call: () => _client.admin.deleteTeam(_currentUserId!, teamId),
+        call: () => _facade.deleteTeam(teamId),
       );
 
   Future<ApiResult<List<server.TeamMemberInfo>>> getTeamMembers(int teamId) =>
       _execute(
         operation: 'getTeamMembers',
-        call: () => _client.team.getMyTeamMembers(_currentUserId!, teamId),
-      );
-
-  Future<ApiResult<server.TeamMember>> addMemberToTeam(int teamId, int userId) => _execute(
-        operation: 'addMemberToTeam',
-        call: () => _client.team.addMemberToTeam(_currentUserId!, teamId, userId),
-      );
-
-  Future<ApiResult<bool>> removeMemberFromTeam(int teamId, int userId) => _execute(
-        operation: 'removeMemberFromTeam',
         call: () =>
-            _client.team.removeMemberFromTeam(_currentUserId!, teamId, userId),
+            _facade.getTeamMembers(userId: _facade.requireCurrentUserId(), teamId: teamId),
       );
 
-  // ============================================================================
-  // Profile API (for avatars)
-  // ============================================================================
+  Future<ApiResult<server.TeamMember>> addMemberToTeam(int teamId, int userId) =>
+      _execute(
+        operation: 'addMemberToTeam',
+        call: () => _facade.addMemberToTeam(teamId: teamId, userId: userId),
+      );
+
+  Future<ApiResult<bool>> removeMemberFromTeam(int teamId, int userId) =>
+      _execute(
+        operation: 'removeMemberFromTeam',
+        call: () => _facade.removeMemberFromTeam(teamId: teamId, userId: userId),
+      );
 
   Future<ApiResult<Uint8List?>> getAvatar(int userId) => _execute(
         operation: 'getAvatar',
-        call: () async {
-          final result = await _client.profile.getAvatar(userId);
-          return result?.buffer.asUint8List();
-        },
+        call: () => _facade.getAvatar(userId),
       );
-
-  // ============================================================================
-  // Health Check
-  // ============================================================================
 
   Future<ApiResult<bool>> checkHealth() => _execute(
         operation: 'health',
         call: () async {
-          await _client.status.health();
+          await _facade.health();
           return true;
         },
       );

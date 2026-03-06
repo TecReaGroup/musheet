@@ -108,7 +108,7 @@ enum ServiceStatus {
 
 ### 2.2 ApiClient（请求客户端）
 
-**职责：** 封装 HTTP 请求，通过拦截器处理鉴权和错误
+**职责：** 作为 app 侧适配层封装请求重试、鉴权恢复与连接状态通知；底层 RPC 调用已下沉到共享纯 Dart facade [`MusheetClientFacade`](packages/musheet_api_facade/lib/src/musheet_client_facade.dart:21)。
 
 ```
 ┌────────────────────────────────────────────────────────────┐

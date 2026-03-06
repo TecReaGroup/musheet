@@ -34,6 +34,8 @@ dependencies:
     path: ../packages/musheet_shared_core
   musheet_shared_ui:
     path: ../packages/musheet_shared_ui
+  musheet_api_facade:
+    path: ../packages/musheet_api_facade
 
   # Utilities
   shared_preferences: ^2.5.4

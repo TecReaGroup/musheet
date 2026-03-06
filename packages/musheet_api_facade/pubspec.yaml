@@ -1,0 +1,15 @@
+name: musheet_api_facade
+description: Pure Dart Serverpod facade for MuSheet app and admin clients.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  serverpod_client: ^3.1.1
+  musheet_client:
+    path: ../../server/musheet_client
+
+dev_dependencies:
+  lints: ^6.0.0
