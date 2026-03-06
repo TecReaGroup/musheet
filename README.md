@@ -100,7 +100,7 @@
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/musheet.git
-cd musheet
+cd musheet/app
 
 # Install dependencies
 flutter pub get
@@ -162,28 +162,30 @@ The server provides RESTful APIs for:
 
 ```
 musheet/
-├── lib/                    # Flutter application
-│   ├── core/              # Business logic
-│   │   ├── data/          # Data sources (local/remote)
-│   │   ├── repositories/  # Repository pattern
-│   │   └── sync/          # Sync coordination
-│   ├── database/          # Drift database schema
-│   ├── models/            # Data models
-│   ├── providers/         # Riverpod providers
-│   ├── screens/           # UI screens
-│   ├── widgets/           # Reusable widgets
-│   └── router/            # GoRouter configuration
+├── app/                    # Flutter application workspace
+│   ├── lib/               # App source code
+│   ├── assets/            # Static assets
+│   ├── test/              # App tests
+│   ├── android/           # Android host project
+│   ├── ios/               # iOS host project
+│   ├── web/               # Flutter web host assets
+│   ├── linux/             # Linux host project
+│   ├── macos/             # macOS host project
+│   ├── windows/           # Windows host project
+│   └── pubspec.yaml       # App package manifest
 │
-├── server/                 # Serverpod backend
+├── server/                 # Serverpod backend workspace
 │   ├── musheet_server/    # Main server project
 │   ├── musheet_client/    # Generated client
 │   ├── docker-compose.yml # Docker orchestration
 │   └── scripts/           # Deployment scripts
 │
-└── assets/                 # Static assets
-    ├── fonts/
-    ├── icons/
-    └── sounds/
+├── admin_web/              # Flutter Web admin console source
+│   ├── lib/
+│   ├── web/
+│   └── pubspec.yaml
+│
+└── docs/                   # Project documentation
 ```
 
 ---
@@ -192,12 +194,15 @@ musheet/
 
 ```bash
 # Run code generation (after model changes)
+cd app
 dart run build_runner build
 
 # Analyze code
+cd app
 flutter analyze
 
 # Run tests
+cd app
 flutter test
 
 # Generate Serverpod protocol (after endpoint changes)

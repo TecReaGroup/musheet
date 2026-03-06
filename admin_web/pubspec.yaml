@@ -29,7 +29,11 @@ dependencies:
   # Serverpod Client (shared with main app)
   serverpod_client: ^3.0.1
   musheet_client:
-    path: ../musheet_client
+    path: ../server/musheet_client
+  musheet_shared_core:
+    path: ../packages/musheet_shared_core
+  musheet_shared_ui:
+    path: ../packages/musheet_shared_ui
 
   # Utilities
   shared_preferences: ^2.5.4

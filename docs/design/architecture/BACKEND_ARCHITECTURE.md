@@ -122,7 +122,15 @@
 
 ```
 musheet/
-├── lib/                         # Flutter 客户端
+├── app/                         # Flutter 客户端工作区
+│   ├── lib/
+│   ├── assets/
+│   ├── test/
+│   └── pubspec.yaml
+├── admin_web/                   # 独立 Flutter Web 管理端源码
+│   ├── lib/
+│   ├── web/
+│   └── pubspec.yaml
 ├── docs/                        # 项目文档
 └── server/
     ├── musheet_server/          # Serverpod 后端
@@ -136,16 +144,14 @@ musheet/
     │   ├── migrations/
     │   └── web/admin/           # 已构建的管理端静态资源
     ├── musheet_client/          # 生成的 Dart client
-    ├── musheet_flutter/         # Flutter 集成包
-    ├── admin_web/               # 独立 Flutter Web 管理端源码
     ├── docker-compose.yml       # PostgreSQL + Redis + Server + Admin Web + Nginx
     └── README.md
 ```
 
 **说明：**
-- `server/` 目录已经是实际存在的后端工作区，不再是“新建规划态”。
-- 管理端源码位于 [`server/admin_web/`](server/admin_web)，入口见 [`server/admin_web/lib/main.dart`](server/admin_web/lib/main.dart:7)。
-- `musheet_server/web/admin/` 保存已构建后的管理端静态资源。
+- [`server/`](server) 目录是后端工作区；[`app/`](app) 与 [`admin_web/`](admin_web) 分别独立承载客户端与管理端。
+- 管理端源码位于 [`admin_web/`](admin_web)，入口见 [`main()`](admin_web/lib/main.dart:7)。
+- [`server/musheet_server/web/admin/`](server/musheet_server/web/admin) 保存已构建后的管理端静态资源。
 - Docker 编排当前支持 `postgres`、`redis`、`musheet_server`、`admin_web`、`nginx`、`backup`，见 [`server/docker-compose.yml`](server/docker-compose.yml:16)。
 
 ---

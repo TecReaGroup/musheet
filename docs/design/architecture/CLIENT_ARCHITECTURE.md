@@ -2,7 +2,7 @@
 
 本文档描述 MuSheet Flutter 客户端当前的核心架构分层、初始化流程、主题体系、同步入口与测试落点，作为客户端实现的总览设计文档。
 
-本文档基于当前项目结构整理，重点参考：[`lib/main.dart`](lib/main.dart:19)、[`lib/core/sync/unified_sync_manager.dart`](lib/core/sync/unified_sync_manager.dart:23)、[`lib/theme/app_theme.dart`](lib/theme/app_theme.dart:4)、[`lib/screens/settings_screen.dart`](lib/screens/settings_screen.dart:14)、[`pubspec.yaml`](pubspec.yaml:30)。
+本文档基于当前项目结构整理，重点参考：[`main()`](app/lib/main.dart:19)、[`UnifiedSyncManager`](app/lib/core/sync/unified_sync_manager.dart:23)、[`AppTheme`](app/lib/theme/app_theme.dart:4)、[`SettingsScreen`](app/lib/screens/settings_screen.dart:14)、[`app/pubspec.yaml`](app/pubspec.yaml)。
 
 ---
 

@@ -162,7 +162,7 @@ docker-compose up -d
 
 ### Admin Web UI（可选）
 
-当前项目包含独立的 Flutter Web 管理端 [`server/admin_web/`](server/admin_web)，并通过 [`server/docker-compose.yml`](server/docker-compose.yml:98) 以可选服务方式启动。
+当前项目包含独立的 Flutter Web 管理端 [`admin_web/`](admin_web)，并通过 [`server/docker-compose.yml`](server/docker-compose.yml:98) 以可选服务方式启动。
 
 启动包含管理端的完整环境：
 
@@ -200,7 +200,7 @@ ifconfig | grep inet
 在 App 中将后端地址配置为：
 - `http://192.168.1.100:8080`
 
-当前客户端会从本地持久化配置中读取 `backend_server_url`，并在启动时恢复，见 [`lib/main.dart`](lib/main.dart:54)。如果未配置地址，客户端会记录 “no server configured” 并跳过远程初始化。
+当前客户端会从本地持久化配置中读取 `backend_server_url`，并在启动时恢复，见 [`main()`](app/lib/main.dart:19)。如果未配置地址，客户端会记录 “no server configured” 并跳过远程初始化。
 
 ### 3. 防火墙设置
 

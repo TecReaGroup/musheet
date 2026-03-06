@@ -34,10 +34,16 @@ server/
 │   │   └── server.dart      # Server configuration
 │   ├── config/              # Environment configs
 │   └── Dockerfile
+├── musheet_client/          # Generated Dart client shared by app/admin_web
 ├── nginx/                   # Nginx configuration
 ├── scripts/                 # Deployment scripts
 ├── docker-compose.yml       # Docker orchestration
 └── .env.example             # Environment template
+
+../admin_web/
+├── lib/                     # Admin UI source
+├── web/                     # Flutter web host assets
+└── pubspec.yaml             # Admin package manifest
 ```
 
 ## Quick Start

@@ -1,0 +1,14 @@
+name: musheet_shared_ui
+description: Shared UI tokens for MuSheet applications.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0

@@ -819,7 +819,21 @@ packages:
   musheet_client:
     dependency: "direct main"
     description:
-      path: "server/musheet_client"
+      path: "../server/musheet_client"
+      relative: true
+    source: path
+    version: "1.0.0"
+  musheet_shared_core:
+    dependency: "direct main"
+    description:
+      path: "../packages/musheet_shared_core"
+      relative: true
+    source: path
+    version: "1.0.0"
+  musheet_shared_ui:
+    dependency: "direct main"
+    description:
+      path: "../packages/musheet_shared_ui"
       relative: true
     source: path
     version: "1.0.0"

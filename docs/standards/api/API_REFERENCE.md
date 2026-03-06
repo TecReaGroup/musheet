@@ -14,7 +14,7 @@ MuSheet 使用 Serverpod 构建后端，并通过 Serverpod Endpoint / RPC 方�
 ## 基础信息
 
 - **服务器框架**: Serverpod
-- **部署结构**: [`server/musheet_server/`](server/musheet_server) + [`server/admin_web/`](server/admin_web) + [`server/docker-compose.yml`](server/docker-compose.yml)
+- **部署结构**: [`app/`](app) + [`server/musheet_server/`](server/musheet_server) + [`admin_web/`](admin_web) + [`server/docker-compose.yml`](server/docker-compose.yml)
 - **数据库**: PostgreSQL
 - **缓存 / 会话依赖**: Redis
 - **认证方式**: Access Token + Refresh Token

@@ -95,7 +95,11 @@ dependencies:
   serverpod_client: ^3.0.1
   serverpod_flutter: ^3.0.1
   musheet_client:
-    path: server/musheet_client
+    path: ../server/musheet_client
+  musheet_shared_core:
+    path: ../packages/musheet_shared_core
+  musheet_shared_ui:
+    path: ../packages/musheet_shared_ui
 
   # Native splash screen
   flutter_native_splash: ^2.4.7

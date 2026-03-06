@@ -96,10 +96,10 @@ services:
       - musheet_network
 
   # Admin Web UI (Flutter Web)
-  # 使用 Dockerfile.prebuilt 需要先本地构建: cd admin_web && flutter build web --release --dart-define=API_URL=/api
+  # 使用 Dockerfile.prebuilt 需要先本地构建: cd ../admin_web && flutter build web --release --dart-define=API_URL=/api
   admin_web:
     build:
-      context: ./admin_web
+      context: ../admin_web
       dockerfile: Dockerfile.prebuilt
     container_name: musheet_admin_web
     restart: unless-stopped
