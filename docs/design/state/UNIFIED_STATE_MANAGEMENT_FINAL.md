@@ -7,12 +7,14 @@
 
 | 决策点 | 选择 | 说明 |
 |--------|------|------|
-| 迁移策略 | **一次性重构** | 一步到位完成迁移，避免过渡期维护两套代码 |
-| UI 状态统一 | **完全 Scoped** | 所有 UI 状态都使用 DataScope 区分，Library 和 Team 完全隔离 |
-| 刷新闪烁 | **修改 refresh 方法** | 在 Notifier 中使用 copyWithPrevious 保留旧数据 |
-| 持久化策略 | **抽象持久化基类** | 创建 PersistentNotifier 封装通用逻辑，实现代码复用 |
-| 派生 Provider | **全面派生化** | 为所有场景创建完整的派生链（过滤、排序、ViewModel） |
-| 文件组织 | **按功能拆分** | 多文件组织 + barrel 文件统一导出 |
+| 迁移策略 | **渐进式重构** | 先统一规范与文档，再以 `score` 领域为样板逐步迁移，避免一次性重构风险 |
+| UI 状态统一 | **Scoped + 统一出口** | UI 状态统一收口到 `providers/`，按 DataScope 和功能键隔离 |
+| 数据状态方案 | **Query / Command 分离** | 查询状态与写操作入口彻底分离，避免同一 Notifier 同时承担列表与命令职责 |
+| 刷新策略 | **数据库流优先** | 列表由数据库监听驱动，减少内存副本与刷新闪烁 |
+| 持久化策略 | **按需抽象** | 持久化基类可作为后续优化，不阻塞当前治理收口 |
+| 派生 Provider | **优先围绕页面与领域落地** | 先收敛排序/过滤/ViewModel 的统一出口，再逐步补齐完整派生链 |
+| 文件组织 | **按职责拆分** | Query、Command、UI State、Derived 分层拆分，并保留兼容层过渡 |
+| 最近打开状态 | **统一到底层 Scoped 模型** | 用户侧语义 Provider 保留，但底层统一映射到 scoped recent/opened family provider |
 
 ---
 
@@ -32,11 +34,11 @@ Screen 组件遵循"Dumb Screen"原则，只负责订阅状态、渲染界面、
 
 **第三层：UI 状态层**
 
-管理所有与界面交互相关的状态。所有 UI 状态都使用 DataScope 区分，确保 Library 和 Team 场景完全隔离。需要持久化的状态通过抽象基类统一处理。
+管理所有与界面交互相关的状态。所有 UI 状态都使用统一出口管理；其中与数据域相关的状态优先使用 DataScope 区分，确保 Library 和 Team 场景完全隔离。当前已收口的范围包括 tab、modal、sort、search、app transient state，以及 recent/opened 相关状态。
 
 **第四层：数据状态层**
 
-管理应用的核心领域数据。已完成 DataScope 改造，支持统一的数据域访问模式。
+管理应用的核心领域数据。该层采用 Query / Command 分离：Query Provider 只负责暴露数据，Command Provider 只负责执行业务写操作。对于 `score`、`setlist` 等可由本地数据库直接监听的领域，列表状态以数据库流为唯一事实源。
 
 **第五层：仓库层（Repository）**
 
@@ -147,13 +149,14 @@ Screen 组件遵循"Dumb Screen"原则，只负责订阅状态、渲染界面、
 
 ### 3.1 设计原则
 
-所有 UI 状态都必须使用 DataScope 作为区分维度，不存在"全局"UI 状态。
+UI 状态原则上必须定义在统一的 `providers/` 出口中；凡是会因为数据域不同而产生差异的状态，都应使用 DataScope 作为区分维度。
 
 这一设计的理由：
 - Library 和 Team 的 UI 偏好应该完全独立
 - 用户在不同 Team 中可能有不同的排序习惯
 - 搜索上下文与当前数据域绑定
 - 避免状态在域之间意外共享
+- 阻止 Screen 文件继续定义重复 Provider，形成新的状态入口
 
 ### 3.2 UI 状态分类
 
@@ -167,10 +170,13 @@ Screen 组件遵循"Dumb Screen"原则，只负责订阅状态、渲染界面、
 **最近打开记录**
 - 乐谱打开记录：按 DataScope 独立维护
 - 曲单打开记录：按 DataScope 独立维护
-- 需要持久化存储
+- 用户侧语义入口保留为 [`recentlyOpenedScoresProvider`](app/lib/providers/ui_state_providers.dart:331) 与 [`recentlyOpenedSetlistsProvider`](app/lib/providers/ui_state_providers.dart:326)
+- 底层统一映射到 [`scopedRecentlyOpenedProvider`](app/lib/providers/ui_state_providers.dart:103)
 
 **最后打开索引**
 - 曲单中的乐谱索引：按 DataScope 维护
+- 用户侧语义入口保留为 [`lastOpenedScoreInSetlistProvider`](app/lib/providers/ui_state_providers.dart:336)
+- 底层统一映射到 [`scopedLastOpenedIndexProvider`](app/lib/providers/ui_state_providers.dart:133)
 - 乐谱中的乐器索引：按 DataScope 维护
 
 **用户偏好**
@@ -206,60 +212,64 @@ Modal 状态使用 `(DataScope, String modalKey)` 格式：
 
 ---
 
-## 第四章：抽象持久化基类设计
+## 第四章：Query / Command 分离设计
 
 ### 4.1 设计目标
 
-创建 PersistentNotifier 基类，封装以下通用逻辑：
-- SharedPreferences 读写
-- 异步加载与状态初始化
-- 写入防抖
-- 存储键的自动生成（包含 DataScope 信息）
-- 序列化与反序列化
+建立统一的领域读写模型，解决当前 `score` / `setlist` 领域中“查询入口、写入口、页面临时逻辑”并存的问题。
+
+核心目标：
+- 让领域列表只有一个事实源
+- 让所有写操作只有一个命令入口
+- 让 Screen 只负责分发意图，不再直接操作 Repository
+- 让兼容层 Provider 在过渡期保留，但停止继续承接新业务
 
 ### 4.2 基类职责
 
-PersistentNotifier 基类提供：
+Query / Command 分离后的职责如下：
 
-**自动存储键生成**
+**Query Provider**
 
-根据 DataScope 和功能键自动生成唯一的存储键，格式为：
-`ui_state_{scopeType}_{scopeId}_{feature}_{subKey}`
+- 只负责读取领域数据
+- 对于乐谱、曲单等领域，优先直接监听数据库流
+- 不暴露新增、修改、删除等命令方法
+- 可继续提供 `byId`、`list`、`detail` 等只读派生查询
 
-例如：
-- `ui_state_user_0_sort_scores`
-- `ui_state_team_1_recentlyOpened_scores`
+**Command Provider**
 
-**异步初始化**
+- 只负责执行新增、修改、删除、复制、导入、重排等写操作
+- 内部调用 Repository 完成持久化和同步触发
+- 不持有 `List<T>` 的权威副本
+- 只暴露执行状态，例如 `isSubmitting`、`error`、`lastAction`
 
-build 方法返回默认值，同时触发异步加载。加载完成后更新状态，UI 自动刷新。
+**兼容层 Provider**
 
-**防抖写入**
+- 可在迁移期继续存在
+- 仅用于兼容旧页面
+- 不再继续新增业务写接口
 
-状态变更时，启动防抖定时器。在指定延迟（如 500ms）内的多次变更只触发一次写入。应用进入后台时强制写入。
+这样可以避免出现以下混乱：
+- 页面 A 通过 Helper 写数据
+- 页面 B 通过旧 Notifier 写数据
+- 页面 C 直接通过 Repository 写数据
+- 最终导致领域状态入口失控
 
-**序列化接口**
+### 4.3 `score` 领域作为首个治理样板
 
-子类需实现两个方法：
-- 将状态转换为可存储的 JSON 格式
-- 从 JSON 恢复状态
+`score` 是当前最适合优先治理的领域，因为其读路径已经部分统一，但写路径仍然散落在多个入口。
 
-### 4.3 需要持久化的状态清单
+规范化后的目标结构：
 
-| 状态类型 | 是否持久化 | 理由 |
-|----------|-----------|------|
-| 排序偏好 | 是 | 用户习惯，跨会话保持 |
-| 最近打开记录 | 是 | 历史记录，跨会话保持 |
-| 最后打开索引 | 否 | 临时状态，会话内有效即可 |
-| 偏好乐器 | 是 | 用户设置，跨会话保持 |
-| 团队功能开关 | 是 | 用户设置，跨会话保持 |
-| 搜索关键词 | 否 | 临时状态 |
-| Modal 开关 | 否 | 临时状态 |
-| Tab 状态 | 否 | 临时状态（可选持久化） |
+- `scores_state_provider.dart`：保留 Query Provider 与兼容读取入口
+- `score_commands_provider.dart`：承接所有 `score` 写操作
+- `ui_state_providers.dart` 或其子模块：承接 `score` 相关排序、最近打开、modal、搜索状态
+- `derived/`：承接排序结果、过滤结果、页面 ViewModel
+
+`score` 领域统一后，再把同样模式复制到 `setlist` 和 team 相关页面。
 
 ---
 
-## 第五章：全面派生化设计
+## 第五章：UI 状态与派生状态治理
 
 ### 5.1 派生 Provider 清单
 
@@ -337,29 +347,19 @@ Riverpod 自动缓存派生 Provider 的计算结果：
 lib/providers/
 ├── core_providers.dart              # 核心服务 Provider
 ├── auth_state_provider.dart         # 认证状态
-├── scores_state_provider.dart       # 乐谱数据
-├── setlists_state_provider.dart     # 曲单数据
-├── teams_state_provider.dart        # 团队数据
-├── base_data_notifier.dart          # 数据 Notifier 工具
+├── scores_state_provider.dart       # score Query + 兼容读取入口
+├── setlists_state_provider.dart     # setlist Query + 兼容读取入口
+├── teams_state_provider.dart        # team 数据状态
+├── score_commands_provider.dart     # score 领域命令入口
+├── setlist_commands_provider.dart   # setlist 领域命令入口
+├── ui_state_providers.dart          # 统一 UI 状态出口（tab/modal/sort/search/recent/transient）
 │
-├── ui_state/                        # UI 状态模块
-│   ├── ui_state.dart                # Barrel 文件，统一导出
-│   ├── persistent_notifier.dart     # 持久化基类
-│   ├── sort_providers.dart          # 排序状态
-│   ├── recently_opened_providers.dart   # 最近打开记录
-│   ├── last_opened_index_providers.dart # 最后打开索引
-│   ├── preferences_providers.dart   # 用户偏好
-│   ├── search_providers.dart        # 搜索状态
-│   ├── modal_providers.dart         # Modal 状态
-│   └── tab_providers.dart           # Tab 状态
-│
-└── derived/                         # 派生状态模块
+└── derived/
     ├── derived.dart                 # Barrel 文件，统一导出
-    ├── filtered_providers.dart      # 过滤 Provider
-    ├── sorted_providers.dart        # 排序 Provider
-    ├── home_view_model.dart         # 首页 ViewModel
-    ├── library_view_model.dart      # Library ViewModel
-    └── team_view_model.dart         # Team ViewModel
+    ├── sorted_providers.dart        # 排序结果
+    ├── filtered_providers.dart      # 过滤结果
+    ├── library_view_model.dart      # Library 页面聚合状态
+    └── team_view_model.dart         # Team 页面聚合状态
 ```
 
 ### 6.2 Barrel 文件设计
@@ -380,103 +380,83 @@ Screen 文件的 import 规则：
 
 ---
 
-## 第七章：刷新不闪烁实现
+## 第七章：迁移策略与实施计划
 
-### 7.1 问题根源
+### 7.1 迁移原则
 
-当前 refresh 方法使用 `state = const AsyncLoading()` 会导致 AsyncValue 的 value 变为 null。下游的同步 Provider 使用 `value ?? []` 返回空列表，造成界面闪烁。
+采用渐进式迁移，而不是一次性重构。
 
-### 7.2 解决方案
+原因：
+- 当前项目已经存在兼容层和历史入口，一次性替换风险过高
+- `score` 领域已经具备较好的 Query 基础，适合先作为试点
+- 先更新文档和团队规范，可以立即阻止新的混乱继续进入代码库
 
-修改所有数据 Notifier 的 refresh 方法，使用 copyWithPrevious 保留旧数据：
+### 7.2 第一阶段：规范收口
 
-刷新开始时，创建新的 AsyncLoading 状态，但通过 copyWithPrevious 保留之前的数据。这样 value 属性仍然可用，UI 可以继续展示旧数据。
+第一阶段只做规则和文档治理，不大规模改动业务代码：
 
-刷新完成时，用新数据替换，UI 平滑过渡。
+- 冻结旧兼容层 Provider 的新增写接口
+- 禁止在 Screen 文件中定义新的 Provider
+- 禁止 Screen 直接读取 Repository 执行写操作
+- 规定所有新增 `score` 逻辑必须走新的 Command Provider
+- 规定所有新增 UI 状态必须进入统一的 `providers/` 出口
 
-刷新失败时，可以选择保留旧数据或显示错误状态。
+### 7.3 第二阶段：以 `score` 为样板重构
 
-### 7.3 影响范围
+第二阶段围绕 `score` 领域收口：
 
-需要修改的文件：
-- scores_state_provider.dart 中的 ScopedScoresNotifier.refresh()
-- setlists_state_provider.dart 中的 ScopedSetlistsNotifier.refresh()
-- teams_state_provider.dart 中的 TeamsStateNotifier（如有类似逻辑）
+- 新建 `score_commands_provider.dart`
+- 将 `addScore / updateScore / deleteScore / duplicateScore / reorderInstrumentScores / updateAnnotations / copyScoreToTeam` 等动作迁入命令层
+- 更新 `score_detail_screen.dart`、`score_viewer_screen.dart`、`add_score_widget.dart` 等调用方
+- 将 `library_screen.dart`、`team_screen.dart` 中和 `score` 相关的 Provider 及业务函数迁出
 
-### 7.4 UI 层配合
+### 7.4 第三阶段：复制到 `setlist` 与 team 页面
 
-UI 层可以通过以下方式展示刷新状态：
-- 使用 AsyncValue 的 isRefreshing 属性判断是否正在刷新
-- 正在刷新时显示轻量指示器（如顶部进度条）
-- 使用 when 方法的 skipLoadingOnRefresh 参数跳过刷新时的 loading 状态
+当 `score` 模式稳定后，再复制到其他领域：
+
+- 按同样模式重构 `setlist`
+- 整理 `team_screen.dart` 中的跨域复制、导入等业务动作
+- 逐步把排序、搜索、最近打开、modal 状态全部迁到统一 UI State 出口
+- 在用户侧 recent/opened 语义 Provider 保留不变的前提下，底层统一到 scoped family provider
+- 最后再评估 `teamsStateProvider` 是否进一步拆分为 Query / Command
 
 ---
 
-## 第八章：一次性重构实施计划
+## 第八章：执行约束
 
-### 8.1 重构范围
+### 8.1 强制性约束
 
-由于选择一次性重构策略，需要在一个 PR 中完成以下所有改动：
+在重构开始后，团队需要遵守以下约束：
 
-**阶段一：创建基础设施**
-- 创建 PersistentNotifier 抽象基类
-- 创建 ui_state 目录结构和 barrel 文件
-- 创建 derived 目录结构和 barrel 文件
+- 新增业务逻辑不得继续写入旧兼容 Provider
+- Screen 文件不得继续定义业务 Provider
+- Screen 文件不得直接调用 Repository 进行写操作
+- Query Provider 不得再承担写命令职责
+- Command Provider 不得维护 `List<T>` 的权威列表状态
 
-**阶段二：迁移 UI 状态 Provider**
-- 将 library_screen.dart 中的所有 Provider 迁移到 ui_state 模块
-- 将 home_screen.dart 中的所有 Provider 迁移到 ui_state 模块
-- 改造为 Scoped 版本（添加 DataScope 参数）
-- 为需要持久化的 Provider 继承 PersistentNotifier
+### 8.2 验证策略
 
-**阶段三：创建派生 Provider**
-- 实现 sortedScoresProvider 和 sortedSetlistsProvider
-- 实现 filteredScoresProvider 和 filteredSetlistsProvider
-- 实现 homeViewModelProvider
-- 实现 libraryViewModelProvider
-- 实现 teamViewModelProvider（如需要）
+渐进式迁移过程中，需要在每个阶段验证以下内容：
 
-**阶段四：修复刷新闪烁**
-- 修改 ScopedScoresNotifier.refresh()
-- 修改 ScopedSetlistsNotifier.refresh()
+**领域一致性验证**
+- 同一领域的写操作是否都通过 Command Provider 发起
+- 页面是否仍存在直接操作 Repository 的行为
+- 旧兼容层是否仍被新增业务继续依赖
 
-**阶段五：更新 Screen 文件**
-- 更新 home_screen.dart 的 import 和 Provider 使用
-- 更新 library_screen.dart 的 import 和 Provider 使用
-- 删除 Screen 文件中的旧 Provider 定义
-- 简化 build 方法，使用 ViewModel Provider
+**页面行为验证**
+- Library 页面：排序、Tab、创建乐谱/曲单
+- Team 页面：域隔离、复制到 team、导入流程
+- Viewer / Detail 页面：标注、乐器排序、偏好记录
 
-**阶段六：清理**
-- 删除重复的 getBestInstrumentIndex 函数
-- 删除其他重复定义
-- 运行 flutter analyze 确保无警告
+**边界情况验证**
+- 空列表
+- 离线状态
+- 登录/登出切换
+- 同步完成后的自动刷新
 
-### 8.2 测试策略
+### 8.3 回滚策略
 
-一次性重构风险较高，需要充分测试：
-
-**功能测试**
-- Home 页面：搜索、最近打开、导航
-- Library 页面：排序、Tab 切换、创建乐谱/曲单
-- Team 页面：数据隔离、排序独立性
-- Viewer 页面：乐器选择、偏好记录
-
-**边界情况测试**
-- 空列表状态
-- 搜索无结果
-- 网络离线
-- 用户登出后重新登录
-
-**持久化测试**
-- 应用重启后状态恢复
-- 不同 DataScope 的状态隔离
-
-### 8.3 回滚计划
-
-如果重构后发现严重问题：
-- 立即回滚整个 PR
-- 分析问题原因
-- 考虑是否改为渐进式迁移策略
+由于采用分阶段重构，每一阶段都应尽量保持可单独回滚。优先通过小步 PR 推进，而不是在一个超大 PR 中同时修改所有页面与 Provider。
 
 ---
 
@@ -542,35 +522,41 @@ lib/providers/derived/
 └── team_view_model.dart
 ```
 
-### 需要修改的文件
+### 本轮已完成的文件调整
 
 ```
-lib/providers/scores_state_provider.dart    # 修复刷新闪烁
-lib/providers/setlists_state_provider.dart  # 修复刷新闪烁
-lib/screens/home_screen.dart                # 更新 import，删除 Provider 定义
-lib/screens/library_screen.dart             # 更新 import，删除 Provider 定义
-lib/providers/ui_state_providers.dart       # 可能需要整合或删除
+lib/providers/score_commands_provider.dart
+lib/providers/setlist_commands_provider.dart
+lib/providers/ui_state_providers.dart
+lib/screens/home_screen.dart
+lib/screens/library_screen.dart
+lib/screens/team_screen.dart
+lib/screens/score_detail_screen.dart
+lib/screens/score_viewer_screen.dart
+lib/screens/setlist_detail_screen.dart
+lib/app.dart
 ```
 
-### 需要删除的代码
+### 本轮已完成的状态收口
 
 ```
-home_screen.dart 中的:
+home_screen.dart 中已迁出:
 - SearchQueryNotifier
 - SearchScopeNotifier
 - HasUnreadNotificationsNotifier
 - 相关 Provider 定义
 
-library_screen.dart 中的:
-- LibraryTabNotifier
-- SetlistSortNotifier
-- ScoreSortNotifier
-- RecentlyOpenedSetlistsNotifier
-- RecentlyOpenedScoresNotifier
-- LastOpenedScoreInSetlistNotifier
-- LastOpenedInstrumentInScoreNotifier
-- PreferredInstrumentNotifier
-- TeamEnabledNotifier
-- getBestInstrumentIndex 函数
+app.dart 中已迁出:
+- ClearSearchRequestNotifier
+- SharedFilePathNotifier
 - 相关 Provider 定义
+
+library_screen.dart / team_screen.dart 中已移除:
+- screen-local tab / modal / sort / recent Provider 定义
+- 对旧 helper / 兼容状态入口的继续依赖
+
+ui_state_providers.dart 中已统一:
+- user 侧 recentlyOpenedScoresProvider / recentlyOpenedSetlistsProvider
+- user 侧 lastOpenedScoreInSetlistProvider
+- 底层统一映射到 scopedRecentlyOpenedProvider / scopedLastOpenedIndexProvider
 ```

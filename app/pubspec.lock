@@ -289,14 +289,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.1.1"
-  dart_pubspec_licenses:
-    dependency: transitive
-    description:
-      name: dart_pubspec_licenses
-      sha256: c3dd75f25ef705d4e8ab09f07afc7a83a80f5635eea11ea2d7b2b4600588b302
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.0.14"
   dart_style:
     dependency: transitive
     description:
@@ -760,14 +752,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.1.7"
-  markdown:
-    dependency: transitive
-    description:
-      name: markdown
-      sha256: "935e23e1ff3bc02d390bad4d4be001208ee92cc217cb5b5a6c19bc14aaa318c1"
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.3.0"
   matcher:
     dependency: transitive
     description:
@@ -884,14 +868,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.1"
-  pana:
-    dependency: transitive
-    description:
-      name: pana
-      sha256: bbad5a3e085fcc2475f08fe1240041e25d74482da80d9af00bc17cce99989e29
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.22.24"
   path:
     dependency: "direct main"
     description:
@@ -976,26 +952,26 @@ packages:
     dependency: transitive
     description:
       name: pdfium_flutter
-      sha256: "8b3f79c61a5e84f0ec43efb5708b42d032e72cb024244e050896eb5a31665ea5"
+      sha256: "0c8b7d5d11d20a1486eade599648e907067568955bd14a1b06de076a968b60a1"
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.7"
+    version: "0.1.9"
   pdfrx:
     dependency: "direct main"
     description:
       name: pdfrx
-      sha256: c9717a8e233fd92ccacd29088e16ae1ba155ebff9ff7a08fdb711820ea6199ff
+      sha256: e32e0c786528eec2b3c56b43f59ef1debce3a27c7accd862b95413f949afcfa9
       url: "https://pub.dev"
     source: hosted
-    version: "2.2.17"
+    version: "2.2.24"
   pdfrx_engine:
     dependency: transitive
     description:
       name: pdfrx_engine
-      sha256: e4e942bda9f3876d34729fab8e0c5185b9384614929d82bd6efa8ef2a31b0be3
+      sha256: a8914433d1f6188b903c53d36b9d7dc908bfa89131591a9db22f1a22470d3a48
       url: "https://pub.dev"
     source: hosted
-    version: "0.3.6"
+    version: "0.3.9"
   perfect_freehand:
     dependency: "direct main"
     description:
@@ -1124,14 +1100,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.28.0"
-  safe_url_check:
-    dependency: transitive
-    description:
-      name: safe_url_check
-      sha256: "49a3e060a7869cbafc8f4845ca1ecbbaaa53179980a32f4fdfeab1607e90f41d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.1.2"
   scribble:
     dependency: "direct main"
     description:
@@ -1473,14 +1441,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.4.0"
-  tar:
-    dependency: transitive
-    description:
-      name: tar
-      sha256: b338bacfd24dae6cf527acb4242003a71fc88ce183a9002376fabbc4ebda30c9
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.2"
   term_glyph:
     dependency: transitive
     description:

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/team.dart';
 import '../providers/scores_state_provider.dart';
+import '../providers/score_commands_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
@@ -113,9 +114,9 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
     );
   }
 
-  /// Get the scores helper for current scope
-  ScopedScoresHelper get _scoresHelper =>
-      ref.read(scopedScoresHelperProvider(_scope));
+  /// Unified score command entry for current scope
+  ScopedScoreCommandsNotifier get _scoreCommands =>
+      ref.read(scopedScoreCommandsProvider(_scope).notifier);
 
   @override
   Widget build(BuildContext context) {
@@ -444,8 +445,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
           final item = newIds.removeAt(oldIndex);
           newIds.insert(newIndex, item);
 
-          // Use unified notifier
-          _scoresHelper.reorderInstrumentScores(currentScore.id, newIds);
+          _scoreCommands.reorderInstrumentScores(currentScore.id, newIds);
         },
         itemBuilder: (context, index) {
           final instrumentScore = currentScore.instrumentScores[index];
@@ -728,7 +728,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
         createdAt: DateTime.now(),
       );
 
-      await _scoresHelper.addInstrumentScore(teamScore.id, teamInstrument);
+      await _scoreCommands.addInstrumentScore(teamScore.id, teamInstrument);
       successCount++;
     }
 
@@ -910,7 +910,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                             TextButton(
                               onPressed: () async {
                                 Navigator.pop(context);
-                                await _scoresHelper.deleteInstrumentScore(
+                                await _scoreCommands.deleteInstrumentScore(
                                   score.id,
                                   instrumentScore.id,
                                 );
@@ -1008,7 +1008,7 @@ class _ScoreDetailScreenState extends ConsumerState<ScoreDetailScreen> {
                       composer: composer,
                     );
 
-                    await _scoresHelper.updateScore(updatedScore);
+                    await _scoreCommands.updateScore(updatedScore);
                     if (!mounted) return;
                     if (_isTeam) {
                       AppToast.success(context, 'Score updated');

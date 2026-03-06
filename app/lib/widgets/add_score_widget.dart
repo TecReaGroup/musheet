@@ -5,6 +5,7 @@ import 'package:path/path.dart' as path;
 import '../core/sync/pdf_sync_service.dart';
 import '../core/data/data_scope.dart';
 import '../providers/scores_state_provider.dart';
+import '../providers/score_commands_provider.dart';
 import '../providers/preferred_instrument_provider.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
@@ -164,9 +165,9 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   /// Get the effective scope (defaults to user if not provided)
   DataScope get _scope => widget.scope ?? DataScope.user;
 
-  /// Get the scores helper for current scope
-  ScopedScoresHelper get _scoresHelper =>
-      ref.read(scopedScoresHelperProvider(_scope));
+  /// Unified score command entry for current scope
+  ScopedScoreCommandsNotifier get _scoreCommands =>
+      ref.read(scopedScoreCommandsProvider(_scope).notifier);
 
   @override
   void initState() {
@@ -294,9 +295,11 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
   }
 
   void _updateTitleSuggestions(String query) {
-    // Use scoped provider for suggestions
-    final helper = ref.read(scopedScoresHelperProvider(_scope));
-    final suggestions = helper.getSuggestionsByTitle(query);
+    final suggestions = ref
+        .read(scopedScoresListProvider(_scope))
+        .where((s) => s.title.toLowerCase().contains(query.toLowerCase()))
+        .take(3)
+        .toList();
     setState(() {
       _titleSuggestions = suggestions;
       _showTitleSuggestions = suggestions.isNotEmpty && query.isNotEmpty;
@@ -347,7 +350,15 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
     }
 
     final composerToCheck = composer.isEmpty ? 'Unknown' : composer;
-    final matched = _scoresHelper.findByTitleAndComposer(title, composerToCheck);
+    final key =
+        '${title.toLowerCase().trim()}|${composerToCheck.toLowerCase().trim()}';
+    final matched = ref
+        .read(scopedScoresListProvider(_scope))
+        .cast<Score?>()
+        .firstWhere(
+          (score) => score?.scoreKey == key,
+          orElse: () => null,
+        );
 
     setState(() {
       _matchedScore = matched;
@@ -509,7 +520,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
         createdAt: now,
       );
 
-      await _scoresHelper.addInstrumentScore(
+      await _scoreCommands.addInstrumentScore(
         widget.existingScore!.id,
         instrumentScore,
       );
@@ -542,7 +553,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
 
       if (_matchedScore != null) {
         // Add instrument score to existing score
-        await _scoresHelper.addInstrumentScore(_matchedScore!.id, instrumentScore);
+        await _scoreCommands.addInstrumentScore(_matchedScore!.id, instrumentScore);
       } else {
         // Create new score with instrument score
         final newScore = Score(
@@ -554,7 +565,7 @@ class _AddScoreWidgetState extends ConsumerState<AddScoreWidget> {
           createdAt: now,
           instrumentScores: [instrumentScore],
         );
-        await _scoresHelper.addScore(newScore);
+        await _scoreCommands.addScore(newScore);
       }
 
       if (!mounted) return;

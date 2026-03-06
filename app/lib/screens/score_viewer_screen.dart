@@ -10,7 +10,7 @@ import 'package:path/path.dart' as p;
 import '../models/team.dart';
 import '../models/annotation.dart';
 import '../models/viewer_data.dart';
-import '../providers/scores_state_provider.dart';
+import '../providers/score_commands_provider.dart';
 import '../core/data/data_scope.dart';
 import '../providers/core_providers.dart';
 import '../core/sync/pdf_sync_service.dart';
@@ -90,8 +90,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   // Preview size for export scaling
   Size _previewSize = Size.zero;
 
-  // Cached provider helper for safe dispose usage
-  ScopedScoresHelper? _scoresHelper;
+  // Cached command notifier for safe dispose usage
+  ScopedScoreCommandsNotifier? _scoreCommands;
 
   // BPM save debounce for team mode
   Timer? _bpmSaveDebounce;
@@ -127,10 +127,10 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     _initAnnotations();
     _loadPdfDocument();
 
-    // Cache the helper for safe dispose usage
+    // Cache the command entry for safe dispose usage
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _scoresHelper = ref.read(scopedScoresHelperProvider(widget.scope));
+      _scoreCommands = ref.read(scopedScoreCommandsProvider(widget.scope).notifier);
     });
   }
 
@@ -151,7 +151,7 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
   /// Save BPM - handles both personal and team modes
   void _saveBpm(int bpm) async {
     final updatedScore = widget.score.copyWith(bpm: bpm);
-    await _scoresHelper?.updateScore(updatedScore);
+    await _scoreCommands?.updateScore(updatedScore);
   }
 
   void _initAnnotations() {
@@ -364,9 +364,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
     super.dispose();
   }
 
-  /// Synchronous version for dispose - uses cached notifier for safe access
+  /// Synchronous version for dispose - uses cached command entry for safe access
   void _saveAnnotationsSync() {
-    if (_currentInstrument == null || _scoresHelper == null) {
+    if (_currentInstrument == null || _scoreCommands == null) {
       return;
     }
 
@@ -378,8 +378,8 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       }
     }
 
-    // Save to database via cached notifier (safe during dispose)
-    _scoresHelper!.updateAnnotations(
+    // Save via cached command entry (safe during dispose)
+    _scoreCommands!.updateAnnotations(
       _scoreData.id,
       _currentInstrument!.id,
       allAnnotations,
@@ -1255,9 +1255,9 @@ class _ScoreViewerScreenState extends ConsumerState<ScoreViewerScreen> {
       }
     }
 
-    // Save to database via scoped provider (works for both personal and team)
+    // Save via unified score command provider (works for both personal and team)
     ref
-        .read(scopedScoresHelperProvider(widget.scope))
+        .read(scopedScoreCommandsProvider(widget.scope).notifier)
         .updateAnnotations(
           _scoreData.id,
           _currentInstrument!.id,

@@ -9,8 +9,10 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/score.dart';
 import '../models/sort_state.dart';
 import '../core/data/data_scope.dart';
+import 'teams_state_provider.dart';
 
 export '../models/sort_state.dart';
 
@@ -68,6 +70,9 @@ class ScopedSortNotifier extends Notifier<SortState> {
 final scopedSortProvider = NotifierProvider.family<ScopedSortNotifier, SortState, (DataScope, String)>(
   (arg) => ScopedSortNotifier(arg),
 );
+
+final setlistSortProvider = scopedSortProvider((DataScope.user, 'setlists'));
+final scoreSortProvider = scopedSortProvider((DataScope.user, 'scores'));
 
 // ============================================================================
 // Recently Opened Tracking
@@ -171,4 +176,200 @@ class TabStateNotifier<T> extends Notifier<T> {
   T build() => initialValue;
 
   void setTab(T tab) => state = tab;
+}
+
+final tabStateProvider =
+    NotifierProvider.family<TabStateNotifier<dynamic>, dynamic, (String, dynamic)>(
+      (arg) => TabStateNotifier<dynamic>(arg.$2),
+    );
+
+// ============================================================================
+// Screen-level shared UI enums and providers
+// ============================================================================
+
+/// Shared Library tab enum. Moved out of screen-local state.
+enum LibraryTab { scores, setlists }
+
+/// Shared Team tab enum. Moved out of screen-local state.
+enum TeamTab { setlists, scores, members }
+
+final libraryTabProvider =
+    NotifierProvider<TabStateNotifier<LibraryTab>, LibraryTab>(
+      () => TabStateNotifier(LibraryTab.setlists),
+    );
+
+final teamTabProvider = NotifierProvider<TabStateNotifier<TeamTab>, TeamTab>(
+  () => TabStateNotifier(TeamTab.setlists),
+);
+
+final showCreateSetlistModalProvider =
+    NotifierProvider<BoolStateNotifier, bool>(() {
+      return BoolStateNotifier('library_create_setlist_modal');
+    });
+
+final showCreateScoreModalProvider =
+    NotifierProvider<BoolStateNotifier, bool>(() {
+      return BoolStateNotifier('library_create_score_modal');
+    });
+
+final showTeamSwitcherProvider = NotifierProvider<BoolStateNotifier, bool>(() {
+  return BoolStateNotifier('team_switcher_modal');
+});
+
+final showScoreModalProvider = NotifierProvider<BoolStateNotifier, bool>(() {
+  return BoolStateNotifier('team_score_modal');
+});
+
+final showSetlistModalProvider = NotifierProvider<BoolStateNotifier, bool>(() {
+  return BoolStateNotifier('team_setlist_modal');
+});
+
+final showCreateSetlistDialogProvider =
+    NotifierProvider<BoolStateNotifier, bool>(() {
+      return BoolStateNotifier('team_create_setlist_modal');
+    });
+
+final showImportScoreModalProvider =
+    NotifierProvider<BoolStateNotifier, bool>(() {
+      return BoolStateNotifier('team_import_score_modal');
+    });
+
+final showImportSetlistModalProvider =
+    NotifierProvider<BoolStateNotifier, bool>(() {
+      return BoolStateNotifier('team_import_setlist_modal');
+    });
+
+// ============================================================================
+// Search and app transient UI state
+// ============================================================================
+
+enum SearchScope { library, team }
+
+class SearchQueryNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void setQuery(String newQuery) => state = newQuery;
+  void clear() => state = '';
+}
+
+class SearchScopeNotifier extends Notifier<SearchScope> {
+  @override
+  SearchScope build() => SearchScope.library;
+
+  void setScope(SearchScope newScope) => state = newScope;
+}
+
+class HasUnreadNotificationsNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setHasUnreadNotifications(bool hasUnread) => state = hasUnread;
+}
+
+class ClearSearchRequestNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void trigger() => state++;
+}
+
+class SharedFilePathNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void setPath(String? path) => state = path;
+  void clear() => state = null;
+}
+
+final searchQueryProvider =
+    NotifierProvider<SearchQueryNotifier, String>(SearchQueryNotifier.new);
+
+final searchScopeProvider =
+    NotifierProvider<SearchScopeNotifier, SearchScope>(
+      SearchScopeNotifier.new,
+    );
+
+final hasUnreadNotificationsProvider =
+    NotifierProvider<HasUnreadNotificationsNotifier, bool>(
+      HasUnreadNotificationsNotifier.new,
+    );
+
+final clearSearchRequestProvider =
+    NotifierProvider<ClearSearchRequestNotifier, int>(
+      ClearSearchRequestNotifier.new,
+    );
+
+final sharedFilePathProvider =
+    NotifierProvider<SharedFilePathNotifier, String?>(
+      SharedFilePathNotifier.new,
+    );
+
+// ============================================================================
+// Shared recent/open history and preferences
+// ============================================================================
+
+class TeamEnabledNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
+
+  void setTeamEnabled(bool enabled) {
+    state = enabled;
+    if (!enabled) {
+      ref.read(teamsStateProvider.notifier).leaveAllTeams();
+    } else {
+      ref.read(teamsStateProvider.notifier).refresh();
+    }
+  }
+}
+
+final recentlyOpenedSetlistsProvider = scopedRecentlyOpenedProvider((
+  DataScope.user,
+  'setlists',
+));
+
+final recentlyOpenedScoresProvider = scopedRecentlyOpenedProvider((
+  DataScope.user,
+  'scores',
+));
+
+final lastOpenedScoreInSetlistProvider = scopedLastOpenedIndexProvider((
+  DataScope.user,
+  'scoreInSetlist',
+));
+
+final teamEnabledProvider = NotifierProvider<TeamEnabledNotifier, bool>(
+  TeamEnabledNotifier.new,
+);
+
+int getBestInstrumentIndex(
+  Score score,
+  int? lastOpenedIndex,
+  String? preferredInstrumentKey,
+) {
+  if (lastOpenedIndex != null &&
+      lastOpenedIndex >= 0 &&
+      lastOpenedIndex < score.instrumentScores.length) {
+    return lastOpenedIndex;
+  }
+
+  if (preferredInstrumentKey != null && score.instrumentScores.isNotEmpty) {
+    final preferredIndex = score.instrumentScores.indexWhere(
+      (inst) => inst.instrumentKey == preferredInstrumentKey,
+    );
+    if (preferredIndex >= 0) {
+      return preferredIndex;
+    }
+  }
+
+  if (score.instrumentScores.isNotEmpty) {
+    final vocalIndex = score.instrumentScores.indexWhere(
+      (inst) => inst.instrumentKey == 'vocal',
+    );
+    if (vocalIndex >= 0) {
+      return vocalIndex;
+    }
+  }
+
+  return 0;
 }

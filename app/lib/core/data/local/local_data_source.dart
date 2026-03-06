@@ -234,7 +234,25 @@ class ScopedLocalDataSource implements SyncableDataSource {
 
   @override
   Stream<List<Score>> watchAllScores() {
-    return _db.select(_db.scores).watch().asyncMap((_) => getAllScores());
+    return Stream.multi((controller) {
+      Future<void> emitLatest() async {
+        if (controller.isClosed) return;
+        controller.add(await getAllScores());
+      }
+
+      final subscriptions = <StreamSubscription<dynamic>>[
+        _db.select(_db.scores).watch().listen((_) => emitLatest()),
+        _db.select(_db.instrumentScores).watch().listen((_) => emitLatest()),
+      ];
+
+      emitLatest();
+
+      controller.onCancel = () async {
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      };
+    });
   }
 
   @override
@@ -548,7 +566,25 @@ class ScopedLocalDataSource implements SyncableDataSource {
 
   @override
   Stream<List<Setlist>> watchAllSetlists() {
-    return _db.select(_db.setlists).watch().asyncMap((_) => getAllSetlists());
+    return Stream.multi((controller) {
+      Future<void> emitLatest() async {
+        if (controller.isClosed) return;
+        controller.add(await getAllSetlists());
+      }
+
+      final subscriptions = <StreamSubscription<dynamic>>[
+        _db.select(_db.setlists).watch().listen((_) => emitLatest()),
+        _db.select(_db.setlistScores).watch().listen((_) => emitLatest()),
+      ];
+
+      emitLatest();
+
+      controller.onCancel = () async {
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      };
+    });
   }
 
   @override

@@ -9,10 +9,14 @@ import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
-import '../app.dart';
 import '../router/app_router.dart';
-import 'library_screen.dart'
+import '../providers/ui_state_providers.dart'
     show
+        SearchScope,
+        searchQueryProvider,
+        searchScopeProvider,
+        hasUnreadNotificationsProvider,
+        clearSearchRequestProvider,
         LibraryTab,
         libraryTabProvider,
         recentlyOpenedSetlistsProvider,
@@ -22,43 +26,6 @@ import 'library_screen.dart'
         getBestInstrumentIndex;
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
-
-enum SearchScope { library, team }
-
-class SearchQueryNotifier extends Notifier<String> {
-  @override
-  String build() => '';
-
-  @override
-  set state(String newState) => super.state = newState;
-}
-
-class SearchScopeNotifier extends Notifier<SearchScope> {
-  @override
-  SearchScope build() => SearchScope.library;
-
-  @override
-  set state(SearchScope newState) => super.state = newState;
-}
-
-class HasUnreadNotificationsNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-final searchQueryProvider = NotifierProvider<SearchQueryNotifier, String>(
-  SearchQueryNotifier.new,
-);
-final searchScopeProvider = NotifierProvider<SearchScopeNotifier, SearchScope>(
-  SearchScopeNotifier.new,
-);
-final hasUnreadNotificationsProvider =
-    NotifierProvider<HasUnreadNotificationsNotifier, bool>(
-      HasUnreadNotificationsNotifier.new,
-    );
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -93,7 +60,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // If team is disabled and search scope is team, switch to library
     if (!teamEnabled && searchScope == SearchScope.team) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(searchScopeProvider.notifier).state = SearchScope.library;
+        ref.read(searchScopeProvider.notifier).setScope(SearchScope.library);
       });
     }
 
@@ -237,11 +204,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       IconButton(
                         onPressed: () =>
                             ref
-                                    .read(
-                                      hasUnreadNotificationsProvider.notifier,
-                                    )
-                                    .state =
-                                false,
+                                .read(hasUnreadNotificationsProvider.notifier)
+                                .setHasUnreadNotifications(false),
                         icon: Stack(
                           children: [
                             const Icon(
@@ -276,7 +240,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     controller: _searchController,
                     focusNode: _searchFocusNode,
                     onChanged: (value) =>
-                        ref.read(searchQueryProvider.notifier).state = value,
+                        ref.read(searchQueryProvider.notifier).setQuery(value),
                     decoration: InputDecoration(
                       hintText: 'Search scores and setlists...',
                       hintStyle: const TextStyle(color: AppColors.gray400),
@@ -461,7 +425,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ) {
     final isSelected = value == current;
     return GestureDetector(
-      onTap: () => ref.read(searchScopeProvider.notifier).state = value,
+      onTap: () => ref.read(searchScopeProvider.notifier).setScope(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: BoxDecoration(
@@ -502,8 +466,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: StatCard.scores(
                 count: libraryScores.length,
                 onTap: () {
-                  ref.read(libraryTabProvider.notifier).state =
-                      LibraryTab.scores;
+                  ref.read(libraryTabProvider.notifier).setTab(
+                    LibraryTab.scores,
+                  );
                   AppNavigation.navigateToLibrary(context);
                 },
               ),
@@ -513,8 +478,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: StatCard.setlists(
                 count: librarySetlists.length,
                 onTap: () {
-                  ref.read(libraryTabProvider.notifier).state =
-                      LibraryTab.setlists;
+                  ref.read(libraryTabProvider.notifier).setTab(
+                    LibraryTab.setlists,
+                  );
                   AppNavigation.navigateToLibrary(context);
                 },
               ),

@@ -218,15 +218,24 @@ void main() {
     });
 
     test('refreshTokenApi calls the refresh token endpoint', () {
-      // Find refreshTokenApi method
-      final methodStart = apiClientSource.indexOf('Future<ApiResult<server.AuthResult>> refreshTokenApi');
-      final nextMethodStart = apiClientSource.indexOf('// ============', methodStart + 10);
+      // Find refreshTokenApi method and slice until the next public API method.
+      final methodStart = apiClientSource.indexOf(
+        'Future<ApiResult<server.AuthResult>> refreshTokenApi',
+      );
+      expect(methodStart, isNonNegative);
+
+      final nextMethodStart = apiClientSource.indexOf(
+        'Future<ApiResult<server.UserProfile>> getProfile',
+        methodStart,
+      );
+      expect(nextMethodStart, greaterThan(methodStart));
+
       final methodBody = apiClientSource.substring(methodStart, nextMethodStart);
 
       expect(
-        methodBody.contains('_client.auth.refreshToken'),
+        methodBody.contains('_facade.refreshToken'),
         isTrue,
-        reason: 'Should call auth.refreshToken on server client',
+        reason: 'Should call refreshToken on facade client',
       );
     });
   });

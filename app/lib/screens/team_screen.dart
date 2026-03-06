@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../providers/teams_state_provider.dart';
 import '../providers/scores_state_provider.dart';
+import '../providers/score_commands_provider.dart';
+import '../providers/setlist_commands_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/ui_state_providers.dart';
 import '../core/data/data_scope.dart';
@@ -17,8 +19,6 @@ import '../widgets/add_score_widget.dart';
 import '../widgets/user_avatar.dart';
 import '../router/app_router.dart';
 import '../utils/sort_utils.dart';
-import 'library_screen.dart'
-    show recentlyOpenedScoresProvider, recentlyOpenedSetlistsProvider;
 
 // ============================================================================
 // Team Operations - Unified helper functions using scoped providers
@@ -31,8 +31,7 @@ Future<void> deleteSetlist({
   required String setlistId,
 }) async {
   final scope = DataScope.team(teamServerId);
-  final repo = ref.read(scopedSetlistRepositoryProvider(scope));
-  await repo.deleteSetlist(setlistId);
+  await ref.read(scopedSetlistCommandsProvider(scope).notifier).deleteSetlist(setlistId);
 }
 
 /// Delete a score from the team
@@ -42,8 +41,7 @@ Future<void> deleteScore({
   required String scoreId,
 }) async {
   final scope = DataScope.team(teamServerId);
-  final repo = ref.read(scopedScoreRepositoryProvider(scope));
-  await repo.deleteScore(scoreId);
+  await ref.read(scopedScoreCommandsProvider(scope).notifier).deleteScore(scoreId);
 }
 
 /// Create a new setlist in the team
@@ -55,7 +53,7 @@ Future<void> createSetlist({
   List<String> scoreIds = const [],
 }) async {
   final scope = DataScope.team(teamServerId);
-  final repo = ref.read(scopedSetlistRepositoryProvider(scope));
+  final setlistCommands = ref.read(scopedSetlistCommandsProvider(scope).notifier);
 
   final setlist = Setlist(
     id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -67,7 +65,7 @@ Future<void> createSetlist({
     createdAt: DateTime.now(),
   );
 
-  await repo.addSetlist(setlist);
+  await setlistCommands.addSetlist(setlist);
 }
 
 /// Copy a personal score to a team
@@ -77,7 +75,7 @@ Future<void> copyScoreToTeam({
   required int teamServerId,
 }) async {
   final scope = DataScope.team(teamServerId);
-  final teamScoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
+  final scoreCommands = ref.read(scopedScoreCommandsProvider(scope).notifier);
 
   // Create a copy of the score with new ID for the team
   final newId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -91,14 +89,14 @@ Future<void> copyScoreToTeam({
     instrumentScores: [], // Don't copy inline, we'll add them separately
   );
 
-  await teamScoreRepo.addScore(teamScore);
+  await scoreCommands.addScore(teamScore);
 
   // Copy instrument scores
   for (final instrScore in personalScore.instrumentScores) {
     final newInstrScore = instrScore.copyWith(
       id: '${newId}_${instrScore.instrumentKey}',
     );
-    await teamScoreRepo.addInstrumentScore(newId, newInstrScore);
+    await scoreCommands.addInstrumentScore(newId, newInstrScore);
   }
 }
 
@@ -110,8 +108,8 @@ Future<void> copySetlistToTeam({
   required int teamServerId,
 }) async {
   final scope = DataScope.team(teamServerId);
-  final teamScoreRepo = ref.read(scopedScoreRepositoryProvider(scope));
-  final teamSetlistRepo = ref.read(scopedSetlistRepositoryProvider(scope));
+  final scoreCommands = ref.read(scopedScoreCommandsProvider(scope).notifier);
+  final setlistCommands = ref.read(scopedSetlistCommandsProvider(scope).notifier);
 
   // Map old score IDs to new team score IDs
   final scoreIdMapping = <String, String>{};
@@ -133,14 +131,14 @@ Future<void> copySetlistToTeam({
     );
     scoreIdMapping[score.id] = newId;
 
-    await teamScoreRepo.addScore(teamScore);
+    await scoreCommands.addScore(teamScore);
 
     // Copy instrument scores
     for (final instrScore in score.instrumentScores) {
       final newInstrScore = instrScore.copyWith(
         id: '${newId}_${instrScore.instrumentKey}',
       );
-      await teamScoreRepo.addInstrumentScore(newId, newInstrScore);
+      await scoreCommands.addInstrumentScore(newId, newInstrScore);
     }
   }
 
@@ -160,112 +158,8 @@ Future<void> copySetlistToTeam({
     sourceSetlistId: personalSetlist.serverId,
   );
 
-  await teamSetlistRepo.addSetlist(teamSetlist);
+  await setlistCommands.addSetlist(teamSetlist);
 }
-
-enum TeamTab { setlists, scores, members }
-
-class TeamTabNotifier extends Notifier<TeamTab> {
-  @override
-  TeamTab build() => TeamTab.setlists;
-
-  @override
-  set state(TeamTab newState) => super.state = newState;
-}
-
-class ShowTeamSwitcherNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-// Modal state notifiers (team-specific UI state)
-class ShowScoreModalNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-class ShowSetlistModalNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-// For "Create New Score" with AddScoreWidget
-class ShowCreateScoreModalNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-// For "Create New Setlist" modal
-class ShowCreateSetlistDialogNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-// For "Import Score from Library" modal
-class ShowImportScoreModalNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-// For "Import Setlist from Library" modal
-class ShowImportSetlistModalNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-final teamTabProvider = NotifierProvider<TeamTabNotifier, TeamTab>(
-  TeamTabNotifier.new,
-);
-final showTeamSwitcherProvider =
-    NotifierProvider<ShowTeamSwitcherNotifier, bool>(
-      ShowTeamSwitcherNotifier.new,
-    );
-
-// Modal state providers (team-specific UI state)
-final showScoreModalProvider = NotifierProvider<ShowScoreModalNotifier, bool>(
-  ShowScoreModalNotifier.new,
-);
-final showSetlistModalProvider =
-    NotifierProvider<ShowSetlistModalNotifier, bool>(
-      ShowSetlistModalNotifier.new,
-    );
-final showCreateScoreModalProvider =
-    NotifierProvider<ShowCreateScoreModalNotifier, bool>(
-      ShowCreateScoreModalNotifier.new,
-    );
-final showCreateSetlistDialogProvider =
-    NotifierProvider<ShowCreateSetlistDialogNotifier, bool>(
-      ShowCreateSetlistDialogNotifier.new,
-    );
-final showImportScoreModalProvider =
-    NotifierProvider<ShowImportScoreModalNotifier, bool>(
-      ShowImportScoreModalNotifier.new,
-    );
-final showImportSetlistModalProvider =
-    NotifierProvider<ShowImportSetlistModalNotifier, bool>(
-      ShowImportSetlistModalNotifier.new,
-    );
 
 class TeamScreen extends ConsumerStatefulWidget {
   const TeamScreen({super.key});
@@ -412,11 +306,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                   children: [
                     GestureDetector(
                       onTap: teams.isNotEmpty
-                          ? () =>
-                                ref
-                                        .read(showTeamSwitcherProvider.notifier)
-                                        .state =
-                                    !showTeamSwitcher
+                          ? () {
+                              ref.read(showTeamSwitcherProvider.notifier).toggle();
+                            }
                           : null,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -475,8 +367,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                             isActive: activeTab == TeamTab.setlists,
                             activeColor: AppColors.emerald600,
                             onTap: () {
-                              ref.read(teamTabProvider.notifier).state =
-                                  TeamTab.setlists;
+                              ref.read(teamTabProvider.notifier).setTab(
+                                TeamTab.setlists,
+                              );
                               resetSwipeState();
                             },
                           ),
@@ -489,8 +382,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                             isActive: activeTab == TeamTab.scores,
                             activeColor: AppColors.blue600,
                             onTap: () {
-                              ref.read(teamTabProvider.notifier).state =
-                                  TeamTab.scores;
+                              ref.read(teamTabProvider.notifier).setTab(
+                                TeamTab.scores,
+                              );
                               resetSwipeState();
                             },
                           ),
@@ -503,8 +397,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                             isActive: activeTab == TeamTab.members,
                             activeColor: AppColors.indigo600,
                             onTap: () {
-                              ref.read(teamTabProvider.notifier).state =
-                                  TeamTab.members;
+                              ref.read(teamTabProvider.notifier).setTab(
+                                TeamTab.members,
+                              );
                               resetSwipeState();
                             },
                           ),
@@ -606,9 +501,9 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               child: FloatingActionButton(
                 onPressed: () {
                   if (activeTab == TeamTab.setlists) {
-                    ref.read(showSetlistModalProvider.notifier).state = true;
+                    ref.read(showSetlistModalProvider.notifier).show();
                   } else {
-                    ref.read(showScoreModalProvider.notifier).state = true;
+                    ref.read(showScoreModalProvider.notifier).show();
                   }
                 },
                 elevation: 2,
@@ -628,10 +523,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               showTitleComposer: true,
               scope: DataScope.team(currentTeam.serverId),
               onClose: () {
-                ref.read(showCreateScoreModalProvider.notifier).state = false;
+                ref.read(showCreateScoreModalProvider.notifier).hide();
               },
               onSuccess: () {
-                ref.read(showCreateScoreModalProvider.notifier).state = false;
+                ref.read(showCreateScoreModalProvider.notifier).hide();
                 // No need to invalidate - createScore uses optimistic updates
               },
             ),
@@ -1409,7 +1304,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
         Positioned.fill(
           child: GestureDetector(
             onTap: () =>
-                ref.read(showTeamSwitcherProvider.notifier).state = false,
+                ref.read(showTeamSwitcherProvider.notifier).hide(),
             child: Container(color: Colors.black.withValues(alpha: 0.05)),
           ),
         ),
@@ -1446,8 +1341,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                         ref
                             .read(currentTeamIdProvider.notifier)
                             .setTeamId(team.id);
-                        ref.read(showTeamSwitcherProvider.notifier).state =
-                            false;
+                        ref.read(showTeamSwitcherProvider.notifier).hide();
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -1539,7 +1433,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               if (currentFocus.hasFocus) {
                 currentFocus.unfocus();
               } else {
-                ref.read(showScoreModalProvider.notifier).state = false;
+                ref.read(showScoreModalProvider.notifier).hide();
               }
             },
             child: Container(color: Colors.black.withValues(alpha: 0.1)),
@@ -1626,8 +1520,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                         ),
                         IconButton(
                           onPressed: () {
-                            ref.read(showScoreModalProvider.notifier).state =
-                                false;
+                            ref.read(showScoreModalProvider.notifier).hide();
                           },
                           icon: const Icon(
                             AppIcons.close,
@@ -1652,14 +1545,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Create New Score',
                           subtitle: 'Create a score directly in team',
                           onTap: () {
-                            ref.read(showScoreModalProvider.notifier).state =
-                                false;
-                            ref
-                                    .read(
-                                      showCreateScoreModalProvider.notifier,
-                                    )
-                                    .state =
-                                true;
+                            ref.read(showScoreModalProvider.notifier).hide();
+                            ref.read(showCreateScoreModalProvider.notifier).show();
                           },
                         ),
                         const SizedBox(height: 12),
@@ -1673,12 +1560,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Import from Library',
                           subtitle: 'Copy a score from personal library',
                           onTap: () {
-                            ref.read(showScoreModalProvider.notifier).state =
-                                false;
-                            ref
-                                    .read(showImportScoreModalProvider.notifier)
-                                    .state =
-                                true;
+                            ref.read(showScoreModalProvider.notifier).hide();
+                            ref.read(showImportScoreModalProvider.notifier).show();
                           },
                         ),
                         const SizedBox(height: 16),
@@ -1733,7 +1616,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               if (currentFocus.hasFocus) {
                 currentFocus.unfocus();
               } else {
-                ref.read(showSetlistModalProvider.notifier).state = false;
+                ref.read(showSetlistModalProvider.notifier).hide();
               }
             },
             child: Container(color: Colors.black.withValues(alpha: 0.1)),
@@ -1823,8 +1706,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                         ),
                         IconButton(
                           onPressed: () {
-                            ref.read(showSetlistModalProvider.notifier).state =
-                                false;
+                            ref.read(showSetlistModalProvider.notifier).hide();
                           },
                           icon: const Icon(
                             AppIcons.close,
@@ -1849,14 +1731,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Create New Setlist',
                           subtitle: 'Create a setlist directly in team',
                           onTap: () {
-                            ref.read(showSetlistModalProvider.notifier).state =
-                                false;
+                            ref.read(showSetlistModalProvider.notifier).hide();
                             ref
-                                    .read(
-                                      showCreateSetlistDialogProvider.notifier,
-                                    )
-                                    .state =
-                                true;
+                                .read(showCreateSetlistDialogProvider.notifier)
+                                .show();
                           },
                         ),
                         const SizedBox(height: 12),
@@ -1870,14 +1748,10 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                           title: 'Import from Library',
                           subtitle: 'Copy a setlist with all its scores',
                           onTap: () {
-                            ref.read(showSetlistModalProvider.notifier).state =
-                                false;
+                            ref.read(showSetlistModalProvider.notifier).hide();
                             ref
-                                    .read(
-                                      showImportSetlistModalProvider.notifier,
-                                    )
-                                    .state =
-                                true;
+                                .read(showImportSetlistModalProvider.notifier)
+                                .show();
                           },
                         ),
                         const SizedBox(height: 16),
@@ -1999,8 +1873,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
               if (currentFocus.hasFocus) {
                 currentFocus.unfocus();
               } else {
-                ref.read(showCreateSetlistDialogProvider.notifier).state =
-                    false;
+                ref.read(showCreateSetlistDialogProvider.notifier).hide();
                 _setlistNameController.clear();
                 _setlistDescriptionController.clear();
                 _createSetlistErrorMessage = null;
@@ -2093,11 +1966,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                         IconButton(
                           onPressed: () {
                             ref
-                                    .read(
-                                      showCreateSetlistDialogProvider.notifier,
-                                    )
-                                    .state =
-                                false;
+                                .read(showCreateSetlistDialogProvider.notifier)
+                                .hide();
                             _setlistNameController.clear();
                             _setlistDescriptionController.clear();
                             _createSetlistErrorMessage = null;
@@ -2181,12 +2051,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                               child: OutlinedButton(
                                 onPressed: () {
                                   ref
-                                          .read(
-                                            showCreateSetlistDialogProvider
-                                                .notifier,
-                                          )
-                                          .state =
-                                      false;
+                                      .read(showCreateSetlistDialogProvider.notifier)
+                                      .hide();
                                   _setlistNameController.clear();
                                   _setlistDescriptionController.clear();
                                   _createSetlistErrorMessage = null;
@@ -2233,12 +2099,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                                   );
 
                                   ref
-                                          .read(
-                                            showCreateSetlistDialogProvider
-                                                .notifier,
-                                          )
-                                          .state =
-                                      false;
+                                      .read(showCreateSetlistDialogProvider.notifier)
+                                      .hide();
                                   _setlistNameController.clear();
                                   _setlistDescriptionController.clear();
                                   _createSetlistErrorMessage = null;
@@ -2276,7 +2138,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
 
   /// Build import score from library modal (same style as setlist_detail_screen add scores modal)
   Widget _buildImportScoreModal(Team currentTeam) {
-    final scoresAsync = ref.watch(scoresStateProvider);
+    final scoresAsync = ref.watch(scopedScoresProvider(DataScope.user));
 
     return scoresAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -2308,7 +2170,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                   setState(() {
                     _importScoreSearchQuery = '';
                   });
-                  ref.read(showImportScoreModalProvider.notifier).state = false;
+                  ref.read(showImportScoreModalProvider.notifier).hide();
                 },
                 child: Container(color: Colors.black.withValues(alpha: 0.1)),
               ),
@@ -2409,11 +2271,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                               onPressed: () {
                                 setState(() => _importScoreSearchQuery = '');
                                 ref
-                                        .read(
-                                          showImportScoreModalProvider.notifier,
-                                        )
-                                        .state =
-                                    false;
+                                    .read(showImportScoreModalProvider.notifier)
+                                    .hide();
                               },
                               icon: const Icon(
                                 AppIcons.close,
@@ -2509,12 +2368,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                                             () => _importScoreSearchQuery = '',
                                           );
                                           ref
-                                                  .read(
-                                                    showImportScoreModalProvider
-                                                        .notifier,
-                                                  )
-                                                  .state =
-                                              false;
+                                              .read(showImportScoreModalProvider.notifier)
+                                              .hide();
                                           await _copyScoreToTeam(
                                             score,
                                             currentTeam,
@@ -2620,7 +2475,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
   /// Build import setlist from library modal (same style as setlist_detail_screen add scores modal)
   Widget _buildImportSetlistModal(Team currentTeam) {
     final setlists = ref.watch(setlistsListProvider);
-    final scoresAsync = ref.watch(scoresStateProvider);
+    final scoresAsync = ref.watch(scopedScoresProvider(DataScope.user));
 
     return scoresAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -2652,8 +2507,7 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                   setState(() {
                     _importSetlistSearchQuery = '';
                   });
-                  ref.read(showImportSetlistModalProvider.notifier).state =
-                      false;
+                  ref.read(showImportSetlistModalProvider.notifier).hide();
                 },
                 child: Container(color: Colors.black.withValues(alpha: 0.1)),
               ),
@@ -2754,12 +2608,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                               onPressed: () {
                                 setState(() => _importSetlistSearchQuery = '');
                                 ref
-                                        .read(
-                                          showImportSetlistModalProvider
-                                              .notifier,
-                                        )
-                                        .state =
-                                    false;
+                                    .read(showImportSetlistModalProvider.notifier)
+                                    .hide();
                               },
                               icon: const Icon(
                                 AppIcons.close,
@@ -2873,12 +2723,8 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
                                                 _importSetlistSearchQuery = '',
                                           );
                                           ref
-                                                  .read(
-                                                    showImportSetlistModalProvider
-                                                        .notifier,
-                                                  )
-                                                  .state =
-                                              false;
+                                              .read(showImportSetlistModalProvider.notifier)
+                                              .hide();
                                           await _copySetlistToTeam(
                                             setlist,
                                             setlistScores,

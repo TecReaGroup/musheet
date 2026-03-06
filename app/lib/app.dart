@@ -7,46 +7,19 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'theme/app_theme.dart';
-import 'screens/library_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'utils/icon_mappings.dart';
 import 'router/app_router.dart';
 import 'providers/core_providers.dart';
+import 'core/data/data_scope.dart';
 import 'providers/scores_state_provider.dart';
 import 'providers/setlists_state_provider.dart';
 import 'providers/auth_state_provider.dart';
+import 'providers/ui_state_providers.dart';
 import 'utils/logger.dart';
 import 'widgets/common_widgets.dart';
 
 enum AppPage { home, library, team, settings }
-
-// Notifier to signal search clear request
-class ClearSearchRequestNotifier extends Notifier<int> {
-  @override
-  int build() => 0;
-
-  void trigger() => state++;
-}
-
-final clearSearchRequestProvider =
-    NotifierProvider<ClearSearchRequestNotifier, int>(
-      ClearSearchRequestNotifier.new,
-    );
-
-// Provider to store shared file path from sharing intent
-class SharedFilePathNotifier extends Notifier<String?> {
-  @override
-  String? build() => null;
-
-  void setPath(String? path) => state = path;
-  void clear() => state = null;
-}
-
-final sharedFilePathProvider =
-    NotifierProvider<SharedFilePathNotifier, String?>(
-      SharedFilePathNotifier.new,
-    );
 
 // Flag to prevent multiple auth initialization attempts
 bool _authInitialized = false;
@@ -69,11 +42,11 @@ class MuSheetApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the scores provider to trigger initial load
-    final scoresAsync = ref.watch(scoresStateProvider);
+    // Watch the user-scoped scores query provider to trigger initial load
+    final scoresAsync = ref.watch(scopedScoresProvider(DataScope.user));
 
-    // Watch the setlists provider to trigger initial load
-    final setlistsAsync = ref.watch(setlistsStateProvider);
+    // Watch the user-scoped setlists query provider to trigger initial load
+    final setlistsAsync = ref.watch(scopedSetlistsProvider(DataScope.user));
 
     // Show splash until all data is loaded (only during initial app load)
     final isLoading = scoresAsync.isLoading || setlistsAsync.isLoading;
@@ -255,11 +228,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           context.go(AppRoutes.library);
 
           // Switch to Scores tab
-          ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
+          ref.read(libraryTabProvider.notifier).setTab(LibraryTab.scores);
 
           // Set shared file path and trigger modal in LibraryScreen
           ref.read(sharedFilePathProvider.notifier).setPath(destPath);
-          ref.read(showCreateScoreModalProvider.notifier).state = true;
+          ref.read(showCreateScoreModalProvider.notifier).show();
         }
       } catch (e) {
         Log.e('SHARE', 'Error handling shared file', error: e);
@@ -275,7 +248,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
     // If search is active, clear search and return to home
     if (searchQuery.isNotEmpty) {
-      ref.read(searchQueryProvider.notifier).state = '';
+      ref.read(searchQueryProvider.notifier).clear();
       ref.read(clearSearchRequestProvider.notifier).trigger();
       context.go(AppRoutes.home);
       return false;

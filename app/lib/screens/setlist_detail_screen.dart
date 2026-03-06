@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/team.dart';
 import '../providers/setlists_state_provider.dart';
+import '../providers/setlist_commands_provider.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/ui_state_providers.dart';
 import '../core/data/data_scope.dart';
@@ -44,9 +45,9 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
   DataScope get _scope => widget.scope;
   bool get _isTeam => _scope.isTeam;
 
-  /// Get the setlists helper for current scope
-  ScopedSetlistsHelper get _setlistsHelper =>
-      ref.read(scopedSetlistsHelperProvider(_scope));
+  /// Unified setlist command entry for current scope
+  ScopedSetlistCommandsNotifier get _setlistCommands =>
+      ref.read(scopedSetlistCommandsProvider(_scope).notifier);
 
   @override
   void dispose() {
@@ -141,7 +142,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                           final newOrder = List<String>.from(currentSetlist.scoreIds);
                           final item = newOrder.removeAt(oldIndex);
                           newOrder.insert(newIndex, item);
-                          await _setlistsHelper.reorderScores(currentSetlist.id, newOrder);
+                          await _setlistCommands.reorderScores(currentSetlist.id, newOrder);
                         },
                         itemBuilder: (context, index) {
                           final score = setlistScores[index];
@@ -457,7 +458,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ),
           TextButton(
             onPressed: () async {
-              await _setlistsHelper.removeScoreFromSetlist(setlistId, score.id);
+              await _setlistCommands.removeScoreFromSetlist(setlistId, score.id);
               if (ctx.mounted) Navigator.pop(ctx);
             },
             child: const Text(
@@ -695,7 +696,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
           ? null
           : _editDescriptionController.text.trim(),
     );
-    await _setlistsHelper.updateSetlist(updatedSetlist);
+    await _setlistCommands.updateSetlist(updatedSetlist);
     setState(() => _showEditModal = false);
   }
 
@@ -930,7 +931,7 @@ class _SetlistDetailScreenState extends ConsumerState<SetlistDetailScreen> {
                     title: score.title,
                     composer: score.composer,
                     onTap: () async {
-                      await _setlistsHelper.addScoreToSetlist(
+                      await _setlistCommands.addScoreToSetlist(
                         currentSetlist.id,
                         score.id,
                       );

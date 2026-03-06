@@ -8,7 +8,7 @@ import '../widgets/user_avatar.dart';
 import '../models/instrument_score.dart';
 import '../providers/auth_state_provider.dart';
 import '../providers/preferred_instrument_provider.dart';
-import 'library_screen.dart' show teamEnabledProvider;
+import '../providers/ui_state_providers.dart' show teamEnabledProvider;
 import '../router/app_router.dart';
 
 class SettingsScreen extends ConsumerWidget {

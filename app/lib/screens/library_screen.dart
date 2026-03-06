@@ -1,249 +1,19 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/scores_state_provider.dart';
+import '../providers/score_commands_provider.dart';
+import '../providers/setlist_commands_provider.dart';
 import '../providers/setlists_state_provider.dart';
-import '../providers/teams_state_provider.dart';
-import '../providers/preferred_instrument_provider.dart';
+import '../providers/ui_state_providers.dart';
 import '../core/data/data_scope.dart';
 import '../theme/app_colors.dart';
 import '../models/score.dart';
 import '../models/setlist.dart';
-import '../models/sort_state.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/add_score_widget.dart';
-import '../app.dart' show sharedFilePathProvider;
 import '../router/app_router.dart';
 import '../utils/sort_utils.dart';
-
-enum LibraryTab { scores, setlists }
-
-class LibraryTabNotifier extends Notifier<LibraryTab> {
-  @override
-  LibraryTab build() => LibraryTab.setlists;
-  
-  @override
-  set state(LibraryTab newState) => super.state = newState;
-}
-
-class SelectedSetlistNotifier extends Notifier<Setlist?> {
-  @override
-  Setlist? build() => null;
-  
-  @override
-  set state(Setlist? newState) => super.state = newState;
-}
-
-class ShowCreateSetlistModalNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-  
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-class ShowCreateScoreModalNotifier extends Notifier<bool> {
-  @override
-  bool build() => false;
-  
-  @override
-  set state(bool newState) => super.state = newState;
-}
-
-// Sort state providers
-class SetlistSortNotifier extends Notifier<SortState> {
-  @override
-  SortState build() => const SortState();
-
-  void setSort(SortType type) {
-    if (state.type == type) {
-      // Same type clicked, toggle ascending/descending
-      state = state.copyWith(ascending: !state.ascending);
-    } else {
-      // Different type: alphabetical defaults to ascending (A→Z), others default to descending (newest first)
-      final defaultAscending = type == SortType.alphabetical;
-      state = SortState(type: type, ascending: defaultAscending);
-    }
-  }
-}
-
-class ScoreSortNotifier extends Notifier<SortState> {
-  @override
-  SortState build() => const SortState();
-
-  void setSort(SortType type) {
-    if (state.type == type) {
-      state = state.copyWith(ascending: !state.ascending);
-    } else {
-      // Different type: alphabetical defaults to ascending (A→Z), others default to descending (newest first)
-      final defaultAscending = type == SortType.alphabetical;
-      state = SortState(type: type, ascending: defaultAscending);
-    }
-  }
-}
-
-final libraryTabProvider = NotifierProvider<LibraryTabNotifier, LibraryTab>(LibraryTabNotifier.new);
-final selectedSetlistProvider = NotifierProvider<SelectedSetlistNotifier, Setlist?>(SelectedSetlistNotifier.new);
-final showCreateSetlistModalProvider = NotifierProvider<ShowCreateSetlistModalNotifier, bool>(ShowCreateSetlistModalNotifier.new);
-final showCreateScoreModalProvider = NotifierProvider<ShowCreateScoreModalNotifier, bool>(ShowCreateScoreModalNotifier.new);
-final setlistSortProvider = NotifierProvider<SetlistSortNotifier, SortState>(SetlistSortNotifier.new);
-final scoreSortProvider = NotifierProvider<ScoreSortNotifier, SortState>(ScoreSortNotifier.new);
-
-// Recently opened records - persisted to SharedPreferences
-class RecentlyOpenedSetlistsNotifier extends Notifier<Map<String, DateTime>> {
-  static const _storageKey = 'recently_opened_setlists';
-
-  @override
-  Map<String, DateTime> build() {
-    _loadFromStorage();
-    return {};
-  }
-
-  Future<void> _loadFromStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString(_storageKey);
-    if (jsonStr != null) {
-      try {
-        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
-        final Map<String, DateTime> loaded = {};
-        for (final entry in decoded.entries) {
-          loaded[entry.key] = DateTime.parse(entry.value as String);
-        }
-        state = loaded;
-      } catch (_) {
-        // Ignore parse errors, start fresh
-      }
-    }
-  }
-
-  Future<void> _saveToStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final Map<String, String> toSave = {};
-    for (final entry in state.entries) {
-      toSave[entry.key] = entry.value.toIso8601String();
-    }
-    await prefs.setString(_storageKey, jsonEncode(toSave));
-  }
-
-  void recordOpen(String id) {
-    state = {...state, id: DateTime.now()};
-    _saveToStorage();
-  }
-}
-
-class RecentlyOpenedScoresNotifier extends Notifier<Map<String, DateTime>> {
-  static const _storageKey = 'recently_opened_scores';
-
-  @override
-  Map<String, DateTime> build() {
-    _loadFromStorage();
-    return {};
-  }
-
-  Future<void> _loadFromStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString(_storageKey);
-    if (jsonStr != null) {
-      try {
-        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
-        final Map<String, DateTime> loaded = {};
-        for (final entry in decoded.entries) {
-          loaded[entry.key] = DateTime.parse(entry.value as String);
-        }
-        state = loaded;
-      } catch (_) {
-        // Ignore parse errors, start fresh
-      }
-    }
-  }
-
-  Future<void> _saveToStorage() async {
-    final prefs = await SharedPreferences.getInstance();
-    final Map<String, String> toSave = {};
-    for (final entry in state.entries) {
-      toSave[entry.key] = entry.value.toIso8601String();
-    }
-    await prefs.setString(_storageKey, jsonEncode(toSave));
-  }
-
-  void recordOpen(String id) {
-    state = {...state, id: DateTime.now()};
-    _saveToStorage();
-  }
-}
-
-// Track last opened score index per setlist
-class LastOpenedScoreInSetlistNotifier extends Notifier<Map<String, int>> {
-  @override
-  Map<String, int> build() {
-    return {};
-  }
-
-  void recordLastOpened(String setlistId, int scoreIndex) {
-    state = {...state, setlistId: scoreIndex};
-  }
-
-  int? getLastOpened(String setlistId) => state[setlistId];
-}
-
-// Track whether team feature is enabled
-class TeamEnabledNotifier extends Notifier<bool> {
-  @override
-  bool build() {
-    return true;
-  }
-  
-  void setTeamEnabled(bool enabled) {
-    state = enabled;
-    // When disabling team, leave all teams and clear their data
-    if (!enabled) {
-      ref.read(teamsStateProvider.notifier).leaveAllTeams();
-    } else {
-      // When re-enabling team, rejoin teams
-      ref.read(teamsStateProvider.notifier).refresh();
-    }
-  }
-}
-
-final recentlyOpenedSetlistsProvider = NotifierProvider<RecentlyOpenedSetlistsNotifier, Map<String, DateTime>>(RecentlyOpenedSetlistsNotifier.new);
-final recentlyOpenedScoresProvider = NotifierProvider<RecentlyOpenedScoresNotifier, Map<String, DateTime>>(RecentlyOpenedScoresNotifier.new);
-final lastOpenedScoreInSetlistProvider = NotifierProvider<LastOpenedScoreInSetlistNotifier, Map<String, int>>(LastOpenedScoreInSetlistNotifier.new);
-// Note: lastOpenedInstrumentInScoreProvider and preferredInstrumentProvider are now in preferred_instrument_provider.dart
-final teamEnabledProvider = NotifierProvider<TeamEnabledNotifier, bool>(TeamEnabledNotifier.new);
-
-// Helper function to get the best instrument index for a score
-// Priority: 1. Last opened > 2. User preferred > 3. Vocal > 4. Default (first)
-int getBestInstrumentIndex(Score score, int? lastOpenedIndex, String? preferredInstrumentKey) {
-  // Priority 1: Use last opened if available
-  if (lastOpenedIndex != null && lastOpenedIndex >= 0 && lastOpenedIndex < score.instrumentScores.length) {
-    return lastOpenedIndex;
-  }
-  
-  // Priority 2: Use preferred instrument if set and available
-  if (preferredInstrumentKey != null && score.instrumentScores.isNotEmpty) {
-    final preferredIndex = score.instrumentScores.indexWhere(
-      (inst) => inst.instrumentKey == preferredInstrumentKey
-    );
-    if (preferredIndex >= 0) {
-      return preferredIndex;
-    }
-  }
-  
-  // Priority 3: Use Vocal if available
-  if (score.instrumentScores.isNotEmpty) {
-    final vocalIndex = score.instrumentScores.indexWhere(
-      (inst) => inst.instrumentKey == 'vocal'
-    );
-    if (vocalIndex >= 0) {
-      return vocalIndex;
-    }
-  }
-  
-  // Priority 4: Default to first instrument
-  return 0;
-}
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({super.key});
@@ -318,15 +88,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
       return;
     }
 
-    ref.read(setlistsStateProvider.notifier).createSetlist(
-      _nameController.text.trim(),
-      _descriptionController.text.trim(),
-    );
+    ref
+        .read(scopedSetlistCommandsProvider(DataScope.user).notifier)
+        .createSetlist(
+          _nameController.text.trim(),
+          _descriptionController.text.trim(),
+        );
 
     _nameController.clear();
     _descriptionController.clear();
     _createSetlistErrorMessage = null;
-    ref.read(showCreateSetlistModalProvider.notifier).state = false;
+    ref.read(showCreateSetlistModalProvider.notifier).hide();
   }
 
   void _handleDelete(String id, bool isScore) {
@@ -343,9 +115,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
           TextButton(
             onPressed: () {
               if (isScore) {
-                ref.read(scoresStateProvider.notifier).deleteScore(id);
+                ref
+                    .read(scopedScoreCommandsProvider(DataScope.user).notifier)
+                    .deleteScore(id);
               } else {
-                ref.read(setlistsStateProvider.notifier).deleteSetlist(id);
+                ref
+                    .read(scopedSetlistCommandsProvider(DataScope.user).notifier)
+                    .deleteSetlist(id);
               }
               resetSwipeState();
               Navigator.pop(context);
@@ -400,7 +176,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                             isActive: activeTab == LibraryTab.setlists,
                             activeColor: AppColors.emerald600,
                             onTap: () {
-                              ref.read(libraryTabProvider.notifier).state = LibraryTab.setlists;
+                              ref.read(libraryTabProvider.notifier).setTab(LibraryTab.setlists);
                               resetSwipeState();
                             },
                           ),
@@ -413,7 +189,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                             isActive: activeTab == LibraryTab.scores,
                             activeColor: AppColors.blue600,
                             onTap: () {
-                              ref.read(libraryTabProvider.notifier).state = LibraryTab.scores;
+                              ref.read(libraryTabProvider.notifier).setTab(LibraryTab.scores);
                               resetSwipeState();
                             },
                           ),
@@ -455,9 +231,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
             child: FloatingActionButton(
               onPressed: () {
                 if (activeTab == LibraryTab.setlists) {
-                  ref.read(showCreateSetlistModalProvider.notifier).state = true;
+                  ref.read(showCreateSetlistModalProvider.notifier).show();
                 } else {
-                  ref.read(showCreateScoreModalProvider.notifier).state = true;
+                  ref.read(showCreateScoreModalProvider.notifier).show();
                 }
               },
               elevation: 2,
@@ -472,11 +248,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               showTitleComposer: true,
               presetFilePath: ref.watch(sharedFilePathProvider),
               onClose: () {
-                ref.read(showCreateScoreModalProvider.notifier).state = false;
+                ref.read(showCreateScoreModalProvider.notifier).hide();
                 ref.read(sharedFilePathProvider.notifier).clear();
               },
               onSuccess: () {
-                ref.read(showCreateScoreModalProvider.notifier).state = false;
+                ref.read(showCreateScoreModalProvider.notifier).hide();
                 ref.read(sharedFilePathProvider.notifier).clear();
               },
             ),
@@ -923,7 +699,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
               if (currentFocus.hasFocus) {
                 currentFocus.unfocus();
               } else {
-                ref.read(showCreateSetlistModalProvider.notifier).state = false;
+                ref.read(showCreateSetlistModalProvider.notifier).hide();
                 _nameController.clear();
                 _descriptionController.clear();
                 _createSetlistErrorMessage = null;
@@ -994,7 +770,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                       ),
                       IconButton(
                         onPressed: () {
-                          ref.read(showCreateSetlistModalProvider.notifier).state = false;
+                          ref.read(showCreateSetlistModalProvider.notifier).hide();
                           _nameController.clear();
                           _descriptionController.clear();
                           _createSetlistErrorMessage = null;
@@ -1062,7 +838,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> with SingleTicker
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
-                                ref.read(showCreateSetlistModalProvider.notifier).state = false;
+                                ref.read(showCreateSetlistModalProvider.notifier).hide();
                                 _nameController.clear();
                                 _descriptionController.clear();
                                 _createSetlistErrorMessage = null;

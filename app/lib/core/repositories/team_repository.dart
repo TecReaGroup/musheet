@@ -65,7 +65,25 @@ class TeamRepository {
 
   /// Watch all teams
   Stream<List<Team>> watchAllTeams() {
-    return _db.select(_db.teams).watch().asyncMap((_) => getAllTeams());
+    return Stream.multi((controller) {
+      Future<void> emitLatest() async {
+        if (controller.isClosed) return;
+        controller.add(await getAllTeams());
+      }
+
+      final subscriptions = <StreamSubscription<dynamic>>[
+        _db.select(_db.teams).watch().listen((_) => emitLatest()),
+        _db.select(_db.teamMembers).watch().listen((_) => emitLatest()),
+      ];
+
+      emitLatest();
+
+      controller.onCancel = () async {
+        for (final subscription in subscriptions) {
+          await subscription.cancel();
+        }
+      };
+    });
   }
 
   /// Get team by ID
