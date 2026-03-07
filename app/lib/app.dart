@@ -97,7 +97,7 @@ class MuSheetApp extends ConsumerWidget {
           await ref.read(authStateProvider.notifier).initialize();
           await ref.read(authStateProvider.notifier).restoreSession();
 
-          // Start background sync if logged in
+          // Start background sync only in account mode
           final syncCoordinator = ref.read(syncCoordinatorProvider);
           if (syncCoordinator != null) {
             await syncCoordinator.syncNow();
@@ -273,7 +273,11 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
   @override
   Widget build(BuildContext context) {
-    final teamEnabled = ref.watch(teamEnabledProvider);
+    final authState = ref.watch(authStateProvider);
+    final libraryMode = ref.watch(libraryStorageModeProvider);
+    final teamEnabled = ref.watch(teamEnabledProvider) &&
+        authState.isAuthenticated &&
+        libraryMode == LibraryStorageMode.account;
     final currentLocation = GoRouterState.of(context).uri.path;
 
     // Determine current page from location

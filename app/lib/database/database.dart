@@ -35,20 +35,29 @@ part 'database.g.dart';
   TeamSyncState,
 ])
 class AppDatabase extends _$AppDatabase {
-  // Singleton instance
-  static AppDatabase? _instance;
+  // Singleton instances keyed by storage name
+  static final Map<String, AppDatabase> _instances = {};
 
-  // Factory constructor for singleton
+  // Factory constructor for default account storage
   factory AppDatabase() {
-    _instance ??= AppDatabase._internal();
-    return _instance!;
+    return AppDatabase.forStorage('account');
   }
 
+  factory AppDatabase.forStorage(String storageKey) {
+    return _instances.putIfAbsent(
+      storageKey,
+      () => AppDatabase._internal(storageKey),
+    );
+  }
+
+  final String? storageKey;
+
   // Private constructor
-  AppDatabase._internal() : super(_openConnection());
+  AppDatabase._internal(this.storageKey)
+      : super(_openConnection(storageKey ?? 'account'));
 
   // Constructor for testing with custom executor (e.g., in-memory database)
-  AppDatabase.forTesting(super.e);
+  AppDatabase.forTesting(super.e) : storageKey = 'testing';
 
   @override
   int get schemaVersion => 4; // Unified tables with scopeType/scopeId
@@ -226,10 +235,10 @@ class AppDatabase extends _$AppDatabase {
   }
 }
 
-LazyDatabase _openConnection() {
+LazyDatabase _openConnection(String storageKey) {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'musheet.db'));
+    final file = File(p.join(dbFolder.path, 'musheet_$storageKey.db'));
     return NativeDatabase(file);
   });
 }

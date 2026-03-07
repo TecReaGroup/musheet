@@ -84,9 +84,11 @@ class TeamsStateNotifier extends AsyncNotifier<TeamsState> {
       }
     });
 
-    // Check current auth state
+    // Team is only available in account mode with an authenticated session.
     final authState = ref.read(authStateProvider);
-    if (authState.status != AuthStatus.authenticated) {
+    final libraryMode = ref.read(libraryStorageModeProvider);
+    if (libraryMode != LibraryStorageMode.account ||
+        authState.status != AuthStatus.authenticated) {
       return const TeamsState();
     }
 

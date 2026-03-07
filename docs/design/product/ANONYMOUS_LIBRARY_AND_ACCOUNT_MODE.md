@@ -1,7 +1,9 @@
 # 匿名 Library 与账户模式设计
 
-> 状态：Draft  
+> 状态：Implemented
 > 决策：采用“**匿名 Library 与账户 Library 完全隔离**”的产品与数据模型。默认进入匿名本地模式；登录后进入账户模式。登录时**不弹出导入选择**，后续预留“从其他账户/匿名库一键导入 Library”的接口。
+>
+> 当前实现对应：[`libraryStorageModeProvider`](app/lib/providers/core_providers.dart:147)、[`appDatabaseProvider`](app/lib/providers/core_providers.dart:171)、[`goRouterProvider`](app/lib/router/app_router.dart:53)、[`TeamScreen`](app/lib/screens/team_screen.dart:165)。
 
 ---
 
@@ -293,7 +295,34 @@ MuSheet 客户端采用两种明确模式：
 
 ---
 
-## 11. 最终推荐
+## 11. 实现落地与验证
+
+### 11.1 已落地行为
+- 匿名模式默认使用匿名数据库，见 [`anonymousAppDatabaseProvider`](app/lib/providers/core_providers.dart:158)
+- 账户模式使用账户数据库，见 [`accountAppDatabaseProvider`](app/lib/providers/core_providers.dart:164)
+- 当前活跃库由 [`libraryStorageModeProvider`](app/lib/providers/core_providers.dart:147) 决定
+- Team 路由仅在账户模式注册，见 [`goRouterProvider`](app/lib/router/app_router.dart:53)
+- Team 页面在匿名模式显示阻断提示，见 [`TeamScreen`](app/lib/screens/team_screen.dart:233)
+- 底部导航仅在账户模式且已认证时显示 Team，见 [`MainScaffold.build()`](app/lib/app.dart:275)
+- 登出仅清理账户空间，不清理匿名库，见 [`AuthStateNotifier.logout()`](app/lib/providers/auth_state_provider.dart:292)
+
+### 11.2 当前验证用例
+- [`library_mode_separation_test.dart`](app/test/unit/providers/library_mode_separation_test.dart)
+  - 验证匿名模式只读取匿名库
+  - 验证账户模式只读取账户库
+- [`team_mode_gating_test.dart`](app/test/widget/team_mode_gating_test.dart)
+  - 验证 Team 路由只在账户模式注册
+  - 验证匿名模式隐藏 Team Tab
+  - 验证账户模式显示 Team Tab
+  - 验证匿名模式下 [`TeamScreen`](app/lib/screens/team_screen.dart:165) 显示阻断文案
+
+### 11.3 验证命令
+- `flutter test test/unit/providers/library_mode_separation_test.dart`
+- `flutter test test/widget/team_mode_gating_test.dart`
+
+---
+
+## 12. 最终推荐
 
 正式采用以下产品规则：
 

@@ -282,14 +282,15 @@ class AuthStateNotifier extends Notifier<AuthState> {
       TeamSyncManager.reset();
     }
 
-    // Logout from server and clear session first
+    // Clear authenticated account storage only. Anonymous local library must survive logout.
+    final accountLocal = ref.read(syncableDataSourceProvider);
+    await accountLocal.deleteAllPdfFiles();
+    await accountLocal.clearAllData();
+
+    // Logout from server and clear session afterwards so provider mode can safely
+    // switch back to anonymous without accidentally deleting anonymous storage.
     final authRepo = ref.read(authRepositoryProvider);
     await authRepo?.logout();
-
-    // Clear local data (includes all team data in database)
-    final local = ref.read(localDataSourceProvider);
-    await local.deleteAllPdfFiles();
-    await local.clearAllData();
 
     // Note: Team data providers (teamScoresNotifierProvider, teamSetlistsNotifierProvider)
     // will automatically clear when they detect auth state change to unauthenticated
@@ -377,7 +378,7 @@ class AuthStateNotifier extends Notifier<AuthState> {
     if (!ApiClient.isInitialized) return;
     if (!SessionService.instance.isAuthenticated) return;
 
-    final db = ref.read(appDatabaseProvider);
+    final db = ref.read(accountAppDatabaseProvider);
     final local = ref.read(syncableDataSourceProvider);
 
     // Initialize PdfSyncService first (used by other coordinators)

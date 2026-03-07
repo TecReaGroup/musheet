@@ -140,24 +140,52 @@ final currentUserIdProvider = Provider<int?>((ref) {
 // Database & Data Source Providers
 // ============================================================================
 
-/// Provider for AppDatabase singleton
-final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  final database = AppDatabase();
+enum LibraryStorageMode { anonymous, account }
+
+/// Provider for current library storage mode.
+/// Anonymous mode is the default until a user session is authenticated.
+final libraryStorageModeProvider = Provider<LibraryStorageMode>((ref) {
+  final sessionAsync = ref.watch(sessionStateProvider);
+  return sessionAsync.when(
+    data: (state) => state.isAuthenticated
+        ? LibraryStorageMode.account
+        : LibraryStorageMode.anonymous,
+    loading: () => LibraryStorageMode.anonymous,
+    error: (_, _) => LibraryStorageMode.anonymous,
+  );
+});
+
+final anonymousAppDatabaseProvider = Provider<AppDatabase>((ref) {
+  final database = AppDatabase.forStorage('anonymous');
   ref.onDispose(() => database.close());
   return database;
 });
 
-/// Provider for SyncableDataSource (user scope)
-/// This provides full sync capabilities for the personal library
-final syncableDataSourceProvider = Provider<SyncableDataSource>((ref) {
+final accountAppDatabaseProvider = Provider<AppDatabase>((ref) {
+  final database = AppDatabase.forStorage('account');
+  ref.onDispose(() => database.close());
+  return database;
+});
+
+/// Provider for AppDatabase singleton bound to the active library mode.
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  final storageMode = ref.watch(libraryStorageModeProvider);
+  return storageMode == LibraryStorageMode.account
+      ? ref.watch(accountAppDatabaseProvider)
+      : ref.watch(anonymousAppDatabaseProvider);
+});
+
+/// Provider for LocalDataSource bound to the active library mode.
+final localDataSourceProvider = Provider<LocalDataSource>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return DriftLocalDataSource(db);
 });
 
-/// Provider for LocalDataSource (user scope)
-/// Alias for syncableDataSourceProvider for backward compatibility
-final localDataSourceProvider = Provider<LocalDataSource>((ref) {
-  return ref.watch(syncableDataSourceProvider);
+/// Provider for the authenticated account library data source.
+/// This must never point at anonymous storage.
+final syncableDataSourceProvider = Provider<SyncableDataSource>((ref) {
+  final db = ref.watch(accountAppDatabaseProvider);
+  return DriftLocalDataSource(db);
 });
 
 /// Provider for ApiClient

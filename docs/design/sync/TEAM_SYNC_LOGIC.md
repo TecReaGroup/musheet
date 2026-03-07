@@ -2,6 +2,10 @@
 
 本文档描述 MuSheet Flutter App 的 Team（团队）功能同步架构，采用与账户个人库相同的**元数据通道**与**文件通道**分离设计，但 Team 数据完全独立于个人库。注意：Team 仅在“账户模式”下可用；匿名模式仅提供本地 personal library，不包含 Team 功能。
 
+> 当前实现收口点：[`libraryStorageModeProvider`](app/lib/providers/core_providers.dart:147) 控制模式切换；[`goRouterProvider`](app/lib/router/app_router.dart:53) 仅在账户模式注册 Team 路由；[`TeamScreen`](app/lib/screens/team_screen.dart:233) 在匿名模式显示阻断提示；[`MainScaffold.build()`](app/lib/app.dart:275) 仅在账户模式且已认证时显示 Team Tab。
+>
+> 当前回归验证：`flutter test test/widget/team_mode_gating_test.dart`
+
 ---
 
 ## 目录

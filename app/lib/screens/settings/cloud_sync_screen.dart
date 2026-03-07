@@ -55,7 +55,9 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
+    final libraryMode = ref.watch(libraryStorageModeProvider);
     final isLoggedIn = authState.isAuthenticated;
+    final isAnonymousMode = libraryMode == LibraryStorageMode.anonymous;
     // Watch sync state for showing last sync time and status
     final syncState = ref.watch(currentSyncStateProvider);
     // Watch connection state for network status
@@ -154,8 +156,10 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                       // Description
                       Text(
                         isLoggedIn
-                            ? 'Your scores and setlists are syncing automatically'
-                            : 'Sign in to sync your data across devices',
+                            ? 'Your account library is syncing automatically'
+                            : isAnonymousMode
+                                ? 'You are using the local library on this device. Add an account to enable sync and team features.'
+                                : 'Sign in to sync your data across devices',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 15,
@@ -242,7 +246,7 @@ class _CloudSyncScreenState extends ConsumerState<CloudSyncScreen> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  isLoggedIn ? 'Logged in' : 'Not logged in',
+                                  isLoggedIn ? 'Account mode' : 'Local mode',
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,

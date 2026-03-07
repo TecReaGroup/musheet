@@ -11,15 +11,267 @@ import '../providers/preferred_instrument_provider.dart';
 import '../providers/ui_state_providers.dart' show teamEnabledProvider;
 import '../router/app_router.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  final LayerLink _accountOptionsLink = LayerLink();
+  final GlobalKey _accountCardKey = GlobalKey();
+  OverlayEntry? _accountOptionsEntry;
 
   void _navigateToLogin(BuildContext context) {
     context.go(AppRoutes.login);
   }
 
+  void _toggleAccountOptions(AuthState authState) {
+    if (_accountOptionsEntry != null) {
+      _hideAccountOptions();
+      return;
+    }
+    _showAccountOptions(authState);
+  }
+
+  void _showAccountOptions(AuthState authState) {
+    final overlay = Overlay.of(context);
+    final renderBox =
+        _accountCardKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+    final cardSize = renderBox.size;
+
+    _accountOptionsEntry = OverlayEntry(
+      builder: (overlayContext) => Stack(
+        children: [
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _hideAccountOptions,
+              child: const SizedBox.expand(),
+            ),
+          ),
+          CompositedTransformFollower(
+            link: _accountOptionsLink,
+            showWhenUnlinked: false,
+            offset: Offset(0, cardSize.height + 8),
+            child: Material(
+              color: Colors.transparent,
+              child: SizedBox(
+                width: cardSize.width,
+                child: _buildAccountOptionsCard(overlayContext, authState),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    overlay.insert(_accountOptionsEntry!);
+  }
+
+  void _hideAccountOptions() {
+    _accountOptionsEntry?.remove();
+    _accountOptionsEntry = null;
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void dispose() {
+    _hideAccountOptions();
+    super.dispose();
+  }
+
+  Widget _buildAccountCard(BuildContext context, AuthState authState) {
+    final isLoggedIn = authState.isAuthenticated;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(12),
+                bottomLeft: Radius.circular(12),
+              ),
+              child: InkWell(
+                onTap: () => _toggleAccountOptions(authState),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: _buildAccountSummary(authState),
+                ),
+              ),
+            ),
+          ),
+          Container(width: 1, height: 64, color: AppColors.gray200),
+          Material(
+            color: Colors.transparent,
+            borderRadius: const BorderRadius.only(
+              topRight: Radius.circular(12),
+              bottomRight: Radius.circular(12),
+            ),
+            child: InkWell(
+              onTap: () {
+                if (isLoggedIn) {
+                  context.go(AppRoutes.profile);
+                } else {
+                  _navigateToLogin(context);
+                }
+              },
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+              child: const SizedBox(
+                width: 52,
+                height: 88,
+                child: Center(
+                  child: Icon(AppIcons.chevronRight, color: AppColors.gray400),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountSummary(AuthState authState) {
+    final user = authState.user;
+    final isLoggedIn = authState.isAuthenticated;
+    final displayName = user?.displayName ?? 'Local Library';
+    final subtitle = isLoggedIn
+        ? (user?.username ?? 'Signed in account')
+        : 'On this device';
+
+    return Row(
+      children: [
+        isLoggedIn
+            ? UserAvatar(
+                userId: user?.id,
+                avatarIdentifier: user?.avatarUrl,
+                displayName: displayName,
+                size: 56,
+              )
+            : Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: const Center(
+                  child: Icon(AppIcons.libraryMusic, color: AppColors.gray500, size: 24),
+                ),
+              ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                  color: AppColors.gray700,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 13, color: AppColors.gray600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              if (isLoggedIn)
+                ConnectionStatusIndicator.small(isConnected: authState.isConnected)
+              else
+                const Text(
+                  'Sync off',
+                  style: TextStyle(fontSize: 12, color: AppColors.gray500),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAccountOptionsCard(BuildContext context, AuthState authState) {
+    final isLoggedIn = authState.isAuthenticated;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        border: Border.all(color: AppColors.gray200),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _AccountSwitcherTile(
+              icon: AppIcons.libraryMusic,
+              iconColor: !isLoggedIn ? AppColors.blue600 : AppColors.gray500,
+              iconBackgroundColor: !isLoggedIn
+                  ? AppColors.blue50
+                  : AppColors.gray100,
+              title: 'Local Library',
+              subtitle: 'On this device',
+              selected: !isLoggedIn,
+              showDivider: true,
+              onTap: _hideAccountOptions,
+            ),
+            if (isLoggedIn)
+              _AccountSwitcherTile(
+                icon: AppIcons.person,
+                iconColor: AppColors.blue600,
+                iconBackgroundColor: AppColors.blue50,
+                title: authState.user?.displayName ?? 'Signed-in Account',
+                subtitle: authState.user?.username ?? 'Signed in',
+                selected: true,
+                showDivider: true,
+                onTap: _hideAccountOptions,
+              ),
+            _AccountAddTile(
+              onTap: () {
+                _hideAccountOptions();
+                _navigateToLogin(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
 
     return Scaffold(
@@ -49,190 +301,184 @@ class SettingsScreen extends ConsumerWidget {
               // Add bottom padding for bottom navigation bar
               padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + kBottomNavigationBarHeight),
               children: [
-          // Profile card section - shows login button or user profile
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.gray200),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-                child: InkWell(
-                  onTap: () {
-                    if (authState.isAuthenticated) {
-                      // Navigate to profile screen
-                      context.go(AppRoutes.profile);
-                    } else {
-                      // Navigate to login screen
-                      _navigateToLogin(context);
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: authState.isAuthenticated
-                      ? _buildLoggedInProfile(authState)
-                      : _buildLoginPrompt(),
+                // Profile card section - local account summary + account actions
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: CompositedTransformTarget(
+                    link: _accountOptionsLink,
+                    child: KeyedSubtree(
+                      key: _accountCardKey,
+                      child: _buildAccountCard(context, authState),
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ),
 
-          SettingsGroup(
-            title: 'PREFERENCES',
-            children: [
-              Consumer(
-                builder: (context, ref, child) {
-                  final preferredInstrument = ref.watch(preferredInstrumentProvider);
-                  String displayText = 'Not set';
-                  if (preferredInstrument != null) {
-                    // Try to find the instrument type
-                    final instrumentType = InstrumentType.values.firstWhere(
-                      (type) => type.name == preferredInstrument,
-                      orElse: () => InstrumentType.other,
-                    );
-                    displayText = instrumentType.name[0].toUpperCase() + instrumentType.name.substring(1);
-                  }
-                  
-                  return SettingsListItem(
-                    icon: AppIcons.piano,
-                    label: 'Preferred Instrument',
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          displayText,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.gray500,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Icon(AppIcons.chevronRight, size: 20, color: AppColors.gray400),
-                      ],
-                    ),
-                    onTap: () {
-                      AppNavigation.navigateToInstrumentPreference(context);
-                    },
-                    showDivider: true,
-                    isFirst: true,
-                  );
-                },
-              ),
-              Consumer(
-                builder: (context, ref, child) {
-                  final teamEnabled = ref.watch(teamEnabledProvider);
-                  
-                  return SettingsListItem(
-                    icon: AppIcons.people,
-                    label: 'Enable Team',
-                    trailing: GestureDetector(
-                      onTap: () {
-                        ref.read(teamEnabledProvider.notifier).setTeamEnabled(!teamEnabled);
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 44,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          color: teamEnabled ? AppColors.blue500 : AppColors.gray300,
-                        ),
-                        child: AnimatedAlign(
-                          duration: const Duration(milliseconds: 200),
-                          alignment: teamEnabled ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            width: 20,
-                            height: 20,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
+                SettingsGroup(
+                  title: 'PREFERENCES',
+                  children: [
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final preferredInstrument = ref.watch(preferredInstrumentProvider);
+                        String displayText = 'Not set';
+                        if (preferredInstrument != null) {
+                          // Try to find the instrument type
+                          final instrumentType = InstrumentType.values.firstWhere(
+                            (type) => type.name == preferredInstrument,
+                            orElse: () => InstrumentType.other,
+                          );
+                          displayText = instrumentType.name[0].toUpperCase() + instrumentType.name.substring(1);
+                        }
+                        
+                        return SettingsListItem(
+                          icon: AppIcons.piano,
+                          label: 'Preferred Instrument',
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                displayText,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.gray500,
                                 ),
-                              ],
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(AppIcons.chevronRight, size: 20, color: AppColors.gray400),
+                            ],
+                          ),
+                          onTap: () {
+                            AppNavigation.navigateToInstrumentPreference(context);
+                          },
+                          showDivider: true,
+                          isFirst: true,
+                        );
+                      },
+                    ),
+                    Consumer(
+                      builder: (context, ref, child) {
+                        final teamEnabled = ref.watch(teamEnabledProvider);
+                        final canUseTeam = authState.isAuthenticated;
+                        
+                        return SettingsListItem(
+                          icon: AppIcons.people,
+                          label: 'Enable Team',
+                          trailing: GestureDetector(
+                            onTap: () {
+                              if (!canUseTeam) return;
+                              ref.read(teamEnabledProvider.notifier).setTeamEnabled(!teamEnabled);
+                            },
+                            child: Opacity(
+                              opacity: canUseTeam ? 1 : 0.5,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 44,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  color: teamEnabled && canUseTeam
+                                      ? AppColors.blue500
+                                      : AppColors.gray300,
+                                ),
+                                child: AnimatedAlign(
+                                  duration: const Duration(milliseconds: 200),
+                                  alignment: teamEnabled && canUseTeam
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.white,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.1),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                          onTap: () {
+                            if (!canUseTeam) {
+                              AppToast.info(
+                                context,
+                                'Sign in to enable Team features',
+                              );
+                              return;
+                            }
+                            ref.read(teamEnabledProvider.notifier).setTeamEnabled(!teamEnabled);
+                          },
+                          showDivider: true,
+                        );
+                      },
                     ),
-                    onTap: () {
-                      ref.read(teamEnabledProvider.notifier).setTeamEnabled(!teamEnabled);
-                    },
-                    showDivider: true,
-                  );
-                },
-              ),
-              SettingsListItem(
-                icon: AppIcons.bluetooth,
-                label: 'Bluetooth Devices',
-                onTap: () => context.go(AppRoutes.bluetoothDevices),
-                isLast: true,
-              ),
-            ],
-          ),
-
-          SettingsGroup(
-            title: 'SYNC & STORAGE',
-            children: [
-              SettingsListItem(
-                icon: AppIcons.cloud,
-                label: 'Cloud Sync',
-                onTap: () => context.go(AppRoutes.cloudSync),
-                showDivider: true,
-                isFirst: true,
-              ),
-              SettingsListItem(
-                icon: AppIcons.notifications,
-                label: 'Notifications',
-                onTap: () => context.go(AppRoutes.notifications),
-                isLast: true,
-              ),
-            ],
-          ),
-
-          SettingsGroup(
-            title: 'ABOUT',
-            children: [
-              SettingsListItem(
-                icon: AppIcons.helpOutline,
-                label: 'Help & Support',
-                onTap: () => context.go(AppRoutes.helpSupport),
-                showDivider: true,
-                isFirst: true,
-              ),
-              SettingsListItem(
-                icon: AppIcons.infoOutline,
-                label: 'About MuSheet',
-                onTap: () => context.go(AppRoutes.about),
-                isLast: true,
-              ),
-            ],
-          ),
-
-          const Padding(
-            padding: EdgeInsets.all(32),
-            child: Column(
-              children: [
-                Text('MuSheet', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
-                SizedBox(height: 8),
-                Text(
-                  'Digital score management for musicians',
-                  style: TextStyle(fontSize: 12, color: AppColors.gray400),
-                  textAlign: TextAlign.center,
+                    SettingsListItem(
+                      icon: AppIcons.bluetooth,
+                      label: 'Bluetooth Devices',
+                      onTap: () => context.go(AppRoutes.bluetoothDevices),
+                      isLast: true,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+
+                SettingsGroup(
+                  title: 'SYNC & STORAGE',
+                  children: [
+                    SettingsListItem(
+                      icon: AppIcons.cloud,
+                      label: 'Cloud Sync',
+                      onTap: () => context.go(AppRoutes.cloudSync),
+                      showDivider: true,
+                      isFirst: true,
+                    ),
+                    SettingsListItem(
+                      icon: AppIcons.notifications,
+                      label: 'Notifications',
+                      onTap: () => context.go(AppRoutes.notifications),
+                      isLast: true,
+                    ),
+                  ],
+                ),
+
+                SettingsGroup(
+                  title: 'ABOUT',
+                  children: [
+                    SettingsListItem(
+                      icon: AppIcons.helpOutline,
+                      label: 'Help & Support',
+                      onTap: () => context.go(AppRoutes.helpSupport),
+                      showDivider: true,
+                      isFirst: true,
+                    ),
+                    SettingsListItem(
+                      icon: AppIcons.infoOutline,
+                      label: 'About MuSheet',
+                      onTap: () => context.go(AppRoutes.about),
+                      isLast: true,
+                    ),
+                  ],
+                ),
+
+                const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      Text('MuSheet', style: TextStyle(fontSize: 14, color: AppColors.gray500)),
+                      SizedBox(height: 8),
+                      Text(
+                        'Digital score management for musicians',
+                        style: TextStyle(fontSize: 12, color: AppColors.gray400),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -240,86 +486,153 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Widget _buildLoginPrompt() {
-    return Row(
-      children: [
-        Container(
-          width: 64,
-          height: 64,
+class _AccountSwitcherTile extends StatelessWidget {
+  const _AccountSwitcherTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBackgroundColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.selected = false,
+    this.showDivider = false,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBackgroundColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool selected;
+  final bool showDivider;
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.blue50 : Colors.white,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: AppColors.gray100,
-            borderRadius: BorderRadius.circular(32),
+            border: showDivider
+                ? Border(bottom: BorderSide(color: AppColors.gray100))
+                : null,
           ),
-          child: const Center(
-            child: Icon(AppIcons.person, color: AppColors.gray400, size: 32),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconBackgroundColor,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, size: 18, color: iconColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: selected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        color: selected ? AppColors.blue600 : AppColors.gray700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (selected)
+                Icon(
+                  AppIcons.check,
+                  size: 18,
+                  color: AppColors.blue600,
+                ),
+            ],
           ),
         ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      ),
+    );
+  }
+}
+
+class _AccountAddTile extends StatelessWidget {
+  const _AccountAddTile({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
             children: [
-              const Text(
-                'Sign in to sync',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  AppIcons.add,
+                  size: 18,
+                  color: AppColors.gray600,
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Connect to server to sync your music',
-                style: TextStyle(fontSize: 14, color: AppColors.gray500),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Add Account',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gray700,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Sign in with another account',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                AppIcons.chevronRight,
+                size: 18,
+                color: AppColors.gray400,
               ),
             ],
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: AppColors.blue500,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Text(
-            'Login',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
-
-  Widget _buildLoggedInProfile(AuthState authState) {
-    final user = authState.user;
-    final displayName = user?.displayName ?? 'User';
-    final username = user?.username ?? '';
-
-    return Row(
-      children: [
-        UserAvatar(
-          userId: user?.id,
-          avatarIdentifier: user?.avatarUrl,
-          displayName: displayName,
-          size: 64,
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(displayName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-              const SizedBox(height: 4),
-              Text(username, style: const TextStyle(fontSize: 14, color: AppColors.gray600)),
-              const SizedBox(height: 4),
-              ConnectionStatusIndicator.small(isConnected: authState.isConnected),
-            ],
-          ),
-        ),
-        const Icon(AppIcons.chevronRight, color: AppColors.gray400),
-      ],
-    );
-  }
-
 }

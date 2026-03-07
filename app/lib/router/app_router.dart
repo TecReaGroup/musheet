@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../providers/core_providers.dart';
 import '../screens/home_screen.dart';
 import '../screens/library_screen.dart';
 import '../screens/team_screen.dart';
@@ -50,6 +51,8 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 // Provider for the GoRouter instance
 final goRouterProvider = Provider<GoRouter>((ref) {
+  final libraryMode = ref.watch(libraryStorageModeProvider);
+
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     debugLogDiagnostics: kDebugMode,
@@ -75,13 +78,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               child: const LibraryScreen(),
             ),
           ),
-          GoRoute(
-            path: AppRoutes.team,
-            pageBuilder: (context, state) => NoTransitionPage(
-              key: state.pageKey,
-              child: const TeamScreen(),
+          if (libraryMode == LibraryStorageMode.account)
+            GoRoute(
+              path: AppRoutes.team,
+              pageBuilder: (context, state) => NoTransitionPage(
+                key: state.pageKey,
+                child: const TeamScreen(),
+              ),
             ),
-          ),
           GoRoute(
             path: AppRoutes.settings,
             pageBuilder: (context, state) => NoTransitionPage(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/setlists_state_provider.dart';
 import '../providers/teams_state_provider.dart';
+import '../providers/core_providers.dart';
 import '../providers/preferred_instrument_provider.dart'
     show preferredInstrumentProvider, lastOpenedInstrumentInScoreProvider;
 import '../core/data/data_scope.dart';
@@ -55,7 +56,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final searchQuery = ref.watch(searchQueryProvider);
     final searchScope = ref.watch(searchScopeProvider);
     final hasUnreadNotifications = ref.watch(hasUnreadNotificationsProvider);
-    final teamEnabled = ref.watch(teamEnabledProvider);
+    final libraryMode = ref.watch(libraryStorageModeProvider);
+    final teamEnabled = ref.watch(teamEnabledProvider) &&
+        libraryMode == LibraryStorageMode.account;
 
     // If team is disabled and search scope is team, switch to library
     if (!teamEnabled && searchScope == SearchScope.team) {

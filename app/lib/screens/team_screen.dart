@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../providers/core_providers.dart';
 import '../providers/teams_state_provider.dart';
 import '../providers/scores_state_provider.dart';
 import '../providers/score_commands_provider.dart';
@@ -230,6 +231,23 @@ class _TeamScreenState extends ConsumerState<TeamScreen>
 
   @override
   Widget build(BuildContext context) {
+    final libraryMode = ref.watch(libraryStorageModeProvider);
+    if (libraryMode != LibraryStorageMode.account) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(32),
+            child: Text(
+              'Sign in to access Team features.',
+              style: TextStyle(fontSize: 16, color: AppColors.gray600),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     // Watch the async state to show loading indicator
     final teamsState = ref.watch(teamsStateProvider);
 
