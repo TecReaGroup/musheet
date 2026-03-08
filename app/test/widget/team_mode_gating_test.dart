@@ -9,7 +9,6 @@ import 'package:musheet/core/services/session_service.dart';
 import 'package:musheet/providers/auth_state_provider.dart';
 import 'package:musheet/providers/core_providers.dart';
 import 'package:musheet/router/app_router.dart';
-import 'package:musheet/screens/team_screen.dart';
 
 class _FixedAuthStateNotifier extends AuthStateNotifier {
   _FixedAuthStateNotifier(this._fixedState);
@@ -59,19 +58,19 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('anonymous/account team gating', () {
-    test('router registers team route only in account mode', () async {
+    test('router keeps team route registered and guards access via policy', () async {
       final routerSource = File('lib/router/app_router.dart').readAsStringSync();
 
-      expect(
-        routerSource,
-        contains('if (libraryMode == LibraryStorageMode.account)'),
-      );
       expect(routerSource, contains('path: AppRoutes.team'));
+      expect(routerSource, contains('RouteCapabilityPolicy'));
+      expect(routerSource, contains('decision = routeGuardPolicy.evaluate'));
       expect(
-        RegExp(
-          r'if \(libraryMode == LibraryStorageMode\.account\)\s+GoRoute\([\s\S]*?path: AppRoutes\.team',
-        ).hasMatch(routerSource),
-        isTrue,
+        routerSource.contains('if (libraryMode == LibraryStorageMode.account)'),
+        isFalse,
+        reason:
+            'Team route should stay registered in the stable router and be '
+            'guarded by capability policy instead of conditional route table '
+            'mutation.',
       );
     });
 
@@ -115,7 +114,7 @@ void main() {
       await _disposePumpedApp(tester);
     });
 
-    testWidgets('team screen blocks anonymous mode with sign-in message', (
+    testWidgets('anonymous mode redirects team route to sign-in screen', (
       tester,
     ) async {
       final container = _createContainer(
@@ -124,15 +123,16 @@ void main() {
       );
       addTearDown(container.dispose);
 
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: const MaterialApp(home: TeamScreen()),
-        ),
-      );
-      await tester.pumpAndSettle();
+      await _pumpRouterApp(tester, container);
 
-      expect(find.text('Sign in to access Team features.'), findsOneWidget);
+      final router = container.read(goRouterProvider);
+      router.go(AppRoutes.team);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+
+      expect(find.text('Sign In'), findsWidgets);
+
+      await _disposePumpedApp(tester);
     });
   });
 }

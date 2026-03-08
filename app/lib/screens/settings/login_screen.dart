@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../providers/auth_state_provider.dart';
-import '../../providers/core_providers.dart';
+import '../../providers/auth_flow_provider.dart';
+import '../../providers/auth_server_config_provider.dart';
 import '../../core/core.dart';
 import '../../router/app_router.dart';
 import '../../widgets/common_widgets.dart';
@@ -39,9 +39,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _loadSavedServerUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedUrl = prefs.getString('backend_server_url');
-    if (savedUrl != null && savedUrl.isNotEmpty) {
+    final savedUrl = await ref
+        .read(authServerConfigCoordinatorProvider)
+        .loadSavedServerUrl();
+    if (savedUrl != null && mounted) {
       setState(() {
         _serverUrlController.text = savedUrl;
       });
@@ -69,9 +70,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('backend_server_url', url);
-      ApiClient.initialize(baseUrl: url);
+      await ref.read(authServerConfigCoordinatorProvider).testConnection(url);
 
       // Test server connectivity using health check endpoint
       final healthResult = await ApiClient.instance.checkHealth();
@@ -101,20 +100,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final serverUrl = _serverUrlController.text.trim();
     if (serverUrl.isNotEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('backend_server_url', serverUrl);
-      ApiClient.initialize(baseUrl: serverUrl);
-      // Initialize ConnectionManager if not already done
-      if (!ConnectionManager.isInitialized) {
-        await ConnectionManager.initialize(
-          networkService: NetworkService.instance,
-        );
-        // Notify providers that ConnectionManager is now available
-        ref.read(connectionManagerInitializedProvider.notifier).markInitialized();
-      }
-      // Invalidate providers to pick up new ApiClient
-      ref.invalidate(apiClientProvider);
-      ref.invalidate(authRepositoryProvider);
+      await ref.read(authServerConfigCoordinatorProvider).configureServer(
+        serverUrl,
+      );
     }
 
     setState(() {
@@ -125,21 +113,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       bool success;
       if (_isLogin) {
-        success = await ref
-            .read(authStateProvider.notifier)
-            .login(
-              username: _usernameController.text.trim(),
-              password: _passwordController.text.trim(),
-            );
+        final result = await ref.read(authFlowCoordinatorProvider).login(
+          username: _usernameController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        success = result.success;
       } else {
         final username = _usernameController.text.trim();
-        success = await ref
-            .read(authStateProvider.notifier)
-            .register(
-              username: username,
-              password: _passwordController.text.trim(),
-              displayName: username,
-            );
+        final result = await ref.read(authFlowCoordinatorProvider).register(
+          username: username,
+          password: _passwordController.text.trim(),
+          displayName: username,
+        );
+        success = result.success;
       }
 
       if (success && mounted) {
@@ -150,15 +136,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           _isLogin ? 'Logged in successfully!' : 'Account created!',
         );
 
-        // Trigger sync after successful login
-        try {
-          final syncCoordinator = ref.read(syncCoordinatorProvider);
-          if (syncCoordinator != null) {
-            await syncCoordinator.syncNow();
-          }
-        } catch (_) {
-          // Sync trigger failed, ignore
-        }
+        // AuthStateNotifier.login()/register() already initialize sync and
+        // trigger the immediate post-login sync. Avoid duplicating that work
+        // here during the route transition back to settings.
       } else if (mounted) {
         final authError = ref.read(authStateProvider).error;
         setState(() => _error = authError ?? 'Authentication failed');

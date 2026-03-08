@@ -8,7 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/core.dart';
-import '../core/services/avatar_cache_service.dart';
 import 'core_providers.dart';
 
 // ============================================================================
@@ -141,170 +140,37 @@ class AuthStateNotifier extends Notifier<AuthState> {
     }
   }
 
-  /// Restore session with cache-first pattern
-  ///
-  /// Loads cached data immediately for fast startup, then validates
-  /// and refreshes in background if online.
-  Future<void> restoreSession() async {
-    final authRepo = ref.read(authRepositoryProvider);
-    if (authRepo == null) return;
+  void setLoading() {
+    state = state.copyWith(status: AuthStatus.loading, clearError: true);
+  }
 
-    // Step 1: Load cached avatar immediately (no network wait)
-    // This uses AvatarCacheService which returns disk cache first
+  void setAuthenticated({
+    required UserProfile? user,
+    required bool isConnected,
+  }) {
+    state = state.copyWith(
+      status: AuthStatus.authenticated,
+      user: user,
+      isConnected: isConnected,
+      clearError: true,
+    );
+  }
+
+  void setUnauthenticated({String? error}) {
+    state = state.copyWith(
+      status: AuthStatus.unauthenticated,
+      error: error,
+      clearUser: true,
+      clearAvatar: true,
+    );
+  }
+
+  void setConnectionState(bool isConnected) {
+    state = state.copyWith(isConnected: isConnected);
+  }
+
+  Future<void> loadAvatar() async {
     await _loadAvatar();
-
-    // Step 2: Check if we're online before network operations
-    final isOnline = NetworkService.instance.isOnline;
-
-    // Step 3: Validate session (returns immediately if offline)
-    final isValid = await authRepo.validateSession();
-    if (!isValid) return;
-
-    // Step 4: Update connection state
-    final isServiceConnected = ConnectionManager.isInitialized
-        ? ConnectionManager.instance.isConnected
-        : isOnline;
-    state = state.copyWith(isConnected: isServiceConnected);
-
-    // Step 5: If online, refresh profile and initialize sync in background
-    if (isOnline) {
-      // Fetch profile in background (don't await)
-      authRepo.fetchProfile();
-
-      // Initialize sync services
-      await _initializeSync();
-    }
-  }
-
-  /// Login with credentials
-  Future<bool> login({
-    required String username,
-    required String password,
-  }) async {
-    final authRepo = ref.read(authRepositoryProvider);
-    if (authRepo == null) {
-      state = state.copyWith(
-        status: AuthStatus.error,
-        error: 'Server not configured',
-      );
-      return false;
-    }
-
-    state = state.copyWith(status: AuthStatus.loading, clearError: true);
-
-    final result = await authRepo.login(
-      username: username,
-      password: password,
-    );
-
-    if (result.success) {
-      state = state.copyWith(
-        status: AuthStatus.authenticated,
-        user: result.user,
-        isConnected: true,
-      );
-
-      // Load avatar after login
-      await _loadAvatar();
-
-      // Initialize sync
-      await _initializeSync();
-
-      // Note: Teams will be synced by teamsStateProvider when auth state changes
-
-      return true;
-    } else {
-      state = state.copyWith(
-        status: AuthStatus.unauthenticated,
-        error: result.error,
-      );
-      return false;
-    }
-  }
-
-  /// Register new user
-  Future<bool> register({
-    required String username,
-    required String password,
-    String? displayName,
-  }) async {
-    final authRepo = ref.read(authRepositoryProvider);
-    if (authRepo == null) {
-      state = state.copyWith(
-        status: AuthStatus.error,
-        error: 'Server not configured',
-      );
-      return false;
-    }
-
-    state = state.copyWith(status: AuthStatus.loading, clearError: true);
-
-    final result = await authRepo.register(
-      username: username,
-      password: password,
-      displayName: displayName,
-    );
-
-    if (result.success) {
-      state = state.copyWith(
-        status: AuthStatus.authenticated,
-        user: result.user,
-        isConnected: true,
-      );
-
-      // Initialize sync
-      await _initializeSync();
-
-      return true;
-    } else {
-      state = state.copyWith(
-        status: AuthStatus.unauthenticated,
-        error: result.error,
-      );
-      return false;
-    }
-  }
-
-  /// Logout
-  Future<void> logout() async {
-    // Stop sync coordinators and services
-    // IMPORTANT: Reset UnifiedSyncManager first, as it holds references to other coordinators
-    if (UnifiedSyncManager.isInitialized) {
-      UnifiedSyncManager.reset();
-    }
-    if (PdfSyncService.isInitialized) {
-      PdfSyncService.reset();
-    }
-    if (SyncCoordinator.isInitialized) {
-      SyncCoordinator.reset();
-    }
-    if (TeamSyncManager.isInitialized) {
-      TeamSyncManager.reset();
-    }
-
-    // Clear authenticated account storage only. Anonymous local library must survive logout.
-    final accountLocal = ref.read(syncableDataSourceProvider);
-    await accountLocal.deleteAllPdfFiles();
-    await accountLocal.clearAllData();
-
-    // Logout from server and clear session afterwards so provider mode can safely
-    // switch back to anonymous without accidentally deleting anonymous storage.
-    final authRepo = ref.read(authRepositoryProvider);
-    await authRepo?.logout();
-
-    // Note: Team data providers (teamScoresNotifierProvider, teamSetlistsNotifierProvider)
-    // will automatically clear when they detect auth state change to unauthenticated
-
-    // Clear avatar cache
-    await AvatarCacheService().clearAllCache();
-
-    // Invalidate repository providers to clear cached data
-    ref.invalidate(scoreRepositoryProvider);
-    ref.invalidate(setlistRepositoryProvider);
-    // Note: teamsStateProvider will be invalidated when it detects auth state change
-
-    // Finally update state to trigger UI navigation
-    state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
   /// Check pending changes count
@@ -374,45 +240,6 @@ class AuthStateNotifier extends Notifier<AuthState> {
     }
   }
 
-  Future<void> _initializeSync() async {
-    if (!ApiClient.isInitialized) return;
-    if (!SessionService.instance.isAuthenticated) return;
-
-    final db = ref.read(accountAppDatabaseProvider);
-    final local = ref.read(syncableDataSourceProvider);
-
-    // Initialize PdfSyncService first (used by other coordinators)
-    if (!PdfSyncService.isInitialized) {
-      PdfSyncService.initialize(
-        api: ApiClient.instance,
-        session: SessionService.instance,
-        network: NetworkService.instance,
-        db: db,
-      );
-      ref.invalidate(pdfSyncServiceProvider);
-    }
-
-    // Initialize UnifiedSyncManager - this handles both Library and Team sync
-    // It internally initializes SyncCoordinator and TeamSyncManager
-    if (!UnifiedSyncManager.isInitialized) {
-      await UnifiedSyncManager.initialize(
-        localLibrary: local,
-        api: ApiClient.instance,
-        session: SessionService.instance,
-        network: NetworkService.instance,
-        db: db,
-      );
-      // Invalidate provider to pick up new instance
-      ref.invalidate(syncCoordinatorProvider);
-    }
-
-    // Re-connect repositories to sync coordinator now that it's initialized
-    ref.invalidate(scoreRepositoryProvider);
-    ref.invalidate(setlistRepositoryProvider);
-
-    // Trigger initial sync for both Library AND Team data
-    await UnifiedSyncManager.instance.requestSync(immediate: true);
-  }
 }
 
 // ============================================================================

@@ -19,67 +19,64 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final LayerLink _accountOptionsLink = LayerLink();
-  final GlobalKey _accountCardKey = GlobalKey();
-  OverlayEntry? _accountOptionsEntry;
-
   void _navigateToLogin(BuildContext context) {
     context.go(AppRoutes.login);
   }
 
-  void _toggleAccountOptions(AuthState authState) {
-    if (_accountOptionsEntry != null) {
-      _hideAccountOptions();
+  Future<void> _showAccountMenu(BuildContext cardContext, AuthState authState) async {
+    final navigator = Navigator.of(cardContext, rootNavigator: true);
+    final overlay = navigator.overlay;
+    final renderBox = cardContext.findRenderObject() as RenderBox?;
+
+    if (overlay == null || renderBox == null) {
       return;
     }
-    _showAccountOptions(authState);
-  }
 
-  void _showAccountOptions(AuthState authState) {
-    final overlay = Overlay.of(context);
-    final renderBox =
-        _accountCardKey.currentContext?.findRenderObject() as RenderBox?;
-    if (renderBox == null) return;
-    final cardSize = renderBox.size;
-
-    _accountOptionsEntry = OverlayEntry(
-      builder: (overlayContext) => Stack(
-        children: [
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: _hideAccountOptions,
-              child: const SizedBox.expand(),
-            ),
-          ),
-          CompositedTransformFollower(
-            link: _accountOptionsLink,
-            showWhenUnlinked: false,
-            offset: Offset(0, cardSize.height + 8),
-            child: Material(
-              color: Colors.transparent,
-              child: SizedBox(
-                width: cardSize.width,
-                child: _buildAccountOptionsCard(overlayContext, authState),
-              ),
-            ),
-          ),
-        ],
-      ),
+    final overlayBox = overlay.context.findRenderObject() as RenderBox;
+    renderBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+    final cardBottomRight = renderBox.localToGlobal(
+      renderBox.size.bottomRight(Offset.zero),
+      ancestor: overlayBox,
     );
+    const horizontalMargin = 16.0;
+    const verticalSpacing = -16.0;
 
-    overlay.insert(_accountOptionsEntry!);
-  }
+    await showGeneralDialog<void>(
+      context: cardContext,
+      barrierLabel: 'Dismiss account menu',
+      barrierDismissible: true,
+      barrierColor: Colors.black.withValues(alpha: 0.18),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return SafeArea(
+          child: Stack(
+            children: [
+              Positioned(
+                left: horizontalMargin,
+                right: horizontalMargin,
+                top: cardBottomRight.dy + verticalSpacing,
+                child: Material(
+                  color: Colors.transparent,
+                  child: _buildAccountMenu(dialogContext, authState),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+        final curvedAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
 
-  void _hideAccountOptions() {
-    _accountOptionsEntry?.remove();
-    _accountOptionsEntry = null;
-  }
-
-  @override
-  void dispose() {
-    _hideAccountOptions();
-    super.dispose();
+        return FadeTransition(
+          opacity: curvedAnimation,
+          child: child,
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 180),
+    );
   }
 
   Widget _buildAccountCard(BuildContext context, AuthState authState) {
@@ -94,26 +91,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                bottomLeft: Radius.circular(12),
-              ),
-              child: InkWell(
-                onTap: () => _toggleAccountOptions(authState),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
+            child: Builder(
+              builder: (cardContext) {
+                return Material(
+                  color: Colors.transparent,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
                   ),
-                  child: _buildAccountSummary(authState),
-                ),
-              ),
+                  child: InkWell(
+                    onTap: () => _showAccountMenu(cardContext, authState),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      bottomLeft: Radius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: _buildAccountSummary(authState),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           Container(width: 1, height: 64, color: AppColors.gray200),
@@ -214,27 +215,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildAccountOptionsCard(BuildContext context, AuthState authState) {
+  Widget _buildAccountMenu(BuildContext context, AuthState authState) {
     final isLoggedIn = authState.isAuthenticated;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        border: Border.all(color: AppColors.gray200),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 480),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+          ],
+          border: Border.all(color: AppColors.gray200),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             _AccountSwitcherTile(
               icon: AppIcons.libraryMusic,
               iconColor: !isLoggedIn ? AppColors.blue600 : AppColors.gray500,
@@ -245,7 +250,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: 'On this device',
               selected: !isLoggedIn,
               showDivider: true,
-              onTap: _hideAccountOptions,
+              onTap: () => Navigator.of(context).pop(),
             ),
             if (isLoggedIn)
               _AccountSwitcherTile(
@@ -256,15 +261,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 subtitle: authState.user?.username ?? 'Signed in',
                 selected: true,
                 showDivider: true,
-                onTap: _hideAccountOptions,
+                onTap: () => Navigator.of(context).pop(),
               ),
             _AccountAddTile(
               onTap: () {
-                _hideAccountOptions();
+                Navigator.of(context).pop();
                 _navigateToLogin(context);
               },
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -304,13 +310,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 // Profile card section - local account summary + account actions
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: CompositedTransformTarget(
-                    link: _accountOptionsLink,
-                    child: KeyedSubtree(
-                      key: _accountCardKey,
-                      child: _buildAccountCard(context, authState),
-                    ),
-                  ),
+                  child: _buildAccountCard(context, authState),
                 ),
 
                 SettingsGroup(

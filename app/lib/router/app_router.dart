@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../providers/core_providers.dart';
+import '../providers/auth_state_provider.dart';
 import '../screens/home_screen.dart';
 import '../screens/library_screen.dart';
 import '../screens/team_screen.dart';
@@ -21,6 +21,7 @@ import '../screens/settings/profile_screen.dart';
 import '../models/team.dart';
 import '../core/data/data_scope.dart';
 import '../app.dart';
+import 'route_guard_policy.dart';
 
 // Route paths
 class AppRoutes {
@@ -49,14 +50,41 @@ class AppRoutes {
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
+class _RouterRefreshNotifier extends ChangeNotifier {
+  void notifyRouter() {
+    notifyListeners();
+  }
+}
+
+final _routerRefreshNotifierProvider = Provider<_RouterRefreshNotifier>((ref) {
+  final notifier = _RouterRefreshNotifier();
+
+  ref.listen<AuthState>(authStateProvider, (previous, next) {
+    notifier.notifyRouter();
+  });
+
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
 // Provider for the GoRouter instance
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final libraryMode = ref.watch(libraryStorageModeProvider);
+  final refreshNotifier = ref.watch(_routerRefreshNotifierProvider);
+  const routeGuardPolicy = RouteCapabilityPolicy();
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
     debugLogDiagnostics: kDebugMode,
     initialLocation: AppRoutes.home,
+    refreshListenable: refreshNotifier,
+    redirect: (context, state) {
+      final authState = ref.read(authStateProvider);
+      final decision = routeGuardPolicy.evaluate(
+        path: state.uri.path,
+        authState: authState,
+      );
+      return decision.redirectLocation;
+    },
     routes: [
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -78,14 +106,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               child: const LibraryScreen(),
             ),
           ),
-          if (libraryMode == LibraryStorageMode.account)
-            GoRoute(
-              path: AppRoutes.team,
-              pageBuilder: (context, state) => NoTransitionPage(
-                key: state.pageKey,
-                child: const TeamScreen(),
-              ),
+          GoRoute(
+            path: AppRoutes.team,
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const TeamScreen(),
             ),
+          ),
           GoRoute(
             path: AppRoutes.settings,
             pageBuilder: (context, state) => NoTransitionPage(

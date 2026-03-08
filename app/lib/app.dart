@@ -10,10 +10,8 @@ import 'theme/app_theme.dart';
 import 'screens/splash_screen.dart';
 import 'utils/icon_mappings.dart';
 import 'router/app_router.dart';
+import 'providers/app_bootstrap_provider.dart';
 import 'providers/core_providers.dart';
-import 'core/data/data_scope.dart';
-import 'providers/scores_state_provider.dart';
-import 'providers/setlists_state_provider.dart';
 import 'providers/auth_state_provider.dart';
 import 'providers/ui_state_providers.dart';
 import 'utils/logger.dart';
@@ -21,14 +19,7 @@ import 'widgets/common_widgets.dart';
 
 enum AppPage { home, library, team, settings }
 
-// Flag to prevent multiple auth initialization attempts
-bool _authInitialized = false;
-
-// Flag to track if initial app loading is complete
-// Once true, we don't show splash screen for provider reloads
-bool _initialLoadComplete = false;
-
-class MuSheetApp extends ConsumerWidget {
+class MuSheetApp extends ConsumerStatefulWidget {
   const MuSheetApp({super.key});
 
   static const _systemUiStyle = SystemUiOverlayStyle(
@@ -41,23 +32,25 @@ class MuSheetApp extends ConsumerWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the user-scoped scores query provider to trigger initial load
-    final scoresAsync = ref.watch(scopedScoresProvider(DataScope.user));
+  ConsumerState<MuSheetApp> createState() => _MuSheetAppState();
+}
 
-    // Watch the user-scoped setlists query provider to trigger initial load
-    final setlistsAsync = ref.watch(scopedSetlistsProvider(DataScope.user));
+class _MuSheetAppState extends ConsumerState<MuSheetApp> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(appBootstrapProvider.notifier).ensureStarted();
+    });
+  }
 
-    // Show splash until all data is loaded (only during initial app load)
-    final isLoading = scoresAsync.isLoading || setlistsAsync.isLoading;
+  @override
+  Widget build(BuildContext context) {
+    final bootstrapState = ref.watch(appBootstrapProvider);
 
-    final hasError = scoresAsync.hasError || setlistsAsync.hasError;
-
-    // Only show splash screen during initial app loading
-    // After initial load, don't show splash for subsequent provider reloads (login/logout)
-    if (isLoading && !_initialLoadComplete) {
+    if (bootstrapState.isBootstrapping) {
       return AnnotatedRegion<SystemUiOverlayStyle>(
-        value: _systemUiStyle,
+        value: MuSheetApp._systemUiStyle,
         child: MaterialApp(
           title: 'MuSheet',
           theme: AppTheme.lightTheme,
@@ -67,57 +60,21 @@ class MuSheetApp extends ConsumerWidget {
       );
     }
 
-    if (hasError) {
-      final error = scoresAsync.error ?? setlistsAsync.error;
+    if (bootstrapState.hasError) {
       return AnnotatedRegion<SystemUiOverlayStyle>(
-        value: _systemUiStyle,
+        value: MuSheetApp._systemUiStyle,
         child: MaterialApp(
           title: 'MuSheet',
           theme: AppTheme.lightTheme,
           debugShowCheckedModeBanner: false,
-          home: ErrorScreen(error: error.toString()),
+          home: ErrorScreen(error: bootstrapState.error.toString()),
         ),
       );
     }
 
-    // Mark initial load as complete once we reach this point
-    // This prevents splash screen from showing on subsequent provider reloads
-    if (!_initialLoadComplete) {
-      _initialLoadComplete = true;
-    }
-
-    // Trigger background session restoration (non-blocking)
-    // This will validate the auth token with the server in the background
-    // Use a flag to prevent multiple initialization attempts from widget rebuilds
-    if (!_authInitialized) {
-      _authInitialized = true;
-      Future.microtask(() async {
-        try {
-          // Initialize auth and restore session
-          await ref.read(authStateProvider.notifier).initialize();
-          await ref.read(authStateProvider.notifier).restoreSession();
-
-          // Start background sync only in account mode
-          final syncCoordinator = ref.read(syncCoordinatorProvider);
-          if (syncCoordinator != null) {
-            await syncCoordinator.syncNow();
-          }
-        } catch (e, stack) {
-          Log.e(
-            'App',
-            'Auth initialization failed',
-            error: e,
-            stackTrace: stack,
-          );
-          // Reset flag to allow retry on next build
-          _authInitialized = false;
-        }
-      });
-    }
-
     final router = ref.watch(goRouterProvider);
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: _systemUiStyle,
+      value: MuSheetApp._systemUiStyle,
       child: MaterialApp.router(
         title: 'MuSheet',
         theme: AppTheme.lightTheme,
@@ -282,15 +239,6 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
 
     // Determine current page from location
     AppPage currentPage = _getPageFromLocation(currentLocation);
-
-    // If team is disabled and current page is team, redirect to settings
-    if (!teamEnabled && currentPage == AppPage.team) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.go(AppRoutes.settings);
-        }
-      });
-    }
 
     return PopScope(
       canPop: false,

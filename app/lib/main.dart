@@ -8,25 +8,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
-import 'package:pdfrx/pdfrx.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
-import 'core/core.dart';
-import 'core/services/avatar_cache_service.dart';
-import 'utils/logger.dart';
+import 'runtime/app_runtime_entrypoint.dart';
 
 void main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
-  // Preserve the native splash screen
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
-
-  // Initialize pdfrx (required for pdfrx 2.x)
-  pdfrxFlutterInitialize();
-
-  // Initialize core services in order
-  await _initializeCoreServices();
+  const appRuntimeEntrypoint = AppRuntimeEntrypoint();
+  await appRuntimeEntrypoint.initialize(widgetsBinding: widgetsBinding);
 
   // Set system UI style
   _configureSystemUI();
@@ -39,59 +29,6 @@ void main() async {
       child: MuSheetApp(),
     ),
   );
-}
-
-/// Initialize all core services in the correct dependency order
-Future<void> _initializeCoreServices() async {
-  try {
-    // 1. Initialize NetworkService first (no dependencies)
-    await NetworkService.initialize();
-
-    // 2. Initialize SessionService (depends on SharedPreferences)
-    await SessionService.initialize();
-
-    // 3. Initialize ApiClient if server URL is configured
-    final prefs = await SharedPreferences.getInstance();
-    final savedUrl = prefs.getString('backend_server_url');
-
-    if (savedUrl != null && savedUrl.isNotEmpty) {
-      ApiClient.initialize(baseUrl: savedUrl);
-
-      // 4. Initialize ConnectionManager (depends on NetworkService and ApiClient)
-      await ConnectionManager.initialize(
-        networkService: NetworkService.instance,
-      );
-
-      // 5. Register onSessionExpired callback to handle token expiration
-      ApiClient.instance.onSessionExpired = () {
-        Log.w('INIT', 'Session expired, logging out...');
-        // Clear local session state
-        SessionService.instance.onLogout();
-        // Clear API auth
-        ApiClient.instance.clearAuth();
-      };
-
-      // Restore auth credentials if token exists
-      if (SessionService.instance.isAuthenticated) {
-        final token = SessionService.instance.token;
-        final userId = SessionService.instance.userId;
-        if (token != null && userId != null) {
-          ApiClient.instance.setAuth(token, userId);
-          Log.i('INIT', 'Services ready, user $userId restored');
-        }
-      } else {
-        Log.i('INIT', 'Services ready, no session');
-      }
-    } else {
-      Log.i('INIT', 'Services ready, no server configured');
-    }
-
-    // Clear memory cache on app startup to refresh avatars from network
-    // (disk cache is preserved for offline support)
-    AvatarCacheService().clearMemoryCache();
-  } catch (e) {
-    Log.e('INIT', 'Error initializing core services', error: e);
-  }
 }
 
 /// Configure system UI appearance

@@ -8,6 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../providers/auth_state_provider.dart';
+import '../../providers/auth_flow_provider.dart';
 import '../../core/core.dart';
 import '../../router/app_router.dart';
 import '../../widgets/common_widgets.dart';
@@ -30,11 +31,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final authState = ref.watch(authStateProvider);
     final user = authState.user;
 
-    // If not authenticated, redirect to login
     if (!authState.isAuthenticated) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.go(AppRoutes.login);
-      });
       return const SizedBox.shrink();
     }
 
@@ -790,7 +787,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
 
     // Perform logout
-    await ref.read(authStateProvider.notifier).logout();
+    await ref.read(authFlowCoordinatorProvider).logout();
 
     if (context.mounted) {
       // Navigate back to settings

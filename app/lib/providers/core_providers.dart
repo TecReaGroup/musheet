@@ -156,15 +156,11 @@ final libraryStorageModeProvider = Provider<LibraryStorageMode>((ref) {
 });
 
 final anonymousAppDatabaseProvider = Provider<AppDatabase>((ref) {
-  final database = AppDatabase.forStorage('anonymous');
-  ref.onDispose(() => database.close());
-  return database;
+  return AppDatabase.forStorage('anonymous');
 });
 
 final accountAppDatabaseProvider = Provider<AppDatabase>((ref) {
-  final database = AppDatabase.forStorage('account');
-  ref.onDispose(() => database.close());
-  return database;
+  return AppDatabase.forStorage('account');
 });
 
 /// Provider for AppDatabase singleton bound to the active library mode.

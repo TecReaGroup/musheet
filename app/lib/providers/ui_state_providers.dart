@@ -12,7 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/score.dart';
 import '../models/sort_state.dart';
 import '../core/data/data_scope.dart';
-import 'teams_state_provider.dart';
+import 'team_runtime_provider.dart';
 
 export '../models/sort_state.dart';
 
@@ -315,11 +315,7 @@ class TeamEnabledNotifier extends Notifier<bool> {
 
   void setTeamEnabled(bool enabled) {
     state = enabled;
-    if (!enabled) {
-      ref.read(teamsStateProvider.notifier).leaveAllTeams();
-    } else {
-      ref.read(teamsStateProvider.notifier).refresh();
-    }
+    ref.read(teamRuntimeCoordinatorProvider).setTeamEnabled(enabled);
   }
 }
 
