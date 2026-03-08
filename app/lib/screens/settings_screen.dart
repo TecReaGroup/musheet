@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/core.dart';
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 import '../widgets/common_widgets.dart';
 import '../widgets/user_avatar.dart';
 import '../models/instrument_score.dart';
+import '../providers/auth_flow_provider.dart';
 import '../providers/auth_state_provider.dart';
+import '../providers/core_providers.dart';
 import '../providers/preferred_instrument_provider.dart';
 import '../providers/ui_state_providers.dart' show teamEnabledProvider;
 import '../router/app_router.dart';
@@ -19,8 +22,8 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  void _navigateToLogin(BuildContext context) {
-    context.go(AppRoutes.login);
+  void _navigateToLogin(BuildContext context, {String mode = 'signIn'}) {
+    context.go(AppRoutes.loginWithMode(mode));
   }
 
   Future<void> _showAccountMenu(BuildContext cardContext, AuthState authState) async {
@@ -110,7 +113,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         horizontal: 16,
                         vertical: 12,
                       ),
-                      child: _buildAccountSummary(authState),
+                      child: _buildAccountSummary(
+                        authState,
+                        ref.read(activeIdentityContextProvider),
+                        ref.read(activeSavedAccountProvider),
+                      ),
                     ),
                   ),
                 );
@@ -150,13 +157,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  Widget _buildAccountSummary(AuthState authState) {
+  Widget _buildAccountSummary(
+    AuthState authState,
+    AppIdentityContext activeContext,
+    SavedAccount? activeSavedAccount,
+  ) {
     final user = authState.user;
     final isLoggedIn = authState.isAuthenticated;
-    final displayName = user?.displayName ?? 'Local Library';
-    final subtitle = isLoggedIn
-        ? (user?.username ?? 'Signed in account')
-        : 'On this device';
+    final isLocal = activeContext.isLocal;
+    final displayName = isLocal
+        ? 'Local Library'
+        : (activeSavedAccount?.effectiveDisplayName ??
+            user?.displayName ??
+            user?.username ??
+            'Account Library');
+    final subtitle = isLocal
+        ? 'On this device'
+        : (activeSavedAccount?.username ?? user?.username ?? 'Saved account');
 
     return Row(
       children: [
@@ -201,7 +218,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 6),
-              if (isLoggedIn)
+              if (!isLocal && isLoggedIn)
                 ConnectionStatusIndicator.small(isConnected: authState.isConnected)
               else
                 const Text(
@@ -216,7 +233,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildAccountMenu(BuildContext context, AuthState authState) {
-    final isLoggedIn = authState.isAuthenticated;
+    final registry = ref.watch(currentAccountRegistryProvider);
+    final activeContext = registry.activeContext;
+    final activeAccountKey = activeContext.accountKey;
+    final activeSavedAccount = registry.activeAccount;
+    final otherAccounts = registry.savedAccounts
+        .where((account) => account.accountKey != activeAccountKey)
+        .toList(growable: false);
 
     return Material(
       color: Colors.transparent,
@@ -240,35 +263,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            _AccountSwitcherTile(
-              icon: AppIcons.libraryMusic,
-              iconColor: !isLoggedIn ? AppColors.blue600 : AppColors.gray500,
-              iconBackgroundColor: !isLoggedIn
-                  ? AppColors.blue50
-                  : AppColors.gray100,
-              title: 'Local Library',
-              subtitle: 'On this device',
-              selected: !isLoggedIn,
-              showDivider: true,
-              onTap: () => Navigator.of(context).pop(),
-            ),
-            if (isLoggedIn)
               _AccountSwitcherTile(
-                icon: AppIcons.person,
-                iconColor: AppColors.blue600,
-                iconBackgroundColor: AppColors.blue50,
-                title: authState.user?.displayName ?? 'Signed-in Account',
-                subtitle: authState.user?.username ?? 'Signed in',
-                selected: true,
+                icon: AppIcons.libraryMusic,
+                iconColor: activeContext.isLocal
+                    ? AppColors.blue600
+                    : AppColors.gray500,
+                iconBackgroundColor: activeContext.isLocal
+                    ? AppColors.blue50
+                    : AppColors.gray100,
+                title: 'Local Library',
+                subtitle: 'On this device',
+                selected: activeContext.isLocal,
                 showDivider: true,
-                onTap: () => Navigator.of(context).pop(),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  if (activeContext.isLocal) return;
+                  await ref.read(authFlowCoordinatorProvider).switchToLocal();
+                },
               ),
-            _AccountAddTile(
-              onTap: () {
-                Navigator.of(context).pop();
-                _navigateToLogin(context);
-              },
-            ),
+              if (activeSavedAccount != null)
+                _AccountSwitcherTile(
+                  icon: AppIcons.person,
+                  iconColor: AppColors.blue600,
+                  iconBackgroundColor: AppColors.blue50,
+                  title: activeSavedAccount.effectiveDisplayName,
+                  subtitle: activeSavedAccount.username,
+                  selected: true,
+                  showDivider: otherAccounts.isNotEmpty,
+                  onTap: () => Navigator.of(context).pop(),
+                ),
+              for (var i = 0; i < otherAccounts.length; i++)
+                _AccountSwitcherTile(
+                  icon: AppIcons.person,
+                  iconColor: AppColors.gray600,
+                  iconBackgroundColor: AppColors.gray100,
+                  title: otherAccounts[i].effectiveDisplayName,
+                  subtitle: otherAccounts[i].reauthRequired
+                      ? 'Sign in again required'
+                      : otherAccounts[i].username,
+                  selected: false,
+                  showDivider: i != otherAccounts.length - 1,
+                  onTap: () async {
+                    Navigator.of(context).pop();
+                    await ref
+                        .read(authFlowCoordinatorProvider)
+                        .switchToAccount(otherAccounts[i].accountKey);
+                  },
+                ),
+              _AccountMenuActionTile(
+                icon: AppIcons.settings,
+                title: 'Manage Accounts',
+                subtitle: 'Remove accounts or sign in again',
+                onTap: () {
+                  Navigator.of(context).pop();
+                  context.go(AppRoutes.manageAccounts);
+                },
+                showDivider: true,
+              ),
+              _AccountAddTile(
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _navigateToLogin(context, mode: 'addAccount');
+                },
+              ),
             ],
           ),
         ),
@@ -564,6 +621,86 @@ class _AccountSwitcherTile extends StatelessWidget {
                   size: 18,
                   color: AppColors.blue600,
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountMenuActionTile extends StatelessWidget {
+  const _AccountMenuActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.showDivider = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            border: showDivider
+                ? const Border(bottom: BorderSide(color: AppColors.gray100))
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.gray100,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: AppColors.gray600,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gray700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.gray500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                AppIcons.chevronRight,
+                size: 18,
+                color: AppColors.gray400,
+              ),
             ],
           ),
         ),

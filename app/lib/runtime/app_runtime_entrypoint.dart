@@ -24,6 +24,7 @@ class AppRuntimeEntrypoint {
     try {
       await NetworkService.initialize();
       await SessionService.initialize();
+      await AccountRegistryService.initialize();
 
       final prefs = await SharedPreferences.getInstance();
       final savedUrl = prefs.getString('backend_server_url');

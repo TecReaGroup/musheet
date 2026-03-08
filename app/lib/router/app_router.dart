@@ -17,6 +17,7 @@ import '../screens/settings/notifications_screen.dart';
 import '../screens/settings/help_support_screen.dart';
 import '../screens/settings/about_screen.dart';
 import '../screens/settings/login_screen.dart';
+import '../screens/settings/manage_accounts_screen.dart';
 import '../screens/settings/profile_screen.dart';
 import '../models/team.dart';
 import '../core/data/data_scope.dart';
@@ -44,6 +45,15 @@ class AppRoutes {
   static const String about = '/about';
   static const String login = '/login';
   static const String profile = '/profile';
+  static const String manageAccounts = '/manage-accounts';
+
+  static String loginWithMode(String mode, {String? accountKey}) {
+    final buffer = StringBuffer('$login?mode=$mode');
+    if (accountKey != null && accountKey.isNotEmpty) {
+      buffer.write('&accountKey=$accountKey');
+    }
+    return buffer.toString();
+  }
 }
 
 // Shell route key for the main scaffold with bottom navigation
@@ -81,6 +91,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final authState = ref.read(authStateProvider);
       final decision = routeGuardPolicy.evaluate(
         path: state.uri.path,
+        queryParameters: state.uri.queryParameters,
         authState: authState,
       );
       return decision.redirectLocation;
@@ -166,6 +177,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: AppRoutes.profile,
             pageBuilder: (context, state) => const MaterialPage(
               child: ProfileScreen(),
+            ),
+          ),
+          GoRoute(
+            path: AppRoutes.manageAccounts,
+            pageBuilder: (context, state) => const MaterialPage(
+              child: ManageAccountsScreen(),
             ),
           ),
         ],

@@ -6,6 +6,7 @@ import '../../utils/icon_mappings.dart';
 import '../../providers/auth_state_provider.dart';
 import '../../providers/auth_flow_provider.dart';
 import '../../providers/auth_server_config_provider.dart';
+import '../../providers/core_providers.dart';
 import '../../core/core.dart';
 import '../../router/app_router.dart';
 import '../../widgets/common_widgets.dart';
@@ -30,6 +31,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
   bool _isTestingConnection = false;
   String? _error;
+
+  String get _authMode =>
+      GoRouterState.of(context).uri.queryParameters['mode'] ?? 'signIn';
+
+  String? get _routeAccountKey =>
+      GoRouterState.of(context).uri.queryParameters['accountKey'];
+
+  bool get _isAddAccountMode => _authMode == 'addAccount';
+
+  bool get _isReauthenticateMode => _authMode == 'reauthenticate';
+
+  String get _screenTitle {
+    if (_isReauthenticateMode) return 'Sign In Again';
+    if (_isAddAccountMode) return 'Add Account';
+    return _isLogin ? 'Sign In' : 'Create Account';
+  }
+
+  String get _submitLabel {
+    if (_isReauthenticateMode) return 'Sign In Again';
+    if (_isAddAccountMode) return 'Add Account';
+    return _isLogin ? 'Sign In' : 'Create Account';
+  }
 
   @override
   void initState() {
@@ -112,7 +135,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       bool success;
-      if (_isLogin) {
+      final forceLoginMode = _isLogin || _isAddAccountMode || _isReauthenticateMode;
+      final reauthAccountKey =
+          _routeAccountKey ?? ref.watch(activeIdentityContextProvider).accountKey;
+      if (_isReauthenticateMode && reauthAccountKey != null) {
+        final result = await ref.read(authFlowCoordinatorProvider).reauthenticate(
+          accountKey: reauthAccountKey,
+          username: _usernameController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        success = result.success;
+      } else if (forceLoginMode) {
         final result = await ref.read(authFlowCoordinatorProvider).login(
           username: _usernameController.text.trim(),
           password: _passwordController.text.trim(),
@@ -133,7 +166,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go(AppRoutes.settings);
         AppToast.success(
           context,
-          _isLogin ? 'Logged in successfully!' : 'Account created!',
+          _isReauthenticateMode
+              ? 'Account restored!'
+              : (_isAddAccountMode
+                    ? 'Account added!'
+                    : (_isLogin ? 'Logged in successfully!' : 'Account created!')),
         );
 
         // AuthStateNotifier.login()/register() already initialize sync and
@@ -157,7 +194,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return SettingsSubScreen(
-      title: _isLogin ? 'Sign In' : 'Create Account',
+      title: _screenTitle,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -282,7 +319,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       )
                     : Text(
-                        _isLogin ? 'Sign In' : 'Create Account',
+                        _submitLabel,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -292,20 +329,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 12),
 
               // Toggle login/register
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _isLogin = !_isLogin;
-                    _error = null;
-                  });
-                },
-                child: Text(
-                  _isLogin
-                      ? "Don't have an account? Create one"
-                      : 'Already have an account? Sign in',
-                  style: const TextStyle(color: AppColors.blue500),
+              if (!_isAddAccountMode && !_isReauthenticateMode)
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isLogin = !_isLogin;
+                      _error = null;
+                    });
+                  },
+                  child: Text(
+                    _isLogin
+                        ? "Don't have an account? Create one"
+                        : 'Already have an account? Sign in',
+                    style: const TextStyle(color: AppColors.blue500),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

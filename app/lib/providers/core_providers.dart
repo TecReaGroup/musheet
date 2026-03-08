@@ -101,9 +101,44 @@ final sessionServiceProvider = Provider<SessionService>((ref) {
   return SessionService.instance;
 });
 
+/// Provider for AccountRegistryService
+/// AccountRegistryService must be initialized before use via AccountRegistryService.initialize()
+final accountRegistryServiceProvider = Provider<AccountRegistryService>((ref) {
+  return AccountRegistryService.instance;
+});
+
 /// Stream provider for session state
 final sessionStateProvider = StreamProvider<SessionState>((ref) {
   return SessionService.instance.stateStream;
+});
+
+/// Stream provider for account registry state
+final accountRegistryStateProvider = StreamProvider<AccountRegistryState>((ref) {
+  return AccountRegistryService.instance.stateStream;
+});
+
+/// Provider for the current account registry snapshot.
+final currentAccountRegistryProvider = Provider<AccountRegistryState>((ref) {
+  final registryAsync = ref.watch(accountRegistryStateProvider);
+  return registryAsync.when(
+    data: (state) => state,
+    loading: () => AccountRegistryService.isInitialized
+        ? AccountRegistryService.instance.state
+        : const AccountRegistryState.initial(),
+    error: (_, _) => AccountRegistryService.isInitialized
+        ? AccountRegistryService.instance.state
+        : const AccountRegistryState.initial(),
+  );
+});
+
+/// Provider for current app identity context.
+final activeIdentityContextProvider = Provider<AppIdentityContext>((ref) {
+  return ref.watch(currentAccountRegistryProvider).activeContext;
+});
+
+/// Provider for the currently active saved account, if any.
+final activeSavedAccountProvider = Provider<SavedAccount?>((ref) {
+  return ref.watch(currentAccountRegistryProvider).activeAccount;
 });
 
 /// Simple provider for authentication status
@@ -143,42 +178,54 @@ final currentUserIdProvider = Provider<int?>((ref) {
 enum LibraryStorageMode { anonymous, account }
 
 /// Provider for current library storage mode.
-/// Anonymous mode is the default until a user session is authenticated.
+/// Backward-compatible projection of the active identity context.
 final libraryStorageModeProvider = Provider<LibraryStorageMode>((ref) {
-  final sessionAsync = ref.watch(sessionStateProvider);
-  return sessionAsync.when(
-    data: (state) => state.isAuthenticated
-        ? LibraryStorageMode.account
-        : LibraryStorageMode.anonymous,
-    loading: () => LibraryStorageMode.anonymous,
-    error: (_, _) => LibraryStorageMode.anonymous,
-  );
+  final identity = ref.watch(activeIdentityContextProvider);
+  return identity.isAccount
+      ? LibraryStorageMode.account
+      : LibraryStorageMode.anonymous;
 });
 
 final anonymousAppDatabaseProvider = Provider<AppDatabase>((ref) {
   return AppDatabase.forStorage('anonymous');
 });
 
+final activeStorageKeyProvider = Provider<String>((ref) {
+  final identity = ref.watch(activeIdentityContextProvider);
+  if (identity.isLocal) return 'anonymous';
+  return 'account_${identity.accountKey}';
+});
+
 final accountAppDatabaseProvider = Provider<AppDatabase>((ref) {
+  final activeAccount = ref.watch(activeSavedAccountProvider);
+  if (activeAccount != null) {
+    return AppDatabase.forStorage('account_${activeAccount.accountKey}');
+  }
+
+  final registry = ref.watch(currentAccountRegistryProvider);
+  if (registry.savedAccounts.isNotEmpty) {
+    return AppDatabase.forStorage(
+      'account_${registry.savedAccounts.first.accountKey}',
+    );
+  }
+
   return AppDatabase.forStorage('account');
 });
 
-/// Provider for AppDatabase singleton bound to the active library mode.
+/// Provider for AppDatabase singleton bound to the active identity context.
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  final storageMode = ref.watch(libraryStorageModeProvider);
-  return storageMode == LibraryStorageMode.account
-      ? ref.watch(accountAppDatabaseProvider)
-      : ref.watch(anonymousAppDatabaseProvider);
+  final storageKey = ref.watch(activeStorageKeyProvider);
+  return AppDatabase.forStorage(storageKey);
 });
 
-/// Provider for LocalDataSource bound to the active library mode.
+/// Provider for LocalDataSource bound to the active identity context.
 final localDataSourceProvider = Provider<LocalDataSource>((ref) {
   final db = ref.watch(appDatabaseProvider);
   return DriftLocalDataSource(db);
 });
 
-/// Provider for the authenticated account library data source.
-/// This must never point at anonymous storage.
+/// Provider for the authenticated active account library data source.
+/// Falls back to the active account database when available.
 final syncableDataSourceProvider = Provider<SyncableDataSource>((ref) {
   final db = ref.watch(accountAppDatabaseProvider);
   return DriftLocalDataSource(db);

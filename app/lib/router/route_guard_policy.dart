@@ -20,8 +20,13 @@ class RouteCapabilityPolicy {
 
   RouteGuardDecision evaluate({
     required String path,
+    required Map<String, String> queryParameters,
     required AuthState authState,
   }) {
+    final authMode = queryParameters['mode'];
+    final allowsAuthenticatedAccess =
+        authMode == 'addAccount' || authMode == 'reauthenticate';
+
     if (_isProfileRoute(path) && !authState.isAuthenticated) {
       return const RouteGuardDecision.redirect(AppRoutes.login);
     }
@@ -30,7 +35,7 @@ class RouteCapabilityPolicy {
       return const RouteGuardDecision.redirect(AppRoutes.login);
     }
 
-    if (_isLoginRoute(path) && authState.isAuthenticated) {
+    if (_isLoginRoute(path) && authState.isAuthenticated && !allowsAuthenticatedAccess) {
       return const RouteGuardDecision.redirect(AppRoutes.settings);
     }
 
