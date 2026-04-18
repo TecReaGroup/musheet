@@ -14,6 +14,9 @@ class UsersPage extends ConsumerStatefulWidget {
 }
 
 class _UsersPageState extends ConsumerState<UsersPage> {
+  final _searchController = TextEditingController();
+  _UserFilter _filter = _UserFilter.all;
+
   @override
   void initState() {
     super.initState();
@@ -23,6 +26,12 @@ class _UsersPageState extends ConsumerState<UsersPage> {
         ref.read(usersProvider.notifier).loadUsers();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   String _formatDate(DateTime? date) {
@@ -187,6 +196,7 @@ class _UsersPageState extends ConsumerState<UsersPage> {
   Widget build(BuildContext context) {
     final usersState = ref.watch(usersProvider);
     final authState = ref.watch(adminAuthProvider);
+    final searchTerm = _searchController.text.trim().toLowerCase();
 
     if (authState.isAuthenticated &&
         usersState.users.isEmpty &&
@@ -194,6 +204,31 @@ class _UsersPageState extends ConsumerState<UsersPage> {
         usersState.error == null) {
       Future.microtask(() => ref.read(usersProvider.notifier).loadUsers());
     }
+
+    final filteredUsers = usersState.users.where((user) {
+      final matchesFilter = switch (_filter) {
+        _UserFilter.all => true,
+        _UserFilter.admins => user.isAdmin,
+        _UserFilter.disabled => user.isDisabled,
+        _UserFilter.active => !user.isDisabled,
+      };
+
+      if (!matchesFilter) {
+        return false;
+      }
+
+      if (searchTerm.isEmpty) {
+        return true;
+      }
+
+      final displayName = user.displayName?.toLowerCase() ?? '';
+      final username = user.username.toLowerCase();
+      final id = '${user.id}';
+
+      return username.contains(searchTerm) ||
+          displayName.contains(searchTerm) ||
+          id.contains(searchTerm);
+    }).toList();
 
     if (usersState.isLoading && usersState.users.isEmpty) {
       return const Center(
@@ -243,7 +278,7 @@ class _UsersPageState extends ConsumerState<UsersPage> {
         icon: LucideIcons.users,
         title: 'Account operations',
         subtitle:
-            'Quickly review role distribution, activation state, and account creation volume while keeping destructive actions clearly separated.',
+            'Review account status, locate the right user quickly, and keep sensitive actions clearly separated from routine administration.',
         trailing: [
           AdminMetricPill(
             icon: LucideIcons.users,
@@ -267,6 +302,73 @@ class _UsersPageState extends ConsumerState<UsersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          AdminToolbar(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 980;
+
+                final filters = Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    AdminFilterChip(
+                      label: 'All',
+                      icon: LucideIcons.layoutList,
+                      selected: _filter == _UserFilter.all,
+                      onTap: () => setState(() => _filter = _UserFilter.all),
+                    ),
+                    AdminFilterChip(
+                      label: 'Admins',
+                      icon: LucideIcons.shieldCheck,
+                      selected: _filter == _UserFilter.admins,
+                      onTap: () => setState(() => _filter = _UserFilter.admins),
+                    ),
+                    AdminFilterChip(
+                      label: 'Active',
+                      icon: LucideIcons.badgeCheck,
+                      selected: _filter == _UserFilter.active,
+                      onTap: () => setState(() => _filter = _UserFilter.active),
+                    ),
+                    AdminFilterChip(
+                      label: 'Disabled',
+                      icon: LucideIcons.ban,
+                      selected: _filter == _UserFilter.disabled,
+                      onTap: () => setState(() => _filter = _UserFilter.disabled),
+                    ),
+                  ],
+                );
+
+                final search = SizedBox(
+                  width: stacked ? double.infinity : 320,
+                  child: AdminSearchField(
+                    controller: _searchController,
+                    hintText: 'Search username, display name, or ID',
+                    onChanged: (_) => setState(() {}),
+                  ),
+                );
+
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      filters,
+                      const SizedBox(height: 14),
+                      search,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(child: filters),
+                    const SizedBox(width: 16),
+                    search,
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
           if (usersState.error != null) ...[
             AdminInlineMessage(
               icon: LucideIcons.circleAlert,
@@ -287,10 +389,17 @@ class _UsersPageState extends ConsumerState<UsersPage> {
                 label: const Text('Create user'),
               ),
             )
+          else if (filteredUsers.isEmpty)
+            const AdminEmptyState(
+              icon: LucideIcons.search,
+              title: 'No matching users',
+              subtitle: 'Adjust the current filters or search terms to see more accounts.',
+            )
           else ...[
             DataTableCard(
               title: 'Directory',
-              subtitle: 'Role, lifecycle state, and recovery actions.',
+              subtitle:
+                  'Role, lifecycle state, and recovery actions for the current filtered result set.',
               icon: LucideIcons.table2,
               child: AdminResponsiveDataTable(
                 minWidth: 1120,
@@ -302,7 +411,7 @@ class _UsersPageState extends ConsumerState<UsersPage> {
                   DataColumn(label: Text('Created')),
                   DataColumn(label: Text('Actions')),
                 ],
-                rows: usersState.users.map((user) {
+                rows: filteredUsers.map((user) {
                   final isCurrentUser = user.id == authState.userId;
 
                   return DataRow(
@@ -417,19 +526,22 @@ class _UsersPageState extends ConsumerState<UsersPage> {
                 }).toList(),
               ),
             ),
-            PaginationControls(
-              currentPage: usersState.page,
-              hasMore: usersState.hasMore,
-              isLoading: usersState.isLoading,
-              onPrevious: () => ref.read(usersProvider.notifier).previousPage(),
-              onNext: () => ref.read(usersProvider.notifier).nextPage(),
-            ),
+            if (searchTerm.isEmpty && _filter == _UserFilter.all)
+              PaginationControls(
+                currentPage: usersState.page,
+                hasMore: usersState.hasMore,
+                isLoading: usersState.isLoading,
+                onPrevious: () => ref.read(usersProvider.notifier).previousPage(),
+                onNext: () => ref.read(usersProvider.notifier).nextPage(),
+              ),
           ],
         ],
       ),
     );
   }
 }
+
+enum _UserFilter { all, admins, active, disabled }
 
 class _CreateUserDialog extends ConsumerStatefulWidget {
   const _CreateUserDialog();

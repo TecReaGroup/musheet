@@ -61,7 +61,8 @@ class AdminShell extends ConsumerWidget {
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(24),
-                        color: Colors.white.withValues(alpha: 0.58),
+                        color: Colors.white.withValues(alpha: 0.66),
+                        border: Border.all(color: AppColors.gray200),
                       ),
                       child: child,
                     ),
@@ -139,7 +140,7 @@ class _AdminSidebar extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Unified with the mobile app visual language',
+                              'Users, teams, settings, and platform health',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -149,6 +150,43 @@ class _AdminSidebar extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: AppColors.blue50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      LucideIcons.shieldCheck,
+                      size: 18,
+                      color: AppColors.blue600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Platform-level actions are grouped here to keep the main content area focused.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.gray600,
+                            height: 1.45,
+                          ),
+                    ),
                   ),
                 ],
               ),

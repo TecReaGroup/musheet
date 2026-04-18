@@ -16,10 +16,18 @@ class TeamsPage extends ConsumerStatefulWidget {
 }
 
 class _TeamsPageState extends ConsumerState<TeamsPage> {
+  final _searchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     Future.microtask(() => ref.read(teamsProvider.notifier).loadTeams());
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _showCreateTeamDialog() async {
@@ -63,6 +71,15 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
   @override
   Widget build(BuildContext context) {
     final teamsState = ref.watch(teamsProvider);
+    final searchTerm = _searchController.text.trim().toLowerCase();
+    final filteredTeams = teamsState.teams.where((team) {
+      if (searchTerm.isEmpty) {
+        return true;
+      }
+
+      return team.name.toLowerCase().contains(searchTerm) ||
+          '${team.id}'.contains(searchTerm);
+    }).toList();
 
     if (teamsState.isLoading && teamsState.teams.isEmpty) {
       return const Center(
@@ -112,7 +129,7 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
         icon: LucideIcons.usersRound,
         title: 'Shared workspaces',
         subtitle:
-            'Track team scale, member distribution, and shared score volume from a workspace that now uses the same bright product rhythm as the app.',
+            'Create and maintain collaboration spaces with clear separation between structure, membership, and destructive team actions.',
         trailing: [
           AdminMetricPill(
             icon: LucideIcons.usersRound,
@@ -139,6 +156,55 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          AdminToolbar(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 980;
+                final search = SizedBox(
+                  width: stacked ? double.infinity : 320,
+                  child: AdminSearchField(
+                    controller: _searchController,
+                    hintText: 'Search team name or ID',
+                    onChanged: (_) => setState(() {}),
+                  ),
+                );
+
+                if (stacked) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Find a team by name or ID before opening members or taking destructive actions.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.gray600,
+                              height: 1.45,
+                            ),
+                      ),
+                      const SizedBox(height: 14),
+                      search,
+                    ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Find a team by name or ID before opening members or taking destructive actions.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.gray600,
+                              height: 1.45,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    search,
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
           if (teamsState.error != null) ...[
             AdminInlineMessage(
               icon: LucideIcons.circleAlert,
@@ -159,6 +225,12 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
                 label: const Text('Create team'),
               ),
             )
+          else if (filteredTeams.isEmpty)
+            const AdminEmptyState(
+              icon: LucideIcons.search,
+              title: 'No matching teams',
+              subtitle: 'Adjust the current search term to see more collaboration spaces.',
+            )
           else ...[
             DataTableCard(
               title: 'Teams directory',
@@ -172,7 +244,7 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
                   DataColumn(label: Text('Shared Scores')),
                   DataColumn(label: Text('Actions')),
                 ],
-                rows: teamsState.teams.map((team) {
+                rows: filteredTeams.map((team) {
                   return DataRow(
                     cells: [
                       DataCell(
@@ -237,13 +309,14 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
                 }).toList(),
               ),
             ),
-            PaginationControls(
-              currentPage: teamsState.page,
-              hasMore: teamsState.hasMore,
-              isLoading: teamsState.isLoading,
-              onPrevious: () => ref.read(teamsProvider.notifier).previousPage(),
-              onNext: () => ref.read(teamsProvider.notifier).nextPage(),
-            ),
+            if (searchTerm.isEmpty)
+              PaginationControls(
+                currentPage: teamsState.page,
+                hasMore: teamsState.hasMore,
+                isLoading: teamsState.isLoading,
+                onPrevious: () => ref.read(teamsProvider.notifier).previousPage(),
+                onNext: () => ref.read(teamsProvider.notifier).nextPage(),
+              ),
           ],
         ],
       ),
@@ -455,11 +528,60 @@ class _TeamMembersDialogState extends ConsumerState<_TeamMembersDialog> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.blue50,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.blue100),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      LucideIcons.usersRound,
+                      size: 18,
+                      color: AppColors.blue600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.teamName,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: AppColors.gray900,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Team ID ${widget.teamId} · Manage membership for this collaboration space.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.gray600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Manage membership for this workspace.',
+                    'Review current members before adding or removing access.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppColors.gray500,
                         ),
@@ -576,29 +698,63 @@ class _AddMemberDialog extends StatefulWidget {
 
 class _AddMemberDialogState extends State<_AddMemberDialog> {
   int? _selectedUserId;
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final searchTerm = _searchController.text.trim().toLowerCase();
+    final filteredUsers = widget.users.where((user) {
+      if (searchTerm.isEmpty) {
+        return true;
+      }
+
+      final displayName = user.displayName?.toLowerCase() ?? '';
+      return user.username.toLowerCase().contains(searchTerm) ||
+          displayName.contains(searchTerm) ||
+          '${user.id}'.contains(searchTerm);
+    }).toList();
+    final dropdownValue = filteredUsers.any((user) => user.id == _selectedUserId)
+        ? _selectedUserId
+        : null;
+
     return AlertDialog(
       title: const Text('Add team member'),
       content: SizedBox(
         width: 420,
-        child: DropdownButtonFormField<int>(
-          value: _selectedUserId,
-          decoration: const InputDecoration(
-            labelText: 'Select user *',
-          ),
-          items: widget.users
-              .map(
-                (user) => DropdownMenuItem<int>(
-                  value: user.id,
-                  child: Text(
-                    '${user.username} (${user.displayName ?? "No name"})',
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (value) => setState(() => _selectedUserId = value),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AdminSearchField(
+              controller: _searchController,
+              hintText: 'Search user by name or ID',
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<int>(
+              value: dropdownValue,
+              decoration: const InputDecoration(
+                labelText: 'Select user *',
+              ),
+              items: filteredUsers
+                  .map(
+                    (user) => DropdownMenuItem<int>(
+                      value: user.id,
+                      child: Text(
+                        '${user.username} (${user.displayName ?? "No name"})',
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedUserId = value),
+            ),
+          ],
         ),
       ),
       actions: [

@@ -149,7 +149,7 @@ class _LoginIntroPanel extends StatelessWidget {
               border: Border.all(color: AppColors.blue100),
             ),
             child: Text(
-              isSignUpMode ? 'Create admin access' : 'Admin workspace sign in',
+              isSignUpMode ? 'First-time admin setup' : 'Secure admin access',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
                     color: AppColors.indigo600,
                     fontWeight: FontWeight.w700,
@@ -158,7 +158,7 @@ class _LoginIntroPanel extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            'Unified administration for the MuSheet platform.',
+            'A focused control room for MuSheet operations.',
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
                   color: AppColors.gray900,
                   height: 1.08,
@@ -166,7 +166,7 @@ class _LoginIntroPanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Use the same MuSheet visual language as the app: cleaner iconography, tighter radii, brighter surfaces, and a more product-like hierarchy.',
+            'Manage users, teams, and platform health in a workspace that matches the main app: bright surfaces, clear spacing, and low-noise hierarchy.',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: AppColors.gray600,
                   height: 1.6,
@@ -189,7 +189,7 @@ class _LoginIntroPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Admin identity',
+                        'Protected workspace',
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               color: AppColors.gray900,
                               fontWeight: FontWeight.w700,
@@ -197,7 +197,7 @@ class _LoginIntroPanel extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Avatar, icon, and card rhythm now follow the main app styling.',
+                        'Administrator-only access with a lighter, product-aligned interface.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.gray500,
                               height: 1.4,
@@ -236,20 +236,20 @@ class _LoginIntroPanel extends StatelessWidget {
           const SizedBox(height: 28),
           _FeatureRow(
             icon: LucideIcons.layoutDashboard,
-            title: 'Operations overview',
-            subtitle: 'Monitor users, teams, content, and environment signals.',
+            title: 'See platform status quickly',
+            subtitle: 'Start from a single overview of users, teams, content, and service health.',
           ),
           const SizedBox(height: 14),
           _FeatureRow(
             icon: LucideIcons.palette,
-            title: 'Design alignment',
-            subtitle: 'Shared colors, spacing, icons, and surfaces with the app.',
+            title: 'Stay visually consistent',
+            subtitle: 'The admin side follows the same color, spacing, and icon system as the app.',
           ),
           const SizedBox(height: 14),
           _FeatureRow(
             icon: LucideIcons.lock,
-            title: 'Controlled access',
-            subtitle: 'Only administrator accounts can access the workspace.',
+            title: 'Keep access controlled',
+            subtitle: 'Only administrator accounts can enter this workspace and operate platform-level actions.',
           ),
         ],
       ),
@@ -366,8 +366,8 @@ class _LoginFormCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         isSignUpMode
-                            ? 'Register the first administrator or sign up with an admin-enabled account.'
-                            : 'Sign in with your administrator credentials to continue.',
+                            ? 'Register the first administrator account for this workspace.'
+                            : 'Sign in with administrator credentials to continue.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: AppColors.gray600,
                               height: 1.5,
@@ -385,7 +385,7 @@ class _LoginFormCard extends StatelessWidget {
                   icon: needsReg ? LucideIcons.badgeInfo : LucideIcons.triangleAlert,
                   message: needsReg
                       ? 'The first registered account will automatically become admin.'
-                      : 'Only administrator accounts can use this workspace.',
+                      : 'This workspace only accepts accounts that already have administrator access.',
                   color: needsReg ? AppColors.indigo600 : AppColors.yellow600,
                   backgroundColor:
                       needsReg ? AppColors.blue50 : AppColors.yellow50,
@@ -468,6 +468,58 @@ class _LoginFormCard extends StatelessWidget {
                 backgroundColor: AppColors.red50,
               ),
             ],
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.blue50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      LucideIcons.shieldCheck,
+                      size: 18,
+                      color: AppColors.blue600,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isSignUpMode ? 'Setup note' : 'Security note',
+                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: AppColors.gray900,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isSignUpMode
+                              ? 'Use a strong password now. This account controls users, teams, and platform-level actions.'
+                              : 'This session grants access to user, team, and system administration actions.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.gray600,
+                                height: 1.5,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 24),
             SizedBox(
               height: 50,

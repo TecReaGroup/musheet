@@ -93,10 +93,7 @@ class AdminPageScaffold extends StatelessWidget {
                     subtitle: subtitle,
                     actions: actions,
                   ),
-                  if (hero != null) ...[
-                    const SizedBox(height: 24),
-                    hero!,
-                  ],
+                  if (hero != null) ...[const SizedBox(height: 24), hero!],
                   const SizedBox(height: 24),
                   child,
                 ],
@@ -189,6 +186,7 @@ class AdminSectionCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return AdminSurface(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -274,58 +272,199 @@ class AdminInfoHero extends StatelessWidget {
           border: Border.all(color: AppColors.blue100),
         ),
         padding: const EdgeInsets.all(20),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const MuSheetBrandMark(size: 52, radius: 16),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 3,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stacked = constraints.maxWidth < 920;
+
+            final intro = Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const MuSheetBrandMark(size: 52, radius: 16),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(icon, size: 18, color: AppColors.blue600),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: AppColors.gray900,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon, size: 18, color: AppColors.blue600),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                color: AppColors.gray900,
+                              ),
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        subtitle,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.gray600,
+                          height: 1.5,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: AppColors.gray600,
-                      height: 1.5,
+                ),
+              ],
+            );
+
+            final metrics = trailing.isEmpty
+                ? null
+                : Align(
+                    alignment: stacked
+                        ? Alignment.centerLeft
+                        : Alignment.centerRight,
+                    child: Wrap(
+                      alignment: stacked
+                          ? WrapAlignment.start
+                          : WrapAlignment.end,
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: trailing,
                     ),
-                  ),
+                  );
+
+            if (stacked) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  intro,
+                  if (metrics != null) ...[
+                    const SizedBox(height: 20),
+                    metrics,
+                  ],
                 ],
-              ),
-            ),
-            if (trailing.isNotEmpty) ...[
-              const SizedBox(width: 24),
-              Expanded(
-                flex: 2,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 12,
-                    runSpacing: 12,
-                    children: trailing,
-                  ),
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(flex: 3, child: intro),
+                if (metrics != null) ...[
+                  const SizedBox(width: 24),
+                  Expanded(flex: 2, child: metrics),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class AdminToolbar extends StatelessWidget {
+  final Widget child;
+
+  const AdminToolbar({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AdminSurface(
+      padding: const EdgeInsets.all(16),
+      radius: 20,
+      child: child,
+    );
+  }
+}
+
+class AdminSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final ValueChanged<String>? onChanged;
+
+  const AdminSearchField({
+    super.key,
+    required this.controller,
+    required this.hintText,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        hintText: hintText,
+        prefixIcon: const Icon(
+          LucideIcons.search,
+          size: 18,
+          color: AppColors.gray500,
+        ),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                onPressed: () {
+                  controller.clear();
+                  onChanged?.call('');
+                },
+                icon: const Icon(
+                  LucideIcons.search,
+                  size: 18,
+                  color: AppColors.gray400,
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class AdminFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  const AdminFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.blue50 : AppColors.gray100,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.blue100 : AppColors.gray200,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(
+                icon,
+                size: 14,
+                color: selected ? AppColors.blue600 : AppColors.gray600,
+              ),
+              const SizedBox(width: 8),
             ],
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: selected ? AppColors.blue600 : AppColors.gray700,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
           ],
         ),
       ),
@@ -346,8 +485,8 @@ class AdminKpiGrid extends StatelessWidget {
         final crossAxisCount = width >= 1320
             ? 4
             : width >= 900
-                ? 2
-                : 1;
+            ? 2
+            : 1;
 
         return GridView.count(
           crossAxisCount: crossAxisCount,
@@ -481,31 +620,35 @@ class AdminStatCard extends StatelessWidget {
               ),
               const Spacer(),
               if (onTap != null)
-                Icon(LucideIcons.arrowUpRight, size: 18, color: AppColors.gray400),
+                Icon(
+                  LucideIcons.arrowUpRight,
+                  size: 18,
+                  color: AppColors.gray400,
+                ),
             ],
           ),
           const Spacer(),
           Text(
             value,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: AppColors.gray900,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: AppColors.gray900,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             label,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: AppColors.gray800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(color: AppColors.gray800),
           ),
           if (helper != null) ...[
             const SizedBox(height: 6),
             Text(
               helper!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppColors.gray500,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: AppColors.gray500),
             ),
           ],
         ],
@@ -569,7 +712,11 @@ class AdminTableCard extends StatelessWidget {
                               color: AppColors.gray100,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Icon(icon, size: 18, color: AppColors.gray700),
+                            child: Icon(
+                              icon,
+                              size: 18,
+                              color: AppColors.gray700,
+                            ),
                           ),
                           const SizedBox(width: 12),
                         ],
@@ -585,9 +732,7 @@ class AdminTableCard extends StatelessWidget {
                                 const SizedBox(height: 4),
                                 Text(
                                   subtitle!,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
+                                  style: Theme.of(context).textTheme.bodySmall
                                       ?.copyWith(color: AppColors.gray500),
                                 ),
                               ],
@@ -815,8 +960,7 @@ class ActionIconButton extends StatelessWidget {
       child: IconButton.filledTonal(
         onPressed: onPressed,
         style: IconButton.styleFrom(
-          backgroundColor:
-              isDanger ? AppColors.red50 : AppColors.gray100,
+          backgroundColor: isDanger ? AppColors.red50 : AppColors.gray100,
           foregroundColor: effectiveColor,
           disabledBackgroundColor: AppColors.gray100,
           disabledForegroundColor: AppColors.gray400,
@@ -881,10 +1025,7 @@ class AdminEmptyState extends StatelessWidget {
                   ),
                 ),
               ],
-              if (action != null) ...[
-                const SizedBox(height: 20),
-                action!,
-              ],
+              if (action != null) ...[const SizedBox(height: 20), action!],
             ],
           ),
         ),
@@ -934,9 +1075,9 @@ class AdminInlineMessage extends StatelessWidget {
             child: Text(
               message,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -975,17 +1116,17 @@ class AdminMetricPill extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.gray500,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.gray500),
           ),
           const SizedBox(width: 8),
           Text(
             value,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.gray900,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: AppColors.gray900,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
@@ -1030,7 +1171,33 @@ class ConfirmDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(title),
-      content: Text(message),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: isDanger ? AppColors.red50 : AppColors.blue50,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              isDanger ? LucideIcons.triangleAlert : LucideIcons.badgeInfo,
+              color: isDanger ? AppColors.red600 : AppColors.blue600,
+              size: 22,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.gray600,
+                  height: 1.5,
+                ),
+          ),
+        ],
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
@@ -1073,9 +1240,9 @@ class PaginationControls extends StatelessWidget {
           Text(
             'Page ${currentPage + 1}',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray600,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: AppColors.gray600,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const Spacer(),
           OutlinedButton.icon(
@@ -1100,12 +1267,7 @@ class AdminUserAvatar extends StatefulWidget {
   final int? userId;
   final double size;
 
-  const AdminUserAvatar({
-    super.key,
-    this.name,
-    this.userId,
-    this.size = 40,
-  });
+  const AdminUserAvatar({super.key, this.name, this.userId, this.size = 40});
 
   @override
   State<AdminUserAvatar> createState() => _AdminUserAvatarState();
@@ -1171,10 +1333,8 @@ class _AdminUserAvatarState extends State<AdminUserAvatar> {
         child: Image.memory(
           _avatarBytes!,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => MuSheetAvatar(
-            name: effectiveName,
-            size: widget.size,
-          ),
+          errorBuilder: (_, _, _) =>
+              MuSheetAvatar(name: effectiveName, size: widget.size),
         ),
       );
     }
@@ -1187,7 +1347,10 @@ class _AdminUserAvatarState extends State<AdminUserAvatar> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
+            colors: [
+              AppColors.avatarGradientStart,
+              AppColors.avatarGradientEnd,
+            ],
           ),
           borderRadius: BorderRadius.circular(widget.size / 2),
         ),
@@ -1215,10 +1378,7 @@ class AdminAppWordmark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MuSheetWordmark(
-      compact: compact,
-      subtitle: 'Admin Workspace',
-    );
+    return MuSheetWordmark(compact: compact, subtitle: 'Admin Workspace');
   }
 }
 
@@ -1308,11 +1468,9 @@ class _AdminSidebarNavTile extends StatelessWidget {
                 child: Text(
                   destination.label,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color:
-                            selected ? AppColors.blue600 : AppColors.gray700,
-                        fontWeight:
-                            selected ? FontWeight.w700 : FontWeight.w500,
-                      ),
+                    color: selected ? AppColors.blue600 : AppColors.gray700,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
                 ),
               ),
               if (selected)

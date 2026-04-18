@@ -86,7 +86,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         icon: LucideIcons.settings,
         title: 'Environment overview',
         subtitle:
-            'The settings area now emphasizes clear grouped surfaces, descriptive metadata, and direct access to health signals and account context.',
+            'Keep account context, service health, and future platform controls in clearly separated groups so low-frequency configuration remains easy to scan.',
         trailing: [
           AdminMetricPill(
             icon: LucideIcons.user,
@@ -95,176 +95,218 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           AdminMetricPill(
             icon: LucideIcons.server,
-            label: 'API',
-            value: 'Connected',
-            accent: AppColors.emerald600,
+            label: 'Health',
+            value: _isHealthy == null
+                ? 'Unchecked'
+                : _isHealthy!
+                    ? 'Healthy'
+                    : 'Issue',
+            accent: _isHealthy == null
+                ? AppColors.blue600
+                : _isHealthy!
+                    ? AppColors.emerald600
+                    : AppColors.red600,
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_healthError != null) ...[
-            AdminInlineMessage(
-              icon: LucideIcons.circleAlert,
-              message: _healthError!,
-              color: AppColors.red600,
-              backgroundColor: AppColors.red50,
-            ),
-            const SizedBox(height: 16),
-          ],
-          _SettingsSection(
-            title: 'Account',
-            subtitle: 'Current administrator session and access actions.',
-            icon: LucideIcons.user,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 1120;
+
+          final accountColumn = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SettingsTile(
+              _SettingsSection(
+                title: 'Account',
+                subtitle: 'Current administrator identity and session actions.',
                 icon: LucideIcons.user,
-                title: 'Current administrator',
-                subtitle:
-                    authState.displayName ?? authState.username ?? 'Unknown user',
-                trailing: AdminUserAvatar(
-                  name: authState.displayName ?? authState.username,
-                  size: 40,
-                ),
+                children: [
+                  _SettingsTile(
+                    icon: LucideIcons.user,
+                    title: 'Current administrator',
+                    subtitle:
+                        authState.displayName ?? authState.username ?? 'Unknown user',
+                    trailing: AdminUserAvatar(
+                      name: authState.displayName ?? authState.username,
+                      size: 40,
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: LucideIcons.badgeInfo,
+                    title: 'Username',
+                    subtitle: authState.username ?? 'Unavailable',
+                    trailing: const Icon(
+                      LucideIcons.chevronsRight,
+                      size: 18,
+                      color: AppColors.gray400,
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: LucideIcons.logOut,
+                    title: 'Logout',
+                    subtitle:
+                        'Remove local admin credentials from this browser.',
+                    trailing: const Icon(
+                      LucideIcons.chevronsRight,
+                      size: 18,
+                      color: AppColors.gray400,
+                    ),
+                    onTap: _handleLogout,
+                  ),
+                ],
               ),
-              _SettingsTile(
-                icon: LucideIcons.badgeInfo,
-                title: 'Username',
-                subtitle: authState.username ?? 'Unavailable',
-                trailing: const Icon(
-                  LucideIcons.chevronsRight,
-                  size: 18,
-                  color: AppColors.gray400,
-                ),
-              ),
-              _SettingsTile(
-                icon: LucideIcons.logOut,
-                title: 'Logout',
-                subtitle: 'Remove local admin credentials from this browser.',
-                trailing: const Icon(
-                  LucideIcons.chevronsRight,
-                  size: 18,
-                  color: AppColors.gray400,
-                ),
-                onTap: _handleLogout,
+              const SizedBox(height: 24),
+              _SettingsSection(
+                title: 'About',
+                subtitle: 'Project metadata for this administration workspace.',
+                icon: LucideIcons.info,
+                children: const [
+                  _SettingsTile(
+                    icon: LucideIcons.badgeInfo,
+                    title: 'MuSheet Admin',
+                    subtitle: 'Version 1.0.0',
+                  ),
+                  _SettingsTile(
+                    icon: LucideIcons.code,
+                    title: 'Built with',
+                    subtitle: 'Flutter Web + Riverpod + Serverpod',
+                  ),
+                ],
               ),
             ],
-          ),
-          const SizedBox(height: 24),
-          _SettingsSection(
-            title: 'System',
-            subtitle: 'Runtime health and environment connectivity.',
-            icon: LucideIcons.serverCog,
+          );
+
+          final systemColumn = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _SettingsTile(
-                icon: LucideIcons.activity,
-                title: 'Server health',
-                subtitle: _isHealthy == null
-                    ? 'Run a health check to verify backend availability.'
-                    : _isHealthy!
-                        ? 'Server is healthy and responding normally.'
-                        : _healthError ?? 'Server health check failed.',
-                trailing: _isCheckingHealth
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        _isHealthy == null
-                            ? LucideIcons.chevronsRight
-                            : _isHealthy!
-                                ? LucideIcons.circleCheckBig
-                                : LucideIcons.circleAlert,
-                        size: 18,
-                        color: _isHealthy == null
-                            ? AppColors.gray400
-                            : _isHealthy!
-                                ? AppColors.emerald600
-                                : AppColors.red600,
-                      ),
-                onTap: _isCheckingHealth ? null : _checkHealth,
-              ),
-              _SettingsTile(
-                icon: LucideIcons.link,
-                title: 'API endpoint',
-                subtitle: AdminApiClient.instance.baseUrl,
-                trailing: const Icon(
-                  LucideIcons.externalLink,
-                  size: 18,
-                  color: AppColors.gray400,
+              if (_healthError != null) ...[
+                AdminInlineMessage(
+                  icon: LucideIcons.circleAlert,
+                  message: _healthError!,
+                  color: AppColors.red600,
+                  backgroundColor: AppColors.red50,
                 ),
+                const SizedBox(height: 16),
+              ],
+              _SettingsSection(
+                title: 'System',
+                subtitle: 'Runtime health and environment connectivity.',
+                icon: LucideIcons.serverCog,
+                children: [
+                  _SettingsTile(
+                    icon: LucideIcons.activity,
+                    title: 'Server health',
+                    subtitle: _isHealthy == null
+                        ? 'Run a health check to verify backend availability.'
+                        : _isHealthy!
+                            ? 'Server is healthy and responding normally.'
+                            : _healthError ?? 'Server health check failed.',
+                    trailing: _isCheckingHealth
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(
+                            _isHealthy == null
+                                ? LucideIcons.chevronsRight
+                                : _isHealthy!
+                                    ? LucideIcons.circleCheckBig
+                                    : LucideIcons.circleAlert,
+                            size: 18,
+                            color: _isHealthy == null
+                                ? AppColors.gray400
+                                : _isHealthy!
+                                    ? AppColors.emerald600
+                                    : AppColors.red600,
+                          ),
+                    onTap: _isCheckingHealth ? null : _checkHealth,
+                  ),
+                  _SettingsTile(
+                    icon: LucideIcons.link,
+                    title: 'API endpoint',
+                    subtitle: AdminApiClient.instance.baseUrl,
+                    trailing: const Icon(
+                      LucideIcons.externalLink,
+                      size: 18,
+                      color: AppColors.gray400,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _SettingsSection(
+                title: 'Roadmap configuration',
+                subtitle:
+                    'Upcoming administrative capabilities reserved for future iterations.',
+                icon: LucideIcons.sparkles,
+                children: const [
+                  _SettingsTile(
+                    icon: LucideIcons.userPlus,
+                    title: 'Registration control',
+                    subtitle:
+                        'Enable or disable self-service account registration.',
+                    enabled: false,
+                    trailing: Switch(value: true, onChanged: null),
+                  ),
+                  _SettingsTile(
+                    icon: LucideIcons.database,
+                    title: 'Storage quotas',
+                    subtitle: 'Set storage policies for users and teams.',
+                    enabled: false,
+                    trailing: Icon(
+                      LucideIcons.chevronsRight,
+                      size: 18,
+                      color: AppColors.gray400,
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: LucideIcons.clipboardList,
+                    title: 'Audit logs',
+                    subtitle: 'Review administrative operations and events.',
+                    enabled: false,
+                    trailing: Icon(
+                      LucideIcons.chevronsRight,
+                      size: 18,
+                      color: AppColors.gray400,
+                    ),
+                  ),
+                  _SettingsTile(
+                    icon: LucideIcons.download,
+                    title: 'Data export',
+                    subtitle: 'Export platform snapshots and operational data.',
+                    enabled: false,
+                    trailing: Icon(
+                      LucideIcons.chevronsRight,
+                      size: 18,
+                      color: AppColors.gray400,
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-          const SizedBox(height: 24),
-          _SettingsSection(
-            title: 'Roadmap configuration',
-            subtitle: 'Upcoming administrative capabilities reserved for future iterations.',
-            icon: LucideIcons.sparkles,
-            children: const [
-              _SettingsTile(
-                icon: LucideIcons.userPlus,
-                title: 'Registration control',
-                subtitle: 'Enable or disable self-service account registration.',
-                enabled: false,
-                trailing: Switch(value: true, onChanged: null),
-              ),
-              _SettingsTile(
-                icon: LucideIcons.database,
-                title: 'Storage quotas',
-                subtitle: 'Set storage policies for users and teams.',
-                enabled: false,
-                trailing: Icon(
-                  LucideIcons.chevronsRight,
-                  size: 18,
-                  color: AppColors.gray400,
-                ),
-              ),
-              _SettingsTile(
-                icon: LucideIcons.clipboardList,
-                title: 'Audit logs',
-                subtitle: 'Review administrative operations and events.',
-                enabled: false,
-                trailing: Icon(
-                  LucideIcons.chevronsRight,
-                  size: 18,
-                  color: AppColors.gray400,
-                ),
-              ),
-              _SettingsTile(
-                icon: LucideIcons.download,
-                title: 'Data export',
-                subtitle: 'Export platform snapshots and operational data.',
-                enabled: false,
-                trailing: Icon(
-                  LucideIcons.chevronsRight,
-                  size: 18,
-                  color: AppColors.gray400,
-                ),
-              ),
+          );
+
+          if (stacked) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                accountColumn,
+                const SizedBox(height: 24),
+                systemColumn,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: accountColumn),
+              const SizedBox(width: 24),
+              Expanded(child: systemColumn),
             ],
-          ),
-          const SizedBox(height: 24),
-          _SettingsSection(
-            title: 'About',
-            subtitle: 'Project metadata for this administration workspace.',
-            icon: LucideIcons.info,
-            children: const [
-              _SettingsTile(
-                icon: LucideIcons.badgeInfo,
-                title: 'MuSheet Admin',
-                subtitle: 'Version 1.0.0',
-              ),
-              _SettingsTile(
-                icon: LucideIcons.code,
-                title: 'Built with',
-                subtitle: 'Flutter Web + Riverpod + Serverpod',
-              ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
