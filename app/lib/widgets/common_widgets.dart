@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:musheet_shared_ui/musheet_shared_ui.dart' as msu;
 import '../theme/app_colors.dart';
 import '../utils/icon_mappings.dart';
 
@@ -16,25 +17,17 @@ import '../utils/icon_mappings.dart';
 ///   iconColor: AppColors.blue550,
 /// )
 /// ```
-class GradientIconBox extends StatelessWidget {
-  final IconData icon;
-  final List<Color> gradientColors;
-  final Color iconColor;
-  final double size;
-  final double iconSize;
-  final double borderRadius;
-
+class GradientIconBox extends msu.GradientIconBox {
   const GradientIconBox({
     super.key,
-    required this.icon,
-    required this.gradientColors,
-    required this.iconColor,
-    this.size = 48,
-    this.iconSize = 24,
-    this.borderRadius = 12,
+    required super.icon,
+    required super.gradientColors,
+    required super.iconColor,
+    super.size = 48,
+    super.iconSize = 24,
+    super.borderRadius = 12,
   });
 
-  /// Score type icon box (blue gradient)
   factory GradientIconBox.score({
     Key? key,
     double size = 48,
@@ -50,7 +43,6 @@ class GradientIconBox extends StatelessWidget {
     );
   }
 
-  /// Setlist type icon box (green gradient)
   factory GradientIconBox.setlist({
     Key? key,
     double size = 48,
@@ -65,62 +57,15 @@ class GradientIconBox extends StatelessWidget {
       iconSize: iconSize,
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(borderRadius),
-      ),
-      child: Icon(icon, size: iconSize, color: iconColor),
-    );
-  }
 }
 
-/// Circular avatar icon - for user/team member avatars
-class AvatarIcon extends StatelessWidget {
-  final String initial;
-  final double size;
-  final List<Color>? gradientColors;
-
+class AvatarIcon extends msu.AvatarIcon {
   const AvatarIcon({
     super.key,
-    required this.initial,
-    this.size = 48,
-    this.gradientColors,
+    required super.initial,
+    super.size = 48,
+    super.gradientColors,
   });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors:
-              gradientColors ?? [AppColors.blue500, const Color(0xFF9333EA)],
-        ),
-        borderRadius: BorderRadius.circular(size / 2),
-      ),
-      child: Center(
-        child: Text(
-          initial.toUpperCase(),
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: size * 0.4,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ============================================================================

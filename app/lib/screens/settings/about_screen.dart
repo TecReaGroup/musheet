@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:musheet_shared_ui/musheet_shared_ui.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/icon_mappings.dart';
 import '../../router/app_router.dart';
@@ -79,7 +80,7 @@ class AboutScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: const [
                                 BoxShadow(
-                                  color: Color(0x1A000000), // black with 10% opacity
+                                  color: Color(0x1A000000),
                                   blurRadius: 20,
                                   offset: Offset(0, 4),
                                 ),
@@ -87,16 +88,18 @@ class AboutScreen extends StatelessWidget {
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: Image.asset(
-                                'assets/icons/generated_icons/app_icon.png',
+                              child: Image(
+                                image: MuSheetIcons.appIconImageProvider(),
                                 fit: BoxFit.cover,
                                 errorBuilder: (context, error, stackTrace) {
-                                  return Container(
+                                  return const ColoredBox(
                                     color: AppColors.blue100,
-                                    child: const Icon(
-                                      AppIcons.musicNote,
-                                      size: 40,
-                                      color: AppColors.blue500,
+                                    child: Center(
+                                      child: MuSheetBrandMark(
+                                        size: 44,
+                                        radius: 12,
+                                        useSvg: false,
+                                      ),
                                     ),
                                   );
                                 },

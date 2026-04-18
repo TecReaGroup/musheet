@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:musheet_shared_ui/musheet_shared_ui.dart';
 import '../providers/auth_state_provider.dart';
 import '../core/services/avatar_cache_service.dart';
 import '../theme/app_colors.dart';
@@ -66,24 +67,10 @@ class UserAvatar extends ConsumerWidget {
   }
 
   Widget _buildPlaceholder(String initial, double fontSize) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
-        ),
-      ),
-      child: Center(
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: AppColors.avatarText,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+    return MuSheetAvatar(
+      name: initial,
+      size: size,
+      fontSize: fontSize,
     );
   }
 }
@@ -208,15 +195,15 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
     }
 
     if (_isLoading) {
-      return Container(
-        decoration: const BoxDecoration(
+      return const DecoratedBox(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
           ),
         ),
-        child: const Center(
+        child: Center(
           child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.avatarText),
         ),
       );
@@ -226,24 +213,10 @@ class _RemoteUserAvatarState extends State<_RemoteUserAvatar> {
   }
 
   Widget _buildPlaceholder(String initial, double fontSize) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.avatarGradientStart, AppColors.avatarGradientEnd],
-        ),
-      ),
-      child: Center(
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: AppColors.avatarText,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+    return MuSheetAvatar(
+      name: initial,
+      size: widget.size,
+      fontSize: fontSize,
     );
   }
 }

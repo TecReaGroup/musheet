@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:musheet_client/musheet_client.dart' as server;
 import '../../core/admin_api_client.dart';
 import '../../core/providers.dart';
@@ -19,9 +19,7 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(() {
-      ref.read(teamsProvider.notifier).loadTeams();
-    });
+    Future.microtask(() => ref.read(teamsProvider.notifier).loadTeams());
   }
 
   Future<void> _showCreateTeamDialog() async {
@@ -38,27 +36,25 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
   Future<void> _handleDeleteTeam(int teamId, String teamName) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Delete Team',
+      title: 'Delete team',
       message:
-          'Are you sure you want to permanently delete "$teamName"? All shared scores and members will be removed.',
+          'Permanently delete "$teamName" and remove its shared resources?',
       confirmLabel: 'Delete',
       isDanger: true,
     );
 
-    if (confirmed && mounted) {
-      final success = await ref.read(teamsProvider.notifier).deleteTeam(teamId);
-      if (mounted) {
-        if (success) {
-          AdminToast.success(context, 'Team deleted');
-        } else {
-          AdminToast.error(context, 'Failed to delete team');
-        }
-      }
-    }
+    if (!confirmed || !mounted) return;
+
+    final success = await ref.read(teamsProvider.notifier).deleteTeam(teamId);
+    if (!mounted) return;
+
+    success
+        ? AdminToast.success(context, 'Team deleted')
+        : AdminToast.error(context, 'Failed to delete team');
   }
 
   Future<void> _showTeamMembersDialog(int teamId, String teamName) async {
-    await showDialog(
+    await showDialog<void>(
       context: context,
       builder: (context) => _TeamMembersDialog(teamId: teamId, teamName: teamName),
     );
@@ -68,190 +64,192 @@ class _TeamsPageState extends ConsumerState<TeamsPage> {
   Widget build(BuildContext context) {
     final teamsState = ref.watch(teamsProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.slate900,
-      body: Column(
+    if (teamsState.isLoading && teamsState.teams.isEmpty) {
+      return const Center(
+        child: AdminLoadingIndicator(message: 'Loading teams...'),
+      );
+    }
+
+    if (teamsState.error != null && teamsState.teams.isEmpty) {
+      return Center(
+        child: AdminEmptyState(
+          icon: LucideIcons.circleAlert,
+          title: 'Failed to load teams',
+          subtitle: teamsState.error,
+          action: ElevatedButton.icon(
+            onPressed: () => ref.read(teamsProvider.notifier).loadTeams(),
+            icon: const Icon(LucideIcons.refreshCw, size: 18),
+            label: const Text('Retry'),
+          ),
+        ),
+      );
+    }
+
+    return AdminPageScaffold(
+      eyebrow: 'Collaboration',
+      title: 'Team management',
+      subtitle:
+          'Create, organize, and maintain team workspaces with a cleaner admin flow aligned to the main MuSheet app.',
+      actions: [
+        OutlinedButton.icon(
+          onPressed: () => ref.read(teamsProvider.notifier).loadTeams(),
+          icon: teamsState.isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(LucideIcons.refreshCw, size: 18),
+          label: const Text('Refresh'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _showCreateTeamDialog,
+          icon: const Icon(LucideIcons.plus, size: 18),
+          label: const Text('Create team'),
+        ),
+      ],
+      hero: AdminInfoHero(
+        icon: LucideIcons.usersRound,
+        title: 'Shared workspaces',
+        subtitle:
+            'Track team scale, member distribution, and shared score volume from a workspace that now uses the same bright product rhythm as the app.',
+        trailing: [
+          AdminMetricPill(
+            icon: LucideIcons.usersRound,
+            label: 'Visible teams',
+            value: '${teamsState.teams.length}',
+            accent: AppColors.purple600,
+          ),
+          AdminMetricPill(
+            icon: LucideIcons.users,
+            label: 'Members',
+            value:
+                '${teamsState.teams.fold<int>(0, (sum, team) => sum + team.memberCount)}',
+            accent: AppColors.blue600,
+          ),
+          AdminMetricPill(
+            icon: LucideIcons.music,
+            label: 'Shared scores',
+            value:
+                '${teamsState.teams.fold<int>(0, (sum, team) => sum + team.sharedScores)}',
+            accent: AppColors.emerald600,
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(24),
-            color: AppColors.slate800,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Team Management',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+          if (teamsState.error != null) ...[
+            AdminInlineMessage(
+              icon: LucideIcons.circleAlert,
+              message: teamsState.error!,
+              color: AppColors.red600,
+              backgroundColor: AppColors.red50,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (teamsState.teams.isEmpty)
+            AdminEmptyState(
+              icon: LucideIcons.usersRound,
+              title: 'No teams found',
+              subtitle: 'Create the first collaboration space to get started.',
+              action: ElevatedButton.icon(
+                onPressed: _showCreateTeamDialog,
+                icon: const Icon(LucideIcons.plus, size: 18),
+                label: const Text('Create team'),
+              ),
+            )
+          else ...[
+            DataTableCard(
+              title: 'Teams directory',
+              subtitle: 'Manage structure, membership, and shared content.',
+              icon: LucideIcons.layoutList,
+              child: AdminResponsiveDataTable(
+                minWidth: 980,
+                columns: const [
+                  DataColumn(label: Text('Team')),
+                  DataColumn(label: Text('Members')),
+                  DataColumn(label: Text('Shared Scores')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: teamsState.teams.map((team) {
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              team.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.gray900,
+                              ),
+                            ),
+                            Text(
+                              'Team ID ${team.id}',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.gray500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Create and manage teams',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray400,
+                      DataCell(
+                        StatusBadge.count(
+                          count: team.memberCount,
+                          icon: LucideIcons.users,
+                          color: AppColors.blue600,
+                        ),
+                      ),
+                      DataCell(
+                        StatusBadge.count(
+                          count: team.sharedScores,
+                          icon: LucideIcons.music,
+                          color: AppColors.emerald600,
+                        ),
+                      ),
+                      DataCell(
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ActionIconButton(
+                              icon: LucideIcons.users,
+                              tooltip: 'View members',
+                              onPressed: () =>
+                                  _showTeamMembersDialog(team.id, team.name),
+                            ),
+                            ActionIconButton(
+                              icon: LucideIcons.trash2,
+                              tooltip: 'Delete team',
+                              isDanger: true,
+                              onPressed: () =>
+                                  _handleDeleteTeam(team.id, team.name),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _showCreateTeamDialog,
-                  icon: const Icon(LucideIcons.plus, size: 18),
-                  label: const Text('Create Team'),
-                ),
-              ],
+                  );
+                }).toList(),
+              ),
             ),
-          ),
-          Divider(height: 1, color: AppColors.slate700),
-
-          // Content
-          Expanded(
-            child: teamsState.isLoading && teamsState.teams.isEmpty
-                ? const AdminLoadingIndicator(message: 'Loading teams...')
-                : teamsState.error != null
-                    ? AdminEmptyState(
-                        icon: LucideIcons.circleAlert,
-                        title: 'Failed to load teams',
-                        subtitle: teamsState.error,
-                        action: ElevatedButton.icon(
-                          onPressed: () =>
-                              ref.read(teamsProvider.notifier).loadTeams(),
-                          icon: const Icon(LucideIcons.refreshCw, size: 16),
-                          label: const Text('Retry'),
-                        ),
-                      )
-                    : teamsState.teams.isEmpty
-                        ? AdminEmptyState(
-                            icon: LucideIcons.users,
-                            title: 'No teams found',
-                            subtitle: 'Create a team to get started',
-                            action: ElevatedButton.icon(
-                              onPressed: _showCreateTeamDialog,
-                              icon: const Icon(LucideIcons.plus, size: 16),
-                              label: const Text('Create Team'),
-                            ),
-                          )
-                        : Column(
-                            children: [
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.all(24),
-                                  child: DataTableCard(
-                                    title: 'Teams',
-                                    icon: LucideIcons.users,
-                                    actions: [
-                                      if (teamsState.isLoading)
-                                        const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                    ],
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: DataTable(
-                                        columns: const [
-                                          DataColumn(label: Text('ID')),
-                                          DataColumn(label: Text('Team Name')),
-                                          DataColumn(
-                                              label: Text('Members'), numeric: true),
-                                          DataColumn(
-                                              label: Text('Shared Scores'),
-                                              numeric: true),
-                                          DataColumn(label: Text('Actions')),
-                                        ],
-                                        rows: teamsState.teams.map((team) {
-                                          return DataRow(
-                                            cells: [
-                                              DataCell(Text('${team.id}')),
-                                              DataCell(
-                                                Text(
-                                                  team.name,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.white,
-                                                  ),
-                                                ),
-                                              ),
-                                              DataCell(
-                                                StatusBadge.count(
-                                                  count: team.memberCount,
-                                                  icon: LucideIcons.users,
-                                                  color: AppColors.indigo500,
-                                                ),
-                                              ),
-                                              DataCell(
-                                                StatusBadge.count(
-                                                  count: team.sharedScores,
-                                                  icon: LucideIcons.music,
-                                                  color: AppColors.emerald500,
-                                                ),
-                                              ),
-                                              DataCell(
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    ActionIconButton(
-                                                      icon: LucideIcons.users,
-                                                      tooltip: 'View Members',
-                                                      onPressed: () =>
-                                                          _showTeamMembersDialog(
-                                                        team.id,
-                                                        team.name,
-                                                      ),
-                                                    ),
-                                                    ActionIconButton(
-                                                      icon: LucideIcons.trash2,
-                                                      tooltip: 'Delete',
-                                                      isDanger: true,
-                                                      onPressed: () =>
-                                                          _handleDeleteTeam(
-                                                        team.id,
-                                                        team.name,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            ],
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              PaginationControls(
-                                currentPage: teamsState.page,
-                                hasMore: teamsState.hasMore,
-                                isLoading: teamsState.isLoading,
-                                onPrevious: () =>
-                                    ref.read(teamsProvider.notifier).previousPage(),
-                                onNext: () =>
-                                    ref.read(teamsProvider.notifier).nextPage(),
-                              ),
-                            ],
-                          ),
-          ),
+            PaginationControls(
+              currentPage: teamsState.page,
+              hasMore: teamsState.hasMore,
+              isLoading: teamsState.isLoading,
+              onPrevious: () => ref.read(teamsProvider.notifier).previousPage(),
+              onNext: () => ref.read(teamsProvider.notifier).nextPage(),
+            ),
+          ],
         ],
       ),
     );
   }
 }
-
-// ============================================================================
-// Create Team Dialog
-// ============================================================================
 
 class _CreateTeamDialog extends ConsumerStatefulWidget {
   const _CreateTeamDialog();
@@ -289,30 +287,25 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
               : _descriptionController.text.trim(),
         );
 
-    if (mounted) {
-      if (success) {
-        Navigator.of(context).pop(true);
-      } else {
-        setState(() {
-          _isLoading = false;
-          _error = 'Failed to create team';
-        });
-      }
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pop(true);
+      return;
     }
+
+    setState(() {
+      _isLoading = false;
+      _error = 'Failed to create team';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(LucideIcons.plus, size: 20),
-          SizedBox(width: 10),
-          Text('Create Team'),
-        ],
-      ),
+      title: const Text('Create team'),
       content: SizedBox(
-        width: 400,
+        width: 440,
         child: Form(
           key: _formKey,
           child: Column(
@@ -322,7 +315,7 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: 'Team Name *',
+                  labelText: 'Team name *',
                   hintText: 'Enter team name',
                 ),
                 validator: (value) {
@@ -336,26 +329,18 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: 'Description (optional)',
-                  hintText: 'Enter description',
+                  labelText: 'Description',
+                  hintText: 'Optional description',
                 ),
                 maxLines: 3,
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.red500.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: AppColors.red400,
-                      fontSize: 13,
-                    ),
-                  ),
+                AdminInlineMessage(
+                  icon: LucideIcons.circleAlert,
+                  message: _error!,
+                  color: AppColors.red600,
+                  backgroundColor: AppColors.red50,
                 ),
               ],
             ],
@@ -378,17 +363,13 @@ class _CreateTeamDialogState extends ConsumerState<_CreateTeamDialog> {
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
-              : const Icon(LucideIcons.plus, size: 16),
-          label: const Text('Create'),
+              : const Icon(LucideIcons.plus, size: 18),
+          label: const Text('Create team'),
         ),
       ],
     );
   }
 }
-
-// ============================================================================
-// Team Members Dialog
-// ============================================================================
 
 class _TeamMembersDialog extends ConsumerStatefulWidget {
   final int teamId;
@@ -407,8 +388,8 @@ class _TeamMembersDialogState extends ConsumerState<_TeamMembersDialog> {
   }
 
   Future<void> _showAddMemberDialog() async {
-    // First load all users
-    final usersResult = await AdminApiClient.instance.getAllUsers(page: 0, pageSize: 1000);
+    final usersResult =
+        await AdminApiClient.instance.getAllUsers(page: 0, pageSize: 1000);
     if (usersResult.isFailure || usersResult.data == null) {
       if (mounted) {
         AdminToast.error(context, 'Failed to load users');
@@ -423,42 +404,42 @@ class _TeamMembersDialogState extends ConsumerState<_TeamMembersDialog> {
       builder: (context) => _AddMemberDialog(users: usersResult.data!),
     );
 
-    if (selectedUserId != null && mounted) {
-      final result =
-          await AdminApiClient.instance.addMemberToTeam(widget.teamId, selectedUserId);
-      if (mounted) {
-        if (result.isSuccess) {
-          AdminToast.success(context, 'Member added');
-          ref.invalidate(teamMembersProvider(widget.teamId));
-          ref.read(teamsProvider.notifier).loadTeams();
-        } else {
-          AdminToast.error(context, result.error ?? 'Failed to add member');
-        }
-      }
+    if (selectedUserId == null || !mounted) return;
+
+    final result =
+        await AdminApiClient.instance.addMemberToTeam(widget.teamId, selectedUserId);
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      AdminToast.success(context, 'Member added');
+      ref.invalidate(teamMembersProvider(widget.teamId));
+      ref.read(teamsProvider.notifier).loadTeams();
+    } else {
+      AdminToast.error(context, result.error ?? 'Failed to add member');
     }
   }
 
   Future<void> _handleRemoveMember(int userId, String username) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Remove Member',
+      title: 'Remove member',
       message: 'Remove "$username" from this team?',
       confirmLabel: 'Remove',
       isDanger: true,
     );
 
-    if (confirmed && mounted) {
-      final result =
-          await AdminApiClient.instance.removeMemberFromTeam(widget.teamId, userId);
-      if (mounted) {
-        if (result.isSuccess) {
-          AdminToast.success(context, 'Member removed');
-          ref.invalidate(teamMembersProvider(widget.teamId));
-          ref.read(teamsProvider.notifier).loadTeams();
-        } else {
-          AdminToast.error(context, 'Failed to remove member');
-        }
-      }
+    if (!confirmed || !mounted) return;
+
+    final result =
+        await AdminApiClient.instance.removeMemberFromTeam(widget.teamId, userId);
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      AdminToast.success(context, 'Member removed');
+      ref.invalidate(teamMembersProvider(widget.teamId));
+      ref.read(teamsProvider.notifier).loadTeams();
+    } else {
+      AdminToast.error(context, 'Failed to remove member');
     }
   }
 
@@ -467,33 +448,36 @@ class _TeamMembersDialogState extends ConsumerState<_TeamMembersDialog> {
     final membersAsync = ref.watch(teamMembersProvider(widget.teamId));
 
     return AlertDialog(
-      title: Row(
-        children: [
-          const Icon(LucideIcons.users, size: 20),
-          const SizedBox(width: 10),
-          Expanded(child: Text('${widget.teamName} - Members')),
-        ],
-      ),
+      title: Text('${widget.teamName} members'),
       content: SizedBox(
-        width: 600,
-        height: 400,
+        width: 760,
+        height: 520,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                Expanded(
+                  child: Text(
+                    'Manage membership for this workspace.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppColors.gray500,
+                        ),
+                  ),
+                ),
                 ElevatedButton.icon(
                   onPressed: _showAddMemberDialog,
-                  icon: const Icon(LucideIcons.userPlus, size: 16),
-                  label: const Text('Add Member'),
+                  icon: const Icon(LucideIcons.userPlus, size: 18),
+                  label: const Text('Add member'),
                 ),
               ],
             ),
             const SizedBox(height: 16),
             Expanded(
               child: membersAsync.when(
-                loading: () =>
-                    const AdminLoadingIndicator(message: 'Loading members...'),
+                loading: () => const AdminLoadingIndicator(
+                  message: 'Loading members...',
+                ),
                 error: (error, _) => AdminEmptyState(
                   icon: LucideIcons.circleAlert,
                   title: 'Failed to load members',
@@ -504,13 +488,15 @@ class _TeamMembersDialogState extends ConsumerState<_TeamMembersDialog> {
                     return const AdminEmptyState(
                       icon: LucideIcons.users,
                       title: 'No members in this team',
+                      subtitle: 'Add a user to start collaborating.',
                     );
                   }
 
                   return SingleChildScrollView(
-                    child: DataTable(
+                    child: AdminResponsiveDataTable(
+                      minWidth: 700,
                       columns: const [
-                        DataColumn(label: Text('Username')),
+                        DataColumn(label: Text('User')),
                         DataColumn(label: Text('Display Name')),
                         DataColumn(label: Text('Role')),
                         DataColumn(label: Text('Joined')),
@@ -521,45 +507,36 @@ class _TeamMembersDialogState extends ConsumerState<_TeamMembersDialog> {
                           cells: [
                             DataCell(
                               Row(
-                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   AdminUserAvatar(
                                     name: member.displayName ?? member.username,
-                                    size: 28,
+                                    size: 32,
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 10),
                                   Text(
                                     member.username,
-                                    style: const TextStyle(fontWeight: FontWeight.w500),
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.gray900,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
                             DataCell(Text(member.displayName ?? '-')),
                             DataCell(
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.slate700,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'Member',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.gray300,
-                                  ),
-                                ),
+                              StatusBadge(
+                                label: 'Member',
+                                backgroundColor: AppColors.blue50,
+                                textColor: AppColors.blue600,
+                                icon: LucideIcons.user,
                               ),
                             ),
                             DataCell(Text(_formatDate(member.joinedAt))),
                             DataCell(
                               ActionIconButton(
                                 icon: LucideIcons.userMinus,
-                                tooltip: 'Remove',
+                                tooltip: 'Remove member',
                                 isDanger: true,
                                 onPressed: () => _handleRemoveMember(
                                   member.userId,
@@ -588,10 +565,6 @@ class _TeamMembersDialogState extends ConsumerState<_TeamMembersDialog> {
   }
 }
 
-// ============================================================================
-// Add Member Dialog
-// ============================================================================
-
 class _AddMemberDialog extends StatefulWidget {
   final List<server.UserInfo> users;
 
@@ -607,35 +580,25 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(LucideIcons.userPlus, size: 20),
-          SizedBox(width: 10),
-          Text('Add Team Member'),
-        ],
-      ),
+      title: const Text('Add team member'),
       content: SizedBox(
-        width: 400,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownButtonFormField<int>(
-              value: _selectedUserId,
-              decoration: const InputDecoration(
-                labelText: 'Select User *',
-              ),
-              items: widget.users.map((user) {
-                return DropdownMenuItem(
+        width: 420,
+        child: DropdownButtonFormField<int>(
+          value: _selectedUserId,
+          decoration: const InputDecoration(
+            labelText: 'Select user *',
+          ),
+          items: widget.users
+              .map(
+                (user) => DropdownMenuItem<int>(
                   value: user.id,
                   child: Text(
                     '${user.username} (${user.displayName ?? "No name"})',
                   ),
-                );
-              }).toList(),
-              onChanged: (value) => setState(() => _selectedUserId = value),
-            ),
-          ],
+                ),
+              )
+              .toList(),
+          onChanged: (value) => setState(() => _selectedUserId = value),
         ),
       ),
       actions: [
@@ -647,8 +610,8 @@ class _AddMemberDialogState extends State<_AddMemberDialog> {
           onPressed: _selectedUserId != null
               ? () => Navigator.of(context).pop(_selectedUserId)
               : null,
-          icon: const Icon(LucideIcons.userPlus, size: 16),
-          label: const Text('Add'),
+          icon: const Icon(LucideIcons.userPlus, size: 18),
+          label: const Text('Add member'),
         ),
       ],
     );

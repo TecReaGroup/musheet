@@ -27,18 +27,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     final result = await AdminApiClient.instance.checkHealth();
 
-    if (mounted) {
-      setState(() {
-        _isCheckingHealth = false;
-        _isHealthy = result.isSuccess;
-        _healthError = result.error;
-      });
+    if (!mounted) return;
 
-      if (result.isSuccess) {
-        AdminToast.success(context, 'Server is healthy');
-      } else {
-        AdminToast.error(context, 'Server health check failed');
-      }
+    setState(() {
+      _isCheckingHealth = false;
+      _isHealthy = result.isSuccess;
+      _healthError = result.error;
+    });
+
+    if (result.isSuccess) {
+      AdminToast.success(context, 'Server is healthy');
+    } else {
+      AdminToast.error(context, 'Server health check failed');
     }
   }
 
@@ -46,7 +46,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final confirmed = await ConfirmDialog.show(
       context,
       title: 'Logout',
-      message: 'Are you sure you want to logout?',
+      message: 'Sign out of the admin workspace on this device?',
       confirmLabel: 'Logout',
     );
 
@@ -59,238 +59,249 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final authState = ref.watch(adminAuthProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.slate900,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            const Text(
-              'System Settings',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Manage system configuration and settings',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.gray400,
-              ),
-            ),
-            const SizedBox(height: 32),
-
-            // Account Section
-            _SettingsSection(
-              title: 'ACCOUNT',
-              children: [
-                _SettingsTile(
-                  icon: LucideIcons.user,
-                  title: 'Current Admin',
-                  subtitle: authState.displayName ?? authState.username ?? 'Unknown',
-                  trailing: AdminUserAvatar(
-                    name: authState.displayName ?? authState.username,
-                    size: 36,
-                  ),
-                ),
-                _SettingsTile(
-                  icon: LucideIcons.logOut,
-                  title: 'Logout',
-                  subtitle: 'Sign out of admin console',
-                  onTap: _handleLogout,
-                  trailing: const Icon(
-                    LucideIcons.chevronRight,
-                    size: 18,
-                    color: AppColors.gray400,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // System Section
-            _SettingsSection(
-              title: 'SYSTEM',
-              children: [
-                _SettingsTile(
-                  icon: LucideIcons.activity,
-                  title: 'Server Health',
-                  subtitle: _isHealthy == null
-                      ? 'Check server status'
-                      : _isHealthy!
-                          ? 'Server is healthy'
-                          : _healthError ?? 'Server is unhealthy',
-                  onTap: _isCheckingHealth ? null : _checkHealth,
-                  trailing: _isCheckingHealth
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : _isHealthy == null
-                          ? const Icon(
-                              LucideIcons.chevronRight,
-                              size: 18,
-                              color: AppColors.gray400,
-                            )
-                          : Icon(
-                              _isHealthy!
-                                  ? LucideIcons.circleCheck
-                                  : LucideIcons.circleAlert,
-                              size: 20,
-                              color: _isHealthy!
-                                  ? AppColors.emerald500
-                                  : AppColors.red500,
-                            ),
-                ),
-                _SettingsTile(
-                  icon: LucideIcons.server,
-                  title: 'API Endpoint',
-                  subtitle: AdminApiClient.instance.baseUrl,
-                  trailing: const Icon(
-                    LucideIcons.externalLink,
-                    size: 18,
-                    color: AppColors.gray400,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Coming Soon Section
-            _SettingsSection(
-              title: 'CONFIGURATION (COMING SOON)',
-              children: [
-                _SettingsTile(
-                  icon: LucideIcons.userPlus,
-                  title: 'Registration Control',
-                  subtitle: 'Enable or disable new user registration',
-                  enabled: false,
-                  trailing: Switch(
-                    value: true,
-                    onChanged: null,
-                  ),
-                ),
-                _SettingsTile(
-                  icon: LucideIcons.database,
-                  title: 'Storage Quotas',
-                  subtitle: 'Set storage limits for users and teams',
-                  enabled: false,
-                  trailing: const Icon(
-                    LucideIcons.chevronRight,
-                    size: 18,
-                    color: AppColors.gray300,
-                  ),
-                ),
-                _SettingsTile(
-                  icon: LucideIcons.fileText,
-                  title: 'Audit Logs',
-                  subtitle: 'View system operation logs',
-                  enabled: false,
-                  trailing: const Icon(
-                    LucideIcons.chevronRight,
-                    size: 18,
-                    color: AppColors.gray300,
-                  ),
-                ),
-                _SettingsTile(
-                  icon: LucideIcons.download,
-                  title: 'Data Export',
-                  subtitle: 'Export users, teams, and logs',
-                  enabled: false,
-                  trailing: const Icon(
-                    LucideIcons.chevronRight,
-                    size: 18,
-                    color: AppColors.gray300,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // About Section
-            _SettingsSection(
-              title: 'ABOUT',
-              children: [
-                const _SettingsTile(
-                  icon: LucideIcons.info,
-                  title: 'MuSheet Admin',
-                  subtitle: 'Version 1.0.0',
-                ),
-                const _SettingsTile(
-                  icon: LucideIcons.code,
-                  title: 'Built with',
-                  subtitle: 'Flutter Web + Riverpod + Serverpod',
-                ),
-              ],
-            ),
-            const SizedBox(height: 48),
-          ],
+    return AdminPageScaffold(
+      eyebrow: 'Configuration',
+      title: 'System settings',
+      subtitle:
+          'Review environment information, account access, and planned configuration capabilities in a layout consistent with the main app.',
+      actions: [
+        OutlinedButton.icon(
+          onPressed: _isCheckingHealth ? null : _checkHealth,
+          icon: _isCheckingHealth
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(LucideIcons.activity, size: 18),
+          label: const Text('Check health'),
         ),
+        ElevatedButton.icon(
+          onPressed: _handleLogout,
+          icon: const Icon(LucideIcons.logOut, size: 18),
+          label: const Text('Logout'),
+        ),
+      ],
+      hero: AdminInfoHero(
+        icon: LucideIcons.settings,
+        title: 'Environment overview',
+        subtitle:
+            'The settings area now emphasizes clear grouped surfaces, descriptive metadata, and direct access to health signals and account context.',
+        trailing: [
+          AdminMetricPill(
+            icon: LucideIcons.user,
+            label: 'Admin',
+            value: authState.username ?? 'Unknown',
+          ),
+          AdminMetricPill(
+            icon: LucideIcons.server,
+            label: 'API',
+            value: 'Connected',
+            accent: AppColors.emerald600,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_healthError != null) ...[
+            AdminInlineMessage(
+              icon: LucideIcons.circleAlert,
+              message: _healthError!,
+              color: AppColors.red600,
+              backgroundColor: AppColors.red50,
+            ),
+            const SizedBox(height: 16),
+          ],
+          _SettingsSection(
+            title: 'Account',
+            subtitle: 'Current administrator session and access actions.',
+            icon: LucideIcons.user,
+            children: [
+              _SettingsTile(
+                icon: LucideIcons.user,
+                title: 'Current administrator',
+                subtitle:
+                    authState.displayName ?? authState.username ?? 'Unknown user',
+                trailing: AdminUserAvatar(
+                  name: authState.displayName ?? authState.username,
+                  size: 40,
+                ),
+              ),
+              _SettingsTile(
+                icon: LucideIcons.badgeInfo,
+                title: 'Username',
+                subtitle: authState.username ?? 'Unavailable',
+                trailing: const Icon(
+                  LucideIcons.chevronsRight,
+                  size: 18,
+                  color: AppColors.gray400,
+                ),
+              ),
+              _SettingsTile(
+                icon: LucideIcons.logOut,
+                title: 'Logout',
+                subtitle: 'Remove local admin credentials from this browser.',
+                trailing: const Icon(
+                  LucideIcons.chevronsRight,
+                  size: 18,
+                  color: AppColors.gray400,
+                ),
+                onTap: _handleLogout,
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsSection(
+            title: 'System',
+            subtitle: 'Runtime health and environment connectivity.',
+            icon: LucideIcons.serverCog,
+            children: [
+              _SettingsTile(
+                icon: LucideIcons.activity,
+                title: 'Server health',
+                subtitle: _isHealthy == null
+                    ? 'Run a health check to verify backend availability.'
+                    : _isHealthy!
+                        ? 'Server is healthy and responding normally.'
+                        : _healthError ?? 'Server health check failed.',
+                trailing: _isCheckingHealth
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        _isHealthy == null
+                            ? LucideIcons.chevronsRight
+                            : _isHealthy!
+                                ? LucideIcons.circleCheckBig
+                                : LucideIcons.circleAlert,
+                        size: 18,
+                        color: _isHealthy == null
+                            ? AppColors.gray400
+                            : _isHealthy!
+                                ? AppColors.emerald600
+                                : AppColors.red600,
+                      ),
+                onTap: _isCheckingHealth ? null : _checkHealth,
+              ),
+              _SettingsTile(
+                icon: LucideIcons.link,
+                title: 'API endpoint',
+                subtitle: AdminApiClient.instance.baseUrl,
+                trailing: const Icon(
+                  LucideIcons.externalLink,
+                  size: 18,
+                  color: AppColors.gray400,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsSection(
+            title: 'Roadmap configuration',
+            subtitle: 'Upcoming administrative capabilities reserved for future iterations.',
+            icon: LucideIcons.sparkles,
+            children: const [
+              _SettingsTile(
+                icon: LucideIcons.userPlus,
+                title: 'Registration control',
+                subtitle: 'Enable or disable self-service account registration.',
+                enabled: false,
+                trailing: Switch(value: true, onChanged: null),
+              ),
+              _SettingsTile(
+                icon: LucideIcons.database,
+                title: 'Storage quotas',
+                subtitle: 'Set storage policies for users and teams.',
+                enabled: false,
+                trailing: Icon(
+                  LucideIcons.chevronsRight,
+                  size: 18,
+                  color: AppColors.gray400,
+                ),
+              ),
+              _SettingsTile(
+                icon: LucideIcons.clipboardList,
+                title: 'Audit logs',
+                subtitle: 'Review administrative operations and events.',
+                enabled: false,
+                trailing: Icon(
+                  LucideIcons.chevronsRight,
+                  size: 18,
+                  color: AppColors.gray400,
+                ),
+              ),
+              _SettingsTile(
+                icon: LucideIcons.download,
+                title: 'Data export',
+                subtitle: 'Export platform snapshots and operational data.',
+                enabled: false,
+                trailing: Icon(
+                  LucideIcons.chevronsRight,
+                  size: 18,
+                  color: AppColors.gray400,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _SettingsSection(
+            title: 'About',
+            subtitle: 'Project metadata for this administration workspace.',
+            icon: LucideIcons.info,
+            children: const [
+              _SettingsTile(
+                icon: LucideIcons.badgeInfo,
+                title: 'MuSheet Admin',
+                subtitle: 'Version 1.0.0',
+              ),
+              _SettingsTile(
+                icon: LucideIcons.code,
+                title: 'Built with',
+                subtitle: 'Flutter Web + Riverpod + Serverpod',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-// ============================================================================
-// Settings Section
-// ============================================================================
-
 class _SettingsSection extends StatelessWidget {
   final String title;
+  final String subtitle;
+  final IconData icon;
   final List<Widget> children;
 
   const _SettingsSection({
     required this.title,
+    required this.subtitle,
+    required this.icon,
     required this.children,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.gray500,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.slate800,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.slate700),
-          ),
-          child: Column(
-            children: [
-              for (int i = 0; i < children.length; i++) ...[
-                children[i],
-                if (i < children.length - 1)
-                  Divider(height: 1, indent: 56, color: AppColors.slate700),
-              ],
-            ],
-          ),
-        ),
-      ],
+    return AdminSectionCard(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      contentPadding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (int i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1)
+              const Divider(height: 1, indent: 72, endIndent: 16),
+          ],
+        ],
+      ),
     );
   }
 }
-
-// ============================================================================
-// Settings Tile
-// ============================================================================
 
 class _SettingsTile extends StatelessWidget {
   final IconData icon;
@@ -311,54 +322,57 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        hoverColor: AppColors.slate700,
-        child: Opacity(
-          opacity: enabled ? 1.0 : 0.5,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+    final child = Padding(
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: enabled ? AppColors.gray100 : AppColors.gray50,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: enabled ? AppColors.gray700 : AppColors.gray400,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.slate700,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, size: 20, color: AppColors.gray400),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: enabled ? AppColors.gray900 : AppColors.gray500,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppColors.gray400,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-                if (trailing != null) trailing!,
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppColors.gray500,
+                        height: 1.4,
+                      ),
+                ),
               ],
             ),
           ),
+          if (trailing != null) trailing!,
+        ],
+      ),
+    );
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.6,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          child: child,
         ),
       ),
     );

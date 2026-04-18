@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/providers.dart';
 import '../../shared/theme/app_colors.dart';
 import '../../shared/widgets/admin_widgets.dart';
@@ -17,9 +17,11 @@ class _UsersPageState extends ConsumerState<UsersPage> {
   @override
   void initState() {
     super.initState();
-    // Load users on init
     Future.microtask(() {
-      ref.read(usersProvider.notifier).loadUsers();
+      final authState = ref.read(adminAuthProvider);
+      if (authState.isAuthenticated) {
+        ref.read(usersProvider.notifier).loadUsers();
+      }
     });
   }
 
@@ -42,168 +44,143 @@ class _UsersPageState extends ConsumerState<UsersPage> {
   Future<void> _handleDeactivate(int userId) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Deactivate User',
-      message: 'Are you sure you want to deactivate this user?',
+      title: 'Deactivate user',
+      message: 'This account will lose access until it is reactivated.',
       confirmLabel: 'Deactivate',
       isDanger: true,
     );
 
-    if (confirmed && mounted) {
-      final success = await ref.read(usersProvider.notifier).deactivateUser(userId);
-      if (mounted) {
-        if (success) {
-          AdminToast.success(context, 'User deactivated');
-        } else {
-          AdminToast.error(context, 'Failed to deactivate user');
-        }
-      }
-    }
+    if (!confirmed || !mounted) return;
+    final success = await ref.read(usersProvider.notifier).deactivateUser(userId);
+    if (!mounted) return;
+    success
+        ? AdminToast.success(context, 'User deactivated')
+        : AdminToast.error(context, 'Failed to deactivate user');
   }
 
   Future<void> _handleReactivate(int userId) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Activate User',
-      message: 'Are you sure you want to activate this user?',
-      confirmLabel: 'Activate',
+      title: 'Reactivate user',
+      message: 'This account will regain access to the platform.',
+      confirmLabel: 'Reactivate',
     );
 
-    if (confirmed && mounted) {
-      final success = await ref.read(usersProvider.notifier).reactivateUser(userId);
-      if (mounted) {
-        if (success) {
-          AdminToast.success(context, 'User activated');
-        } else {
-          AdminToast.error(context, 'Failed to activate user');
-        }
-      }
-    }
+    if (!confirmed || !mounted) return;
+    final success = await ref.read(usersProvider.notifier).reactivateUser(userId);
+    if (!mounted) return;
+    success
+        ? AdminToast.success(context, 'User activated')
+        : AdminToast.error(context, 'Failed to activate user');
   }
 
   Future<void> _handleDelete(int userId, String username) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Delete User',
+      title: 'Delete user',
       message:
-          'Are you sure you want to permanently delete "$username"? This action cannot be undone.',
+          'Permanently delete "$username"? This action cannot be undone.',
       confirmLabel: 'Delete',
       isDanger: true,
     );
 
-    if (confirmed && mounted) {
-      final success = await ref.read(usersProvider.notifier).deleteUser(userId);
-      if (mounted) {
-        if (success) {
-          AdminToast.success(context, 'User deleted');
-        } else {
-          AdminToast.error(context, 'Failed to delete user');
-        }
-      }
-    }
+    if (!confirmed || !mounted) return;
+    final success = await ref.read(usersProvider.notifier).deleteUser(userId);
+    if (!mounted) return;
+    success
+        ? AdminToast.success(context, 'User deleted')
+        : AdminToast.error(context, 'Failed to delete user');
   }
 
   Future<void> _handlePromote(int userId) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Promote to Admin',
-      message: 'Are you sure you want to give this user admin privileges?',
+      title: 'Promote to admin',
+      message: 'Grant administrator permissions to this account?',
       confirmLabel: 'Promote',
     );
 
-    if (confirmed && mounted) {
-      final success = await ref.read(usersProvider.notifier).promoteToAdmin(userId);
-      if (mounted) {
-        if (success) {
-          AdminToast.success(context, 'User promoted to admin');
-        } else {
-          AdminToast.error(context, 'Failed to promote user');
-        }
-      }
-    }
+    if (!confirmed || !mounted) return;
+    final success = await ref.read(usersProvider.notifier).promoteToAdmin(userId);
+    if (!mounted) return;
+    success
+        ? AdminToast.success(context, 'User promoted to admin')
+        : AdminToast.error(context, 'Failed to promote user');
   }
 
   Future<void> _handleDemote(int userId) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Demote from Admin',
-      message: 'Are you sure you want to remove admin privileges from this user?',
+      title: 'Demote admin',
+      message: 'Remove administrator permissions from this account?',
       confirmLabel: 'Demote',
       isDanger: true,
     );
 
-    if (confirmed && mounted) {
-      final success = await ref.read(usersProvider.notifier).demoteFromAdmin(userId);
-      if (mounted) {
-        if (success) {
-          AdminToast.success(context, 'User demoted');
-        } else {
-          AdminToast.error(context, 'Failed to demote user');
-        }
-      }
-    }
+    if (!confirmed || !mounted) return;
+    final success = await ref.read(usersProvider.notifier).demoteFromAdmin(userId);
+    if (!mounted) return;
+    success
+        ? AdminToast.success(context, 'User demoted')
+        : AdminToast.error(context, 'Failed to demote user');
   }
 
   Future<void> _handleResetPassword(int userId) async {
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Reset Password',
-      message: 'This will generate a new temporary password. Continue?',
+      title: 'Reset password',
+      message: 'Generate a temporary password for this account?',
       confirmLabel: 'Reset',
     );
 
-    if (confirmed && mounted) {
-      final tempPassword = await ref.read(usersProvider.notifier).resetPassword(userId);
-      if (mounted) {
-        if (tempPassword != null) {
-          await showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Password Reset'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Temporary password:'),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.slate800,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: SelectableText(
-                      tempPassword,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Please share this with the user securely.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.gray500,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Done'),
-                ),
-              ],
-            ),
-          );
-        } else {
-          AdminToast.error(context, 'Failed to reset password');
-        }
-      }
+    if (!confirmed || !mounted) return;
+
+    final tempPassword = await ref.read(usersProvider.notifier).resetPassword(userId);
+    if (!mounted) return;
+
+    if (tempPassword == null) {
+      AdminToast.error(context, 'Failed to reset password');
+      return;
     }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Temporary password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Share this password securely with the user.'),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: SelectableText(
+                tempPassword,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.gray900,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -211,246 +188,248 @@ class _UsersPageState extends ConsumerState<UsersPage> {
     final usersState = ref.watch(usersProvider);
     final authState = ref.watch(adminAuthProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.slate900,
-      body: Column(
+    if (authState.isAuthenticated &&
+        usersState.users.isEmpty &&
+        !usersState.isLoading &&
+        usersState.error == null) {
+      Future.microtask(() => ref.read(usersProvider.notifier).loadUsers());
+    }
+
+    if (usersState.isLoading && usersState.users.isEmpty) {
+      return const Center(
+        child: AdminLoadingIndicator(message: 'Loading users...'),
+      );
+    }
+
+    if (usersState.error != null && usersState.users.isEmpty) {
+      return Center(
+        child: AdminEmptyState(
+          icon: LucideIcons.circleAlert,
+          title: 'Failed to load users',
+          subtitle: usersState.error,
+          action: ElevatedButton.icon(
+            onPressed: () => ref.read(usersProvider.notifier).loadUsers(),
+            icon: const Icon(LucideIcons.refreshCw, size: 18),
+            label: const Text('Retry'),
+          ),
+        ),
+      );
+    }
+
+    return AdminPageScaffold(
+      eyebrow: 'Accounts',
+      title: 'User management',
+      subtitle:
+          'Manage account status, permissions, and onboarding from a cleaner workspace aligned with the app design system.',
+      actions: [
+        OutlinedButton.icon(
+          onPressed: () => ref.read(usersProvider.notifier).loadUsers(),
+          icon: usersState.isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(LucideIcons.refreshCw, size: 18),
+          label: const Text('Refresh'),
+        ),
+        ElevatedButton.icon(
+          onPressed: _showCreateUserDialog,
+          icon: const Icon(LucideIcons.userPlus, size: 18),
+          label: const Text('Create user'),
+        ),
+      ],
+      hero: AdminInfoHero(
+        icon: LucideIcons.users,
+        title: 'Account operations',
+        subtitle:
+            'Quickly review role distribution, activation state, and account creation volume while keeping destructive actions clearly separated.',
+        trailing: [
+          AdminMetricPill(
+            icon: LucideIcons.users,
+            label: 'Visible users',
+            value: '${usersState.users.length}',
+          ),
+          AdminMetricPill(
+            icon: LucideIcons.shieldCheck,
+            label: 'Admins',
+            value: '${usersState.users.where((user) => user.isAdmin).length}',
+            accent: AppColors.blue600,
+          ),
+          AdminMetricPill(
+            icon: LucideIcons.ban,
+            label: 'Disabled',
+            value: '${usersState.users.where((user) => user.isDisabled).length}',
+            accent: AppColors.red600,
+          ),
+        ],
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(24),
-            color: AppColors.slate800,
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'User Management',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Manage user accounts and permissions',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.gray400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _showCreateUserDialog,
-                  icon: const Icon(LucideIcons.userPlus, size: 18),
-                  label: const Text('Create User'),
-                ),
-              ],
+          if (usersState.error != null) ...[
+            AdminInlineMessage(
+              icon: LucideIcons.circleAlert,
+              message: usersState.error!,
+              color: AppColors.red600,
+              backgroundColor: AppColors.red50,
             ),
-          ),
-          Divider(height: 1, color: AppColors.slate700),
+            const SizedBox(height: 16),
+          ],
+          if (usersState.users.isEmpty)
+            AdminEmptyState(
+              icon: LucideIcons.users,
+              title: 'No users found',
+              subtitle: 'Create the first managed account to populate this table.',
+              action: ElevatedButton.icon(
+                onPressed: _showCreateUserDialog,
+                icon: const Icon(LucideIcons.userPlus, size: 18),
+                label: const Text('Create user'),
+              ),
+            )
+          else ...[
+            DataTableCard(
+              title: 'Directory',
+              subtitle: 'Role, lifecycle state, and recovery actions.',
+              icon: LucideIcons.table2,
+              child: AdminResponsiveDataTable(
+                minWidth: 1120,
+                columns: const [
+                  DataColumn(label: Text('User')),
+                  DataColumn(label: Text('Display Name')),
+                  DataColumn(label: Text('Role')),
+                  DataColumn(label: Text('Status')),
+                  DataColumn(label: Text('Created')),
+                  DataColumn(label: Text('Actions')),
+                ],
+                rows: usersState.users.map((user) {
+                  final isCurrentUser = user.id == authState.userId;
 
-          // Content
-          Expanded(
-            child: usersState.isLoading && usersState.users.isEmpty
-                ? const AdminLoadingIndicator(message: 'Loading users...')
-                : usersState.error != null
-                    ? AdminEmptyState(
-                        icon: LucideIcons.circleAlert,
-                        title: 'Failed to load users',
-                        subtitle: usersState.error,
-                        action: ElevatedButton.icon(
-                          onPressed: () =>
-                              ref.read(usersProvider.notifier).loadUsers(),
-                          icon: const Icon(LucideIcons.refreshCw, size: 16),
-                          label: const Text('Retry'),
-                        ),
-                      )
-                    : usersState.users.isEmpty
-                        ? AdminEmptyState(
-                            icon: LucideIcons.users,
-                            title: 'No users found',
-                            action: ElevatedButton.icon(
-                              onPressed: _showCreateUserDialog,
-                              icon: const Icon(LucideIcons.userPlus, size: 16),
-                              label: const Text('Create User'),
-                            ),
-                          )
-                        : Column(
+                  return DataRow(
+                    cells: [
+                      DataCell(
+                        SizedBox(
+                          width: 240,
+                          child: Row(
                             children: [
+                              AdminUserAvatar(
+                                name: user.displayName ?? user.username,
+                                userId: user.id,
+                                size: 36,
+                              ),
+                              const SizedBox(width: 12),
                               Expanded(
-                                child: SingleChildScrollView(
-                                  padding: const EdgeInsets.all(24),
-                                  child: DataTableCard(
-                                    title: 'Users',
-                                    icon: LucideIcons.users,
-                                    actions: [
-                                      if (usersState.isLoading)
-                                        const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                    ],
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: DataTable(
-                                        columns: const [
-                                          DataColumn(label: Text('ID')),
-                                          DataColumn(label: Text('Username')),
-                                          DataColumn(label: Text('Display Name')),
-                                          DataColumn(label: Text('Role')),
-                                          DataColumn(label: Text('Status')),
-                                          DataColumn(label: Text('Created')),
-                                          DataColumn(label: Text('Actions')),
-                                        ],
-                                        rows: usersState.users.map((user) {
-                                          final isCurrentUser =
-                                              user.id == authState.userId;
-
-                                          return DataRow(
-                                            cells: [
-                                              DataCell(Text('${user.id}')),
-                                              DataCell(
-                                                Row(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  children: [
-                                                    AdminUserAvatar(
-                                                      name: user.displayName ??
-                                                          user.username,
-                                                      size: 32,
-                                                    ),
-                                                    const SizedBox(width: 10),
-                                                    Text(
-                                                      user.username,
-                                                      style: const TextStyle(
-                                                        fontWeight: FontWeight.w500,
-                                                        color: Colors.white,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              DataCell(
-                                                Text(user.displayName ?? '-'),
-                                              ),
-                                              DataCell(
-                                                user.isAdmin
-                                                    ? StatusBadge.admin()
-                                                    : StatusBadge.user(),
-                                              ),
-                                              DataCell(
-                                                user.isDisabled
-                                                    ? StatusBadge.disabled()
-                                                    : StatusBadge.active(),
-                                              ),
-                                              DataCell(
-                                                Text(_formatDate(user.createdAt)),
-                                              ),
-                                              DataCell(
-                                                isCurrentUser
-                                                    ? const Text(
-                                                        'Current User',
-                                                        style: TextStyle(
-                                                          color: AppColors.gray400,
-                                                          fontSize: 12,
-                                                        ),
-                                                      )
-                                                    : Row(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          if (user.isDisabled)
-                                                            ActionIconButton(
-                                                              icon: LucideIcons.check,
-                                                              tooltip: 'Activate',
-                                                              color:
-                                                                  AppColors.emerald600,
-                                                              onPressed: () =>
-                                                                  _handleReactivate(
-                                                                      user.id),
-                                                            )
-                                                          else
-                                                            ActionIconButton(
-                                                              icon: LucideIcons.ban,
-                                                              tooltip: 'Deactivate',
-                                                              onPressed: () =>
-                                                                  _handleDeactivate(
-                                                                      user.id),
-                                                            ),
-                                                          if (user.isAdmin)
-                                                            ActionIconButton(
-                                                              icon:
-                                                                  LucideIcons.userMinus,
-                                                              tooltip: 'Demote',
-                                                              onPressed: () =>
-                                                                  _handleDemote(
-                                                                      user.id),
-                                                            )
-                                                          else
-                                                            ActionIconButton(
-                                                              icon: LucideIcons.shield,
-                                                              tooltip: 'Promote',
-                                                              onPressed: () =>
-                                                                  _handlePromote(
-                                                                      user.id),
-                                                            ),
-                                                          ActionIconButton(
-                                                            icon: LucideIcons.key,
-                                                            tooltip: 'Reset Password',
-                                                            onPressed: () =>
-                                                                _handleResetPassword(
-                                                                    user.id),
-                                                          ),
-                                                          ActionIconButton(
-                                                            icon: LucideIcons.trash2,
-                                                            tooltip: 'Delete',
-                                                            isDanger: true,
-                                                            onPressed: () =>
-                                                                _handleDelete(
-                                                              user.id,
-                                                              user.username,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                              ),
-                                            ],
-                                          );
-                                        }).toList(),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      user.username,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.gray900,
                                       ),
                                     ),
-                                  ),
+                                    Text(
+                                      'ID ${user.id}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.gray500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              PaginationControls(
-                                currentPage: usersState.page,
-                                hasMore: usersState.hasMore,
-                                isLoading: usersState.isLoading,
-                                onPrevious: () =>
-                                    ref.read(usersProvider.notifier).previousPage(),
-                                onNext: () =>
-                                    ref.read(usersProvider.notifier).nextPage(),
                               ),
                             ],
                           ),
-          ),
+                        ),
+                      ),
+                      DataCell(Text(user.displayName ?? '-')),
+                      DataCell(
+                        user.isAdmin ? StatusBadge.admin() : StatusBadge.user(),
+                      ),
+                      DataCell(
+                        user.isDisabled
+                            ? StatusBadge.disabled()
+                            : StatusBadge.active(),
+                      ),
+                      DataCell(Text(_formatDate(user.createdAt))),
+                      DataCell(
+                        isCurrentUser
+                            ? const Text(
+                                'Current session',
+                                style: TextStyle(
+                                  color: AppColors.gray500,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              )
+                            : Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  if (user.isDisabled)
+                                    ActionIconButton(
+                                      icon: LucideIcons.badgeCheck,
+                                      tooltip: 'Reactivate',
+                                      color: AppColors.emerald600,
+                                      onPressed: () => _handleReactivate(user.id),
+                                    )
+                                  else
+                                    ActionIconButton(
+                                      icon: LucideIcons.ban,
+                                      tooltip: 'Deactivate',
+                                      color: AppColors.red600,
+                                      onPressed: () => _handleDeactivate(user.id),
+                                    ),
+                                  if (user.isAdmin)
+                                    ActionIconButton(
+                                      icon: LucideIcons.userMinus,
+                                      tooltip: 'Demote',
+                                      onPressed: () => _handleDemote(user.id),
+                                    )
+                                  else
+                                    ActionIconButton(
+                                      icon: LucideIcons.shieldPlus,
+                                      tooltip: 'Promote',
+                                      onPressed: () => _handlePromote(user.id),
+                                    ),
+                                  ActionIconButton(
+                                    icon: LucideIcons.keyRound,
+                                    tooltip: 'Reset password',
+                                    onPressed: () => _handleResetPassword(user.id),
+                                  ),
+                                  ActionIconButton(
+                                    icon: LucideIcons.trash2,
+                                    tooltip: 'Delete',
+                                    isDanger: true,
+                                    onPressed: () => _handleDelete(
+                                      user.id,
+                                      user.username,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
+            ),
+            PaginationControls(
+              currentPage: usersState.page,
+              hasMore: usersState.hasMore,
+              isLoading: usersState.isLoading,
+              onPrevious: () => ref.read(usersProvider.notifier).previousPage(),
+              onNext: () => ref.read(usersProvider.notifier).nextPage(),
+            ),
+          ],
         ],
       ),
     );
   }
 }
-
-// ============================================================================
-// Create User Dialog
-// ============================================================================
 
 class _CreateUserDialog extends ConsumerStatefulWidget {
   const _CreateUserDialog();
@@ -493,30 +472,25 @@ class _CreateUserDialogState extends ConsumerState<_CreateUserDialog> {
           isAdmin: _isAdmin,
         );
 
-    if (mounted) {
-      if (success) {
-        Navigator.of(context).pop(true);
-      } else {
-        setState(() {
-          _isLoading = false;
-          _error = 'Failed to create user';
-        });
-      }
+    if (!mounted) return;
+
+    if (success) {
+      Navigator.of(context).pop(true);
+      return;
     }
+
+    setState(() {
+      _isLoading = false;
+      _error = 'Failed to create user';
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(LucideIcons.userPlus, size: 20),
-          SizedBox(width: 10),
-          Text('Create User'),
-        ],
-      ),
+      title: const Text('Create user'),
       content: SizedBox(
-        width: 400,
+        width: 440,
         child: Form(
           key: _formKey,
           child: Column(
@@ -540,7 +514,7 @@ class _CreateUserDialogState extends ConsumerState<_CreateUserDialog> {
               TextFormField(
                 controller: _passwordController,
                 decoration: const InputDecoration(
-                  labelText: 'Initial Password *',
+                  labelText: 'Initial password *',
                   hintText: 'Minimum 6 characters',
                 ),
                 obscureText: true,
@@ -558,33 +532,33 @@ class _CreateUserDialogState extends ConsumerState<_CreateUserDialog> {
               TextFormField(
                 controller: _displayNameController,
                 decoration: const InputDecoration(
-                  labelText: 'Display Name (optional)',
-                  hintText: 'Enter display name',
+                  labelText: 'Display name',
+                  hintText: 'Optional name shown in UI',
                 ),
               ),
               const SizedBox(height: 16),
-              CheckboxListTile(
-                value: _isAdmin,
-                onChanged: (value) => setState(() => _isAdmin = value ?? false),
-                title: const Text('Admin privileges'),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.gray50,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.gray200),
+                ),
+                child: CheckboxListTile(
+                  value: _isAdmin,
+                  onChanged: (value) => setState(() => _isAdmin = value ?? false),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Grant admin privileges'),
+                ),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.red500.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(
-                      color: AppColors.red400,
-                      fontSize: 13,
-                    ),
-                  ),
+                AdminInlineMessage(
+                  icon: LucideIcons.circleAlert,
+                  message: _error!,
+                  color: AppColors.red600,
+                  backgroundColor: AppColors.red50,
                 ),
               ],
             ],
@@ -607,8 +581,8 @@ class _CreateUserDialogState extends ConsumerState<_CreateUserDialog> {
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 )
-              : const Icon(LucideIcons.userPlus, size: 16),
-          label: const Text('Create'),
+              : const Icon(LucideIcons.userPlus, size: 18),
+          label: const Text('Create user'),
         ),
       ],
     );

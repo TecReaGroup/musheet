@@ -11,233 +11,207 @@ class AdminShell extends ConsumerWidget {
 
   const AdminShell({super.key, required this.child});
 
+  static const _destinations = [
+    AdminNavDestination(
+      icon: LucideIcons.layoutDashboard,
+      label: 'Dashboard',
+      path: '/dashboard',
+    ),
+    AdminNavDestination(
+      icon: LucideIcons.users,
+      label: 'Users',
+      path: '/users',
+    ),
+    AdminNavDestination(
+      icon: LucideIcons.usersRound,
+      label: 'Teams',
+      path: '/teams',
+    ),
+    AdminNavDestination(
+      icon: LucideIcons.settings2,
+      label: 'Settings',
+      path: '/settings',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(adminAuthProvider);
+    final currentPath = GoRouterState.of(context).matchedLocation;
 
     return Scaffold(
-      backgroundColor: AppColors.slate900,
-      body: Row(
-        children: [
-          // Sidebar
-          _AdminSidebar(
-            currentPath: GoRouterState.of(context).matchedLocation,
-            displayName: authState.displayName ?? authState.username,
-          ),
-          // Main content
-          Expanded(child: child),
-        ],
+      backgroundColor: const Color(0xFFF6FAFF),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 1100;
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _AdminSidebar(
+                  compact: compact,
+                  currentPath: currentPath,
+                  displayName: authState.displayName ?? authState.username,
+                  userId: authState.userId,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 20, 20, 20),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        color: Colors.white.withValues(alpha: 0.58),
+                      ),
+                      child: child,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 }
 
 class _AdminSidebar extends StatelessWidget {
+  final bool compact;
   final String currentPath;
   final String? displayName;
+  final int? userId;
 
   const _AdminSidebar({
+    required this.compact,
     required this.currentPath,
     this.displayName,
+    this.userId,
   });
 
   @override
   Widget build(BuildContext context) {
+    final width = compact ? 240.0 : 288.0;
+
     return Container(
-      width: 260,
-      color: AppColors.slate800,
-      child: Column(
-        children: [
-          // Logo Header
-          Container(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.indigo500, AppColors.indigo600],
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.indigo500.withValues(alpha: 0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+      width: width,
+      padding: const EdgeInsets.fromLTRB(20, 20, 12, 20),
+      child: AdminSurface(
+        padding: const EdgeInsets.all(20),
+        radius: 24,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AdminAppWordmark(),
+            const SizedBox(height: 24),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFEFF6FF), Color(0xFFECFDF5)],
+                ),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.blue100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const MuSheetBrandMark(
+                        size: 40,
+                        radius: 14,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Admin Workspace',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(color: AppColors.gray900),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Unified with the mobile app visual language',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: AppColors.gray600),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                  ),
-                  child: const Icon(
-                    LucideIcons.music,
-                    size: 22,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'MuSheet',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
-                    Text(
-                      'Admin Console',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.gray500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Divider(color: AppColors.slate700, height: 1),
-
-          // Navigation Items
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-              child: Column(
-                children: [
-                  _NavItem(
-                    icon: LucideIcons.layoutDashboard,
-                    label: 'Dashboard',
-                    path: '/dashboard',
-                    currentPath: currentPath,
-                  ),
-                  const SizedBox(height: 4),
-                  _NavItem(
-                    icon: LucideIcons.users,
-                    label: 'Users',
-                    path: '/users',
-                    currentPath: currentPath,
-                  ),
-                  const SizedBox(height: 4),
-                  _NavItem(
-                    icon: LucideIcons.usersRound,
-                    label: 'Teams',
-                    path: '/teams',
-                    currentPath: currentPath,
-                  ),
-                  const SizedBox(height: 4),
-                  _NavItem(
-                    icon: LucideIcons.settings,
-                    label: 'Settings',
-                    path: '/settings',
-                    currentPath: currentPath,
                   ),
                 ],
               ),
             ),
-          ),
-
-          // User Info Footer
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(color: AppColors.slate700),
-              ),
-            ),
-            child: Row(
-              children: [
-                AdminUserAvatar(
-                  name: displayName,
-                  size: 36,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        displayName ?? 'Admin',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        'Administrator',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.gray500,
-                        ),
-                      ),
-                    ],
+            const SizedBox(height: 24),
+            Text(
+              'Navigation',
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: AppColors.gray500,
+                    letterSpacing: 0.8,
+                    fontWeight: FontWeight.w700,
                   ),
-                ),
-              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String path;
-  final String currentPath;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.path,
-    required this.currentPath,
-  });
-
-  bool get isActive => currentPath == path;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => context.go(path),
-        borderRadius: BorderRadius.circular(8),
-        hoverColor: AppColors.slate700,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive ? AppColors.indigo600 : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 20,
-                color: isActive ? Colors.white : AppColors.gray400,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: isActive ? FontWeight.w500 : FontWeight.w400,
-                  color: isActive ? Colors.white : AppColors.gray300,
+            const SizedBox(height: 12),
+            Expanded(
+              child: SingleChildScrollView(
+                child: AdminSidebarNav(
+                  destinations: AdminShell._destinations,
+                  currentPath: currentPath,
                 ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.gray50,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.gray200),
+              ),
+              child: Row(
+                children: [
+                  AdminUserAvatar(name: displayName, userId: userId, size: 42),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          displayName ?? 'Administrator',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(color: AppColors.gray900),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'System administrator',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.gray500),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

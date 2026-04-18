@@ -1,11 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:musheet_shared_ui/musheet_shared_ui.dart';
 
-/// Icon mappings from Material Icons to Lucide Icons
-/// This ensures consistent icon usage across the app matching Figma design
+/// App-local icon facade.
+///
+/// Shared MuSheet icon mappings live in
+/// [`MuSheetIcons`](packages/musheet_shared_ui/lib/src/branding_widgets.dart:7).
+/// App-only custom SVG widgets remain here.
 class AppIcons {
-  // Custom SVG Icons
+  AppIcons._();
+
+  static const home = MuSheetIcons.home;
+  static const homeOutlined = MuSheetIcons.homeOutlined;
+  static const libraryMusic = MuSheetIcons.libraryMusic;
+  static const libraryMusicOutlined = MuSheetIcons.libraryMusicOutlined;
+  static const people = MuSheetIcons.people;
+  static const peopleOutline = MuSheetIcons.peopleOutline;
+  static const settings = MuSheetIcons.settings;
+  static const settingsOutlined = MuSheetIcons.settingsOutlined;
+  static const setlistIcon = MuSheetIcons.setlistIcon;
+  static const add = MuSheetIcons.add;
+  static const close = MuSheetIcons.close;
+  static const search = MuSheetIcons.search;
+  static const edit = MuSheetIcons.edit;
+  static const delete = MuSheetIcons.delete;
+  static const share = MuSheetIcons.share;
+  static const check = MuSheetIcons.check;
+  static const copy = MuSheetIcons.copy;
+  static const chevronRight = MuSheetIcons.chevronRight;
+  static const chevronLeft = MuSheetIcons.chevronLeft;
+  static const chevronDown = MuSheetIcons.chevronDown;
+  static const chevronUp = MuSheetIcons.chevronUp;
+  static const keyboardArrowDown = MuSheetIcons.keyboardArrowDown;
+  static const arrowBack = MuSheetIcons.arrowBack;
+  static const arrowForward = MuSheetIcons.arrowForward;
+  static const arrowUp = MuSheetIcons.arrowUp;
+  static const arrowDown = MuSheetIcons.arrowDown;
+  static const sortAsc = MuSheetIcons.sortAsc;
+  static const sortDesc = MuSheetIcons.sortDesc;
+  static const listOrdered = MuSheetIcons.listOrdered;
+  static const clock = MuSheetIcons.clock;
+  static const alphabetical = MuSheetIcons.alphabetical;
+  static const calendarClock = MuSheetIcons.calendarClock;
+  static const musicNote = MuSheetIcons.musicNote;
+  static const metronome = MuSheetIcons.metronome;
+  static const playArrow = MuSheetIcons.playArrow;
+  static const play = MuSheetIcons.play;
+  static const stop = MuSheetIcons.stop;
+  static const pause = MuSheetIcons.pause;
+  static const mic = MuSheetIcons.mic;
+  static const micOff = MuSheetIcons.micOff;
+  static const speed = MuSheetIcons.speed;
+  static const playlistPlay = MuSheetIcons.playlistPlay;
+  static const piano = MuSheetIcons.piano;
+  static const keyboardMusic = MuSheetIcons.keyboardMusic;
+  static const drum = MuSheetIcons.drum;
+  static const guitar = MuSheetIcons.guitar;
+  static const circleSlash = MuSheetIcons.circleSlash;
+  static const person = MuSheetIcons.person;
+  static const rotateCcwKey = MuSheetIcons.rotateCcwKey;
+  static const undo = MuSheetIcons.undo;
+  static const redo = MuSheetIcons.redo;
+  static const autoFixHigh = MuSheetIcons.autoFixHigh;
+  static const dragHandle = MuSheetIcons.dragHandle;
+  static const rotateCcw = MuSheetIcons.rotateCcw;
+  static const rotateCw = MuSheetIcons.rotateCw;
+  static const pictureAsPdfOutlined = MuSheetIcons.pictureAsPdfOutlined;
+  static const upload = MuSheetIcons.upload;
+  static const notifications = MuSheetIcons.notifications;
+  static const notificationsOutlined = MuSheetIcons.notificationsOutlined;
+  static const email = MuSheetIcons.email;
+  static const accessTime = MuSheetIcons.accessTime;
+  static const trendingUp = MuSheetIcons.trendingUp;
+  static const bluetooth = MuSheetIcons.bluetooth;
+  static const cloud = MuSheetIcons.cloud;
+  static const cloudOff = MuSheetIcons.cloudOff;
+  static const helpOutline = MuSheetIcons.helpOutline;
+  static const infoOutline = MuSheetIcons.infoOutline;
+  static const globe = MuSheetIcons.globe;
+  static const fileText = MuSheetIcons.fileText;
+  static const star = MuSheetIcons.star;
+  static const bookOpen = MuSheetIcons.bookOpen;
+  static const mail = MuSheetIcons.mail;
+  static const bug = MuSheetIcons.bug;
+  static const lightbulb = MuSheetIcons.lightbulb;
+  static const refreshCw = MuSheetIcons.refreshCw;
+  static const refreshCcw = MuSheetIcons.refreshCcw;
+  static const sync = MuSheetIcons.sync;
+  static const wifi = MuSheetIcons.wifi;
+  static const wifiOff = MuSheetIcons.wifiOff;
+  static const workspacePremium = MuSheetIcons.workspacePremium;
+  static const fiberManualRecord = MuSheetIcons.fiberManualRecord;
+  static const camera = MuSheetIcons.camera;
+  static const image = MuSheetIcons.image;
+
   static Widget bassGuitar({double size = 24, Color? color}) {
     return SvgPicture.asset(
       'assets/icons/bass_guitar.svg',
@@ -16,7 +104,7 @@ class AppIcons {
           : null,
     );
   }
-  
+
   static Widget metronomeIcon({double size = 24, Color? color}) {
     return SvgPicture.asset(
       'assets/icons/metronome.svg',
@@ -27,115 +115,4 @@ class AppIcons {
           : null,
     );
   }
-  // Navigation (bottom bar)
-  static const home = LucideIcons.house;
-  static const homeOutlined = LucideIcons.house;
-  static const libraryMusic = LucideIcons.library;  // Library tab uses library building icon
-  static const libraryMusicOutlined = LucideIcons.library;
-  static const people = LucideIcons.users;
-  static const peopleOutline = LucideIcons.users;
-  static const settings = LucideIcons.settings;
-  static const settingsOutlined = LucideIcons.settings;
-  
-  // Setlist icon (used in Library tab's Setlists section and everywhere setlists appear)
-  static const setlistIcon = LucideIcons.listMusic;
-  
-  // Common Actions
-  static const add = LucideIcons.plus;
-  static const close = LucideIcons.x;
-  static const search = LucideIcons.search;
-  static const edit = LucideIcons.squarePen;
-  static const delete = LucideIcons.trash2;
-  static const share = LucideIcons.share2;
-  static const check = LucideIcons.check;
-  static const copy = LucideIcons.copy;
-  
-  // Navigation & Direction
-  static const chevronRight = LucideIcons.chevronRight;
-  static const chevronLeft = LucideIcons.chevronLeft;
-  static const chevronDown = LucideIcons.chevronDown;
-  static const chevronUp = LucideIcons.chevronUp;
-  static const keyboardArrowDown = LucideIcons.chevronDown;
-  static const arrowBack = LucideIcons.arrowLeft;
-  static const arrowForward = LucideIcons.arrowRight;
-  static const arrowUp = LucideIcons.arrowUp;
-  static const arrowDown = LucideIcons.arrowDown;
-  
-  // Sorting
-  static const sortAsc = LucideIcons.arrowUpNarrowWide;
-  static const sortDesc = LucideIcons.arrowDownWideNarrow;
-  static const listOrdered = LucideIcons.listOrdered;
-  static const clock = LucideIcons.clock;
-  static const alphabetical = LucideIcons.aLargeSmall;
-  static const calendarClock = LucideIcons.calendarClock;
-  
-  // Music & Media
-  static const musicNote = LucideIcons.music;
-  // metronome is now a Widget method (metronomeIcon) - kept for backwards compatibility
-  static const metronome = LucideIcons.drum;
-  static const playArrow = LucideIcons.play;
-  static const play = LucideIcons.play;
-  static const stop = LucideIcons.square;
-  static const pause = LucideIcons.pause;
-  static const mic = LucideIcons.mic;
-  static const micOff = LucideIcons.micOff;
-  static const speed = LucideIcons.gauge;
-  static const playlistPlay = LucideIcons.listMusic;
-  static const piano = LucideIcons.piano;
-  static const keyboardMusic = LucideIcons.piano;
-  static const drum = LucideIcons.drum;
-  static const guitar = LucideIcons.guitar;
-  static const circleSlash = LucideIcons.circleSlash;
-  
-  // People & User
-  static const person = LucideIcons.user;
-  static const rotateCcwKey = LucideIcons.rotateCcwKey;  // For password change
-  
-  // Editing & Drawing
-  static const undo = LucideIcons.undo;
-  static const redo = LucideIcons.redo;
-  static const autoFixHigh = LucideIcons.eraser;
-  static const dragHandle = LucideIcons.gripVertical;
-  static const rotateCcw = LucideIcons.rotateCcw;
-  static const rotateCw = LucideIcons.rotateCw;
-  
-  // Files & Documents
-  static const pictureAsPdfOutlined = LucideIcons.fileText;
-  static const upload = LucideIcons.upload;
-  
-  // Communication
-  static const notifications = LucideIcons.bell;
-  static const notificationsOutlined = LucideIcons.bell;
-  static const email = LucideIcons.mail;
-  
-  // Time & Status
-  static const accessTime = LucideIcons.clock;
-  static const trendingUp = LucideIcons.trendingUp;
-  
-  // Settings & System
-  static const bluetooth = LucideIcons.bluetooth;
-  static const cloud = LucideIcons.cloud;
-  static const cloudOff = LucideIcons.cloudOff;
-  static const helpOutline = LucideIcons.handHelping;
-  static const infoOutline = LucideIcons.info;
-  static const globe = LucideIcons.globe;
-  static const fileText = LucideIcons.fileText;
-  static const star = LucideIcons.star;
-  static const bookOpen = LucideIcons.bookOpen;
-  static const mail = LucideIcons.mail;
-  static const bug = LucideIcons.bug;
-  static const lightbulb = LucideIcons.lightbulb;
-  static const refreshCw = LucideIcons.refreshCw;
-  static const refreshCcw = LucideIcons.refreshCcw;
-  static const sync = LucideIcons.refreshCcw;
-  static const wifi = LucideIcons.wifi;
-  static const wifiOff = LucideIcons.wifiOff;
-  
-  // Special
-  static const workspacePremium = LucideIcons.award;
-  static const fiberManualRecord = LucideIcons.circle;
-
-  // Camera & Images
-  static const camera = LucideIcons.camera;
-  static const image = LucideIcons.image;
 }
